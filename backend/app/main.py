@@ -186,6 +186,17 @@ from app.routers import jql as jql_router  # noqa: E402
 app.include_router(jql_router.router)
 from app.routers import packages as packages_router  # noqa: E402
 app.include_router(packages_router.router)
+
+
+from app.packages.requirements import MissingPrerequisite  # noqa: E402
+
+
+@app.exception_handler(MissingPrerequisite)
+async def _missing_package(_request, exc: MissingPrerequisite):
+    """An import a workspace is not ready for: said as what to install, wherever the import runs."""
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=422, content={"detail": {
+        "error": str(exc), "code": exc.code, "capability": exc.capability, "install": exc.offered_by}})
 app.include_router(mcp.router)
 app.include_router(groups.router)
 app.include_router(icons.router)

@@ -12,6 +12,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+
+from app.packages.install import install
 from sqlalchemy import select
 
 from app.db import Base, SessionLocal, engine
@@ -339,6 +341,8 @@ def test_pages_become_typed_documents_with_a_published_revision(confluence_stub)
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
     db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
+    db.flush()
     db.add(Schema(uid=f"sc-{suffix}", workspace_id=ws, name="Cameras"))
     db.flush()
     db.add(Asset(uid=f"as-{suffix}", workspace_id=ws, schema_uid=f"sc-{suffix}",
@@ -385,6 +389,8 @@ def test_reimporting_an_unchanged_page_adds_no_revision(confluence_stub):
 
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
+    db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
     db.commit()
     db.close()
 
@@ -410,6 +416,8 @@ def test_an_edited_page_supersedes_the_previous_revision(confluence_stub):
 
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
+    db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
     db.commit()
     db.close()
     _run(ws, confluence_stub)
@@ -445,6 +453,8 @@ def test_a_wrong_base_url_names_the_context_path(confluence_stub):
     ws = f"ws-{suffix}"
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
+    db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
     db.commit()
     db.close()
 
@@ -474,6 +484,8 @@ def _workspace() -> str:
     ws = f"ws-{suffix}"
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
+    db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
     db.commit()
     db.close()
     return ws

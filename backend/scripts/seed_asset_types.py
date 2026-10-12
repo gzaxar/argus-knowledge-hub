@@ -14,13 +14,15 @@ The catalogue has two sets, seeded separately.
 
   all       everything in one workspace, for a hub that has only one.
 
-Safe to run again: an existing type keeps every attribute it has and gains any it
-lacks, a type the EPIK8s importers made is adopted rather than duplicated, and a
-type seeded under a former name (Equipment Item, Place) is renamed in place. Run
-it before or after an import; the result is the same.
+It installs the accelerator package (backend/packages/accelerator) through the package
+installer, so the workspace's record says which version it has; core-facility comes with
+it when missing. Safe to run again: the version a workspace has already changes nothing;
+a newer one adds what the workspace lacks (an existing type keeps every attribute it has),
+a type the EPIK8s importers made is adopted rather than duplicated, and a type seeded under
+a former name (Equipment Item, Place) is renamed in place. Imports no longer install it:
+a workspace needs it before an EPIK8s or PBS import.
 
-Nothing here runs when a workspace is created: a workspace that only holds
-tickets has no use for object types in its tree.
+The same is on the workspace's Packages page in the web app.
 
 Usage (from anywhere, with the backend's virtualenv and DATABASE_URL set):
   python backend/scripts/seed_asset_types.py global   <catalogue_workspace> [--dry-run]
@@ -79,7 +81,7 @@ def main() -> None:
 
     from app.db import SessionLocal
     from app.models.workspace import Workspace
-    from app.services.asset_types import ensure_asset_types
+    from app.packages import install as installer
 
     db = SessionLocal()
     try:
@@ -87,31 +89,30 @@ def main() -> None:
             if name and db.get(Workspace, name) is None:
                 print(f"No workspace {name!r}.")
                 sys.exit(1)
+        run = installer.plan if dry_run else installer.install
+        kwargs = {} if dry_run else {"actor": "seed_asset_types.py"}
         try:
-            result = ensure_asset_types(db, workspace, scope=mode, catalogue_workspace_id=catalogue)
-            from app.packages.install import note_seeded
-            note_seeded(db, workspace, "accelerator", how="seeded", actor="seed_asset_types.py",
-                        options={"scope": mode, **({"catalogue_workspace_id": catalogue} if catalogue else {})})
-        except ValueError as e:                    # includes CatalogueMissing
+            plan = run(db, workspace, ["accelerator"], catalogue_workspace_id=catalogue,
+                       scope="global" if mode == "global" else None, **kwargs)
+        except installer.PackageProblem as e:
             print(e)
             db.rollback()
             sys.exit(1)
         where = f"in {workspace!r}" + (f", hanging from {catalogue!r}" if catalogue else "")
-        print(f"{mode}: created {len(result.created)}, adopted {len(result.adopted)}, "
-              f"renamed {len(result.renamed)}, extended {len(result.extended)} {where}")
-        if result.iconed:
-            print(f"  default icons given to {len(result.iconed)} types that had none")
-        if result.renamed:
-            print("  renamed in place: " + ", ".join(result.renamed))
-        if result.reused:
-            print(f"  used from the catalogue, which shares them ({len(result.reused)}): "
-                  + ", ".join(result.reused))
-        if result.adopted:
-            print("  adopted (made by an importer, now under the catalogue): "
-                  + ", ".join(result.adopted))
-        if result.duplicates:
-            print("  already had a type of the same name that is not the catalogue's — "
-                  "left alone, and now there are two: " + ", ".join(result.duplicates))
+        for step in plan.steps:
+            r = step.result or {}
+            if step.action == "unchanged":
+                print(f"{step.package_id} {step.version}: already installed {where}, nothing to do")
+                continue
+            print(f"{step.package_id} {step.version}: {step.action}"
+                  + (f" from {step.from_version}" if step.from_version else "")
+                  + f", created {len(r.get('created') or [])}, extended {len(r.get('extended') or [])} {where}")
+            for label, key in (("renamed in place", "renamed"), ("adopted (made by an importer, now under the "
+                               "catalogue)", "adopted"), ("used from the catalogue, which shares them", "reused"),
+                               ("already had a type of the same name that is not the catalogue's — left alone",
+                                "duplicates")):
+                if r.get(key):
+                    print(f"  {label}: " + ", ".join(r[key]))
         if mode == "global":
             print("  Shared: its types, and so every object made from them. Documents here "
                   "are shared only once the workspace is flagged global (Administration).")

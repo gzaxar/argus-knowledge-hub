@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from app.models.attachment import Attachment
 from app.models.document import Document, DocumentRelation, DocumentRevision
 from app.services.confluence_import import choose_document_type
-from app.services.document_types import ensure_document_types, type_uid
+from app.services.document_types import ensure_document_kinds, type_uid
 from app.services.drawings import (
     dwg_to_dxf,
     needs_conversion,
@@ -208,7 +208,7 @@ def import_markdown(
     contents = expand_uploads(files)
     markdown_paths = [p for p in contents if p.lower().endswith(MARKDOWN_SUFFIXES)]
 
-    type_uids = ensure_document_types(db, workspace_id)
+    type_uids = ensure_document_kinds(db, workspace_id)
     db.flush()
 
     documents = attachments = 0

@@ -74,13 +74,65 @@ self-contained, the shared catalogue, or hanging from one), and its history: `in
 
 - Reinstalling the version a workspace has, with the same checksum, changes nothing.
 - A package whose content changed without a new version is refused: raise the version.
-- A newer version is applied additively (what a workspace lacks is added; nothing it has is changed).
-  Renames, removals, type changes and tighter validation will need a reviewed upgrade with a migration plan.
+- A newer version goes through an **upgrade** (below).
 
 API: `GET /v1/packages`, `GET /v1/packages/{id}`, `POST /v1/packages/resolve`,
 `GET /v1/workspaces/{ws}/packages`, `POST /v1/workspaces/{ws}/packages/preview`,
 `POST /v1/workspaces/{ws}/packages/install` (workspace owners and administrators). Web: **New workspace →
 Starts from**, and the workspace's **Packages** page.
+
+## Upgrades
+
+Each version a workspace is given is kept as a snapshot (`package_snapshots`). Moving to a newer version
+compares three things — the snapshot, the newer version, and the workspace's definitions today (its local
+edits) — change by change (`app/packages/diff.py`):
+
+| Category | What | How it is applied |
+|---|---|---|
+| additive | a new type, attribute, option, kind, enumeration, class; a type that becomes concrete; an attribute that takes several values | by itself |
+| definition | a label, an option's label, a description, aliases | by itself, except where the workspace changed it itself |
+| breaking | a removal; a rename (an attribute's `renamed_from`, a type's `former_names`); an attribute's type or target changed; a type moved in the tree or no longer concrete; tighter validation (a pattern, unique, required, single-valued, an option removed) | only by a decision in the migration plan |
+
+The preview (`POST /v1/workspaces/{ws}/packages/preview`, or the Packages page) lists every change with the
+records it bears on, the values the newer definition would refuse, and whether it touches the workspace's
+own edits. The install then needs a decision for each breaking change, `apply` or `keep` (the workspace's
+definition stays), in `decisions`; without one, nothing is applied. Applying is refused while records hold
+values the newer definition would not accept — change them first, or keep. What applying does:
+
+- an attribute removed: its definition goes; the values records hold under it stay;
+- an attribute renamed: the definition is renamed and the values move to the new key on every record;
+- tighter validation, a new type: the new definition, when no record breaks it;
+- a type removed or no longer concrete: records can no longer be made of it; existing ones stay;
+- a type moved: its new parent; a type renamed: its new name, same uid;
+- an enumeration or option removed: removed; a class removed: no longer offered.
+
+A workspace's own edits are kept: an attribute it removed is not added back, a label it changed is not
+changed back. The upgrade's history entry keeps the plan's decisions, what each did, and the conflicts.
+A beamline workspace upgrades its machine's own types; the shared ones are upgraded in the catalogue
+workspace they come from.
+
+## Imports need packages; they never install them
+
+An importer declares the capabilities it needs (`provides` of a package) and `app/packages/requirements.py`
+checks them before anything is written. A workspace that lacks one is told what to install, and nothing is
+imported. Imports never install or rewrite definitions: a workspace's definitions change only through the
+installer, previewed and recorded.
+
+| Import | Needs | May still create |
+|---|---|---|
+| EPIK8s configuration (web and `scripts/import_epik8s.py`) | `accelerator-catalogue` | its own `epik8s-…` types when the catalogue has none of that name |
+| PBS workbook (`scripts/import_pbs.py`) | `accelerator-catalogue` | — |
+| Jira issues | `tickets` | a ticket kind for each issue type the data names that the workspace lacks |
+| Confluence, Markdown, Olog | `documents` | a missing core document kind it classifies into |
+
+The base ticket and document types' fields are no longer rewritten by an import (they were reset to the
+release's on every import, losing local edits). A workspace given its definitions before the record began is
+recognised when an import first asks (recorded as `detected`), not reinstalled. What an import's own data
+names — a Jira issue type, an Insight object type, the type a source record states — is the data's, and may
+still be created; a catalogue package never is.
+
+The automatic catalogue fallback (`asset_types.ensure_for_import`: adopt the only catalogue there was, or put
+the whole catalogue in the workspace) is gone.
 
 ## Parity
 

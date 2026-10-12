@@ -15,6 +15,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+
+from app.packages.install import install
 from sqlalchemy import select
 
 from app.db import Base, SessionLocal, engine
@@ -169,6 +171,8 @@ def test_imports_issues_with_comments_and_is_idempotent(jira_stub):
 
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
+    db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
     db.commit()
     db.close()
 
@@ -222,6 +226,8 @@ def test_pagination_fetches_every_page(jira_stub):
 
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
+    db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
     db.commit()
     db.close()
 
@@ -244,6 +250,8 @@ def test_a_ticket_naming_an_asset_key_is_linked_to_it(jira_stub):
 
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
+    db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
     db.flush()
     db.add(Schema(uid=f"sc-{suffix}", workspace_id=ws, name="Cameras"))
     db.flush()
@@ -282,6 +290,8 @@ def test_link_assets_can_be_turned_off(jira_stub):
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
     db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
+    db.flush()
     db.add(Schema(uid=f"sc-{suffix}", workspace_id=ws, name="Cameras"))
     db.flush()
     db.add(Asset(uid=f"as-{suffix}", workspace_id=ws, schema_uid=f"sc-{suffix}",
@@ -308,6 +318,8 @@ def test_a_failing_search_marks_the_job_failed(jira_stub):
     ws = f"ws-{suffix}"
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
+    db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
     db.commit()
     db.close()
 
@@ -353,6 +365,8 @@ def test_a_context_path_is_found_rather_than_404ing(context_path_stub):
 
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
+    db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
     db.commit()
     db.close()
 
@@ -412,6 +426,8 @@ def test_standard_jira_fields_are_captured(jira_stub):
 
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
+    db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
     db.commit()
     db.close()
 
@@ -450,13 +466,15 @@ def test_a_ticket_type_is_created_per_jira_issue_type(jira_stub):
     ws = f"ws-{suffix}"
     _JiraStub.issues = [
         _issue(f"LNF-{suffix}-1", "A task", "Open", "new", issuetype="Task"),
-        _issue(f"LNF-{suffix}-2", "A bug", "Open", "new", issuetype="Bug"),
+        _issue(f"LNF-{suffix}-2", "An incident", "Open", "new", issuetype="Incident"),
         _issue(f"LNF-{suffix}-3", "Another task", "Open", "new", issuetype="Task"),
     ]
     _JiraStub.comments = {}
 
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
+    db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
     db.commit()
     db.close()
 
@@ -474,15 +492,17 @@ def test_a_ticket_type_is_created_per_jira_issue_type(jira_stub):
     children = db.scalars(
         select(Schema).where(Schema.parent_schema_uid == base.uid)
     ).all()
-    assert {c.name for c in children} == {"Task", "Bug"}, "only types actually present"
+    from app.services.ticket_types import DEFAULT_ISSUE_TYPES
+    # The workspace's own kinds (core-facility), and the one the data named that it lacked: nothing else.
+    assert {c.name for c in children} == set(DEFAULT_ISSUE_TYPES) | {"Incident"}, "only types actually present"
     # Fields come from the parent, so a child adds none of its own.
     assert all(c.attributes == [] for c in children)
 
     task_uid = next(c.uid for c in children if c.name == "Task")
     assert db.get(Issue, f"{ws}:LNF-{suffix}-1").schema_uid == task_uid
     assert db.get(Issue, f"{ws}:LNF-{suffix}-3").schema_uid == task_uid
-    bug_uid = next(c.uid for c in children if c.name == "Bug")
-    assert db.get(Issue, f"{ws}:LNF-{suffix}-2").schema_uid == bug_uid
+    incident_uid = next(c.uid for c in children if c.name == "Incident")
+    assert db.get(Issue, f"{ws}:LNF-{suffix}-2").schema_uid == incident_uid
     db.close()
 
 
@@ -499,6 +519,8 @@ def test_a_reimport_moves_legacy_keys_onto_the_argus_ones(jira_stub):
 
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
+    db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
     db.flush()
     db.add(Issue(
         uid=f"{ws}:{key}", workspace_id=ws, title="Camera offline", state="new",

@@ -8,9 +8,9 @@
   what was applied; its history (`PackageInstallation`) every install, upgrade, seeding by an import, and
   the packages found already in place when the record began (`detected`).
 
-Applying a package is today's seeding, fed from the package (Phase 2 kept it byte-for-byte): additive,
-so a newer version of a package only adds what a workspace lacks. Renames, removals and type changes need
-the reviewed upgrade path (docs/packages.md), not this one.
+Installing a package is today's seeding, fed from the package (Phase 2 kept it byte-for-byte). Moving to a
+newer version goes through app/packages/upgrade.py: additive and definition changes by themselves, each
+breaking one by a decision in the migration plan, all recorded.
 """
 from __future__ import annotations
 
@@ -192,7 +192,7 @@ def _steps(db: Session, workspace_id: str, package_ids: list[str]) -> list[tuple
 # --------------------------------------------------------------------------- planning and installing
 
 def _run(db: Session, workspace_id: str, package_ids: list[str], *, catalogue_workspace_id: Optional[str],
-         scope: Optional[str], actor: Optional[str], keep: bool) -> Plan:
+         scope: Optional[str], actor: Optional[str], keep: bool, decisions: Optional[dict] = None) -> Plan:
     if db.get(Workspace, workspace_id) is None:
         raise PackageProblem(f"no workspace {workspace_id!r}")
     steps = _steps(db, workspace_id, package_ids)
@@ -207,7 +207,13 @@ def _run(db: Session, workspace_id: str, package_ids: list[str], *, catalogue_wo
             if step.action == "unchanged":
                 continue
             own = options if p.id == defaults.ACCELERATOR else {}
-            step.result = APPLIERS[p.id](db, workspace_id, own)
+            if step.action == "upgrade":
+                from app.packages import upgrade
+                own = installed(db, workspace_id)[p.id].options or {}
+                step.result = upgrade.apply(db, workspace_id, p, decisions) if keep else \
+                    upgrade.preview(db, workspace_id, p, decisions)
+            else:
+                step.result = APPLIERS[p.id](db, workspace_id, own)
             if keep:
                 _record(db, workspace_id, p, step.action, step.from_version, own, step.result, actor)
         db.flush()
@@ -224,23 +230,24 @@ def _run(db: Session, workspace_id: str, package_ids: list[str], *, catalogue_wo
 
 
 def plan(db: Session, workspace_id: str, package_ids: list[str], *, catalogue_workspace_id: Optional[str] = None,
-         scope: Optional[str] = None) -> Plan:
+         scope: Optional[str] = None, decisions: Optional[dict] = None) -> Plan:
     """What installing these packages would do, applied and rolled back: nothing is kept."""
     from app.services.asset_types import CatalogueMissing
     try:
         return _run(db, workspace_id, package_ids, catalogue_workspace_id=catalogue_workspace_id, scope=scope,
-                    actor=None, keep=False)
+                    actor=None, keep=False, decisions=decisions)
     except (CatalogueMissing, ValueError) as e:
         raise PackageProblem(str(e)) from None
 
 
 def install(db: Session, workspace_id: str, package_ids: list[str], *, actor: Optional[str] = None,
-            catalogue_workspace_id: Optional[str] = None, scope: Optional[str] = None) -> Plan:
+            catalogue_workspace_id: Optional[str] = None, scope: Optional[str] = None,
+            decisions: Optional[dict] = None) -> Plan:
     """Install (or upgrade to) these packages and what they depend on, all or nothing. The caller commits."""
     from app.services.asset_types import CatalogueMissing
     try:
         return _run(db, workspace_id, package_ids, catalogue_workspace_id=catalogue_workspace_id, scope=scope,
-                    actor=actor, keep=True)
+                    actor=actor, keep=True, decisions=decisions)
     except (CatalogueMissing, ValueError) as e:
         raise PackageProblem(str(e)) from None
 
@@ -254,49 +261,51 @@ def _record(db: Session, workspace_id: str, p: Package, action: str, from_versio
         db.add(row)
     row.version, row.checksum, row.installed_at, row.installed_by = p.version, p.checksum, now(), actor
     row.options = options or None
+    from app.packages.upgrade import snapshot
+    snapshot(db, p)
     db.add(PackageInstallation(workspace_id=workspace_id, package_id=p.id, action=action, from_version=from_version,
                                to_version=p.version, checksum=p.checksum, result=result, actor=actor, at=now()))
 
 
-def note_seeded(db: Session, workspace_id: str, package_id: str, *, options: Optional[dict] = None,
-                actor: Optional[str] = None, how: str = "seeded") -> None:
-    """Seeding that did not go through the installer (an import, the seeding script) put this package's
-    current definitions in the workspace: the record says so, so it stays exact."""
-    p = available().get(package_id)
-    if p is None or db.get(Workspace, workspace_id) is None:
-        return
-    row = installed(db, workspace_id).get(package_id)
-    if row is not None and row.version == p.version and row.checksum == p.checksum:
-        return
-    _record(db, workspace_id, p, how, row.version if row else None, options or {}, None, actor)
-    db.flush()
+def detect_workspace(db: Session, ws: str) -> int:
+    """Record the packages one workspace evidently has but no record names (core facility when it has the
+    base ticket type; the accelerator catalogue when it has the catalogue's root type, or hangs from a
+    catalogue that has), as `detected`, at the version this release ships. Installs nothing. Returns how
+    many it recorded."""
+    from app.services import asset_types
+    from app.services.ticket_types import BASE_UID_SUFFIX
+    have = installed(db, ws)
+    n = 0
+    if defaults.CORE not in have and db.get(Schema, f"{ws}:{BASE_UID_SUFFIX}") is not None:
+        _record(db, ws, available()[defaults.CORE], "detected", None, {}, None, None)
+        n += 1
+    if defaults.ACCELERATOR not in have:
+        own_root = db.get(Schema, asset_types.type_uid(ws, asset_types.ROOT_NAME))
+        hangs_from = asset_types.catalogue_of(db, ws)
+        if own_root is not None or hangs_from:
+            if hangs_from:
+                options = {"scope": asset_types.SCOPE_BEAMLINE, "catalogue_workspace_id": hangs_from}
+            elif own_root.is_global:
+                options = {"scope": asset_types.SCOPE_GLOBAL}
+            else:
+                options = {"scope": asset_types.SCOPE_ALL}
+            _record(db, ws, available()[defaults.ACCELERATOR], "detected", None, options, None, None)
+            n += 1
+    if n:
+        db.flush()
+    return n
 
 
 def detect(db: Session) -> int:
-    """Begin the record for workspaces made before it: the packages each one evidently has (core facility when
-    it has the base ticket type; the accelerator catalogue when it has the catalogue's root type, or hangs
-    from a catalogue that has). Recorded as `detected`, at the version this release ships. Idempotent."""
-    from app.services import asset_types
-    from app.services.ticket_types import BASE_UID_SUFFIX
-    n = 0
-    for ws in db.scalars(select(Workspace.id)):
-        have = installed(db, ws)
-        if defaults.CORE not in have and db.get(Schema, f"{ws}:{BASE_UID_SUFFIX}") is not None:
-            _record(db, ws, available()[defaults.CORE], "detected", None, {}, None, None)
-            n += 1
-        if defaults.ACCELERATOR not in have:
-            own_root = db.get(Schema, asset_types.type_uid(ws, asset_types.ROOT_NAME))
-            hangs_from = asset_types.catalogue_of(db, ws)
-            if own_root is not None or hangs_from:
-                if hangs_from:
-                    options = {"scope": asset_types.SCOPE_BEAMLINE, "catalogue_workspace_id": hangs_from}
-                elif own_root.is_global:
-                    options = {"scope": asset_types.SCOPE_GLOBAL}
-                else:
-                    options = {"scope": asset_types.SCOPE_ALL}
-                _record(db, ws, available()[defaults.ACCELERATOR], "detected", None, options, None, None)
-                n += 1
-    db.flush()
+    """Begin the record for every workspace made before it (detect_workspace), and keep the definitions of
+    each version in use that this release ships (what a later upgrade compares against). Idempotent."""
+    n = sum(detect_workspace(db, ws) for ws in list(db.scalars(select(Workspace.id))))
+    from app.packages.upgrade import snapshot
+    shipped = available()
+    for row in db.scalars(select(WorkspacePackage)):
+        p = shipped.get(row.package_id)
+        if p is not None and p.checksum == row.checksum:
+            snapshot(db, p)
     return n
 
 

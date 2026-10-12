@@ -39,6 +39,13 @@ A workspace's types come from **template packages**, versioned definitions that 
   before anything changes; installing is all or nothing.
 - Installing the version a workspace already has changes nothing. A package holds definitions only, never
   records or site data.
+- **Upgrading** to a newer version (offered on the Packages page) lists every change first. New types, fields
+  and options go in by themselves; new wording too, except where the workspace changed it itself. Anything
+  that could break records — a field removed or renamed, tighter rules, fewer options, a type withdrawn —
+  needs a decision, *apply* or *keep this workspace's*, with the number of records it touches; applying is
+  refused while records would not satisfy it. The decisions are kept in the package history.
+- Imports need the packages their records use (an EPIK8s or PBS import needs the Accelerator catalogue): a
+  workspace without one is told what to install, and nothing is imported.
 
 ## The production installation
 

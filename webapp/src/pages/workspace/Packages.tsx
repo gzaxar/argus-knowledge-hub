@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { ApiError, packagesApi, type PackagePlan } from "../../api/client";
+import { ApiError, packagesApi, type PackageChange, type PackagePlan } from "../../api/client";
 import { contentsLine } from "../../components/PackagePicker";
 
 function problem(e: unknown): string {
@@ -35,12 +35,14 @@ export function WorkspacePackages() {
   const all = useQuery({ queryKey: ["packages"], queryFn: packagesApi.list });
   const [chosen, setChosen] = useState("");
   const [plan, setPlan] = useState<PackagePlan | null>(null);
-  const preview = useMutation({ mutationFn: () => packagesApi.preview(workspaceId, { packages: [chosen] }),
+  const [decisions, setDecisions] = useState<Record<string, "apply" | "keep">>({});
+  const preview = useMutation({ mutationFn: () => packagesApi.preview(workspaceId, { packages: [chosen], decisions }),
                                 onSuccess: setPlan });
   const install = useMutation({
-    mutationFn: () => packagesApi.install(workspaceId, { packages: [chosen] }),
+    mutationFn: () => packagesApi.install(workspaceId, { packages: [chosen], decisions }),
     onSuccess: () => {
       setPlan(null);
+      setDecisions({});
       setChosen("");
       queryClient.invalidateQueries({ queryKey: ["workspace-packages", workspaceId] });
       queryClient.invalidateQueries({ queryKey: ["schemas"] });
@@ -89,10 +91,14 @@ export function WorkspacePackages() {
         <div className="rounded border border-slate-200 bg-white p-4">
           <h2 className="text-sm font-semibold text-slate-900">Add a package</h2>
           <div className="mt-2 flex items-center gap-2">
-            <select value={chosen} onChange={(e) => { setChosen(e.target.value); setPlan(null); }}
+            <select value={chosen} onChange={(e) => { setChosen(e.target.value); setPlan(null); setDecisions({}); }}
                     className="rounded border border-slate-300 px-2 py-1.5 text-sm">
               <option value="">Choose…</option>
-              {offer.map((p) => <option key={p.id} value={p.id}>{p.name} {p.version} — {contentsLine(p)}</option>)}
+              {offer.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {have.has(p.id) ? "Upgrade: " : ""}{p.name} {p.version} — {contentsLine(p)}
+                </option>
+              ))}
             </select>
             <button type="button" disabled={!chosen || preview.isPending} onClick={() => preview.mutate()}
                     className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-50">
@@ -115,8 +121,15 @@ export function WorkspacePackages() {
                   </p>
                 );
               })}
+              {plan.steps.filter((s) => s.action === "upgrade").map((s) => (
+                <Upgrade key={s.package_id} changes={(s.result.changes as PackageChange[]) ?? []}
+                         decisions={decisions} onDecide={(id, v) => setDecisions({ ...decisions, [id]: v })} />
+              ))}
               {plan.options?.scope && <p className="text-xs text-slate-500">The object catalogue goes in {how(plan.options)}.</p>}
-              <button type="button" disabled={!plan.changes || install.isPending} onClick={() => install.mutate()}
+              <button type="button"
+                      disabled={!plan.changes || install.isPending || plan.steps.some((s) =>
+                        s.action === "upgrade" && ((s.result.needs_decision as string[]) ?? []).some((id) => !decisions[id]))}
+                      onClick={() => install.mutate()}
                       className="rounded bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
                 {install.isPending ? "Installing…" : plan.changes ? "Install" : "Nothing to install"}
               </button>
@@ -139,6 +152,56 @@ export function WorkspacePackages() {
           ))}
         </ul>
       </div>
+    </div>
+  );
+}
+
+
+const CATEGORY: Record<string, string> = {
+  additive: "Added — applied by itself",
+  definition: "Changed wording — applied where this workspace did not change it",
+  breaking: "Needs a decision",
+};
+
+/** An upgrade's changes, grouped; each breaking one with its records and the choice to apply or keep it. */
+function Upgrade({ changes, decisions, onDecide }: {
+  changes: PackageChange[];
+  decisions: Record<string, "apply" | "keep">;
+  onDecide: (id: string, v: "apply" | "keep") => void;
+}) {
+  return (
+    <div className="space-y-3 rounded border border-slate-200 p-3">
+      {(["breaking", "additive", "definition"] as const).map((cat) => {
+        const list = changes.filter((c) => c.category === cat);
+        if (!list.length) return null;
+        return (
+          <div key={cat}>
+            <h3 className="text-xs font-semibold uppercase text-slate-500">{CATEGORY[cat]} ({list.length})</h3>
+            <ul className="mt-1 space-y-1">
+              {list.map((c) => (
+                <li key={c.id} className="text-sm">
+                  <span className="text-slate-500">{c.subject}:</span> {c.detail}
+                  {c.records > 0 && <span className="text-xs text-slate-500"> · {c.records} record(s)</span>}
+                  {c.violations > 0 && (
+                    <span className="text-xs text-red-700"> · {c.violations} would not be accepted: change them first, or keep</span>
+                  )}
+                  {c.conflict && <span className="text-xs text-amber-700"> · {c.conflict}</span>}
+                  {cat === "breaking" && (
+                    <span className="ml-2 inline-flex gap-2 text-xs">
+                      {c.actions.map((a) => (
+                        <label key={a} className="flex items-center gap-1">
+                          <input type="radio" name={c.id} checked={decisions[c.id] === a} onChange={() => onDecide(c.id, a)} />
+                          {a === "apply" ? "apply" : "keep this workspace's"}
+                        </label>
+                      ))}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -221,17 +221,43 @@ def test_a_workspace_made_before_packages_is_recorded_once_from_what_it_has(ws):
     db.close()
 
 
-def test_an_import_that_seeds_the_catalogue_keeps_the_record_exact(ws):
+def test_an_import_requires_the_packages_it_needs_and_installs_none(ws):
+    from app.packages.requirements import MissingPrerequisite, require
+    from app.services.document_types import ensure_document_kinds
+    from app.services.ticket_types import ensure_ticket_kinds
     db = SessionLocal()
-    catalogue = f"{ws}-catalogue"
-    db.add(Workspace(id=catalogue, name=catalogue))
-    db.flush()
-    asset_types.ensure_asset_types(db, catalogue, scope=asset_types.SCOPE_GLOBAL)
-    asset_types.ensure_for_import(db, ws, catalogue_workspace_id=catalogue)
+    with pytest.raises(MissingPrerequisite, match="Install accelerator first"):
+        require(db, ws, "accelerator-catalogue")
+    with pytest.raises(MissingPrerequisite, match="Install core-facility first"):
+        ensure_ticket_kinds(db, ws, {"Incident"})
+    with pytest.raises(MissingPrerequisite):
+        ensure_document_kinds(db, ws)
+    assert _count(db, Schema, ws) == 0 and _count(db, WorkspacePackage, ws) == 0
+    db.rollback()
+
+    installer.install(db, ws, ["core-facility"])
     db.commit()
-    [step] = [h for h in installer.history(db, ws) if h.package_id == "accelerator"]
-    assert step.action == "seeded" and step.to_version == available()["accelerator"].version
-    assert installer.installed(db, ws)["accelerator"].options == {"scope": "beamline", "catalogue_workspace_id": catalogue}
+    base = db.get(Schema, f"{ws}:argus-ticket")
+    base.attributes = [a for a in base.attributes if a["key"] != "argus_votes"]   # a local edit
+    db.commit()
+    kinds = ensure_ticket_kinds(db, ws, {"Incident", "Task"})
+    db.commit()
+    assert set(kinds) == {"Incident", "Task"} and db.get(Schema, kinds["Incident"]).parent_schema_uid == base.uid
+    assert "argus_votes" not in {a["key"] for a in db.get(Schema, f"{ws}:argus-ticket").attributes}, \
+        "an import does not rewrite the base type's fields"
+    db.close()
+
+
+def test_a_workspace_given_the_catalogue_before_the_record_is_recognised_not_reinstalled(ws):
+    from app.packages.requirements import require
+    db = SessionLocal()
+    asset_types.ensure_asset_types(db, ws)
+    db.commit()
+    schemas = _count(db, Schema, ws)
+    require(db, ws, "accelerator-catalogue")
+    db.commit()
+    assert [(h.package_id, h.action) for h in installer.history(db, ws)] == [("accelerator", "detected")]
+    assert _count(db, Schema, ws) == schemas
     db.close()
 
 

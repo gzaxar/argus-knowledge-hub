@@ -1849,6 +1849,22 @@ export interface PackagesInput {
   packages: string[];
   catalogue_workspace_id?: string;
   scope?: string;
+  /** An upgrade's migration plan: for each breaking change, "apply" or "keep". */
+  decisions?: Record<string, "apply" | "keep">;
+}
+
+export interface PackageChange {
+  id: string;
+  category: "additive" | "definition" | "breaking";
+  area: string;
+  subject: string;
+  element: string | null;
+  what: string;
+  detail: string;
+  conflict: string | null;
+  records: number;
+  violations: number;
+  actions: ("apply" | "keep")[];
 }
 
 export const packagesApi = {

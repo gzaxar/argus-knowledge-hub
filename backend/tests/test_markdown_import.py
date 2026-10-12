@@ -9,6 +9,8 @@ import secrets
 import zipfile
 
 import pytest
+
+from app.packages.install import install
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -49,6 +51,8 @@ def token():
     db = SessionLocal()
     workspace_id = f"md-{secrets.token_hex(4)}"
     db.add(Workspace(id=workspace_id, name="Test"))
+    db.flush()
+    install(db, workspace_id, ["core-facility"])  # as the web makes one
     db.flush()
     raw = secrets.token_urlsafe(16)
     db.add(ApiToken(workspace_id=workspace_id, token_hash=hash_token(raw)))

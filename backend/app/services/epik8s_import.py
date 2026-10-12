@@ -72,6 +72,8 @@ from app.services import dns_convention
 from app.services.network_resolve import IPV4, NetworkIndex, short_host
 from app.services.relations import rebuild_asset_relations
 
+# The packages a workspace must have before an EPIK8s import (their `provides`).
+REQUIRES = ("accelerator-catalogue",)
 SOURCE = "epik8s"
 
 # The object types this import owns. Created on first run if they are not
@@ -1428,16 +1430,10 @@ def run_epik8s_import(
         # The revision, not the branch: a branch names whatever is newest, so
         # "which revision said so" needs the commit it pointed at when read.
         revision = _resolve_commit(provider, repo_url, pat, branch) or branch
-        # The catalogue's types first, as the CLI always did: a workspace nobody seeded imports too.
-        from app.services.asset_types import ensure_for_import
-        seeded, catalogue = ensure_for_import(db, workspace_id)
-        if seeded.catalogue_created:
-            _progress(db, job, f"The catalogue {catalogue} gained {len(seeded.catalogue_created)} shared type(s) "
-                               f"it lacked ({', '.join(seeded.catalogue_created[:5])})")
-        if seeded.created:
-            _progress(db, job, f"Seeded {len(seeded.created)} object type(s) of the catalogue"
-                               + (f" (hanging from {catalogue})" if catalogue else ""))
-        db.commit()
+        # The accelerator catalogue is a prerequisite, installed beforehand (the workspace's Packages page):
+        # an import never installs it (app/packages/requirements.py).
+        from app.packages.requirements import require
+        require(db, workspace_id, *REQUIRES)
         importer = _Importer(db, job, workspace_id, f"{repo_url}@{revision}:{path}",
                              infer_elements=infer_elements, it_workspace=it_workspace,
                              infer_controllers=infer_controllers, link_inventory=link_inventory)

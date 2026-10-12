@@ -7833,6 +7833,14 @@
             ],
             "title": "Catalogue Workspace Id"
           },
+          "decisions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Decisions",
+            "type": "object"
+          },
           "packages": {
             "items": {
               "type": "string"

@@ -142,6 +142,35 @@ def ensure_ticket_types(db: Session, workspace_id: str, issue_type_names: set[st
     return out
 
 
+def ensure_ticket_kinds(db: Session, workspace_id: str, names: set[str]) -> dict:
+    """The kinds of ticket an import's data names (a Jira project's issue types), under the workspace's base
+    ticket type: the missing ones are created, empty. Unlike `ensure_ticket_types` (the installer's), the
+    base type's fields are left as the workspace has them, and nothing is installed: a workspace without the
+    core-facility package is told to install it. Returns name -> schema uid for every kind asked for."""
+    from app.packages.requirements import MissingPrerequisite, providers, require
+    require(db, workspace_id, "tickets")
+    base_uid = f"{workspace_id}:{BASE_UID_SUFFIX}"
+    if db.get(Schema, base_uid) is None:
+        raise MissingPrerequisite(workspace_id, "tickets", providers("tickets"))
+    out: dict[str, str] = {}
+    created = False
+    for name in sorted(n for n in names if n):
+        child_uid = f"{base_uid}:{name.lower().replace(' ', '-')}"
+        if db.get(Schema, child_uid) is None:
+            db.add(Schema(uid=child_uid, workspace_id=workspace_id, name=name, applies_to="tickets",
+                          parent_schema_uid=base_uid, attributes=[], metadata_json={"source": "import"}))
+            created = True
+        out[name] = child_uid
+    db.flush()
+    if created:
+        from sqlalchemy import select as _select
+        from app.services import catalogue_icons
+        every = {s.name: s.uid for s in db.scalars(_select(Schema).where(Schema.workspace_id == workspace_id,
+                                                                        Schema.applies_to == "tickets"))}
+        catalogue_icons.apply(db, workspace_id, every, False, icon_of=catalogue_icons.ticket_icon)
+    return out
+
+
 def migrate_legacy_attributes(attributes: dict) -> dict:
     """Rewrite a ticket's attributes from the Jira-shaped keys onto the
     ARGUS ones, leaving anything else untouched. A value already under the

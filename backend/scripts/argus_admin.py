@@ -41,8 +41,6 @@ from app.models.api_token import ApiToken  # noqa: E402
 from app.models.role import Role, RoleBinding  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.models.workspace import Workspace  # noqa: E402
-from app.routers.workspaces import seed_default_global_values, seed_default_ticket_types  # noqa: E402
-from app.services.document_types import ensure_document_types  # noqa: E402
 from app.services.roles import ensure_system_roles  # noqa: E402
 
 # The workspaces the Keycloak test users are bound to (scripts/seed_dev_users.py).
@@ -108,9 +106,9 @@ def create_workspace(db, workspace_id: str, name: str, is_global: bool = False) 
     if created:
         db.add(Workspace(id=workspace_id, name=name, is_global=is_global))
         db.flush()
-    seed_default_global_values(db, workspace_id)
-    seed_default_ticket_types(db, workspace_id)
-    ensure_document_types(db, workspace_id)
+    # The core-facility package, through the installer (recorded); unchanged on a workspace that has it.
+    from app.packages.install import install
+    install(db, workspace_id, ["core-facility"], actor="argus-admin")
     return created
 
 

@@ -103,6 +103,37 @@ def ensure_document_types(
     return out
 
 
+def ensure_document_kinds(db: Session, workspace_id: str, names: set[str] | None = None) -> dict:
+    """The kinds of document an import classifies into (the core kinds unless named), under the workspace's
+    base document type: a missing one is created, empty. Unlike `ensure_document_types` (the installer's),
+    the base type's fields are left as the workspace has them, and nothing is installed: a workspace without
+    the core-facility package is told to install it. Returns name -> schema uid."""
+    from app.packages.requirements import MissingPrerequisite, providers, require
+    require(db, workspace_id, "documents")
+    base_uid = f"{workspace_id}:{BASE_UID_SUFFIX}"
+    if db.get(Schema, base_uid) is None:
+        raise MissingPrerequisite(workspace_id, "documents", providers("documents"))
+    wanted = {name: description for name, description in DEFAULT_DOCUMENT_TYPES} if names is None \
+        else {n: None for n in names if n}
+    out: dict[str, str] = {}
+    created = False
+    for name, description in wanted.items():
+        child_uid = type_uid(workspace_id, name)
+        if db.get(Schema, child_uid) is None:
+            db.add(Schema(uid=child_uid, workspace_id=workspace_id, name=name, description=description,
+                          applies_to="documents", parent_schema_uid=base_uid, attributes=[],
+                          metadata_json={"source": "argus" if names is None else "import"}))
+            created = True
+        out[name] = child_uid
+    db.flush()
+    if created:
+        from app.services import catalogue_icons
+        every = {s.name: s.uid for s in db.scalars(select(Schema).where(Schema.workspace_id == workspace_id,
+                                                                      Schema.applies_to == "documents"))}
+        catalogue_icons.apply(db, workspace_id, every, False, icon_of=catalogue_icons.document_icon)
+    return out
+
+
 def existing_document_type_uids(db: Session, workspace_id: str) -> list[str]:
     base_uid = f"{workspace_id}:{BASE_UID_SUFFIX}"
     return list(

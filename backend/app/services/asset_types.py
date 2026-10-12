@@ -213,7 +213,6 @@ class SeedResult:
     duplicates: list = field(default_factory=list)   # a same-named type that is not ours
     iconed: list = field(default_factory=list)       # given their default icon (catalogue_icons)
     reused: list = field(default_factory=list)       # a beamline type the catalogue already shares
-    catalogue_created: list = field(default_factory=list)  # shared types added to the catalogue first
 
 
 def _bound(attributes: list, uids: dict) -> list:
@@ -277,52 +276,6 @@ def catalogue_of(db: Session, workspace_id: str) -> Optional[str]:
     return max(set(homes), key=homes.count) if homes else None
 
 
-def ensure_for_import(db: Session, workspace_id: str,
-                      catalogue_workspace_id: Optional[str] = None) -> tuple[SeedResult, Optional[str]]:
-    """The types an importer writes, made available before it writes: what the CLI importers always did, and
-    every importer (web ones too) now does, so a workspace nobody seeded imports as well as a seeded one.
-
-    * a workspace already hanging from a catalogue is brought up to date against it;
-    * one seeded on its own (its own types, no catalogue) keeps being self-contained;
-    * one with no types: against the given catalogue, else the only global catalogue there is; with several,
-      the importer is told to choose rather than guess; with none, the whole catalogue goes in this workspace.
-
-    A catalogue seeded before a shared type existed (Observable came with the beam model) is brought up to
-    date first — additive, as seeding it again by hand would be — and the result says what it gained.
-
-    Returns the seed result and the catalogue used (None: self-contained)."""
-    catalogue = catalogue_workspace_id or catalogue_of(db, workspace_id)
-    if catalogue is None:
-        own = db.scalar(select(func.count()).select_from(Schema).where(
-            Schema.workspace_id == workspace_id, Schema.applies_to == "objects"))
-        if not own:
-            homes = sorted({w for w in db.scalars(select(Schema.workspace_id).where(
-                Schema.is_global.is_(True), Schema.applies_to == "objects", Schema.workspace_id != workspace_id))})
-            if len(homes) == 1:
-                catalogue = homes[0]
-            elif len(homes) > 1:
-                raise CatalogueMissing(
-                    f"workspace “{workspace_id}” has no object types yet, and there are several catalogues "
-                    f"({', '.join(homes)}): seed it against one first — `scripts/seed_asset_types.py beamline "
-                    f"{workspace_id} --catalogue <catalogue>`")
-    added: list = []
-    if catalogue:
-        shared = set(db.scalars(select(Schema.name).where(Schema.workspace_id == catalogue,
-                                                         Schema.applies_to == "objects")))
-        if any(n not in shared for n in GLOBAL_TYPES):
-            added = ensure_asset_types(db, catalogue, scope=SCOPE_GLOBAL).created
-    scope = SCOPE_BEAMLINE if catalogue else SCOPE_ALL
-    result = ensure_asset_types(db, workspace_id, scope=scope, catalogue_workspace_id=catalogue)
-    result.catalogue_created = added
-    # The record of which packages a workspace uses stays exact for what an import seeded (app.packages).
-    from app.packages.install import note_seeded
-    if added:
-        note_seeded(db, catalogue, "accelerator", how="seeded", options={"scope": SCOPE_GLOBAL})
-    note_seeded(db, workspace_id, "accelerator", how="seeded",
-                options={"scope": scope, **({"catalogue_workspace_id": catalogue} if catalogue else {})})
-    return result, catalogue
-
-
 def resolve_type_uids(db: Session, workspace_id: str,
                       catalogue_workspace_id: Optional[str] = None) -> dict:
     """name -> uid of every object type this workspace can use: its own first, then
@@ -352,13 +305,16 @@ def resolve_type_uids(db: Session, workspace_id: str,
 
 
 def ensure_asset_types(db: Session, workspace_id: str, scope: str = SCOPE_ALL,
-                       catalogue_workspace_id: Optional[str] = None) -> SeedResult:
+                       catalogue_workspace_id: Optional[str] = None,
+                       only: Optional[set] = None) -> SeedResult:
     """Create the catalogue, or bring it up to date.
 
     scope "all"      every type, in this one workspace (a single-workspace hub)
     scope "global"   the shared set, in the catalogue workspace, flagged global
     scope "beamline" the per-machine set, in this workspace, under global parents
                      found in `catalogue_workspace_id`
+
+    `only`: write just these types (an upgrade adding new ones), leaving every other type as it is.
 
     Idempotent and additive: types that exist keep their attributes and gain any
     they lack. A type the EPIK8s importers made (uid `epik8s-...`, no parent) is
@@ -423,6 +379,8 @@ def ensure_asset_types(db: Session, workspace_id: str, scope: str = SCOPE_ALL,
         result.uids[spec.name] = _uid_for(db, workspace_id, spec, others)
 
     for spec in specs:
+        if only is not None and spec.name not in only:
+            continue
         uid = result.uids[spec.name]
         parent_uid = result.uids[spec.parent] if spec.parent else None
         wanted = _bound(spec.attributes, result.uids)
@@ -478,6 +436,6 @@ def ensure_asset_types(db: Session, workspace_id: str, scope: str = SCOPE_ALL,
         db.flush()
     # Every type a picture: its own default, or its nearest ancestor's; never over one already chosen.
     from app.services import catalogue_icons
-    result.iconed = catalogue_icons.apply(db, workspace_id, {spec.name: result.uids[spec.name] for spec in specs},
-                                          share)
+    result.iconed = catalogue_icons.apply(db, workspace_id, {spec.name: result.uids[spec.name] for spec in specs
+                                                             if only is None or spec.name in only}, share)
     return result

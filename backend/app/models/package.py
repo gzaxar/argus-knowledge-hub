@@ -40,3 +40,18 @@ class PackageInstallation(Base):
     result: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)   # what it created and extended
     actor: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PackageSnapshot(Base):
+    """A package's definitions exactly as a workspace was given them: what an upgrade compares the newer
+    version with (and the workspace's own edits against)."""
+    __tablename__ = "package_snapshots"
+    __table_args__ = (UniqueConstraint("package_id", "checksum"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    package_id: Mapped[str] = mapped_column(String)
+    version: Mapped[str] = mapped_column(String)
+    checksum: Mapped[str] = mapped_column(String)
+    manifest: Mapped[dict] = mapped_column(JSONB)
+    sections: Mapped[dict] = mapped_column(JSONB)
+    recorded_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)

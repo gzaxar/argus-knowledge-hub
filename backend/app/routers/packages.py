@@ -23,6 +23,8 @@ class PackagesIn(BaseModel):
     catalogue_workspace_id: Optional[str] = None
     # for the accelerator catalogue: "global" makes this workspace the catalogue others hang from
     scope: Optional[str] = None
+    # an upgrade's migration plan: for each breaking change (by id), "apply" or "keep"
+    decisions: dict[str, str] = {}
 
 
 def _may_read(db: Session, identity: Identity, workspace_id: str) -> None:
@@ -118,7 +120,7 @@ def preview_install(workspace_id: str, body: PackagesIn, identity=Depends(get_id
     _may_install(db, identity, workspace_id)
     try:
         plan = installer.plan(db, workspace_id, body.packages, catalogue_workspace_id=body.catalogue_workspace_id,
-                              scope=body.scope)
+                              scope=body.scope, decisions=body.decisions)
     except installer.PackageProblem as e:
         db.rollback()
         raise HTTPException(status_code=422, detail={"error": str(e), "code": "package"})
@@ -135,7 +137,8 @@ def install_packages(workspace_id: str, body: PackagesIn, identity=Depends(get_i
     actor = identity.user.id if isinstance(identity, OidcIdentity) else "api-token"
     try:
         plan = installer.install(db, workspace_id, body.packages, actor=actor,
-                                 catalogue_workspace_id=body.catalogue_workspace_id, scope=body.scope)
+                                 catalogue_workspace_id=body.catalogue_workspace_id, scope=body.scope,
+                                 decisions=body.decisions)
     except installer.PackageProblem as e:
         db.rollback()
         raise HTTPException(status_code=422, detail={"error": str(e), "code": "package"})

@@ -20,7 +20,7 @@ from app.models.import_job import ImportJob
 from app.models.issue import Issue, IssueComment, IssueHistory, IssueLink
 from app.services.import_merge import effective_strategy, should_write
 from app.services.ticket_types import (
-    ensure_ticket_types,
+    ensure_ticket_kinds,
     migrate_legacy_attributes,
 )
 from app.services.jira_import import (
@@ -577,7 +577,7 @@ def run_jira_issue_import(
             new_types = page_types - set(type_uids)
             if new_types:
                 type_uids.update(
-                    ensure_ticket_types(db, workspace_id, page_types | set(type_uids))
+                    ensure_ticket_kinds(db, workspace_id, page_types | set(type_uids))
                 )
                 db.commit()
 

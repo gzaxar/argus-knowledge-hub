@@ -96,11 +96,21 @@ def db():
 
 
 @pytest.fixture()
-def workspace(db):
+def bare(db):
+    """A workspace with no object catalogue."""
     ws = f"pbs-{secrets.token_hex(4)}"
     db.add(Workspace(id=ws, name="PBS"))
     db.commit()
     return ws
+
+
+@pytest.fixture()
+def workspace(db, bare):
+    """A workspace with the accelerator catalogue installed, self-contained: what a PBS import needs."""
+    from app.packages.install import install
+    install(db, bare, ["accelerator"])
+    db.commit()
+    return bare
 
 
 @pytest.fixture()
@@ -243,10 +253,11 @@ def test_running_it_twice_changes_nothing(db, workspace, facility):
 
 
 def test_a_dry_run_writes_nothing(db, workspace, facility):
+    types = db.query(Schema).filter(Schema.workspace_id == workspace).count()
     import_pbs(db, workspace, read_workbook(workbook(GOOD)), facility, "x.xlsx", dry_run=True)
     db.expire_all()
     assert not assets(db, workspace) and not edges(db, workspace)
-    assert db.query(Schema).filter(Schema.workspace_id == workspace).count() == 0
+    assert db.query(Schema).filter(Schema.workspace_id == workspace).count() == types
 
 
 def test_a_re_read_leaves_what_a_person_has_since_decided(db, workspace, facility):
@@ -265,6 +276,10 @@ def test_a_re_read_leaves_what_a_person_has_since_decided(db, workspace, facilit
 def test_a_key_that_belongs_to_another_workspace_is_named_not_clobbered(db, facility):
     a, b = f"pbs-{secrets.token_hex(4)}", f"pbs-{secrets.token_hex(4)}"
     db.add_all([Workspace(id=a, name="A"), Workspace(id=b, name="B")])
+    db.commit()
+    from app.packages.install import install
+    for w in (a, b):
+        install(db, w, ["accelerator"])
     db.commit()
     import_pbs(db, a, read_workbook(workbook(GOOD)), facility, "x.xlsx")
     with pytest.raises(ValueError, match="already exists in workspace"):
@@ -309,17 +324,20 @@ def test_the_real_workbook_reads_and_imports(db, workspace, facility):
                                     exclude_uid=obj.uid, skip_unique=True, skip_reference=True), obj.key
 
 
-def test_with_a_shared_catalogue_only_the_beamlines_own_types_are_made_here(db, workspace, facility):
+def test_with_a_shared_catalogue_only_the_beamlines_own_types_are_made_here(db, bare, facility):
+    from app.packages.install import install
     from app.services import asset_types as at
+    workspace = bare
     cat = f"pbs-cat-{secrets.token_hex(4)}"
     db.add(Workspace(id=cat, name="Catalogue"))
     db.commit()
-    at.ensure_asset_types(db, cat, scope="global")
+    install(db, cat, ["accelerator"], scope="global")
+    install(db, workspace, ["accelerator"], catalogue_workspace_id=cat)
     db.commit()
 
     import_pbs(db, workspace, read_workbook(workbook(GOOD)), facility, "x.xlsx",
                catalogue_workspace_id=cat)
-    made_here = {s.name for s in db.query(Schema).filter(Schema.workspace_id == workspace)}
+    made_here = {s.name for s in db.query(Schema).filter(Schema.workspace_id == workspace, Schema.applies_to == "objects")}
     assert made_here == set(at.BEAMLINE_TYPES)                    # no copy of the shared ones
 
     objs = assets(db, workspace)
@@ -332,19 +350,18 @@ def test_with_a_shared_catalogue_only_the_beamlines_own_types_are_made_here(db, 
     assert objs[f"{facility}:AREA:MHX3"].schema_uid == at.type_uid(cat, "Area")
 
 
-def test_a_shared_catalogue_that_is_not_there_is_named(db, workspace, facility):
-    from app.services import asset_types as at
-    empty = f"pbs-cat-{secrets.token_hex(4)}"
-    db.add(Workspace(id=empty, name="Empty"))
-    db.commit()
-    with pytest.raises(at.CatalogueMissing):
-        import_pbs(db, workspace, read_workbook(workbook(GOOD)), facility, "x.xlsx",
-                   catalogue_workspace_id=empty)
+def test_an_import_into_a_workspace_without_the_catalogue_is_refused_and_writes_nothing(db, bare, facility):
+    from app.packages.requirements import MissingPrerequisite
+    with pytest.raises(MissingPrerequisite, match="Install accelerator first"):
+        import_pbs(db, bare, read_workbook(workbook(GOOD)), facility, "x.xlsx")
     db.rollback()
+    assert db.query(Schema).filter(Schema.workspace_id == bare).count() == 0
+    assert not assets(db, bare)
 
 
-def test_a_beamline_workspace_keeps_using_its_catalogue_without_being_told(db, workspace, facility):
+def test_a_beamline_workspace_keeps_using_its_catalogue_without_being_told(db, bare, facility):
     from app.services import asset_types as at
+    workspace = bare
     cat = f"pbs-cat-{secrets.token_hex(4)}"
     db.add(Workspace(id=cat, name="Catalogue"))
     db.commit()

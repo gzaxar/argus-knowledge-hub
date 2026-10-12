@@ -24,7 +24,7 @@ KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 ATTRIBUTE_TYPES = {"string", "text", "integer", "float", "boolean", "date", "datetime", "enumeration", "user",
                    "group", "reference"}
 ATTRIBUTE_KEYS = {"key", "name", "type", "required", "indexed", "multi", "unique", "readonly", "options",
-                  "option_set", "reference", "include_children", "regex"}
+                  "option_set", "reference", "include_children", "regex", "renamed_from"}
 OPTION_KEYS = {"id", "value", "responsible", "meaning"}
 TYPE_KEYS = {"name", "parent", "description", "abstract", "aliases", "icon", "behaviors", "map_layer", "locatable",
              "attributes"}
@@ -109,6 +109,10 @@ def _attributes(report: _Report, section: str, where: str, attrs, sets: dict, ty
         if key in keys:
             report.add(section, at, "duplicate attribute key")
         keys.add(key)
+        if a.get("renamed_from") is not None and (not KEY.match(str(a["renamed_from"])) or a["renamed_from"] == key):
+            report.add(section, at, "renamed_from names the attribute's previous key")
+        if a.get("renamed_from") and any(isinstance(b, dict) and b.get("key") == a["renamed_from"] for b in attrs):
+            report.add(section, at, f"renamed_from {a['renamed_from']!r} is still an attribute here")
         kind = a.get("type", "string")
         if kind not in ATTRIBUTE_TYPES:
             report.add(section, at, f"unsupported type {kind!r} (one of {', '.join(sorted(ATTRIBUTE_TYPES))})")

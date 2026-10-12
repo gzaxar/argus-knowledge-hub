@@ -44,15 +44,15 @@ def main(argv: list[str]) -> None:
     from app.models.schema import Schema
     from app.models.workspace import Workspace
     from app.services import beam_model as bm
-    from app.services.asset_types import ensure_asset_types
 
     db = SessionLocal()
     if db.get(Workspace, ws) is None:
         print(f"no workspace {ws}: tools/argus-admin workspace create {ws} first")
         sys.exit(1)
-    seeded = ensure_asset_types(db, ws)
+    from app.packages.install import install
+    plan = install(db, ws, ["accelerator"], actor="beam_model_demo.py")
     db.commit()
-    print(f"types: {len(seeded.created)} created")
+    print("packages: " + ", ".join(f"{s.package_id} {s.version} {s.action}" for s in plan.steps))
     awaiting = False
     for name in ("dafne_accumulator.json", "linac.json", "laser_transport.json", "ring.beam.json",
                  "transfer.beam.json", "aperture.beam.json", "collider_ir.beam.json"):

@@ -24,7 +24,7 @@ camera, a BPM's electronics, an LLRF chassis, a modulator. They are read from th
 device metadata (devgroup, devfunc, devtype, template) and, for magnets, from the LNF
 name code; a channel neither says anything about is counted and reported, not guessed
 at. Each is marked `inferred` and says why, keeps anything a person adds to it, and
-needs the catalogue's types (seeded first).
+needs the catalogue's types (the accelerator package, installed first).
 
 Each Access Point says what kind of endpoint it is (a serial converter, a host, an
 instrument, a camera), read from the class prefix of INFN's DNS naming convention and, for
@@ -43,11 +43,8 @@ With --infer-elements, --infer-controllers also makes the controller box each IO
 address) instead of inferring a twin, as a proposal to confirm under Channels ↔ hardware.
 Asking the AI about unrecognised channels is in the web import only.
 
-The types are seeded first if they are not there (asset_types.ensure_for_import, as the
-web import does): with --catalogue the shared ones are used where they are and only
-this beamline's own are created here; a workspace already seeded against a catalogue
-keeps using it; one with no types hangs from the only catalogue there is (and is told
-to choose when there are several); a self-contained one stays so. Run it again after the file changes: it updates what the file says and
+The workspace must have the accelerator catalogue first (the workspace's Packages page, or
+scripts/seed_asset_types.py): an import does not install it, and stops saying so. Run it again after the file changes: it updates what the file says and
 leaves what has been added since.
 
 Usage (from anywhere, with the backend's virtualenv and DATABASE_URL set):
@@ -101,7 +98,6 @@ def main() -> None:
     from app.db import SessionLocal, engine
     from app.models.import_job import ImportJob
     from app.models.workspace import Workspace
-    from app.services.asset_types import CatalogueMissing, ensure_for_import
     from app.services.epik8s_import import _Importer
     from app.services.relations import rebuild_asset_relations
 
@@ -135,12 +131,15 @@ def main() -> None:
             if name and db.get(Workspace, name) is None:
                 print(f"No workspace {name!r}.")
                 sys.exit(1)
+        # The accelerator catalogue first, explicitly: an import does not install it.
+        from app.packages.requirements import require
+        from app.services.epik8s_import import REQUIRES
         try:
-            seeded, catalogue = ensure_for_import(db, workspace_id, catalogue)
-        except (CatalogueMissing, ValueError) as e:
-            print(e)
+            require(db, workspace_id, *REQUIRES)
+        except ValueError as e:
+            print(f"{e}\n(or: python backend/scripts/seed_asset_types.py beamline {workspace_id} "
+                  f"--catalogue <catalogue>)")
             sys.exit(1)
-        db.commit()
 
         job = ImportJob(uid=f"job-{secrets.token_hex(6)}", workspace_id=workspace_id,
                         source="epik8s")
@@ -166,11 +165,6 @@ def main() -> None:
 
         beamline = str(values.get("beamline") or "").strip() or "unknown"
         print(f"read {path}: beamline {beamline}")
-        if seeded.catalogue_created:
-            print(f"  (the catalogue {catalogue} gained {len(seeded.catalogue_created)} shared types first)")
-        if seeded.created:
-            where = f", hanging from {catalogue!r}" if catalogue else ""
-            print(f"  ({len(seeded.created)} types created first{where})")
         for name, n in sorted(importer.counts.items()):
             if n:
                 print(f"  {name:24s} {n}")

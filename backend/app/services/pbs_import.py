@@ -35,7 +35,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.asset import Asset, Relation
-from app.services.asset_types import SCOPE_ALL, SCOPE_BEAMLINE, catalogue_of, ensure_asset_types
+from app.services.asset_types import catalogue_of, resolve_type_uids
+
+# The packages a workspace must have before a PBS import (their `provides`).
+REQUIRES = ("accelerator-catalogue",)
 from app.services.relations import rebuild_asset_relations
 
 SOURCE_LABEL = "PBS workbook"
@@ -421,20 +424,14 @@ def import_pbs(db: Session, workspace_id: str, book: Workbook, facility: str,
     """Write a read workbook into a workspace. `facility` prefixes every key,
     because object keys are unique across the whole installation.
 
-    With `catalogue_workspace_id` the shared types are used where they are, and only
-    this beamline's own are created here. Without it, a workspace already seeded
-    against a catalogue keeps using it, and one that is not gets the whole catalogue,
-    which is right for a hub that has only one workspace."""
+    The workspace must have the accelerator catalogue (package `accelerator`), installed beforehand: the
+    import writes objects of its types and never installs them. With `catalogue_workspace_id` the shared
+    types are used from that catalogue; without it, from the one the workspace hangs from."""
+    # The accelerator catalogue is a prerequisite, installed beforehand: an import never installs it.
+    from app.packages.requirements import require
+    require(db, workspace_id, *REQUIRES)
     catalogue_workspace_id = catalogue_workspace_id or catalogue_of(db, workspace_id)
-    seeded = ensure_asset_types(
-        db, workspace_id,
-        scope=SCOPE_BEAMLINE if catalogue_workspace_id else SCOPE_ALL,
-        catalogue_workspace_id=catalogue_workspace_id)
-    from app.packages.install import note_seeded
-    note_seeded(db, workspace_id, "accelerator", how="seeded", options={
-        "scope": SCOPE_BEAMLINE if catalogue_workspace_id else SCOPE_ALL,
-        **({"catalogue_workspace_id": catalogue_workspace_id} if catalogue_workspace_id else {})})
-    w = _Writer(db, workspace_id, facility, source_ref, seeded.uids)
+    w = _Writer(db, workspace_id, facility, source_ref, resolve_type_uids(db, workspace_id, catalogue_workspace_id))
     w.warnings.extend(book.warnings)
 
     packages = {c: w.upsert("Work Package", f"{facility}:WP:{c}", f"{c} {d or ''}".strip(),
@@ -526,5 +523,4 @@ def import_pbs(db: Session, workspace_id: str, book: Workbook, facility: str,
         db.rollback()
     else:
         db.commit()
-    return PbsResult(counts=counts, warnings=w.warnings,
-                     seeded=[f"{len(seeded.created)} types created"] if seeded.created else [])
+    return PbsResult(counts=counts, warnings=w.warnings)

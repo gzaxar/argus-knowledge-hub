@@ -1,7 +1,7 @@
 ---
 title: Importing data
 summary: Bringing equipment, tickets and documents in from EPIK8s, Jira, Confluence, Git and Markdown; re-running imports; mapping imported records.
-keywords: [import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
+keywords: [prerequisite, missing package, install the catalogue, import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
 order: 50
 ---
 
@@ -26,15 +26,27 @@ runs. **New** starts one. Choose the source:
 A configuration is saved with a name and can be **run again** whenever the source changes; each run
 records what it read (for Git sources, the commit).
 
+## What a workspace needs before an import
+
+An import writes records of the types the workspace already has; it never installs types. An **EPIK8s** or
+**PBS** import needs the **Accelerator catalogue** package; Jira, Confluence, Markdown and Olog imports need
+**Core facility** (every workspace made in the web app has it). If the workspace lacks it, the import stops
+before writing anything and says which package to install: install it on the workspace's **Packages** page
+(at the bottom of the side bar), preview first, then import again. An import still creates the kinds its
+own data names (a Jira issue type the workspace lacks), never a whole catalogue, and leaves the fields of
+the workspace's ticket and document types as they are.
+
 ## Import an EPIK8s configuration, step by step
 
-1. **Imports → New → EPIK8s control**.
-2. **Configuration name**: for example `epik8s-btf`.
-3. **Provider** (GitHub or GitLab), **Repository URL** (for example
+1. The workspace has the **Accelerator catalogue** (its **Packages** page). Hanging from a catalogue
+   workspace, it shares that one's equipment, products and locations.
+2. **Imports → New → EPIK8s control**.
+3. **Configuration name**: for example `epik8s-btf`.
+4. **Provider** (GitHub or GitLab), **Repository URL** (for example
    `https://baltig.infn.it/lnf-da-control/epik8s-btf.git`), **Branch** (`main`) and the path of the
    values file (`deploy/values.yaml`). **Personal access token**: only for a private repository; leave
    it blank for a public one.
-4. Options:
+5. Options:
    - **Infer equipment and lattice elements (rules)**: also make what the channels drive, which the file
      never lists: magnets and their supplies, ion pumps, cameras, BPMs, screens, mirrors… They are
      marked *inferred*; a person's later edits are kept on the next run under the default merge strategy
@@ -46,7 +58,7 @@ records what it read (for Git sources, the commit).
      queue.
    - **IT workspace for converters, servers and their ports**: optionally, a shared workspace where the
      serial converters and servers the hostnames name are made, once for all beamlines.
-5. Save and run. The run page shows progress, then the counts and any warnings.
+6. Save and run. The run page shows progress, then the counts and any warnings.
 
 Notes:
 - The workspace gets the catalogue's types automatically the first time.

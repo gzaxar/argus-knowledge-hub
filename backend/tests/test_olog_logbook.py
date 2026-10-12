@@ -9,6 +9,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+
+from app.packages.install import install
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -62,6 +64,8 @@ def facility():
     ws = f"olog-{t}"
     db = SessionLocal()
     db.add(Workspace(id=ws, name="BTF"))
+    db.flush()
+    install(db, ws, ["core-facility"])  # as the web makes one
     db.flush()
     db.add(Schema(uid=f"{ws}:magnet", workspace_id=ws, name="Magnet", applies_to="objects"))
     db.flush()

@@ -174,17 +174,43 @@ def unseeded(monkeypatch):
     db.close()
 
 
-def test_the_web_import_seeds_a_workspace_nobody_seeded_as_the_cli_does(unseeded):
+def _fails(w, **options) -> str:
     db = SessionLocal()
-    others = {w for w in db.scalars(__import__("sqlalchemy").select(Schema.workspace_id).where(
-        Schema.is_global.is_(True), Schema.workspace_id != unseeded["cat"]))}
+    uid = str(uuid.uuid4())
+    db.add(ImportJob(uid=uid, workspace_id=w["ws"], source="epik8s"))
+    db.commit()
     db.close()
-    if others:
-        pytest.skip(f"another catalogue exists in this database ({sorted(others)}): the import would ask which")
+    epik8s_import.run_epik8s_import(uid, w["ws"], "github", "https://git.example/x", None, **options)
+    db = SessionLocal()
+    job = db.get(ImportJob, uid)
+    db.close()
+    assert job.status == "failed"
+    return job.error or ""
+
+
+def _install(w, catalogue=None):
+    from app.packages.install import install
+    db = SessionLocal()
+    install(db, w["ws"], ["accelerator"], catalogue_workspace_id=catalogue)
+    db.commit()
+    db.close()
+
+
+def test_an_import_into_a_workspace_without_the_catalogue_imports_nothing_and_says_what_to_install(unseeded):
+    """Imports no longer install the catalogue behind the workspace's back (the old fallback adopted the only
+    catalogue there was, or put the whole of it in the workspace): the workspace is told to install it."""
+    error = _fails(unseeded, infer_elements=True)
+    assert "accelerator catalogue" in error and "Install accelerator first" in error
+    db = SessionLocal()
+    assert db.query(Schema).filter(Schema.workspace_id == unseeded["ws"]).count() == 0
+    assert db.query(Asset).filter(Asset.workspace_id == unseeded["ws"]).count() == 0
+    db.close()
+
+
+def test_once_installed_against_its_catalogue_the_import_uses_the_shared_types_where_they_are(unseeded):
+    _install(unseeded, catalogue=unseeded["cat"])
     run(unseeded, infer_elements=True)
     db = SessionLocal()
-    job = db.query(ImportJob).filter(ImportJob.workspace_id == unseeded["ws"]).one()
-    assert job.status == "completed", job.error
     # Its own beamline types hang from the catalogue; the shared ones are used where they are.
     assert at.catalogue_of(db, unseeded["ws"]) == unseeded["cat"]
     usable = at.resolve_type_uids(db, unseeded["ws"])
@@ -195,51 +221,30 @@ def test_the_web_import_seeds_a_workspace_nobody_seeded_as_the_cli_does(unseeded
     db.close()
 
 
-def test_seeding_for_an_import_picks_the_right_catalogue(unseeded):
-    db = SessionLocal()
-    try:
-        # Several catalogues and no types: the importer is told to choose, not left to guess.
-        other = f"cat2-{secrets.token_hex(3)}"
-        db.add(Workspace(id=other, name=other))
-        db.flush()
-        at.ensure_asset_types(db, other, scope=at.SCOPE_GLOBAL)
-        with pytest.raises(at.CatalogueMissing) as e:
-            at.ensure_for_import(db, unseeded["ws"])
-        assert unseeded["cat"] in str(e.value) and other in str(e.value)
-        # Named explicitly, it hangs from that one; seeded again later, it keeps using it.
-        _seeded, used = at.ensure_for_import(db, unseeded["ws"], unseeded["cat"])
-        assert used == unseeded["cat"]
-        assert at.ensure_for_import(db, unseeded["ws"])[1] == unseeded["cat"]
-    finally:
-        db.rollback()
-        db.close()
-
-
-def test_a_self_contained_workspace_stays_self_contained(world):
-    db = SessionLocal()
-    try:
-        result, used = at.ensure_for_import(db, world["ws"])
-        assert used is None and not result.created          # already whole: nothing new, no catalogue imposed
-    finally:
-        db.rollback()
-        db.close()
-
-
-def test_a_catalogue_seeded_before_a_shared_type_existed_is_brought_up_to_date(unseeded):
-    """bugs/importing-epik8s.txt, second report: the catalogue lacked Observable (added by the beam model)."""
+def test_installing_against_a_catalogue_that_lacks_a_shared_type_says_which_and_applies_nothing(unseeded):
+    """bugs/importing-epik8s.txt, second report: a catalogue lacking Observable. The fallback quietly added it
+    to the catalogue workspace; now the catalogue is brought up to date by its own administrators."""
+    from app.packages.install import PackageProblem, install
     db = SessionLocal()
     try:
         obs = db.query(Schema).filter(Schema.workspace_id == unseeded["cat"], Schema.name == "Observable").one()
         db.delete(obs)
         db.flush()
-        result, used = at.ensure_for_import(db, unseeded["ws"], unseeded["cat"])
-        assert used == unseeded["cat"] and result.catalogue_created == ["Observable"]
-        assert "Quadrupole" in result.created
-        assert db.query(Schema).filter(Schema.workspace_id == unseeded["cat"], Schema.name == "Observable",
-                                       Schema.is_global.is_(True)).count() == 1
+        with pytest.raises(PackageProblem, match="Observable"):
+            install(db, unseeded["ws"], ["accelerator"], catalogue_workspace_id=unseeded["cat"])
     finally:
         db.rollback()
         db.close()
+
+
+def test_a_workspace_seeded_before_the_record_began_imports_as_before(world):
+    """The world fixture puts the catalogue in directly (as workspaces made before packages had it): the
+    import records it as detected and goes ahead."""
+    run(world, infer_elements=True)
+    from app.packages.install import history
+    db = SessionLocal()
+    assert {(h.package_id, h.action) for h in history(db, world["ws"])} >= {("accelerator", "detected")}
+    db.close()
 
 
 # --- an overlay file (values-linac.yaml) -------------------------------------------------------------
@@ -277,12 +282,7 @@ def test_an_overlay_takes_its_beamline_and_template_defaults_from_values_yaml(un
         return {"deploy/values.yaml": BASE, "deploy/values-linac.yaml": OVERLAY}[path].replace(
             "BEAMLINE", unseeded["tag"].lower())
     monkeypatch.setattr(epik8s_import, "_fetch", fetch)
-    db = SessionLocal()
-    others = {w for w in db.scalars(__import__("sqlalchemy").select(Schema.workspace_id).where(
-        Schema.is_global.is_(True), Schema.workspace_id != unseeded["cat"]))}
-    db.close()
-    if others:
-        pytest.skip(f"another catalogue exists in this database ({sorted(others)})")
+    _install(unseeded, catalogue=unseeded["cat"])
     run(unseeded, path="deploy/values-linac.yaml", infer_elements=True)
     assert fetched == ["deploy/values-linac.yaml", "deploy/values.yaml"]
     db = SessionLocal()

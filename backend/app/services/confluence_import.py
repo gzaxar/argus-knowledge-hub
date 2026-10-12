@@ -25,7 +25,7 @@ from app.db import SessionLocal
 from app.models.attachment import Attachment
 from app.models.document import Document, DocumentRelation, DocumentRevision
 from app.models.import_job import ImportJob
-from app.services.document_types import ensure_document_types, type_uid
+from app.services.document_types import ensure_document_kinds, type_uid
 from app.services.import_merge import effective_strategy
 from app.services.jira_import import (
     _TimeoutSession,
@@ -521,7 +521,7 @@ def run_confluence_import(
             _set_progress(db, job, f"Confluence API found at {resolved}")
         base_url = resolved
 
-        type_uids = ensure_document_types(db, workspace_id)
+        type_uids = ensure_document_kinds(db, workspace_id)
         db.commit()
 
         # Asset keys mentioned in a page body become links, the same way

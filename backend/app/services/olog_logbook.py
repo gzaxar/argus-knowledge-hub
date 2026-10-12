@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.models.attachment import Attachment
 from app.models.document import Document, DocumentRelation, DocumentRevision
-from app.services.document_types import ensure_document_types, type_uid
+from app.services.document_types import ensure_document_kinds, type_uid
 
 KIND = "Logbook Entry"
 ATTACHMENTS_DIR = os.environ.get("ATTACHMENTS_DIR", "/data/attachments")
@@ -131,7 +131,7 @@ def upsert_entries(db: Session, workspace_id: str, facility: str, entries: list[
                    entry_url: Optional[str] = None, link_equipment: bool = True) -> dict:
     """Store a batch of Olog entries. Returns, per entry, what happened and which of its files are still
     needed (the sender uploads only those)."""
-    types = ensure_document_types(db, workspace_id)
+    types = ensure_document_kinds(db, workspace_id)
     doc_type = types.get(KIND) or type_uid(workspace_id, KIND)
     facility = (facility or "olog").strip()
     results, counts = [], {"created": 0, "updated": 0, "unchanged": 0, "rejected": 0}
