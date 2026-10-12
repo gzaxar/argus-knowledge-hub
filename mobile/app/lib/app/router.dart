@@ -12,6 +12,8 @@ import '../features/assets/asset_list_screen.dart';
 import '../features/graph/graph_record_screen.dart';
 import '../features/graph/graph_screen.dart';
 import '../features/search/query_screen.dart';
+import '../features/places/location_reviews_screen.dart';
+import '../features/places/nearby_screen.dart';
 import '../widgets/in_workspace.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/shell/app_shell.dart';
@@ -125,6 +127,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                   photoFirst: st.uri.queryParameters['photo'] == '1')),
       GoRoute(path: '/replace/:uid', builder: (_, st) => ReplaceScreen(positionUid: st.pathParameters['uid']!)),
       GoRoute(path: '/reviews', builder: (_, _) => const ReviewScreen()),
+      GoRoute(path: '/nearby', builder: (_, _) => const NearbyScreen()),
+      GoRoute(path: '/location-reviews', builder: (_, _) => const LocationReviewsScreen()),
       GoRoute(
           path: '/query',
           builder: (_, st) => QueryScreen(

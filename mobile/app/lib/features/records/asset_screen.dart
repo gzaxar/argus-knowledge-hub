@@ -5,6 +5,7 @@ import '../../domain/capture.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../widgets/follow_button.dart';
+import '../../widgets/location_section.dart';
 import '../../app/providers.dart';
 import '../../app/queue.dart';
 import '../../data/command_queue.dart';
@@ -232,6 +233,7 @@ class _AssetBodyState extends ConsumerState<_AssetBody> {
           ),
         ),
       ),
+      LocationSection(uid: a.uid),
       RelatedByMeaning(kind: RecordKind.asset, uid: a.uid),
       SectionHeader('Files', trailing: '${attachments.length}'),
       if (attachments.isEmpty) const ListTile(title: Text('No files yet.')),

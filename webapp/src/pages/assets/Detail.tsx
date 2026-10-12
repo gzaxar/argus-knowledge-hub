@@ -23,6 +23,8 @@ import { TransferItemAction } from "../../components/TransferItemAction";
 import { effectiveAttributes, inheritedKeys } from "../../lib/schemaAttributes";
 import { AssetContextPanel } from "../../components/hub/ContextPanels";
 import { SemanticRelated } from "../../components/SemanticRelated";
+import { LocationCard } from "../../components/LocationCard";
+import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
 import { FollowButton } from "../../components/FollowButton";
 import { useShowKeys } from "../../api/displayPrefs";
 
@@ -50,6 +52,7 @@ async function downloadAttachment(uid: string, filename: string) {
 }
 
 export function AssetDetail() {
+  const currentWorkspaceForLocation = useCurrentWorkspaceId();
   const showKeys = useShowKeys();
   const { uid } = useParams<{ uid: string }>();
   const queryClient = useQueryClient();
@@ -568,6 +571,8 @@ export function AssetDetail() {
             </button>
           </form>
         </SectionCard>
+
+        <LocationCard uid={a.uid} editable={a.workspace_id === currentWorkspaceForLocation} />
 
         <SectionCard title="Related by meaning">
           <SemanticRelated kind="asset" uid={a.uid} />

@@ -222,6 +222,8 @@ class ApiClient {
           return DecideIn.fromJson(value);
         case 'DecideReplacementIn':
           return DecideReplacementIn.fromJson(value);
+        case 'DecisionIn':
+          return DecisionIn.fromJson(value);
         case 'DeviceIn':
           return DeviceIn.fromJson(value);
         case 'DocumentCreate':
@@ -272,6 +274,8 @@ class ApiClient {
           return MentionedObject.fromJson(value);
         case 'MyWorkspaceOut':
           return MyWorkspaceOut.fromJson(value);
+        case 'ObservationIn':
+          return ObservationIn.fromJson(value);
         case 'OutcomeIn':
           return OutcomeIn.fromJson(value);
         case 'ReplaceIn':

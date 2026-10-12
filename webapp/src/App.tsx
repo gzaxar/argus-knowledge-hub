@@ -15,6 +15,7 @@ import { AssetDetail } from "./pages/assets/Detail";
 import { AssetForm } from "./pages/assets/Form";
 import { AssetSearch } from "./pages/assets/Search";
 import { AdvancedSearch } from "./pages/search/Advanced";
+import { MapPage } from "./pages/map/MapPage";
 import { DocumentDetail } from "./pages/documents/Detail";
 import { DocumentForm } from "./pages/documents/Form";
 import { DocumentList } from "./pages/documents/List";
@@ -99,6 +100,7 @@ export function App() {
 
           <Route path="/assets/search" element={<AssetSearch />} />
           <Route path="/search/advanced" element={<AdvancedSearch />} />
+          <Route path="/map" element={<MapPage />} />
           <Route path="/assets/new" element={<AssetForm />} />
           <Route path="/assets/:uid" element={<AssetDetail />} />
           <Route path="/assets/:uid/edit" element={<AssetForm />} />

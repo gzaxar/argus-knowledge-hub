@@ -1197,6 +1197,23 @@
         "title": "DecideReplacementIn",
         "type": "object"
       },
+      "DecisionIn": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "DecisionIn",
+        "type": "object"
+      },
       "DeviceIn": {
         "properties": {
           "app_version": {
@@ -3018,6 +3035,79 @@
           "can_approve_documents"
         ],
         "title": "MyWorkspaceOut",
+        "type": "object"
+      },
+      "ObservationIn": {
+        "properties": {
+          "accuracy_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy M"
+          },
+          "crs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crs"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          },
+          "latitude": {
+            "title": "Latitude",
+            "type": "number"
+          },
+          "longitude": {
+            "title": "Longitude",
+            "type": "number"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "title": "ObservationIn",
         "type": "object"
       },
       "OutcomeIn": {
@@ -5032,6 +5122,172 @@
         "summary": "Update Asset",
         "tags": [
           "assets"
+        ]
+      }
+    },
+    "/v1/assets/{uid}/location": {
+      "get": {
+        "description": "The record's approved location (or none), whether its type may have one and on which map layer, the\nhistory of its approved locations, and the field observations of it.",
+        "operationId": "get_location",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Location",
+        "tags": [
+          "locations"
+        ]
+      }
+    },
+    "/v1/assets/{uid}/location/observations": {
+      "post": {
+        "description": "Where someone saw the record (a phone's GPS fix and its accuracy). It never moves the record: it\nagrees with the approved location, or it waits for a person to review it.",
+        "operationId": "observe",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObservationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Observe",
+        "tags": [
+          "locations"
         ]
       }
     },
@@ -9427,6 +9683,260 @@
         ]
       }
     },
+    "/v1/location-reviews": {
+      "get": {
+        "description": "Field observations of this workspace's records waiting for a decision (or decided: status=…).",
+        "operationId": "location_reviews",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "pending",
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Location Reviews",
+        "tags": [
+          "locations"
+        ]
+      }
+    },
+    "/v1/location-reviews/{obs_id}/accept": {
+      "post": {
+        "description": "Accept an observation: it becomes the record's approved location (the previous one kept in history).",
+        "operationId": "accept_observation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "obs_id",
+            "required": true,
+            "schema": {
+              "title": "Obs Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Accept Observation",
+        "tags": [
+          "locations"
+        ]
+      }
+    },
+    "/v1/location-reviews/{obs_id}/reject": {
+      "post": {
+        "operationId": "reject_observation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "obs_id",
+            "required": true,
+            "schema": {
+              "title": "Obs Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reject Observation",
+        "tags": [
+          "locations"
+        ]
+      }
+    },
     "/v1/lookup/{identifier}": {
       "get": {
         "description": "A Jira key, an old Jira or Insight URL, an Insight key or objectId:\nthe ARGUS record it became, or where it can still be read.",
@@ -9502,6 +10012,153 @@
         "summary": "Lookup",
         "tags": [
           "lookup"
+        ]
+      }
+    },
+    "/v1/map/nearby": {
+      "get": {
+        "description": "The records within a distance of a point, nearest first, as GeoJSON with each one's distance.",
+        "operationId": "map_nearby",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "latitude",
+            "required": true,
+            "schema": {
+              "title": "Latitude",
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "longitude",
+            "required": true,
+            "schema": {
+              "title": "Longitude",
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "radius_m",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "exclusiveMinimum": 0.0,
+              "maximum": 100000.0,
+              "title": "Radius M",
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspaces",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspaces"
+            }
+          },
+          {
+            "in": "query",
+            "name": "types",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Types"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Map Nearby",
+        "tags": [
+          "locations"
         ]
       }
     },

@@ -253,7 +253,9 @@ def _add_types(db: Session, workspace_id: str, row: WorkspacePackage, new: Packa
         db.add(Schema(uid=uid, workspace_id=workspace_id, name=t.name, description=t.description,
                       applies_to="objects", is_concrete=not t.abstract,
                       parent_schema_uid=usable.get(t.parent) if t.parent else None, attributes=attrs,
-                      is_global=shared, metadata_json={"source": "argus", **({"aliases": t.aliases} if t.aliases else {})}))
+                      is_global=shared, metadata_json={"source": "argus", **({"aliases": t.aliases} if t.aliases else {}),
+                                                       **({"locatable": True} if t.locatable else {}),
+                                                       **({"map_layer": t.map_layer} if t.map_layer else {})}))
         db.flush()
         made[t.name] = uid
     every = {t.name: t for t in c.object_types(new, _shared_sets())}
@@ -330,8 +332,9 @@ def _apply_automatic(db: Session, workspace_id: str, row: WorkspacePackage, new:
             prop = ch.id.rsplit("/", 1)[-1]
             if prop == "description":
                 schema.description = ch.after["description"]
-            elif prop == "aliases":
-                schema.metadata_json = {**(schema.metadata_json or {}), "aliases": ch.after["aliases"]}
+            elif prop in ("aliases", "locatable", "map_layer"):
+                meta = {**(schema.metadata_json or {}), prop: ch.after[prop]}
+                schema.metadata_json = {k: v for k, v in meta.items() if v not in (None, False)}
             elif prop == "concrete":
                 schema.is_concrete = True
             done.append(ch.id)

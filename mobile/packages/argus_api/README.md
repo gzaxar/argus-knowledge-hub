@@ -128,6 +128,12 @@ Class | Method | HTTP request | Description
 *LedgerApi* | [**confirmReplacement**](doc//LedgerApi.md#confirmreplacement) | **POST** /v1/ledger/review/replacements/{conflict_id}/confirm | Confirm Replacement
 *LedgerApi* | [**myReviewItems**](doc//LedgerApi.md#myreviewitems) | **GET** /v1/ledger/review/mine | My Review Items
 *LedgerApi* | [**rejectReplacement**](doc//LedgerApi.md#rejectreplacement) | **POST** /v1/ledger/review/replacements/{conflict_id}/reject | Reject Replacement
+*LocationsApi* | [**acceptObservation**](doc//LocationsApi.md#acceptobservation) | **POST** /v1/location-reviews/{obs_id}/accept | Accept Observation
+*LocationsApi* | [**getLocation**](doc//LocationsApi.md#getlocation) | **GET** /v1/assets/{uid}/location | Get Location
+*LocationsApi* | [**locationReviews**](doc//LocationsApi.md#locationreviews) | **GET** /v1/location-reviews | Location Reviews
+*LocationsApi* | [**mapNearby**](doc//LocationsApi.md#mapnearby) | **GET** /v1/map/nearby | Map Nearby
+*LocationsApi* | [**observe**](doc//LocationsApi.md#observe) | **POST** /v1/assets/{uid}/location/observations | Observe
+*LocationsApi* | [**rejectObservation**](doc//LocationsApi.md#rejectobservation) | **POST** /v1/location-reviews/{obs_id}/reject | Reject Observation
 *LookupApi* | [**lookup**](doc//LookupApi.md#lookup) | **GET** /v1/lookup/{identifier} | Lookup
 *MetaApi* | [**apiMeta**](doc//MetaApi.md#apimeta) | **GET** /v1/meta/api | Api Meta
 *NotificationsApi* | [**followRecord**](doc//NotificationsApi.md#followrecord) | **PUT** /v1/notifications/following/{subject}/{uid} | Follow Record
@@ -178,6 +184,7 @@ Class | Method | HTTP request | Description
  - [CloseReviewIn](doc//CloseReviewIn.md)
  - [DecideIn](doc//DecideIn.md)
  - [DecideReplacementIn](doc//DecideReplacementIn.md)
+ - [DecisionIn](doc//DecisionIn.md)
  - [DeviceIn](doc//DeviceIn.md)
  - [DocumentCreate](doc//DocumentCreate.md)
  - [DocumentOut](doc//DocumentOut.md)
@@ -203,6 +210,7 @@ Class | Method | HTTP request | Description
  - [MeOut](doc//MeOut.md)
  - [MentionedObject](doc//MentionedObject.md)
  - [MyWorkspaceOut](doc//MyWorkspaceOut.md)
+ - [ObservationIn](doc//ObservationIn.md)
  - [OutcomeIn](doc//OutcomeIn.md)
  - [ReplaceIn](doc//ReplaceIn.md)
  - [RevokeIn](doc//RevokeIn.md)

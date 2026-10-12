@@ -76,6 +76,7 @@ class FakeArgus {
   /// What the person asked to hear about, per workspace.
   final Map<String, Map<String, dynamic>> subscriptions = {};
   final Set<String> following = {};
+  final List<Map<String, dynamic>> observations = [];
 
   /// Labels on records, by record uid: put on and taken off by the app.
   final Map<String, List<Map<String, dynamic>>> labels = {};
@@ -149,6 +150,42 @@ class FakeArgus {
         for (final (id, name) in [(workspaceId, 'Slice'), ('other-ws', 'Ring')])
           {'workspace_id': id, 'workspace_name': name, ...?subscriptions[id]},
       ]);
+    }
+    final located = RegExp(r'^/v1/assets/([^/]+)/location$').firstMatch(p);
+    if (located != null && m == 'GET') {
+      return _json({'uid': located.group(1), 'locatable': true, 'map_layer': 'equipment', 'hidden': false,
+        'location': {'uid': 'f1', 'latitude': 41.8217, 'longitude': 12.6726, 'accuracy_m': 3, 'source': 'manual',
+          'confirmed_at': '2026-10-12T09:00:00Z', 'valid_from': '2026-10-12T09:00:00Z', 'state': 'confirmed'},
+        'history': [], 'observations': observations});
+    }
+    final observing = RegExp(r'^/v1/assets/([^/]+)/location/observations$').firstMatch(p);
+    if (observing != null && m == 'POST') {
+      final b = body();
+      final o = {'id': observations.length + 1, 'subject_uid': observing.group(1), 'latitude': b['latitude'],
+        'longitude': b['longitude'], 'accuracy_m': b['accuracy_m'], 'status': 'pending', 'distance_m': 829.4,
+        'observed_at': '2026-10-12T10:00:00Z'};
+      observations.add(o);
+      return _json(o, 201);
+    }
+    if (p == '/v1/map/nearby' && m == 'GET') {
+      return _json({'type': 'FeatureCollection', 'features': [
+        {'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [12.6826, 41.8219]}, 'properties': {
+          'uid': ionPumpUid, 'key': 'S7C415E:AST:IP-07', 'name': 'Ion pump 7', 'type': 'Ion Pump',
+          'workspace_id': workspaceId, 'map_layer': 'equipment', 'distance_m': 12.3}},
+      ]});
+    }
+    if (p == '/v1/location-reviews' && m == 'GET') {
+      return _json([
+        for (final o in observations.where((o) => o['status'] == 'pending'))
+          {...o, 'record': {'uid': ionPumpUid, 'key': 'S7C415E:AST:IP-07', 'name': 'Ion pump 7', 'type': 'Ion Pump'},
+            'approved': {'latitude': 41.8217, 'longitude': 12.6726, 'accuracy_m': 3}},
+      ]);
+    }
+    final deciding = RegExp(r'^/v1/location-reviews/(\d+)/(accept|reject)$').firstMatch(p);
+    if (deciding != null && m == 'POST') {
+      final o = observations.firstWhere((o) => '${o['id']}' == deciding.group(1));
+      o['status'] = deciding.group(2) == 'accept' ? 'accepted' : 'rejected';
+      return _json(o);
     }
     final follow = RegExp(r'^/v1/notifications/following/(asset|document)/([^/]+)$').firstMatch(p);
     if (follow != null) {

@@ -1879,3 +1879,105 @@ export const packagesApi = {
   install: (workspaceId: string, input: PackagesInput) =>
     request<PackagePlan>(`/v1/workspaces/${workspaceId}/packages/install`, { method: "POST", body: json(input) }),
 };
+
+/** Places: approved locations, field observations and their review, the map (backend services/spatial). */
+export interface PlacedFeature {
+  uid: string;
+  latitude: number;
+  longitude: number;
+  accuracy_m: number | null;
+  source: string;
+  valid_from: string | null;
+  valid_until: string | null;
+  state: string;
+  confirmed_by: string | null;
+  confirmed_at: string | null;
+  reviewer: string | null;
+  note: string | null;
+}
+
+export interface LocationObservation {
+  id: number;
+  subject_uid: string;
+  latitude: number;
+  longitude: number;
+  accuracy_m: number | null;
+  observed_at: string | null;
+  observed_by: string | null;
+  status: "consistent" | "pending" | "accepted" | "rejected";
+  distance_m: number | null;
+  decided_by: string | null;
+  note: string | null;
+  record?: { uid: string; key: string; name: string; type: string };
+  approved?: PlacedFeature | null;
+}
+
+export interface AssetLocationView {
+  uid: string;
+  locatable: boolean;
+  map_layer: string | null;
+  hidden: boolean;
+  location: PlacedFeature | null;
+  history: PlacedFeature[];
+  observations: LocationObservation[];
+}
+
+export interface MapFeature {
+  type: "Feature";
+  id: string;
+  geometry: { type: "Point"; coordinates: [number, number] };
+  properties: { uid: string; key: string; name: string; type: string; workspace_id: string; status: string;
+                map_layer: string | null; accuracy_m: number | null; source: string; distance_m?: number };
+}
+
+export interface MapFilters {
+  workspaces?: string[];
+  types?: string[];
+  status?: string[];
+}
+
+function mapQuery(filters: MapFilters): string {
+  const q = new URLSearchParams();
+  if (filters.workspaces?.length) q.set("workspaces", filters.workspaces.join(","));
+  if (filters.types?.length) q.set("types", filters.types.join(","));
+  if (filters.status?.length) q.set("status", filters.status.join(","));
+  return q.toString();
+}
+
+export const placesApi = {
+  location: (uid: string) => request<AssetLocationView>(`/v1/assets/${uid}/location`),
+  setLocation: (uid: string, input: { latitude: number; longitude: number; accuracy_m?: number; note?: string }) =>
+    request<PlacedFeature>(`/v1/assets/${uid}/location`, { method: "PUT", body: json(input) }),
+  removeLocation: (uid: string) => request<void>(`/v1/assets/${uid}/location`, { method: "DELETE" }),
+  reviews: (status = "pending") => request<LocationObservation[]>(`/v1/location-reviews?status=${status}`),
+  decide: (id: number, accept: boolean, note?: string) =>
+    request<LocationObservation>(`/v1/location-reviews/${id}/${accept ? "accept" : "reject"}`,
+                                 { method: "POST", body: json({ note }) }),
+  features: (bbox: [number, number, number, number], filters: MapFilters) =>
+    request<{ type: "FeatureCollection"; features: MapFeature[]; truncated: boolean }>(
+      `/v1/map/features?bbox=${bbox.map((n) => n.toFixed(6)).join(",")}&${mapQuery(filters)}`),
+  nearby: (latitude: number, longitude: number, radius: number, filters: MapFilters) =>
+    request<{ type: "FeatureCollection"; features: MapFeature[] }>(
+      `/v1/map/nearby?latitude=${latitude}&longitude=${longitude}&radius_m=${radius}&${mapQuery(filters)}`),
+  layers: () => request<{ id: string; name: string; description?: string; package: string }[]>("/v1/map/layers"),
+  /** A CSV or (Geo)JSON file of locations: dry_run says what would happen, row by row. */
+  importLocations: (file: File, dryRun: boolean) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<LocationImport>(`/v1/locations/import?dry_run=${dryRun}`, { method: "POST", body: form });
+  },
+};
+
+export interface LocationImport {
+  dry_run: boolean;
+  counts: { set: number; to_review: number; consistent: number; rejected: number };
+  rows: { row: number; identifier: string; outcome: string; problem?: string; distance_m?: number;
+          record?: { uid: string; key: string; name: string } }[];
+}
+
+/** The map's background: OpenStreetMap unless the installation names its own tile server. */
+export const MAP_TILES = {
+  url: import.meta.env.VITE_MAP_TILES_URL || "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  attribution: import.meta.env.VITE_MAP_TILES_ATTRIBUTION ||
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+};

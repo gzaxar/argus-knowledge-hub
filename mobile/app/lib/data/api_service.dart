@@ -198,6 +198,7 @@ class ApiService {
   api.UploadsApi uploads(api.ApiClient c) => api.UploadsApi(c);
   api.NotificationsApi notifications(api.ApiClient c) => api.NotificationsApi(c);
   api.SearchApi search(api.ApiClient c) => api.SearchApi(c);
+  api.LocationsApi locations(api.ApiClient c) => api.LocationsApi(c);
   api.GlobalValuesApi globalValues(api.ApiClient c) => api.GlobalValuesApi(c);
   api.SchemasApi schemas(api.ApiClient c) => api.SchemasApi(c);
   api.AiApi ai(api.ApiClient c) => api.AiApi(c);

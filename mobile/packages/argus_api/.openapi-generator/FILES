@@ -19,6 +19,7 @@ lib/api/intake_api.dart
 lib/api/issues_api.dart
 lib/api/labels_api.dart
 lib/api/ledger_api.dart
+lib/api/locations_api.dart
 lib/api/lookup_api.dart
 lib/api/meta_api.dart
 lib/api/notifications_api.dart
@@ -54,6 +55,7 @@ lib/model/chat_in.dart
 lib/model/close_review_in.dart
 lib/model/decide_in.dart
 lib/model/decide_replacement_in.dart
+lib/model/decision_in.dart
 lib/model/device_in.dart
 lib/model/document_create.dart
 lib/model/document_out.dart
@@ -79,6 +81,7 @@ lib/model/issue_update.dart
 lib/model/me_out.dart
 lib/model/mentioned_object.dart
 lib/model/my_workspace_out.dart
+lib/model/observation_in.dart
 lib/model/outcome_in.dart
 lib/model/replace_in.dart
 lib/model/revoke_in.dart

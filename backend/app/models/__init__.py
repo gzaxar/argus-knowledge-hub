@@ -72,3 +72,4 @@ from app.models import beam_model  # noqa: F401,E402
 from app.models import portability  # noqa: F401,E402
 from app.models import portability_config  # noqa: F401,E402
 from app.models import package  # noqa: F401,E402
+from app.models import spatial  # noqa: F401,E402

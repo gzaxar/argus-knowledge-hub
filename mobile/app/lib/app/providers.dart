@@ -499,6 +499,20 @@ final followingProvider = FutureProvider.autoDispose.family<bool, (String, Strin
 
 final queryRepositoryProvider = Provider((ref) => QueryRepository(ref.watch(apiServiceProvider)));
 
+final locationRepositoryProvider = Provider((ref) => LocationRepository(ref.watch(apiServiceProvider)));
+
+/// A record's place on the map (its approved location, and what the field observed).
+final assetLocationProvider = FutureProvider.autoDispose.family<AssetLocation, String>((ref, uid) {
+  ref.watch(workspaceIdProvider);
+  return ref.watch(locationRepositoryProvider).get(uid);
+});
+
+/// Field observations of this workspace's records waiting for a decision.
+final locationReviewsProvider = FutureProvider.autoDispose<List<LocationObservationItem>>((ref) {
+  ref.watch(workspaceIdProvider);
+  return ref.watch(locationRepositoryProvider).reviews();
+});
+
 // --------------------------------------------------------------------------- replacement and review (M3)
 
 final replacementRepositoryProvider = Provider((ref) => ReplacementRepository(ref.watch(apiServiceProvider)));

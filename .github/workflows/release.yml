@@ -23,11 +23,19 @@ env:
 jobs:
   backend-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read          # the database image (ghcr.io) for the test service
     services:
       postgres:
         # As in docker-compose.yml: Ask ARGUS's search needs pgvector. From Google's Docker Hub mirror: Docker
         # Hub limits anonymous pulls by address, and the shared runners hit it.
-        image: mirror.gcr.io/pgvector/pgvector:pg16-trixie
+        # With PostGIS too (the spatial model): the database image every release publishes (deploy/postgres),
+        # which production runs since the switch rehearsed with tools/db-image-rehearsal.
+        image: ghcr.io/infn-argus/argus-knowledge-hub-postgres:latest
+        credentials:   # a new GitHub package is private: the workflow's own token reads it
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres

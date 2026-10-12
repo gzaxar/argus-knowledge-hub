@@ -186,6 +186,8 @@ from app.routers import jql as jql_router  # noqa: E402
 app.include_router(jql_router.router)
 from app.routers import packages as packages_router  # noqa: E402
 app.include_router(packages_router.router)
+from app.routers import spatial as spatial_router  # noqa: E402
+app.include_router(spatial_router.router)
 
 
 from app.packages.requirements import MissingPrerequisite  # noqa: E402

@@ -113,17 +113,29 @@ def _by_installer(db, kind, workspace_id, catalogue_id):
 NEW_IN_IT = {"Firewall", "Wireless Access Point", "Storage System", "Patch Panel"}
 
 
+def _without_placement(dump: dict) -> dict:
+    """core-objects 1.1.0 added map placement (`locatable`, `map_layer` in a type's metadata)."""
+    for part in dump.values():
+        for s in part["schemas"]:
+            if s.get("metadata"):
+                s["metadata"] = {k: v for k, v in s["metadata"].items() if k not in ("locatable", "map_layer")}
+    return dump
+
+
 def test_installing_the_packages_writes_exactly_what_seeding_wrote_before_them():
     """The record in fixtures/package_parity was made from the Python definitions, before they moved to YAML.
-    Since then the catalogue was split into core-objects, it and accelerator (same types, same uids) and it
-    gained four IT types; nothing else changed."""
+    Since then the catalogue was split into core-objects, it and accelerator (same types, same uids), it
+    gained four IT types, and core-objects 1.1.0 map placement (`locatable`, `map_layer`); nothing else."""
     before = json.loads((FIXTURES / "seeding.json").read_text())
     now = seed_every_way(_by_installer)
     added = {s["name"] for part in now.values() for s in part["schemas"] if s["name"] in NEW_IN_IT}
     assert added == NEW_IN_IT
+    placed = {s["name"] for part in now.values() for s in part["schemas"]
+              if (s.get("metadata") or {}).get("locatable")}
+    assert placed == {"Asset", "Location"}
     for part in now.values():
         part["schemas"] = [s for s in part["schemas"] if s["name"] not in NEW_IN_IT]
-    assert now == before
+    assert _without_placement(now) == before
 
 
 # --------------------------------------------------------------------------- the installer and the record

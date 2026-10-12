@@ -484,3 +484,55 @@ class Cockpit {
   final List<CockpitItem> reviewOverdue;
   final List<CockpitItem> recent;
 }
+
+
+/// A record's place on the map: whether its type may have one, its approved location (with where it came
+/// from), and what the field observed (services/spatial on the server).
+class AssetLocation {
+  const AssetLocation(
+      {required this.locatable, this.layer, this.hidden = false, this.current, this.observations = const []});
+
+  final bool locatable;
+  final String? layer;
+  final bool hidden; // its type restricts the location from this person
+  final PlacedPoint? current;
+  final List<LocationObservationItem> observations;
+}
+
+class PlacedPoint {
+  const PlacedPoint(
+      {required this.latitude, required this.longitude, this.accuracy, this.source, this.at, this.reviewer});
+
+  final double latitude;
+  final double longitude;
+  final double? accuracy;
+  final String? source;
+  final DateTime? at;
+  final String? reviewer;
+}
+
+class LocationObservationItem {
+  const LocationObservationItem(
+      {required this.id, required this.status, required this.latitude, required this.longitude, this.accuracy,
+      this.distance, this.observedBy, this.at, this.record, this.approved});
+
+  final int id;
+  final String status; // consistent | pending | accepted | rejected
+  final double latitude;
+  final double longitude;
+  final double? accuracy;
+  final double? distance; // metres from the approved location
+  final String? observedBy;
+  final DateTime? at;
+  final LinkTarget? record; // in the review queue: what it is about
+  final PlacedPoint? approved;
+}
+
+/// A record near a point, with how far it is.
+class NearbyHit {
+  const NearbyHit({required this.target, required this.distance, this.layer});
+
+  final LinkTarget target;
+  final double distance;
+  final String? layer;
+}

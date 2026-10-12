@@ -120,6 +120,12 @@ class TypeSpec:
     abstract: bool = False
     # Other names records of this type go by in imports ("pipe", "bellows"): the mapping's rules match them.
     aliases: list = field(default_factory=list)
+    # May records of this type (and below it) have a location on the map, and on which layer (services/spatial).
+    locatable: bool = False
+    map_layer: Optional[str] = None
+
+    def placement(self) -> dict:
+        return {**({"locatable": True} if self.locatable else {}), **({"map_layer": self.map_layer} if self.map_layer else {})}
 
 
 # The reference fields that are edges of the graph too, and the verb each one is (knowledge-graph design):
@@ -143,7 +149,8 @@ def type_uid(workspace_id: str, name: str) -> str:
 # same list, read from it. A type's name, attribute keys and option ids are what stored records use.
 
 def _spec(t) -> TypeSpec:
-    return TypeSpec(t.name, t.parent, t.description, list(t.attributes), t.abstract, list(t.aliases))
+    return TypeSpec(t.name, t.parent, t.description, list(t.attributes), t.abstract, list(t.aliases), t.locatable,
+                    t.map_layer)
 
 
 def specs_of(package_id: str) -> list[TypeSpec]:
@@ -420,7 +427,8 @@ def ensure_asset_types(db: Session, workspace_id: str, scope: str = SCOPE_ALL,
                 description=spec.description, applies_to="objects",
                 is_concrete=not spec.abstract, parent_schema_uid=parent_uid,
                 attributes=wanted, is_global=share,
-                metadata_json={"source": "argus", **({"aliases": spec.aliases} if spec.aliases else {})},
+                metadata_json={"source": "argus", **({"aliases": spec.aliases} if spec.aliases else {}),
+                               **spec.placement()},
             ))
             result.created.append(spec.name)
             db.flush()
@@ -456,6 +464,10 @@ def ensure_asset_types(db: Session, workspace_id: str, scope: str = SCOPE_ALL,
         # Aliases are the catalogue's own knowledge: a release that adds one reaches workspaces seeded before.
         if spec.aliases and (schema.metadata_json or {}).get("aliases") != spec.aliases:
             schema.metadata_json = {**(schema.metadata_json or {}), "aliases": spec.aliases}
+            touched = True
+        placement = spec.placement()
+        if placement and any((schema.metadata_json or {}).get(k) != v for k, v in placement.items()):
+            schema.metadata_json = {**(schema.metadata_json or {}), **placement}
             touched = True
         if touched and spec.name not in result.adopted and spec.name not in result.renamed:
             result.extended.append(spec.name)

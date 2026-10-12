@@ -40,6 +40,7 @@ const SECTIONS: Record<SectionKey, SectionConfig> = {
     landing: "/assets/search",
     links: [
       { to: "/assets/search", label: "Browse & search" },
+      { to: "/map", label: "Map" },
       { to: "/search/advanced?entity=assets", label: "Advanced search (JQL)" },
       { to: "/catalogue/types", label: "Type catalogue" },
       { to: "/labels", label: "Labels & QR codes" },

@@ -6,6 +6,12 @@
 # Never rename a type, an attribute key or an option id here: stored records use them. A type's uid in a
 # workspace is <workspace>:argus-object:<name as a slug>.
 
+# The layers records with a location are shown on (basic GIS). A type marked `locatable` — and every type
+# under it — may have one; its layer is the nearest one up the tree (a domain may give its types their own).
+map_layers:
+  - {id: equipment, name: Equipment, description: "Physical units where they are installed or stored."}
+  - {id: places, name: Places, description: "Buildings, halls, tunnels, racks and stores."}
+
 object_types:
   # Names a type had before it was renamed: a workspace seeded under the old name is renamed in place.
   former_names: {Asset: Equipment Item, Location: Place}
@@ -49,6 +55,8 @@ object_types:
     - name: "Asset"
       parent: "Engineered Item"
       description: "The serialised box, with a purchase order."
+      locatable: true
+      map_layer: equipment
       abstract: true
       icon: tabler/package
       behaviors: [equipment]
@@ -187,6 +195,8 @@ object_types:
     - name: "Location"
       parent: "Item"
       description: "Where something is, and the rules for reaching it."
+      locatable: true
+      map_layer: places
       abstract: true
       icon: tabler/map-pin
       attributes:

@@ -71,7 +71,8 @@ def definitions(sections: dict, package_id: str, extra_sets: Optional[dict] = No
     types = {}
     for t in c.object_types(p, sets):
         types[t.name] = {"parent": t.parent, "abstract": t.abstract, "description": t.description, "icon": t.icon,
-                         "aliases": t.aliases, "attributes": {a["key"]: a for a in t.attributes},
+                         "aliases": t.aliases, "locatable": t.locatable, "map_layer": t.map_layer,
+                         "attributes": {a["key"]: a for a in t.attributes},
                          "attr_renamed_from": {a["key"]: a.get("renamed_from")
                                                for a in raw_types[t.name].get("attributes") or []
                                                if a.get("renamed_from")}}
@@ -190,7 +191,7 @@ def compare(old: dict, new: dict) -> list[Change]:
         elif o["abstract"] and not n["abstract"]:
             out.append(Change(f"object_types/{name}/concrete", ADDITIVE, "object_types", name, None, "widened",
                               f"records can be of type {name!r}", {"abstract": True}, {"abstract": False}))
-        for prop in ("description", "icon", "aliases"):
+        for prop in ("description", "icon", "aliases", "locatable", "map_layer"):
             if o[prop] != n[prop]:
                 out.append(Change(f"object_types/{name}/{prop}", DEFINITION, "object_types", name, None, "changed",
                                   f"{name!r}: new {prop}", {prop: o[prop]}, {prop: n[prop]}))

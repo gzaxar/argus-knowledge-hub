@@ -81,6 +81,12 @@ FIELD_OPERATIONS = [
     ("get", "/v1/hub/my-work"),
     ("get", "/v1/search/jql"),
     ("get", "/v1/search/jql/fields"),
+    ("get", "/v1/assets/{uid}/location"),
+    ("post", "/v1/assets/{uid}/location/observations"),
+    ("get", "/v1/map/nearby"),
+    ("get", "/v1/location-reviews"),
+    ("post", "/v1/location-reviews/{obs_id}/accept"),
+    ("post", "/v1/location-reviews/{obs_id}/reject"),
     # Next to the equipment: what else references it, its files, and what people have said and done to it
     ("get", "/v1/assets/{asset_uid}/comments"),
     ("post", "/v1/assets/{asset_uid}/comments"),

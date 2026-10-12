@@ -7,7 +7,9 @@ import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../core/problem.dart';
 import '../domain/capture.dart';
-import '../domain/models.dart' show AttributeDef, CockpitItem, QueryHit, QueryResult, RecordKind;
+import '../domain/models.dart'
+    show AssetLocation, AttributeDef, CockpitItem, LinkTarget, LocationObservationItem, NearbyHit, PlacedPoint,
+        QueryHit, QueryResult, RecordKind;
 import 'api_service.dart';
 
 Map<String, Object?> _map(Object? o) => o is Map ? o.map((k, v) => MapEntry(k.toString(), v)) : const {};
@@ -432,5 +434,82 @@ class QueryRepository {
             workspaceName: m['workspace_name']?.toString(),
           )).toList(),
     );
+  }
+}
+
+
+/// Places: a record's location, field observations of it and their review, and what is near a point.
+class LocationRepository {
+  LocationRepository(this._api);
+  final ApiService _api;
+
+  static double? _d(Object? v) => (v as num?)?.toDouble();
+
+  static PlacedPoint? _point(Object? raw) {
+    final m = raw is Map ? raw.map((k, v) => MapEntry(k.toString(), v)) : null;
+    if (m == null) return null;
+    return PlacedPoint(
+        latitude: _d(m['latitude'])!,
+        longitude: _d(m['longitude'])!,
+        accuracy: _d(m['accuracy_m']),
+        source: m['source']?.toString(),
+        at: _date(m['confirmed_at'] ?? m['valid_from']),
+        reviewer: m['reviewer']?.toString());
+  }
+
+  static LocationObservationItem _observation(Map<String, Object?> m) {
+    final record = _map(m['record']);
+    return LocationObservationItem(
+        id: (m['id'] as num).toInt(),
+        status: (m['status'] ?? '').toString(),
+        latitude: _d(m['latitude'])!,
+        longitude: _d(m['longitude'])!,
+        accuracy: _d(m['accuracy_m']),
+        distance: _d(m['distance_m']),
+        observedBy: m['observed_by']?.toString(),
+        at: _date(m['observed_at']),
+        record: record.isEmpty
+            ? null
+            : LinkTarget(kind: RecordKind.asset, uid: record['uid'].toString(), title: record['name']?.toString(),
+                key: record['key']?.toString(), subtitle: record['type']?.toString()),
+        approved: _point(m['approved']));
+  }
+
+  Future<AssetLocation> get(String uid) async {
+    final r = _map(await _api.json((c) => _api.locations(c).getLocationWithHttpInfo(uid)));
+    return AssetLocation(
+        locatable: r['locatable'] == true,
+        layer: r['map_layer']?.toString(),
+        hidden: r['hidden'] == true,
+        current: _point(r['location']),
+        observations: _list(r['observations']).map(_map).map(_observation).toList());
+  }
+
+  /// Where the person sees the record now: it never moves it; the answer says whether it agrees with the
+  /// approved location or waits for review.
+  Future<LocationObservationItem> observe(String uid, double lat, double lon, {double? accuracy}) async =>
+      _observation(_map(await _api.json((c) => _api.locations(c).observeWithHttpInfo(
+          uid, api.ObservationIn(latitude: lat, longitude: lon, accuracyM: accuracy)))));
+
+  Future<List<NearbyHit>> nearby(double lat, double lon, {double radius = 200}) async {
+    final r = _map(await _api.json((c) => _api.locations(c).mapNearbyWithHttpInfo(lat, lon, radiusM: radius)));
+    return _list(r['features']).map(_map).map((f) {
+      final p = _map(f['properties']);
+      return NearbyHit(
+          target: LinkTarget(kind: RecordKind.asset, uid: p['uid'].toString(), title: p['name']?.toString(),
+              key: p['key']?.toString(), subtitle: p['type']?.toString(), workspaceId: p['workspace_id']?.toString()),
+          distance: _d(p['distance_m']) ?? 0,
+          layer: p['map_layer']?.toString());
+    }).toList();
+  }
+
+  Future<List<LocationObservationItem>> reviews() async =>
+      _list(await _api.json((c) => _api.locations(c).locationReviewsWithHttpInfo()))
+          .map(_map).map(_observation).toList();
+
+  Future<void> decide(int id, {required bool accept}) async {
+    await _api.json((c) => accept
+        ? _api.locations(c).acceptObservationWithHttpInfo(id, api.DecisionIn())
+        : _api.locations(c).rejectObservationWithHttpInfo(id, api.DecisionIn()));
   }
 }
