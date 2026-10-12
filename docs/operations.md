@@ -1271,3 +1271,41 @@ relation to a record whose creation failed fails with it. The model's
 next turn is told what became of each proposal. Nothing is applied
 without the person, and the external MCP server stays read-only.
 
+
+
+## Rehearsing the database image (before switching to PostGIS)
+
+The basic GIS release needs PostGIS in the database. The database image `argus-knowledge-hub-postgres`
+(deploy/postgres) is the PostgreSQL 16 + pgvector image production runs, with PostGIS added: the same
+PostgreSQL major version and data format. Every release builds it; production keeps
+`images.postgres: pgvector/pgvector:pg16-trixie` until the rehearsal below has passed **on production's
+data**. Keycloak's database lives on the same server, so it is rehearsed too.
+
+1. Take the two dumps (read-only on the server):
+
+   ```
+   kubecloud -n argus exec deploy/argus-postgres -- pg_dump -U argus -Fc -d argus    > argus.dump
+   kubecloud -n argus exec deploy/argus-postgres -- pg_dump -U argus -Fc -d keycloak > keycloak.dump
+   ```
+
+   They hold everything, credentials included: keep them on an encrypted disk and delete them afterwards.
+
+2. Rehearse, on any machine with Docker:
+
+   ```
+   KEYCLOAK_ADMIN_USER=<master admin> KEYCLOAK_ADMIN_PASSWORD=<…> \
+   tools/db-image-rehearsal --argus-dump argus.dump --keycloak-dump keycloak.dump \
+       --image ghcr.io/infn-argus/argus-knowledge-hub-postgres:<version> \
+       --backend-image ghcr.io/infn-argus/argus-knowledge-hub-backend:<version> --realm argus
+   ```
+
+   It restores both databases into the new image and checks: the image (PostgreSQL, pgvector, PostGIS),
+   the restore, a nearest-neighbour query on the knowledge index, PostGIS answering, ARGUS's migrations to
+   head and its packages, Keycloak starting on the restored database with the administrator signing in,
+   and a backup taken from the new image restoring with every table's row count the same. It writes a
+   report: keep it with the change.
+
+3. Only after it passes: take a fresh `python -m app.ledger backup`, set `images.postgres` to the rehearsed
+   image in `values-production.yaml`, and release. The pod restarts on the same data directory; Keycloak and
+   the API reconnect. Rolling back is setting the previous image again (PostGIS is created by a migration
+   of the GIS release, not by the image, so the data directory stays readable by the old image until then).

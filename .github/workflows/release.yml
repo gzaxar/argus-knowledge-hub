@@ -14,6 +14,7 @@ concurrency:
 env:
   BACKEND_IMAGE: ghcr.io/infn-argus/argus-knowledge-hub-backend
   WEB_IMAGE: ghcr.io/infn-argus/argus-knowledge-hub-web
+  POSTGRES_IMAGE: ghcr.io/infn-argus/argus-knowledge-hub-postgres
   VALUES: charts/argus-knowledge-hub/values-production.yaml
   # Built into the web app (Vite): where the browser signs in and finds the API in production.
   WEB_KEYCLOAK: https://keycloak.90.147.174.30.myip.cloud.infn.it/realms/argus
@@ -132,6 +133,17 @@ jobs:
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
+      # The database image with PostGIS beside pgvector (deploy/postgres). Built with every release, so the
+      # one to rehearse and switch to is always at hand; production keeps its image until values.yaml says
+      # otherwise, after tools/db-image-rehearsal has passed on its data (docs/operations.md).
+      - uses: docker/build-push-action@v6
+        with:
+          context: deploy/postgres
+          push: true
+          tags: ${{ env.POSTGRES_IMAGE }}:${{ steps.version.outputs.version }},${{ env.POSTGRES_IMAGE }}:latest
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=postgres
+          cache-to: type=gha,mode=max,scope=postgres
 
   # The deployment itself: Argo CD follows the chart's production values on main.
   deploy:

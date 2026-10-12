@@ -1,0 +1,227 @@
+#!/usr/bin/env bash
+# The release gate before the database image changes (PostgreSQL 16 + pgvector → + PostGIS):
+# restore ARGUS's and Keycloak's databases into the new image and check everything still works there,
+# before production is switched to it. Nothing here touches a running installation: it works on dumps,
+# in throw-away containers, and writes a report.
+#
+#   tools/db-image-rehearsal --argus-dump argus.dump --keycloak-dump keycloak.dump \
+#       [--image ghcr.io/infn-argus/argus-knowledge-hub-postgres:<version>] \
+#       [--backend-image ghcr.io/infn-argus/argus-knowledge-hub-backend:<version>] \
+#       [--keycloak-image quay.io/keycloak/keycloak:24.0.5] [--realm argus] [--report rehearsal.md]
+#
+# The dumps are `pg_dump -Fc` of the two databases (docs/operations.md, "Rehearsing the database image").
+# For the Keycloak sign-in check, set KEYCLOAK_ADMIN_USER and KEYCLOAK_ADMIN_PASSWORD (the master realm's
+# administrator of the installation the dump is from); without them that check is skipped, and says so.
+#
+# Checks, each recorded in the report:
+#   1. the new image: PostgreSQL version; pgvector and PostGIS available
+#   2. both databases restore (pg_restore errors counted)
+#   3. pgvector: the extension, and a nearest-neighbour query on the knowledge index
+#   4. PostGIS: the extension can be created and answers a distance query (then dropped again)
+#   5. ARGUS: its migrations run to head on the restored database, and its packages validate
+#   6. Keycloak starts on the restored database, serves the realm, and an administrator signs in
+#   7. backup recovery: a dump taken from the new image restores into another new-image container
+#      with every table's row count the same
+set -uo pipefail
+
+IMAGE="argus-postgres:rehearsal"
+BACKEND_IMAGE="argus-knowledge-hub-api"
+KEYCLOAK_IMAGE="quay.io/keycloak/keycloak:24.0.5"
+REALM="argus"
+REPORT="db-image-rehearsal-$(date +%Y%m%d-%H%M%S).md"
+ARGUS_DUMP="" KEYCLOAK_DUMP=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --image) IMAGE="$2"; shift 2 ;;
+    --backend-image) BACKEND_IMAGE="$2"; shift 2 ;;
+    --keycloak-image) KEYCLOAK_IMAGE="$2"; shift 2 ;;
+    --realm) REALM="$2"; shift 2 ;;
+    --report) REPORT="$2"; shift 2 ;;
+    --argus-dump) ARGUS_DUMP="$2"; shift 2 ;;
+    --keycloak-dump) KEYCLOAK_DUMP="$2"; shift 2 ;;
+    -h|--help) sed -n '2,26p' "$0"; exit 0 ;;
+    *) echo "unknown argument $1"; exit 2 ;;
+  esac
+done
+[ -f "$ARGUS_DUMP" ] && [ -f "$KEYCLOAK_DUMP" ] || { echo "give --argus-dump and --keycloak-dump (pg_dump -Fc files)"; exit 2; }
+
+RUN="rehearsal-$$"
+NET="$RUN-net"
+DB1="$RUN-db1" DB2="$RUN-db2" KC="$RUN-kc"
+PW="rehearsal-$RANDOM$RANDOM"
+WORK="$(mktemp -d)"
+FAILED=0
+LINES=()
+
+cleanup() {
+  docker rm -f "$DB1" "$DB2" "$KC" >/dev/null 2>&1
+  docker network rm "$NET" >/dev/null 2>&1
+  rm -rf "$WORK"
+}
+trap cleanup EXIT
+
+ok()   { LINES+=("| ✓ | $1 | $2 |"); echo "✓ $1 — $2"; }
+bad()  { LINES+=("| ✗ | $1 | $2 |"); echo "✗ $1 — $2"; FAILED=1; }
+skip() { LINES+=("| – | $1 | $2 |"); echo "– $1 — $2"; }
+# No -i: these run inside `while read` loops, whose input `docker exec -i` would swallow.
+psql_in() { local c="$1" db="$2"; shift 2; docker exec "$c" psql -U argus -d "$db" -v ON_ERROR_STOP=1 -At "$@" </dev/null; }
+
+start_db() {
+  docker run -d --name "$1" --network "$NET" -e POSTGRES_USER=argus -e POSTGRES_PASSWORD="$PW" \
+    -e POSTGRES_DB=argus "$IMAGE" >/dev/null || return 1
+  for _ in $(seq 1 60); do
+    docker exec "$1" pg_isready -U argus -d argus >/dev/null 2>&1 && sleep 2 && return 0
+    sleep 1
+  done
+  return 1
+}
+
+restore() {   # container, database, dump file → count of pg_restore errors
+  docker cp "$3" "$1:/tmp/restore.dump" >/dev/null
+  docker exec "$1" sh -c "pg_restore -U argus -d '$2' --no-owner --role=argus /tmp/restore.dump" \
+    >"$WORK/restore-$1-$2.log" 2>&1
+  grep -c "^pg_restore: error" "$WORK/restore-$1-$2.log"
+}
+
+counts() {   # container, database → "table count" per line, sorted
+  psql_in "$1" "$2" -c "SELECT table_schema || '.' || table_name FROM information_schema.tables
+                        WHERE table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog', 'information_schema')
+                        ORDER BY 1" | while read -r t; do
+    echo "$t $(psql_in "$1" "$2" -c "SELECT count(*) FROM $t")"
+  done
+}
+
+docker network create "$NET" >/dev/null
+CURL=mirror.gcr.io/curlimages/curl:8.10.1
+docker image inspect "$CURL" >/dev/null 2>&1 || docker pull -q "$CURL" >/dev/null
+
+# 1. the image
+if start_db "$DB1"; then
+  ver=$(psql_in "$DB1" argus -c "SHOW server_version")
+  avail=$(psql_in "$DB1" argus -c "SELECT string_agg(name || ' ' || default_version, ', ' ORDER BY name)
+                                    FROM pg_available_extensions WHERE name IN ('vector', 'postgis')")
+  if echo "$avail" | grep -q vector && echo "$avail" | grep -q postgis; then
+    ok "image" "$IMAGE: PostgreSQL $ver; available: $avail"
+  else
+    bad "image" "$IMAGE: PostgreSQL $ver; available: ${avail:-none} (needs vector and postgis)"
+  fi
+else
+  bad "image" "$IMAGE did not start"; exit 1
+fi
+
+# 2. restore
+psql_in "$DB1" argus -c "CREATE DATABASE keycloak" >/dev/null
+for pair in "argus:$ARGUS_DUMP" "keycloak:$KEYCLOAK_DUMP"; do
+  db="${pair%%:*}" file="${pair#*:}"
+  errors=$(restore "$DB1" "$db" "$file")
+  tables=$(psql_in "$DB1" "$db" -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'")
+  if [ "$errors" = "0" ]; then ok "restore $db" "$(basename "$file"): $tables tables, no errors"
+  else bad "restore $db" "$(basename "$file"): $errors pg_restore error(s) — $(grep -m1 '^pg_restore: error' "$WORK/restore-$DB1-$db.log")"; fi
+done
+
+# 3. pgvector
+vext=$(psql_in "$DB1" argus -c "SELECT extversion FROM pg_extension WHERE extname = 'vector'" 2>/dev/null)
+if [ -z "$vext" ]; then
+  skip "pgvector" "the restored database has no vector extension (no knowledge index was ever built)"
+else
+  rows=$(psql_in "$DB1" argus -c "SELECT count(*) FROM knowledge_chunks WHERE embedding IS NOT NULL" 2>/dev/null || echo 0)
+  if [ "${rows:-0}" -gt 0 ]; then
+    near=$(psql_in "$DB1" argus -c "WITH q AS (SELECT model, embedding FROM knowledge_chunks WHERE embedding IS NOT NULL LIMIT 1)
+                                    SELECT count(*) FROM (SELECT k.id FROM knowledge_chunks k, q WHERE k.model = q.model
+                                    AND k.embedding IS NOT NULL ORDER BY k.embedding <=> q.embedding LIMIT 5) n" 2>&1)
+    if [[ "$near" =~ ^[0-9]+$ ]] && [ "$near" -gt 0 ]; then ok "pgvector" "vector $vext; $rows passages; a nearest-neighbour query answers ($near nearest)"
+    else bad "pgvector" "vector $vext; the nearest-neighbour query failed: $near"; fi
+  else
+    ok "pgvector" "vector $vext restored; the index holds no passages to query"
+  fi
+fi
+
+# 4. PostGIS
+gis=$(psql_in "$DB1" argus -c "CREATE EXTENSION IF NOT EXISTS postgis" -c "SELECT postgis_lib_version()" \
+       -c "SELECT round(ST_Distance(ST_SetSRID(ST_MakePoint(12.68, 41.82), 4326)::geography,
+                                    ST_SetSRID(ST_MakePoint(12.69, 41.82), 4326)::geography))" 2>&1 | tail -2 | paste -sd' ' -)
+psql_in "$DB1" argus -c "DROP EXTENSION IF EXISTS postgis" >/dev/null 2>&1
+if [[ "$gis" =~ ^[0-9.]+\ [0-9]+$ ]]; then ok "PostGIS" "postgis ${gis% *} creates and answers: two points 0.01° apart at Frascati are ${gis#* } m apart"
+else bad "PostGIS" "$gis"; fi
+
+# 5. ARGUS migrations and packages
+mig=$(docker run --rm --network "$NET" -e DATABASE_URL="postgresql://argus:$PW@$DB1:5432/argus" "$BACKEND_IMAGE" \
+      sh -c "alembic upgrade head 2>&1 | tail -1 >&2; alembic current 2>/dev/null | tail -1" 2>"$WORK/alembic.log")
+if echo "$mig" | grep -q "(head)"; then ok "ARGUS migrations" "$BACKEND_IMAGE: at $mig"
+else bad "ARGUS migrations" "$BACKEND_IMAGE: $(tail -3 "$WORK/alembic.log" | paste -sd' ' -) ${mig}"; fi
+pk=$(docker run --rm "$BACKEND_IMAGE" python -m app.packages validate 2>&1)
+if [ $? -eq 0 ]; then ok "packages" "$(echo "$pk" | paste -sd'; ' -)"
+else skip "packages" "this backend image has no template packages yet, or they did not validate: $(echo "$pk" | tail -1)"; fi
+
+# 6. Keycloak
+docker run -d --name "$KC" --network "$NET" -e KC_DB=postgres -e KC_DB_URL="jdbc:postgresql://$DB1:5432/keycloak" \
+  -e KC_DB_USERNAME=argus -e KC_DB_PASSWORD="$PW" -e KC_HEALTH_ENABLED=true -e KC_HTTP_ENABLED=true \
+  -e KC_HOSTNAME_STRICT=false "$KEYCLOAK_IMAGE" start-dev >/dev/null
+kc_up=""
+for _ in $(seq 1 90); do
+  if docker exec "$KC" bash -c "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n' >&3 && grep -q '\"UP\"' <&3" 2>/dev/null; then
+    kc_up=1; break
+  fi
+  sleep 2
+done
+kc_get() {  # path → body
+  docker run --rm --network "$NET" "$CURL" -s "$@"
+}
+if [ -n "$kc_up" ]; then
+  issuer=$(kc_get "http://$KC:8080/realms/$REALM/.well-known/openid-configuration" | grep -o '"issuer":"[^"]*"')
+  if [ -n "$issuer" ]; then ok "Keycloak" "$KEYCLOAK_IMAGE started on the restored database; realm $REALM: $issuer"
+  else bad "Keycloak" "started, but realm $REALM is not served"; fi
+  if [ -n "${KEYCLOAK_ADMIN_USER:-}" ] && [ -n "${KEYCLOAK_ADMIN_PASSWORD:-}" ]; then
+    token=$(kc_get -X POST "http://$KC:8080/realms/master/protocol/openid-connect/token" \
+              --data-urlencode grant_type=password --data-urlencode client_id=admin-cli \
+              --data-urlencode "username=$KEYCLOAK_ADMIN_USER" --data-urlencode "password=$KEYCLOAK_ADMIN_PASSWORD" \
+              | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+    if [ -n "$token" ]; then
+      users=$(kc_get -H "Authorization: Bearer $token" "http://$KC:8080/admin/realms/$REALM/users/count")
+      ok "sign-in" "the administrator signs in with the restored credentials; realm $REALM has $users users"
+    else bad "sign-in" "the administrator could not sign in against the restored database"; fi
+  else
+    skip "sign-in" "KEYCLOAK_ADMIN_USER / KEYCLOAK_ADMIN_PASSWORD not set"
+  fi
+else
+  bad "Keycloak" "$KEYCLOAK_IMAGE did not become ready on the restored database: $(docker logs "$KC" 2>&1 | grep -m1 -i error)"
+fi
+docker rm -f "$KC" >/dev/null 2>&1
+
+# 7. backup recovery from the new image
+if start_db "$DB2"; then
+  psql_in "$DB2" argus -c "CREATE DATABASE keycloak" >/dev/null
+  same=1
+  for db in argus keycloak; do
+    docker exec "$DB1" pg_dump -U argus -Fc -d "$db" -f "/tmp/$db.backup"
+    docker cp "$DB1:/tmp/$db.backup" "$WORK/$db.backup" >/dev/null
+    errors=$(restore "$DB2" "$db" "$WORK/$db.backup")
+    counts "$DB1" "$db" >"$WORK/a-$db.txt"
+    counts "$DB2" "$db" >"$WORK/b-$db.txt"
+    if [ "$errors" = "0" ] && diff -q "$WORK/a-$db.txt" "$WORK/b-$db.txt" >/dev/null; then
+      ok "backup recovery $db" "dumped from the new image and restored into another: $(wc -l <"$WORK/a-$db.txt" | tr -d ' ') tables, every row count the same"
+    else
+      same=0
+      bad "backup recovery $db" "$errors restore error(s); differing tables: $(diff "$WORK/a-$db.txt" "$WORK/b-$db.txt" | grep '^<' | head -3 | paste -sd' ' -)"
+    fi
+  done
+else
+  bad "backup recovery" "a second container of $IMAGE did not start"
+fi
+
+{
+  echo "# Database image rehearsal"
+  echo
+  echo "$(date -u '+%Y-%m-%d %H:%M UTC') · image \`$IMAGE\` · backend \`$BACKEND_IMAGE\` · Keycloak \`$KEYCLOAK_IMAGE\`"
+  echo "· dumps \`$(basename "$ARGUS_DUMP")\`, \`$(basename "$KEYCLOAK_DUMP")\`"
+  echo
+  echo "| | Check | Result |"
+  echo "|---|---|---|"
+  printf '%s\n' "${LINES[@]}"
+  echo
+  if [ "$FAILED" = "0" ]; then echo "**Passed**: the new image can take these databases."
+  else echo "**Failed**: do not switch production to this image until the failures above are understood."; fi
+} >"$REPORT"
+echo
+echo "report: $REPORT"
+exit "$FAILED"
