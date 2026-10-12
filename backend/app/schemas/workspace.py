@@ -11,6 +11,11 @@ class WorkspaceCreate(BaseModel):
     # cage, and an admin importing an existing identifier needs the exact
     # one they already have.
     id: Optional[str] = None
+    # The template packages it starts from, besides core-facility (always): e.g. ["accelerator"].
+    packages: list[str] = []
+    # With the accelerator catalogue: the catalogue workspace whose shared types it hangs from; left out, the
+    # whole catalogue goes in this workspace.
+    catalogue_workspace_id: Optional[str] = None
 
 
 class WorkspaceUpdate(BaseModel):

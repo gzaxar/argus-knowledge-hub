@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError, workspacesApi } from "../../api/client";
+import { PackagePicker } from "../../components/PackagePicker";
 
 /** Creating a workspace.
  *
@@ -18,6 +19,8 @@ export function NewWorkspace() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [customId, setCustomId] = useState<string | null>(null);
+  const [packages, setPackages] = useState<string[]>([]);
+  const [catalogue, setCatalogue] = useState("");
 
   const rule = useQuery({ queryKey: ["workspace-id-rule"], queryFn: workspacesApi.idRule });
 
@@ -33,7 +36,8 @@ export function NewWorkspace() {
   const createMutation = useMutation({
     // Sent only when overridden: otherwise the server derives it, so a form
     // left open since the rule changed cannot produce a stale identifier.
-    mutationFn: () => workspacesApi.create(trimmed, customId?.trim() || undefined),
+    mutationFn: () => workspacesApi.create(trimmed, customId?.trim() || undefined, packages,
+                                           packages.includes("accelerator") ? catalogue || undefined : undefined),
     onSuccess: (ws) => navigate(`/workspaces/${ws.id}/members`),
   });
 
@@ -121,11 +125,14 @@ export function NewWorkspace() {
           </p>
         </div>
 
+        <PackagePicker chosen={packages} onChange={setPackages} catalogue={catalogue} onCatalogue={setCatalogue} />
+
         {createMutation.isError && (
           <p className="text-sm text-red-600">
             {createMutation.error instanceof ApiError
               ? String(
-                  (createMutation.error.body as { detail?: string })?.detail ??
+                  ((createMutation.error.body as { detail?: string | { error?: string } })?.detail as { error?: string })?.error ??
+                    (createMutation.error.body as { detail?: string })?.detail ??
                     JSON.stringify(createMutation.error.body),
                 )
               : "Failed to create workspace"}

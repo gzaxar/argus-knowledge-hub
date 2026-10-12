@@ -1,7 +1,7 @@
 ---
 title: Administration and the production installation
 summary: The administration pages, the production installation (addresses, sign-in, releases, the mobile app's distribution), backups, and where operators find the details.
-keywords: [administration, admin, settings, workspace identifiers, users, production, deployment, release, version, argo cd, keycloak, kubernetes, backup, restore, disk, operations, google play, apk, privacy, mirror]
+keywords: [administration, package, packages, template, workspace template, catalogue package, accelerator catalogue, core facility, admin, settings, workspace identifiers, users, production, deployment, release, version, argo cd, keycloak, kubernetes, backup, restore, disk, operations, google play, apk, privacy, mirror]
 order: 140
 ---
 
@@ -20,6 +20,25 @@ For administrators, **Administration** (bottom of the side bar):
 | **AI** | the AI settings every workspace without its own uses (see *AI settings*) |
 | **API tokens** | every personal and robot token: who made it, what it may do, expiry, last use; revoke any |
 | **Portability** | exports and imports (see *Export and import*) |
+
+## Workspace templates (packages)
+
+A workspace's types come from **template packages**, versioned definitions that ship with ARGUS:
+
+| Package | Gives a workspace |
+|---|---|
+| **Core facility** | ticket and document types and their fields, status and priority, the default ticket workflow (every workspace) |
+| **Accelerator catalogue** | the object types of an accelerator facility: sections, modules, beam elements, equipment, products, vendors, control, locations, network records, ports |
+
+- **New workspace → Starts from**: tick the packages; the form lists each one (and what it needs) with what it
+  holds before anything is created. With the accelerator catalogue, choose whether the workspace keeps the
+  whole catalogue or hangs from a catalogue workspace, sharing its equipment, products and locations.
+- The workspace's **Packages** page (link at the bottom of the side bar) says exactly which version of each it
+  uses, with a checksum of what was applied, how it was put in, and the history: installed, upgraded, seeded
+  by an import, or found in place when the record began. **Add a package** previews what it would create
+  before anything changes; installing is all or nothing.
+- Installing the version a workspace already has changes nothing. A package holds definitions only, never
+  records or site data.
 
 ## The production installation
 

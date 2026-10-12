@@ -89,6 +89,9 @@ def main() -> None:
                 sys.exit(1)
         try:
             result = ensure_asset_types(db, workspace, scope=mode, catalogue_workspace_id=catalogue)
+            from app.packages.install import note_seeded
+            note_seeded(db, workspace, "accelerator", how="seeded", actor="seed_asset_types.py",
+                        options={"scope": mode, **({"catalogue_workspace_id": catalogue} if catalogue else {})})
         except ValueError as e:                    # includes CatalogueMissing
             print(e)
             db.rollback()

@@ -32,11 +32,16 @@ from app.models.ledger import TicketLink
 from app.models.schema import Schema
 
 OTHER = "Other Equipment"
-UNCLASSIFIED = "Unclassified"
-SEED = ["I/O Module", "Scope", "Timing Module", "PLC", "Motion Controller", "Laser System", "Cryogenic Device",
-        "Cable", "Rack PDU", UNCLASSIFIED]
-# A seed class the catalogue already has as a type, under another name.
-ALREADY_A_TYPE = {"Cable": "Cable Run"}
+# The starting vocabulary, and the classes the catalogue already has as a type under another name: the
+# accelerator package (backend/packages/accelerator/vocabulary.yaml).
+def _vocabulary() -> dict:
+    from app.packages import defaults
+    return defaults.equipment_classes()
+
+
+SEED = list(_vocabulary().get("classes") or [])
+UNCLASSIFIED = str(_vocabulary().get("unclassified") or "Unclassified")
+ALREADY_A_TYPE = dict(_vocabulary().get("already_a_type") or {})
 THRESHOLDS = {"objects": 25, "workspaces": 2, "requested_attributes": 3}
 ALERT_SHARE, ALERT_MIN, ALERT_ABSOLUTE = 0.05, 10, 50
 KEY_VALUE = re.compile(r"^\s*([A-Za-z][A-Za-z0-9 _/-]{1,30}?)\s*[:=]\s*\S", re.M)

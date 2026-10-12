@@ -1,0 +1,11 @@
+id: core-facility
+version: 1.0.0
+name: Core facility
+description: >-
+  What every workspace starts with, whatever it keeps: the fields every ticket and document carries, the
+  kinds of ticket and document, the shared status and priority enumerations, and the default ticket
+  workflow. Object types come from a catalogue package (accelerator, and later IT, plant…).
+owner: INFN ARGUS
+license: EUPL-1.2
+provides: [tickets, documents]
+contents: [enumerations.yaml, ticket_types.yaml, document_types.yaml, workflows.yaml]

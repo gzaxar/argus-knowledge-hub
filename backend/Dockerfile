@@ -59,6 +59,8 @@ COPY app app
 COPY alembic alembic
 COPY alembic.ini .
 COPY scripts scripts
+# The template packages (YAML) workspaces are made from (app/packages).
+COPY packages packages
 
 ENV PORT=8080
 ENV PYTHONUNBUFFERED=1

@@ -430,6 +430,10 @@ def import_pbs(db: Session, workspace_id: str, book: Workbook, facility: str,
         db, workspace_id,
         scope=SCOPE_BEAMLINE if catalogue_workspace_id else SCOPE_ALL,
         catalogue_workspace_id=catalogue_workspace_id)
+    from app.packages.install import note_seeded
+    note_seeded(db, workspace_id, "accelerator", how="seeded", options={
+        "scope": SCOPE_BEAMLINE if catalogue_workspace_id else SCOPE_ALL,
+        **({"catalogue_workspace_id": catalogue_workspace_id} if catalogue_workspace_id else {})})
     w = _Writer(db, workspace_id, facility, source_ref, seeded.uids)
     w.warnings.extend(book.warnings)
 

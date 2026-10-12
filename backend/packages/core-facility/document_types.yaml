@@ -1,0 +1,67 @@
+# The base document type and the kinds of document, ordered roughly by how binding they are.
+# A type's uid is <workspace>:argus-document[:<kind>].
+document_types:
+  base:
+    name: "Document"
+    description: "Fields every document carries, whatever wrote it."
+    icon: tabler/file-text
+    attributes:
+      - {key: argus_system, name: System, indexed: true}
+      - {key: argus_subsystem, name: Subsystem, indexed: true}
+      - {key: argus_facility, name: Facility, indexed: true}
+      - {key: argus_keywords, name: Keywords, indexed: true, multi: true}
+      - {key: argus_lifecycle, name: Lifecycle, type: enumeration, options: [{id: current, value: Current}, {id: under_revision, value: Under revision}, {id: superseded, value: Superseded}, {id: withdrawn, value: Withdrawn}]}
+      - {key: argus_document_number, name: Document number, indexed: true}
+      - {key: argus_revision_label, name: Revision label}
+      - {key: argus_approved_by, name: Approved by, type: user}
+      - {key: argus_review_interval_months, name: Review interval (months), type: integer}
+      - {key: argus_source, name: Source, type: enumeration, readonly: true, options: [{id: manual, value: Written here}, {id: confluence, value: Confluence}, {id: git, value: Git}, {id: jira, value: Jira}]}
+      - {key: argus_source_id, name: Source id, readonly: true}
+      - {key: argus_source_url, name: Source link, readonly: true}
+      - {key: argus_source_space, name: Source space, readonly: true}
+      - {key: argus_source_version, name: Version at source, type: integer, readonly: true}
+      - {key: argus_source_updated, name: Updated at source, type: datetime, readonly: true}
+      - {key: argus_source_author, name: Author at source, readonly: true}
+  kinds:
+    - name: "Procedure"
+      description: "A controlled, step-by-step operation someone is expected to follow exactly."
+      icon: tabler/list-numbers
+    - name: "Work Instruction"
+      description: "How a specific task is done on specific equipment; narrower than a procedure."
+      icon: tabler/clipboard-list
+    - name: "Safety Document"
+      description: "Radiation, interlock, access and personnel safety — including risk assessments."
+      icon: tabler/shield-check
+    - name: "Specification"
+      description: "What a system must do or be: requirements, interfaces, acceptance criteria."
+      icon: tabler/file-certificate
+    - name: "Design Report"
+      description: "Why a system is built the way it is, including calculations and trade-offs."
+      icon: tabler/file-analytics
+    - name: "Drawing"
+      description: "Mechanical, electrical, vacuum or layout drawings, and their reference numbers."
+      icon: tabler/vector
+    - name: "Manual"
+      description: "Vendor or in-house documentation for a device, usually not written here."
+      icon: tabler/book-2
+    - name: "Commissioning Record"
+      description: "What was done and measured when a system was first brought into operation."
+      icon: tabler/clipboard-check
+    - name: "Test Report"
+      description: "The result of a measurement or acceptance test, tied to equipment and a date."
+      icon: tabler/test-pipe
+    - name: "Maintenance Report"
+      description: "What was done during an intervention, and what state the equipment was left in."
+      icon: tabler/tools
+    - name: "Logbook Entry"
+      description: "What happened during a shift or a run — the operational narrative."
+      icon: tabler/notebook
+    - name: "Runbook"
+      description: "What to do when something goes wrong, including symptoms and first actions."
+      icon: tabler/list-check
+    - name: "Meeting Minutes"
+      description: "Decisions taken and who took them."
+      icon: tabler/users-group
+    - name: "Note"
+      description: "Anything that doesn't belong to the kinds above."
+      icon: tabler/note

@@ -22,111 +22,21 @@ from app.models.schema import Schema
 BASE_UID_SUFFIX = "argus-document"
 BASE_TYPE_NAME = "Document"
 
-# (name, description). Ordered roughly by how binding the document is.
-DEFAULT_DOCUMENT_TYPES = [
-    ("Procedure",
-     "A controlled, step-by-step operation someone is expected to follow exactly."),
-    ("Work Instruction",
-     "How a specific task is done on specific equipment; narrower than a procedure."),
-    ("Safety Document",
-     "Radiation, interlock, access and personnel safety — including risk assessments."),
-    ("Specification",
-     "What a system must do or be: requirements, interfaces, acceptance criteria."),
-    ("Design Report",
-     "Why a system is built the way it is, including calculations and trade-offs."),
-    ("Drawing",
-     "Mechanical, electrical, vacuum or layout drawings, and their reference numbers."),
-    ("Manual",
-     "Vendor or in-house documentation for a device, usually not written here."),
-    ("Commissioning Record",
-     "What was done and measured when a system was first brought into operation."),
-    ("Test Report",
-     "The result of a measurement or acceptance test, tied to equipment and a date."),
-    ("Maintenance Report",
-     "What was done during an intervention, and what state the equipment was left in."),
-    ("Logbook Entry",
-     "What happened during a shift or a run — the operational narrative."),
-    ("Runbook",
-     "What to do when something goes wrong, including symptoms and first actions."),
-    ("Meeting Minutes",
-     "Decisions taken and who took them."),
-    ("Note",
-     "Anything that doesn't belong to the kinds above."),
-]
-
-LIFECYCLE_OPTIONS = [
-    {"id": "current", "value": "Current"},
-    {"id": "under_revision", "value": "Under revision"},
-    {"id": "superseded", "value": "Superseded"},
-    {"id": "withdrawn", "value": "Withdrawn"},
-]
-
-SOURCE_OPTIONS = [
-    {"id": "manual", "value": "Written here"},
-    {"id": "confluence", "value": "Confluence"},
-    {"id": "git", "value": "Git"},
-    {"id": "jira", "value": "Jira"},
-]
-
-# (key, name, type, extra)
-BASE_ATTRIBUTES = [
-    # What the document is about operationally. These are what make a
-    # document findable by someone with a problem rather than a filename.
-    # The same keys tickets carry, so a system names one thing across the
-    # whole hub rather than one thing per section.
-    ("argus_system", "System", "string", {"indexed": True}),
-    ("argus_subsystem", "Subsystem", "string", {"indexed": True}),
-    # Indexed rather than a fixed list: the facilities are a closed set in
-    # principle, but inventing that list here would be guessing, and the
-    # vocabulary fills itself from what the records actually say.
-    ("argus_facility", "Facility", "string", {"indexed": True}),
-    # The field the Confluence import fills. Free text here is what turns
-    # one keyword into "BTF", "btf" and "BTF " — three terms, no filter.
-    ("argus_keywords", "Keywords", "string", {"multiValue": True, "indexed": True}),
-
-    # Document control. An accelerator's documentation is only worth
-    # anything if you can tell which version is in force.
-    ("argus_lifecycle", "Lifecycle", "enumeration", {"options": LIFECYCLE_OPTIONS}),
-    ("argus_document_number", "Document number", "string", {"indexed": True}),
-    ("argus_revision_label", "Revision label", "string", {}),
-    # A person, so it picks from the directory. Controlled documentation
-    # that can't say who approved it isn't controlled.
-    ("argus_approved_by", "Approved by", "user", {}),
-    ("argus_review_interval_months", "Review interval (months)", "integer", {}),
-
-    # Where it came from, kept rather than being the model.
-    ("argus_source", "Source", "enumeration", {"options": SOURCE_OPTIONS, "readOnly": True}),
-    ("argus_source_id", "Source id", "string", {"readOnly": True}),
-    ("argus_source_url", "Source link", "string", {"readOnly": True}),
-    ("argus_source_space", "Source space", "string", {"readOnly": True}),
-    ("argus_source_version", "Version at source", "integer", {"readOnly": True}),
-    ("argus_source_updated", "Updated at source", "datetime", {"readOnly": True}),
-    ("argus_source_author", "Author at source", "string", {"readOnly": True}),
-]
+# The kinds of document (ordered roughly by how binding they are) and the fields every document carries:
+# the core-facility package (backend/packages/core-facility/document_types.yaml). The operational keys are
+# the ones tickets use, so a system names one thing across the hub; document control says which version
+# is in force; where it came from is kept, read-only.
+def _definitions():
+    from app.packages import defaults
+    return defaults.document_types()
 
 
-def _attribute(key: str, name: str, type_: str, extra: dict) -> dict:
-    out = {
-        "id": key,
-        "key": key,
-        "name": name,
-        "type": type_,
-        "required": False,
-        "multiValue": extra.get("multiValue", False),
-        "unique": extra.get("unique", False),
-        "readOnly": extra.get("readOnly", False),
-        # An indexed attribute is a key rather than prose: the values it
-        # already holds are offered as you type, so the same term is reused
-        # instead of being spelled three ways.
-        "indexed": extra.get("indexed", False),
-    }
-    if extra.get("options"):
-        out["options"] = extra["options"]
-    return out
+DEFAULT_DOCUMENT_TYPES = [(name, description) for name, description, _ in _definitions().kinds]
+BASE_DESCRIPTION = _definitions().base_description
 
 
 def base_attributes() -> list[dict]:
-    return [_attribute(*a) for a in BASE_ATTRIBUTES]
+    return [dict(a) for a in _definitions().base_attributes]
 
 
 def type_uid(workspace_id: str, name: str) -> str:
@@ -150,7 +60,7 @@ def ensure_document_types(
             uid=base_uid,
             workspace_id=workspace_id,
             name=BASE_TYPE_NAME,
-            description="Fields every document carries, whatever wrote it.",
+            description=BASE_DESCRIPTION,
             applies_to="documents",
             is_concrete=False,
             attributes=base_attributes(),

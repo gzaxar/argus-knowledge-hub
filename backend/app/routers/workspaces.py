@@ -21,7 +21,6 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.services.integrity import cleanup_workspace, generate_integrity_report, relink_workspace
 from app.services.relations import rebuild_relations_for_schemas
-from app.services.document_types import ensure_document_types
 from app.services.ticket_types import DEFAULT_ISSUE_TYPES, ensure_ticket_types
 from app.services import asset_keys
 from app.services.workspace_ids import rule as id_rule, save_rule, slugify, unique_id
@@ -61,46 +60,18 @@ def seed_default_global_values(db: Session, workspace_id: str) -> None:
         )
     }
 
-    def _add(applies_to: str, key: str, name: str, options: list, default_value: str | None = None):
-        if (applies_to, key) in existing:
-            return
+    # From the core-facility package (enumerations.yaml): optional per type (a schema opts in via an
+    # attribute), never forced. A later Jira import may overwrite an enumeration's options with the source
+    # system's real statuses (same key, upsert-by-key there).
+    from app.packages import defaults
+    for e in defaults.enumerations():
+        if (e["applies_to"], e["key"]) in existing:
+            continue
         db.add(GlobalValue(
-            uid=str(uuid.uuid4()), workspace_id=workspace_id, key=key, name=name,
-            type="enumeration", applies_to=applies_to, is_system_default=True,
-            default_value=default_value, options=options,
+            uid=str(uuid.uuid4()), workspace_id=workspace_id, key=e["key"], name=e["name"],
+            type=e["type"], applies_to=e["applies_to"], is_system_default=True,
+            default_value=e["default"], options=e["options"],
         ))
-
-    # Optional per type (a schema opts in via a reference/global attribute),
-    # never forced. Matches the Flutter app's own default set; a later Jira
-    # import may overwrite its options with the source system's real
-    # statuses (same key, upsert-by-key there).
-    _add("objects", "status", "Status", default_value="uninstalled", options=[
-        {"id": "active", "value": "Active"},
-        {"id": "action_needed", "value": "Action Needed"},
-        {"id": "broken", "value": "Broken"},
-        {"id": "not_active", "value": "Not Active"},
-        {"id": "ok", "value": "Ok"},
-        {"id": "uninstalled", "value": "Uninstalled"},
-    ])
-    _add("tickets", "priority", "Priority", options=[
-        {"id": "low", "value": "Low"},
-        {"id": "medium", "value": "Medium"},
-        {"id": "high", "value": "High"},
-        {"id": "blocker", "value": "Blocker"},
-        {"id": "critical", "value": "Critical"},
-    ])
-    _add("tickets", "status", "Status", default_value="new", options=[
-        {"id": "new", "value": "New", "responsible": "Help Desk (Queue)",
-         "meaning": "Created and waiting to be picked up."},
-        {"id": "in_progress", "value": "In Progress", "responsible": "Assigned Technician",
-         "meaning": "Actively being analyzed or fixed."},
-        {"id": "pending", "value": "Pending", "responsible": "External Party (User/Vendor)",
-         "meaning": "Paused, waiting for an external action."},
-        {"id": "resolved", "value": "Resolved", "responsible": "User (for verification)",
-         "meaning": "The solution has been applied."},
-        {"id": "closed", "value": "Closed", "responsible": "None (Archived)",
-         "meaning": "Successfully resolved and locked."},
-    ])
 
 
 def seed_default_ticket_types(db: Session, workspace_id: str) -> None:
@@ -262,15 +233,23 @@ def create_workspace(
         # afterwards.
         workspace_id = unique_id(db, name, id_rule(db))
 
-    workspace = make_workspace(db, workspace_id, name, owner_user_id=identity.user.id)
+    from app.packages.install import PackageProblem
+    try:
+        workspace = make_workspace(db, workspace_id, name, owner_user_id=identity.user.id,
+                                   packages=body.packages, catalogue_workspace_id=body.catalogue_workspace_id)
+    except PackageProblem as e:
+        db.rollback()
+        raise HTTPException(status_code=422, detail={"error": str(e), "code": "package"})
     db.commit()
     db.refresh(workspace)
     return workspace
 
 
-def make_workspace(db: Session, workspace_id: str, name: str, owner_user_id: Optional[str] = None) -> Workspace:
-    """A workspace ready to use: its global values, ticket types and document types, and, when someone made
-    it, that person with full rights."""
+def make_workspace(db: Session, workspace_id: str, name: str, owner_user_id: Optional[str] = None,
+                   packages: Optional[list[str]] = None, catalogue_workspace_id: Optional[str] = None) -> Workspace:
+    """A workspace ready to use: the template packages it starts from (core-facility unless others are
+    chosen: its global values, ticket and document types; the accelerator catalogue on request) recorded with
+    their versions, and, when someone made it, that person with full rights."""
     workspace = Workspace(id=workspace_id, name=name)
     db.add(workspace)
     db.flush()
@@ -283,9 +262,9 @@ def make_workspace(db: Session, workspace_id: str, name: str, owner_user_id: Opt
             can_read_documents=True, can_create_documents=True,
             can_modify_documents=True, can_delete_documents=True, can_approve_documents=True,
         ))
-    seed_default_global_values(db, workspace.id)
-    seed_default_ticket_types(db, workspace.id)
-    ensure_document_types(db, workspace.id)
+    from app.packages.install import install
+    install(db, workspace.id, list(dict.fromkeys(["core-facility", *(packages or [])])),
+            actor=owner_user_id, catalogue_workspace_id=catalogue_workspace_id)
     return workspace
 
 

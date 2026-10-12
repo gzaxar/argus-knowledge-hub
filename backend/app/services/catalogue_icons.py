@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Optional
 
@@ -24,83 +25,25 @@ from app.models.icon import Icon
 from app.models.schema import Schema
 
 ICON_DIR = Path(__file__).resolve().parents[1] / "catalogue_icons"
+
+# A package preview runs seeding and rolls it back: it must not leave icon files behind (packages/install).
+PREVIEW: ContextVar[bool] = ContextVar("catalogue_icons_preview", default=False)
 PREFIX = "argus-"
 
-ICONS = {
-    # the root and its branches
-    "Item": "tabler/box", "Engineered Item": "tabler/components",
-    "Functional Element": "tabler/hierarchy-2", "Asset": "tabler/package",
-    "Catalog Item": "tabler/book", "Control Item": "tabler/adjustments",
-    "Engineering Record": "tabler/file-description", "Location": "tabler/map-pin",
-    "IT Record": "tabler/address-book",
-    # the machine, as a function
-    "Facility": "tabler/building-factory-2", "Section": "tabler/section", "Machine System": "tabler/sitemap",
-    "Machine Module": "tabler/puzzle", "RF Station": "tabler/antenna-bars-5",
-    "Beam Element": "tabler/arrow-narrow-right",
-    "Dipole": "argus/dipole-magnet", "Quadrupole": "argus/quadrupole", "Sextupole": "tabler/hexagon",
-    "Corrector": "argus/dipole-magnet", "Solenoid": "tabler/spiral",
-    "Accelerating Structure": "tabler/wave-sine", "RF Gun": "tabler/atom", "RF Deflector": "tabler/arrow-bear-right",
-    "Undulator": "tabler/wave-square", "Plasma Module": "tabler/atom-2", "Collimator": "tabler/focus-centered",
-    "Beam Stopper": "tabler/hand-stop", "Mirror": "tabler/flip-horizontal", "Vacuum Sector": "tabler/brackets-contain",
-    "Diagnostic Element": "tabler/chart-line", "Screen Station": "tabler/aperture",
-    "Drift": "tabler/line-dashed", "Kicker": "tabler/arrow-bear-right", "Septum": "tabler/arrows-join",
-    "RF Cavity": "tabler/wave-sine", "Beam Source": "tabler/flare", "Beam Dump": "tabler/cylinder",
-    "Lens": "tabler/focus-centered", "Beam Splitter": "tabler/prism", "Generic Beam Element": "tabler/box",
-    "Generic Monitor": "tabler/device-analytics", "Beam System": "tabler/atom", "Beam": "tabler/atom-2",
-    "Photon Beam": "tabler/sun", "Beam Path": "tabler/route", "Observable": "tabler/eye",
-    "Model Dataset": "tabler/database", "Control Signal": "tabler/wave-square",
-    "Beam Position Monitor": "tabler/crosshair", "Beam Charge Monitor": "tabler/chart-donut",
-    "Faraday Cup": "tabler/cup", "Wire Scanner": "tabler/scan", "Emittance Meter": "tabler/chart-scatter",
-    "Spectrometer Station": "tabler/prism", "Beam Loss Monitor": "tabler/alert-triangle",
-    "Beam Arrival Monitor": "tabler/clock", "Bunch Length Monitor": "tabler/ruler-measure",
-    # the equipment
-    "Power Supply": "tabler/bolt", "Magnet Assembly": "argus/dipole-magnet", "RF Amplifier": "tabler/antenna",
-    "Modulator": "tabler/wave-saw-tool", "Low-Level RF Unit": "tabler/cpu",
-    "Waveguide Component": "tabler/arrows-right-left",
-    "Vacuum Pump": "tabler/propeller", "Vacuum Gauge": "tabler/gauge", "Vacuum Valve": "argus/vacuum-valve",
-    "Vacuum Chamber": "tabler/cylinder", "Vacuum Component": "argus/vacuum-cross", "Vacuum Controller": "tabler/settings-automation",
-    "Motion Controller": "tabler/adjustments-horizontal", "Motor Axis": "tabler/engine",
-    "Actuator": "tabler/arrows-move-horizontal", "Camera": "tabler/camera", "Optical Assembly": "tabler/eye",
-    "Scintillator Screen": "tabler/sun", "Digitizer": "tabler/device-analytics", "Instrument": "tabler/tool",
-    "I/O Module": "tabler/plug", "PLC": "tabler/cpu-2", "Timing Module": "tabler/clock",
-    "Electronics Crate": "tabler/server-2", "Electronics Board": "tabler/cpu",
-    "IT Equipment": "tabler/device-desktop", "Network Device": "tabler/network", "Router": "tabler/router",
-    "Serial Converter": "tabler/plug-connected", "Media Converter": "tabler/transform",
-    "Computing Node": "tabler/server", "Workstation": "tabler/device-desktop",
-    "Chiller": "tabler/snowflake", "Cooling Circuit Component": "tabler/droplet",
-    "Cryogenic Device": "tabler/temperature-minus", "Interlock Unit": "tabler/lock",
-    "Radiation Monitor": "tabler/radioactive", "Laser System": "tabler/flare",
-    "Cable Run": "tabler/plug-connected", "Power Cable": "tabler/plug", "HV Cable": "tabler/bolt",
-    "RF Cable": "tabler/antenna", "Signal Cable": "tabler/activity", "Ethernet Cable": "tabler/network",
-    "Mechanical Support": "tabler/building-bridge", "Spare Part": "tabler/box-multiple", "Other Equipment": "tabler/box",
-    "Equipment Port": "tabler/plug-connected",
-    # the catalogue
-    "Product Model": "tabler/barcode", "Vendor": "tabler/building-store",
-    # control
-    "Control Configuration": "tabler/file-settings", "IOC Template": "tabler/template", "IOC": "tabler/terminal-2",
-    "Control Device": "tabler/toggle-left", "Access Point": "tabler/access-point", "Serial Line": "tabler/line-dashed",
-    "Communication Path": "tabler/route", "Bus Segment": "tabler/arrows-join",
-    "Control Service": "tabler/cloud-computing", "Control Network": "tabler/network", "Storage Mount": "tabler/database",
-    # engineering records
-    "Utility Requirement": "tabler/bolt", "Procurement Record": "tabler/receipt", "Work Package": "tabler/briefcase",
-    # places and addresses
-    "Building": "tabler/building", "Area": "tabler/map-2", "Rack": "tabler/stack-2",
-    "Storage Location": "tabler/packages", "Network Segment": "tabler/network", "Address Record": "tabler/at",
-}
+def _icons() -> tuple[dict, dict, dict]:
+    """The default icons, as the packages give them: each object, ticket and document type its own."""
+    from app.packages import defaults
+    objects = {t.name: t.icon for t in defaults.object_types() if t.icon}
+    out = []
+    for kinds in (defaults.ticket_types(), defaults.document_types()):
+        icons = {kinds.base_name: kinds.base_icon} if kinds.base_icon else {}
+        icons.update({name: icon for name, _, icon in kinds.kinds if icon})
+        out.append(icons)
+    return objects, out[0], out[1]
 
 
-# The default ticket and document types (ticket_types, document_types). A type an import adds (a Jira
-# "Incident") takes its base type's icon.
-TICKET_ICONS = {"Ticket": "tabler/ticket", "Epic": "tabler/bolt", "Story": "tabler/bookmark", "Task": "tabler/checkbox",
-                "Bug": "tabler/bug", "Sub-task": "tabler/subtask"}
-DOCUMENT_ICONS = {
-    "Document": "tabler/file-text", "Commissioning Record": "tabler/clipboard-check",
-    "Design Report": "tabler/file-analytics", "Drawing": "tabler/vector", "Logbook Entry": "tabler/notebook",
-    "Maintenance Report": "tabler/tools", "Manual": "tabler/book-2", "Meeting Minutes": "tabler/users-group",
-    "Note": "tabler/note", "Procedure": "tabler/list-numbers", "Runbook": "tabler/list-check",
-    "Safety Document": "tabler/shield-check", "Specification": "tabler/file-certificate",
-    "Test Report": "tabler/test-pipe", "Work Instruction": "tabler/clipboard-list",
-}
+# A type an import adds (a Jira "Incident") takes its base type's icon.
+ICONS, TICKET_ICONS, DOCUMENT_ICONS = _icons()
 
 
 def ticket_icon(name: str) -> Optional[str]:
@@ -143,7 +86,7 @@ def _library_icon(db: Session, workspace_id: str, icon: str, share: bool) -> Ico
         row.is_global = True
     # A fresh install, a wiped store, or a release that redrew the icon: the catalogue's own files follow it.
     current = open(row.storage_path, "rb").read() if os.path.exists(row.storage_path) else None
-    if current != content:
+    if current != content and not PREVIEW.get():
         os.makedirs(os.path.dirname(row.storage_path), exist_ok=True)
         with open(row.storage_path, "wb") as f:
             f.write(content)

@@ -184,6 +184,8 @@ from app.routers import logbook as logbook_router  # noqa: E402
 app.include_router(logbook_router.router)
 from app.routers import jql as jql_router  # noqa: E402
 app.include_router(jql_router.router)
+from app.routers import packages as packages_router  # noqa: E402
+app.include_router(packages_router.router)
 app.include_router(mcp.router)
 app.include_router(groups.router)
 app.include_router(icons.router)
@@ -215,6 +217,12 @@ def _default_workspace() -> None:
         made = ensure_default_workspace(db)
         if made:
             logging.getLogger(__name__).info("created the default workspace %s", made)
+        # Workspaces made before packages were recorded: what each evidently has, recorded once.
+        from app.packages.install import detect
+        found = detect(db)
+        db.commit()
+        if found:
+            logging.getLogger(__name__).info("recorded %s template packages already in place", found)
     except Exception:  # noqa: BLE001 — a database not yet migrated must not stop the API
         db.rollback()
         logging.getLogger(__name__).warning("default workspace skipped", exc_info=True)

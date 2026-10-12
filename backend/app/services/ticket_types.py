@@ -24,97 +24,29 @@ from app.models.schema import Schema
 BASE_UID_SUFFIX = "argus-ticket"
 BASE_TYPE_NAME = "Ticket"
 
-# The kinds of work a ticket can be. Close to what trackers use, so an
-# import needs no mapping for the common case.
-DEFAULT_ISSUE_TYPES = ("Epic", "Story", "Task", "Bug", "Sub-task")
+# The kinds of work a ticket can be, and the fields every ticket carries: the core-facility package
+# (backend/packages/core-facility/ticket_types.yaml). Close to what trackers use, so an import needs no
+# mapping for the common case; the operational fields (category, impact, downtime) are what ARGUS reasons over.
+def _definitions():
+    from app.packages import defaults
+    return defaults.ticket_types()
 
-# Operational classification — what makes a ticket useful to ARGUS. A fault
-# that stopped the beam and one that didn't are different facts.
-CATEGORY_OPTIONS = [
-    {"id": "fault", "value": "Fault"},
-    {"id": "maintenance", "value": "Maintenance"},
-    {"id": "upgrade", "value": "Upgrade"},
-    {"id": "request", "value": "Request"},
-    {"id": "investigation", "value": "Investigation"},
-    {"id": "other", "value": "Other"},
-]
 
-IMPACT_OPTIONS = [
-    {"id": "beam_down", "value": "Beam down"},
-    {"id": "beam_degraded", "value": "Beam degraded"},
-    {"id": "no_beam_impact", "value": "No beam impact"},
-    {"id": "safety", "value": "Safety"},
-    {"id": "unknown", "value": "Unknown"},
-]
+DEFAULT_ISSUE_TYPES = tuple(name for name, _, _ in _definitions().kinds)
+BASE_DESCRIPTION = _definitions().base_description
 
-DETECTED_BY_OPTIONS = [
-    {"id": "operator", "value": "Operator"},
-    {"id": "alarm", "value": "Alarm"},
-    {"id": "monitoring", "value": "Monitoring"},
-    {"id": "inspection", "value": "Inspection"},
-    {"id": "user_report", "value": "User report"},
-]
 
-SOURCE_OPTIONS = [
-    {"id": "manual", "value": "Created here"},
-    {"id": "jira", "value": "Jira"},
-]
+def _options_of(key: str) -> list[dict]:
+    for a in _definitions().base_attributes:
+        if a["key"] == key:
+            return [dict(o) for o in a.get("options") or []]
+    return []
 
-# (key, name, type, extra), ordered as they should read on a ticket.
-BASE_ATTRIBUTES = [
-    # The fields ARGUS reasons over; the rest is description.
-    ("argus_category", "Category", "enumeration", {"options": CATEGORY_OPTIONS}),
-    ("argus_impact", "Operational impact", "enumeration", {"options": IMPACT_OPTIONS}),
-    ("argus_detected_by", "Detected by", "enumeration", {"options": DETECTED_BY_OPTIONS}),
-    # Indexed, and deliberately the same keys documents use: "the vacuum
-    # system" has to be one term across tickets and documentation, or the
-    # graph cannot answer "everything about this system".
-    ("argus_system", "System", "string", {"indexed": True}),
-    ("argus_subsystem", "Subsystem", "string", {"indexed": True}),
 
-    # Cause and cure, in the operators' own words. Free text on purpose:
-    # forcing a taxonomy here yields "other" for everything interesting,
-    # and retrieval reads prose perfectly well.
-    ("argus_root_cause", "Root cause", "text", {}),
-    ("argus_corrective_action", "Corrective action", "text", {}),
-    ("argus_resolution", "Resolution", "string", {"indexed": True}),
-
-    # Downtime — the number anyone asks for first.
-    ("argus_downtime_start", "Downtime start", "datetime", {}),
-    ("argus_downtime_end", "Downtime end", "datetime", {}),
-    ("argus_downtime_minutes", "Downtime (minutes)", "integer", {}),
-
-    # Planning.
-    ("argus_epic", "Epic", "string", {}),
-    ("argus_epic_name", "Epic name", "string", {}),
-    ("argus_sprint", "Sprint", "string", {"multiValue": True, "indexed": True}),
-    ("argus_story_points", "Story points", "float", {}),
-    ("argus_components", "Components", "string", {"multiValue": True, "indexed": True}),
-    ("argus_fix_versions", "Fix version/s", "string", {"multiValue": True, "indexed": True}),
-    ("argus_affects_versions", "Affects version/s", "string",
-     {"multiValue": True, "indexed": True}),
-    ("argus_environment", "Environment", "text", {}),
-    ("argus_parent", "Parent ticket", "string", {}),
-    ("argus_time_spent", "Time spent (s)", "integer", {}),
-    ("argus_time_estimate", "Original estimate (s)", "integer", {}),
-    # Not a `user` yet: imported reporters are display names from Jira with
-    # no matching account here, and typing this as a user would fail every
-    # import until the directory holds those people.
-    ("argus_reporter", "Reporter", "string", {"indexed": True}),
-    ("argus_votes", "Votes", "integer", {}),
-    ("argus_watchers", "Watchers", "integer", {}),
-
-    # Where it came from. Read-only: a re-import overwrites these, so an
-    # edit here would only be undone.
-    ("argus_source", "Source", "enumeration", {"options": SOURCE_OPTIONS, "readOnly": True}),
-    ("argus_project", "Project at source", "string", {"readOnly": True}),
-    ("argus_source_key", "Source key", "string", {"readOnly": True}),
-    ("argus_source_url", "Source link", "string", {"readOnly": True}),
-    ("argus_source_status", "Status at source", "string", {"readOnly": True}),
-    ("argus_source_type", "Type at source", "string", {"readOnly": True}),
-    ("argus_source_created", "Created at source", "datetime", {"readOnly": True}),
-    ("argus_source_updated", "Updated at source", "datetime", {"readOnly": True}),
-]
+# The operational classifications, as the AI drafting reads them.
+CATEGORY_OPTIONS = _options_of("argus_category")
+IMPACT_OPTIONS = _options_of("argus_impact")
+DETECTED_BY_OPTIONS = _options_of("argus_detected_by")
 
 # Keys written while the model was still Jira's. Mapped rather than
 # dropped: the tickets already imported hold real values under them.
@@ -152,28 +84,8 @@ LEGACY_KEY_MAP = {
 }
 
 
-def _attribute(key: str, name: str, type_: str, extra: dict) -> dict:
-    out = {
-        "id": key,
-        "key": key,
-        "name": name,
-        "type": type_,
-        "required": False,
-        "multiValue": extra.get("multiValue", False),
-        "unique": extra.get("unique", False),
-        "readOnly": extra.get("readOnly", False),
-        # An indexed attribute is a key rather than prose: the values it
-        # already holds are offered as you type, so the same term is reused
-        # instead of being spelled three ways.
-        "indexed": extra.get("indexed", False),
-    }
-    if extra.get("options"):
-        out["options"] = extra["options"]
-    return out
-
-
 def base_attributes() -> list[dict]:
-    return [_attribute(*a) for a in BASE_ATTRIBUTES]
+    return [dict(a) for a in _definitions().base_attributes]
 
 
 def ensure_ticket_types(db: Session, workspace_id: str, issue_type_names: set[str]) -> dict:
@@ -192,7 +104,7 @@ def ensure_ticket_types(db: Session, workspace_id: str, issue_type_names: set[st
             uid=base_uid,
             workspace_id=workspace_id,
             name=BASE_TYPE_NAME,
-            description="Fields every ticket carries, whatever created it.",
+            description=BASE_DESCRIPTION,
             applies_to="tickets",
             is_concrete=False,
             attributes=base_attributes(),

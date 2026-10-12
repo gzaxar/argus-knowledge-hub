@@ -24,9 +24,9 @@ from app.models.schema import Schema
 from app.models.workspace import Workspace
 from app.services import asset_types as at
 from app.services.attribute_validation import check_attributes, effective_attributes
-from app.services.document_types import BASE_ATTRIBUTES as DOCUMENT_ATTRIBUTES
+from app.services.document_types import base_attributes as document_attributes
 from app.services.epik8s_import import _Importer
-from app.services.ticket_types import BASE_ATTRIBUTES as TICKET_ATTRIBUTES
+from app.services.ticket_types import base_attributes as ticket_attributes
 from tests.test_epik8s_import import VALUES_TEMPLATE
 
 pytestmark = pytest.mark.usefixtures("_schema")
@@ -119,12 +119,13 @@ def test_only_the_root_and_the_six_branches_sit_directly_under_it():
 
 def test_the_keys_shared_with_tickets_and_documents_are_spelled_the_same():
     item = {a["key"]: a for a in at.BY_NAME["Item"].attributes}
-    for key, _name, type_, extra in TICKET_ATTRIBUTES + DOCUMENT_ATTRIBUTES:
+    for attr in ticket_attributes() + document_attributes():
+        key = attr["key"]
         if key in ("argus_system", "argus_subsystem", "argus_facility", "argus_keywords"):
             assert key in item
-            assert item[key]["type"] == type_
-            assert item[key]["indexed"] == extra.get("indexed", False)
-            assert item[key]["multiValue"] == extra.get("multiValue", False)
+            assert item[key]["type"] == attr["type"]
+            assert item[key]["indexed"] == attr["indexed"]
+            assert item[key]["multiValue"] == attr["multiValue"]
     assert {"argus_system", "argus_subsystem", "argus_facility", "argus_keywords"} <= set(item)
 
 

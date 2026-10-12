@@ -40,17 +40,13 @@ class WorkflowError(ValueError):
     code = "workflow"
 
 
-BUILTIN = {
-    "uid": None, "name": "ARGUS default", "initial": "new", "is_default": True,
-    "states": [
-        {"key": "new", "name": "New", "category": "open"},
-        {"key": "in_progress", "name": "In Progress", "category": "active"},
-        {"key": "pending", "name": "Pending", "category": "waiting"},
-        {"key": "resolved", "name": "Resolved", "category": "done"},
-        {"key": "closed", "name": "Closed", "category": "done"},
-    ],
-    "transitions": [{"from": "*", "to": "*", "name": "Move"}],
-}
+def _builtin() -> dict:
+    """The workflow of a type with none of its own: the core-facility package's default."""
+    from app.packages import defaults
+    return defaults.default_workflow()
+
+
+BUILTIN = _builtin()
 
 
 def slug(name: str) -> str:

@@ -598,10 +598,11 @@ export const workspacesApi = {
   listMine: () => request<MyWorkspace[]>("/v1/me/workspaces"),
   /** `id` omitted: the server derives it from the name by the
    * installation's rule, so a stale form cannot make one that breaks it. */
-  create: (name: string, id?: string) =>
+  create: (name: string, id?: string, packages: string[] = [], catalogueWorkspaceId?: string) =>
     request<MyWorkspace>("/v1/workspaces", {
       method: "POST",
-      body: json(id ? { name, id } : { name }),
+      body: json({ name, ...(id ? { id } : {}), packages,
+                   ...(catalogueWorkspaceId ? { catalogue_workspace_id: catalogueWorkspaceId } : {}) }),
     }),
   suggestId: (name: string) =>
     request<WorkspaceIdSuggestion>(
@@ -1795,4 +1796,70 @@ export const jqlApi = {
     }
   },
   fields: () => request<Record<JqlEntity, JqlField[]>>("/v1/search/jql/fields"),
+};
+
+/** Template packages: what the installation ships, and what a workspace uses (backend app/packages). */
+export interface PackageInfo {
+  id: string;
+  version: string;
+  name: string;
+  description: string;
+  owner: string;
+  depends: Record<string, string>;
+  provides: string[];
+  checksum: string;
+  contents: Record<string, number>;
+  installable?: boolean;
+  problems?: string[];
+  requested?: boolean;
+}
+
+export interface WorkspacePackageRow {
+  package_id: string;
+  name: string;
+  version: string;
+  checksum: string;
+  options: Record<string, string> | null;
+  installed_at: string | null;
+  installed_by: string | null;
+  shipped_version: string | null;
+  upgrade_available: boolean;
+}
+
+export interface PackageHistoryRow {
+  package_id: string;
+  action: string;
+  from_version: string | null;
+  to_version: string;
+  checksum: string;
+  actor: string | null;
+  at: string | null;
+  result: Record<string, unknown> | null;
+}
+
+export interface PackagePlan {
+  workspace_id: string;
+  options: Record<string, string>;
+  changes: boolean;
+  steps: { package_id: string; version: string; action: string; from_version: string | null; requested: boolean;
+           result: Record<string, unknown> }[];
+}
+
+export interface PackagesInput {
+  packages: string[];
+  catalogue_workspace_id?: string;
+  scope?: string;
+}
+
+export const packagesApi = {
+  list: () => request<PackageInfo[]>("/v1/packages"),
+  resolve: (packages: string[]) =>
+    request<PackageInfo[]>("/v1/packages/resolve", { method: "POST", body: json({ packages }) }),
+  ofWorkspace: (workspaceId: string) =>
+    request<{ workspace_id: string; packages: WorkspacePackageRow[]; history: PackageHistoryRow[] }>(
+      `/v1/workspaces/${workspaceId}/packages`),
+  preview: (workspaceId: string, input: PackagesInput) =>
+    request<PackagePlan>(`/v1/workspaces/${workspaceId}/packages/preview`, { method: "POST", body: json(input) }),
+  install: (workspaceId: string, input: PackagesInput) =>
+    request<PackagePlan>(`/v1/workspaces/${workspaceId}/packages/install`, { method: "POST", body: json(input) }),
 };

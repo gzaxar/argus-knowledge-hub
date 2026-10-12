@@ -23,3 +23,4 @@ openpyxl==3.1.5
 pypdf==5.1.0
 # Compresses the chunks of portable archives (app/portability).
 zstandard==0.23.0
+packaging==26.3
