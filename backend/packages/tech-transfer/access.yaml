@@ -1,0 +1,21 @@
+roles:
+  - id: technology-transfer-officer
+    name: Technology transfer officer
+    description: "The whole portfolio: inventions, patents, licences, spin-offs; sees unpublished inventions, costs and commercial terms."
+    objects: [read, create, modify]
+    tickets: [read, create, modify, approve]
+    documents: [read, create, modify, approve]
+    restricted: [unpublished_invention, costs, commercial_terms]
+  - id: ip-committee-member
+    name: IP committee member
+    description: "Decides on disclosures and annuities; sees unpublished inventions and costs."
+    objects: [read]
+    tickets: [read, modify, approve]
+    documents: [read]
+    restricted: [unpublished_invention, costs]
+  - id: inventor
+    name: Inventor
+    description: "Discloses inventions and follows their evaluation; sees no costs or terms."
+    objects: [read, create]
+    tickets: [read, create]
+    documents: [read, create]

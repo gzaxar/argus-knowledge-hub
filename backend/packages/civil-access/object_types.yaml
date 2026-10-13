@@ -1,0 +1,108 @@
+# Building infrastructure and access control on the core backbone (Building, Area, Rack and Storage Location
+# are core-objects'). "Access Point" is the accelerator package's control endpoint: the physical side of
+# access control is called Door, Badge Reader and Access Controller here, never Access Point.
+# Never rename a type, an attribute key or an option id: stored records use them.
+
+option_sets:
+  security_level:
+    - {id: public, value: Public}
+    - {id: staff, value: Staff}
+    - {id: restricted, value: Restricted}
+    - {id: high_security, value: High security}
+
+map_layers:
+  - {id: access, name: Access control, description: "Doors, readers, controllers and access zones."}
+  - {id: building-services, name: Building services, description: "Elevators, cranes and other building systems."}
+
+object_types:
+  types:
+    - name: "Room"
+      parent: "Area"
+      description: "A room: its number, floor area, use and occupancy."
+      icon: tabler/building
+      attributes:
+        - {key: room_number, name: Room number, indexed: true}
+        - {key: floor_area_m2, name: Floor area (m²), type: float, unit: m²}
+        - {key: room_use, name: Use, type: enumeration, options: [{id: office, value: Office}, {id: laboratory, value: Laboratory}, {id: workshop, value: Workshop}, {id: technical, value: Technical room}, {id: storage, value: Storage}, {id: clean_room, value: Clean room}, {id: meeting, value: Meeting room}, {id: circulation, value: Corridor or stairs}, {id: other, value: Other}]}
+        - {key: max_occupancy, name: Maximum occupancy, type: integer, unit: persons}
+        - {key: floor_load_kn_m2, name: Floor load (kN/m²), type: float, unit: kN/m²}
+    - name: "Access Zone"
+      parent: "Area"
+      description: "A set of spaces entered under one access rule, through controlled doors."
+      icon: tabler/lock
+      locatable: true
+      map_layer: access
+      attributes:
+        - {key: security_level, name: Security level, type: enumeration, option_set: security_level}
+        - {key: opening_hours, name: Opening hours, description: "e.g. Mon-Fri 07:00-20:00."}
+        - {key: zone_manager, name: Zone manager, type: user}
+    - name: "Access Control Equipment"
+      parent: "Asset"
+      description: "Equipment of the access control system."
+      abstract: true
+      icon: tabler/lock
+      locatable: true
+      map_layer: access
+      attributes:
+        - {key: security_notes, name: Security notes, type: text, restricted: physical_security}
+    - name: "Door"
+      parent: "Access Control Equipment"
+      description: "A door or gate between two spaces: its kind, fire rating and whether access is controlled."
+      icon: tabler/arrows-right-left
+      attributes:
+        - {key: door_kind, name: Kind, type: enumeration, options: [{id: standard, value: Standard}, {id: fire_door, value: Fire door}, {id: security, value: Security door}, {id: shielding, value: Shielding door}, {id: roller, value: Roller shutter}, {id: gate, value: Gate}]}
+        - {key: fire_rating_min, name: Fire rating (min), type: integer, unit: min}
+        - {key: access_controlled, name: Access controlled, type: boolean}
+        - {key: leads_to, name: Leads to, type: reference, reference: Area, include_children: true}
+    - name: "Badge Reader"
+      parent: "Access Control Equipment"
+      description: "Reads a badge, PIN or biometric and asks the controller to open a door."
+      icon: tabler/scan
+      attributes:
+        - {key: reader_technology, name: Technology, type: enumeration, multi: true, options: [{id: mifare, value: MIFARE}, {id: hid_prox, value: HID Prox}, {id: pin, value: PIN}, {id: biometric, value: Biometric}, {id: qr, value: QR code}]}
+        - {key: reads_for, name: Door, type: reference, reference: Door}
+        - {key: access_controller, name: Controller, type: reference, reference: Access Controller}
+    - name: "Access Controller"
+      parent: "Access Control Equipment"
+      description: "Decides who may pass and drives the door locks of its readers."
+      icon: tabler/cpu
+      attributes:
+        - {key: n_doors, name: Doors, type: integer}
+        - {key: firmware_version, name: Firmware version}
+    - name: "Building System"
+      parent: "Asset"
+      description: "A system of the building that is inspected by law or contract."
+      abstract: true
+      icon: tabler/building
+      locatable: true
+      map_layer: building-services
+      attributes:
+        - {key: statutory_inspection_due, name: Statutory inspection due, type: date, indexed: true}
+        - {key: registration_number, name: Registration number, description: "The number it is registered under with the authority."}
+    - name: "Elevator"
+      parent: "Building System"
+      description: "A lift: load, stops and its inspection."
+      icon: tabler/stack-2
+      attributes:
+        - {key: rated_load_kg, name: Rated load (kg), type: float, unit: kg}
+        - {key: n_stops, name: Stops, type: integer}
+    - name: "Overhead Crane"
+      parent: "Building System"
+      description: "A bridge or gantry crane: safe working load and span."
+      icon: tabler/building-bridge
+      attributes:
+        - {key: swl_t, name: Safe working load (t), type: float, unit: t}
+        - {key: span_m, name: Span (m), type: float, unit: m}
+
+reference_relations:
+  leads_to: "gives access to"
+  reads_for: "controls door"
+  access_controller: "on access controller"
+
+relation_types:
+  - {id: gives-access-to, verb: "gives access to", from: Door, to: Area, layer: access, flows: none, description: "a door and the space it opens into"}
+  - {id: controls-door, verb: "controls door", from: Badge Reader, to: Door, layer: access, flows: forward, carries: function, description: "a reader and the door it opens: a failed reader leaves the door shut"}
+  - {id: on-access-controller, verb: "on access controller", from: Badge Reader, to: Access Controller, layer: access, flows: reverse, carries: function, description: "a reader and its controller: a failed controller stops its readers"}
+
+restricted_classes:
+  - {id: physical_security, description: "How spaces are physically secured: alarm zones, codes, camera coverage, lock details."}

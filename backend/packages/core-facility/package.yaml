@@ -1,10 +1,12 @@
 id: core-facility
-version: 1.0.0
+version: 2.0.0
 name: Core facility
 description: >-
-  What every workspace starts with, whatever it keeps: the fields every ticket and document carries, the
-  kinds of ticket and document, the shared status and priority enumerations, and the default ticket
-  workflow. Object types come from a catalogue package (accelerator, and later IT, plant…).
+  What every workspace starts with, whatever it keeps, and nothing of any one domain: the fields every
+  ticket and document carries, the kinds of ticket and document, the shared status and priority
+  enumerations, and the default ticket workflow. Records come from the packages a workspace chooses:
+  equipment from core-objects and its domains, agreements and parties from core-records. Since 2.0 its
+  vocabulary is domain neutral (the beam-specific impacts are the accelerator package's).
 owner: INFN ARGUS
 license: EUPL-1.2
 provides: [tickets, documents]

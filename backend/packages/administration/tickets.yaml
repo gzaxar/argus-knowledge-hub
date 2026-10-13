@@ -1,0 +1,62 @@
+ticket_types:
+  kinds:
+    - name: "Procurement Request"
+      description: "A request to buy something: what, roughly what it costs, which budget, by when."
+      icon: tabler/receipt
+      attributes:
+        - {key: requested_items, name: What, type: text}
+        - {key: estimated_eur, name: Estimated cost (EUR), type: float, unit: EUR, restricted: costs}
+        - {key: budget_line, name: Budget line, type: reference, reference: Budget Line}
+        - {key: proposed_procedure, name: Proposed procedure, type: enumeration, options: [{id: open, value: Open}, {id: negotiated, value: Negotiated}, {id: direct_award, value: Direct award}, {id: framework_call_off, value: Framework call-off}, {id: marketplace, value: Public marketplace}]}
+        - {key: needed_by, name: Needed by, type: date}
+    - name: "Contract Renewal"
+      description: "A contract coming to its end: renew, renegotiate or let it end."
+      icon: tabler/file-certificate
+      attributes:
+        - {key: contract, name: Contract, type: reference, reference: Contract, include_children: true}
+        - {key: renewal_decision, name: Decision, type: enumeration, options: [{id: renew, value: Renew}, {id: renegotiate, value: Renegotiate}, {id: terminate, value: Let it end}]}
+    - name: "Goods Receipt"
+      description: "What arrived against an order, and whether it was complete and as ordered."
+      icon: tabler/package
+      attributes:
+        - {key: purchase_order, name: Order, type: reference, reference: Purchase Order}
+        - {key: received_on, name: Received on, type: date}
+        - {key: complete, name: Complete, type: boolean}
+        - {key: discrepancy, name: Discrepancy, type: text}
+
+workflows:
+  - id: procurement-request
+    name: "Procurement request"
+    description: "Draft, submitted, budget checked, approved by someone who may approve, ordered, closed."
+    applies_to: ["Procurement Request"]
+    initial: draft
+    states:
+      - {key: draft, name: Draft, category: open}
+      - {key: submitted, name: Submitted, category: open}
+      - {key: budget_checked, name: Budget checked, category: active}
+      - {key: approved, name: Approved, category: active}
+      - {key: ordered, name: Ordered, category: waiting}
+      - {key: closed, name: Closed, category: done}
+      - {key: rejected, name: Rejected, category: done}
+    transitions:
+      - {from: draft, to: submitted, name: Submit}
+      - {from: submitted, to: budget_checked, name: Confirm budget, requires: [assignee, comment]}
+      - {from: submitted, to: draft, name: Return for changes, requires: [comment]}
+      - {from: budget_checked, to: approved, name: Approve, requires: [approver]}
+      - {from: budget_checked, to: rejected, name: Reject, requires: [approver, comment]}
+      - {from: approved, to: ordered, name: Order placed, requires: [comment]}
+      - {from: ordered, to: closed, name: Close, requires: [resolution]}
+
+document_types:
+  kinds:
+    - name: "Signed Contract"
+      description: "The signed text of a contract or amendment, with its protocol number."
+      icon: tabler/file-certificate
+      attributes:
+        - {key: signed_on, name: Signed on, type: date}
+        - {key: protocol_number, name: Protocol number, indexed: true}
+    - name: "Tender Document"
+      description: "Specifications, notices and evaluation records of a tender."
+      icon: tabler/file-description
+      attributes:
+        - {key: cig, name: CIG, validator: admin.cig}

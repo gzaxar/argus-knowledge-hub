@@ -1,0 +1,250 @@
+# The backbone every object catalogue stands on: the root and its branches, physical equipment (Asset) and
+# what is generic about it (ports, cables, supports, spares, instruments, cooling plant), products and vendors,
+# and places. Domain packages (accelerator, it, electrical, hydraulic, hvac, plant) add their own types under
+# it. Moved here unchanged from the accelerator catalogue 1.x: names, uids, attribute keys and option ids.
+#
+# Never rename a type, an attribute key or an option id here: stored records use them. A type's uid in a
+# workspace is <workspace>:argus-object:<name as a slug>.
+
+# The layers records with a location are shown on (basic GIS). A type marked `locatable` — and every type
+# under it — may have one; its layer is the nearest one up the tree (a domain may give its types their own).
+map_layers:
+  - {id: equipment, name: Equipment, description: "Physical units where they are installed or stored."}
+  - {id: places, name: Places, description: "Buildings, halls, tunnels, racks and stores."}
+
+object_types:
+  # Names a type had before it was renamed: a workspace seeded under the old name is renamed in place.
+  former_names: {Asset: Equipment Item, Location: Place}
+  types:
+    - name: "Item"
+      description: "Anything the inventory holds. Carries the keys shared with tickets and documents."
+      abstract: true
+      icon: tabler/box
+      behaviors: [root]
+      attributes:
+        - {key: description, name: Description, type: text}
+        - {key: argus_facility, name: Facility, indexed: true}
+        - {key: argus_system, name: System, indexed: true}
+        - {key: argus_subsystem, name: Subsystem, indexed: true}
+        - {key: argus_keywords, name: Keywords, indexed: true, multi: true}
+        - {key: argus_lifecycle, name: Lifecycle, type: enumeration, options: [{id: planned, value: Planned}, {id: in_service, value: In service}, {id: standby, value: Standby}, {id: maintenance, value: Under maintenance}, {id: faulty, value: Faulty}, {id: decommissioned, value: Decommissioned}, {id: scrapped, value: Scrapped}]}
+        - {key: argus_criticality, name: Criticality, type: enumeration, options: [{id: safety, value: Safety-critical}, {id: beam_critical, value: Beam-critical}, {id: degrades, value: Degrades beam}, {id: non_critical, value: Non-critical}]}
+        - {key: argus_owner, name: Owning service, type: group, indexed: true}
+        - {key: argus_responsible, name: Responsible, type: user}
+        - {key: argus_source, name: Source, type: enumeration, readonly: true, options: [{id: manual, value: Created here}, {id: epik8s, value: EPIK8s}, {id: epik8s-devices, value: epik8s-devices}, {id: jira, value: Jira}, {id: git, value: Git}, {id: pbs, value: PBS workbook}]}
+        - {key: argus_source_ref, name: Source revision, readonly: true}
+    - name: "Engineered Item"
+      parent: "Item"
+      description: "Anything in the product breakdown: PBS code, work package, design status."
+      abstract: true
+      icon: tabler/components
+      attributes:
+        - {key: pbs_code, name: PBS code, indexed: true, unique: true, regex: '^[A-Z0-9]+(-[A-Z0-9.]+){3,4}$'}
+        - {key: pbs_area, name: Area / zone, indexed: true}
+        - {key: pbs_system, name: PBS system, indexed: true}
+        - {key: pbs_family, name: PBS family, indexed: true}
+        - {key: pbs_type, name: PBS type, indexed: true}
+        - {key: pbs_sequential, name: Sequential number}
+        - {key: component_id, name: Component id, indexed: true}
+        - {key: wbs_code, name: Work package, indexed: true}
+        - {key: module_code, name: Module, indexed: true}
+        - {key: station_name, name: Station, indexed: true}
+        - {key: design_status, name: Design status, type: enumeration, options: [{id: study, value: Study}, {id: defined, value: Defined}, {id: approved, value: Approved}]}
+        - {key: unit_count, name: Number of units, type: integer}
+        - {key: sequence_index, name: Sequence in the PBS, type: integer}
+    - name: "Asset"
+      parent: "Engineered Item"
+      description: "The serialised box, with a purchase order."
+      locatable: true
+      map_layer: equipment
+      abstract: true
+      icon: tabler/package
+      behaviors: [equipment]
+      attributes:
+        - {key: manufacturer, name: Manufacturer, indexed: true}
+        - {key: model, name: Model, indexed: true}
+        - {key: serial, name: Serial number, indexed: true}
+        - {key: product_model, name: Instance of, type: reference, reference: Product Model}
+        - {key: argus_location, name: Located in, type: reference, reference: Location, include_children: true}
+        - {key: inventory_number, name: Inventory number, indexed: true, unique: true}
+        - {key: installed_on, name: Installed on, type: date}
+        - {key: removed_on, name: Removed on, type: date}
+        - {key: warranty_until, name: Warranty until, type: date}
+        - {key: condition, name: Condition, type: enumeration, options: [{id: new, value: New}, {id: good, value: Good}, {id: degraded, value: Degraded}, {id: faulty, value: Faulty}, {id: beyond_repair, value: Beyond repair}]}
+        - {key: is_spare, name: Held as spare, type: boolean}
+        - {key: inventory_url, name: Inventory link}
+    - name: "Instrument"
+      parent: "Asset"
+      description: "A bench or rack instrument."
+      icon: tabler/tool
+    - name: "Chiller"
+      parent: "Asset"
+      description: "A water chiller."
+      icon: tabler/snowflake
+    - name: "Cooling Circuit Component"
+      parent: "Asset"
+      description: "A pump, exchanger or valve in a cooling circuit."
+      icon: tabler/droplet
+    - name: "Cable Run"
+      parent: "Asset"
+      description: "A cable between two pieces of hardware. Classified by what it carries; a logical line (a serial line, a network path) is composed of cables and the active equipment between them, and is `carried by` them."
+      abstract: true
+      icon: tabler/plug-connected
+      attributes:
+        - {key: cable_label, name: Cable label, indexed: true}
+        - {key: cable_type, name: Cable type (as specified)}
+        - {key: length_m, name: Length (m), type: float}
+        - {key: from_asset, name: From, type: reference, reference: Asset, include_children: true}
+        - {key: from_connector, name: From connector}
+        - {key: to_asset, name: To, type: reference, reference: Asset, include_children: true}
+        - {key: to_connector, name: To connector}
+        - {key: signal, name: Signal}
+    - name: "Ethernet Cable"
+      parent: "Cable Run"
+      description: "A copper Ethernet cable."
+      icon: tabler/network
+      attributes:
+        - {key: ethernet_category, name: Category, type: enumeration, options: [{id: cat5e, value: Cat5e}, {id: cat6, value: Cat6}, {id: cat6a, value: Cat6a}, {id: cat7, value: Cat7}]}
+    - name: "Serial Cable"
+      parent: "Cable Run"
+      description: "A serial cable between a converter and an instrument, or between instruments on a bus."
+      attributes:
+        - {key: serial_standard, name: Standard, type: enumeration, options: [{id: rs_232, value: RS-232}, {id: rs_422, value: RS-422}, {id: rs_485, value: RS-485}]}
+    - name: "Fibre Cable"
+      parent: "Cable Run"
+      description: "An optical fibre."
+      attributes:
+        - {key: fibre_mode, name: Mode, type: enumeration, options: [{id: multimode, value: Multimode}, {id: single_mode, value: Single mode}]}
+    - name: "Power Cable"
+      parent: "Cable Run"
+      description: "A mains or DC supply cable."
+      icon: tabler/plug
+      attributes:
+        - {key: rated_current_a, name: Rated current (A), type: float}
+        - {key: rated_voltage_v, name: Rated voltage (V), type: float}
+    - name: "HV Cable"
+      parent: "Cable Run"
+      description: "A high-voltage cable, such as an ion pump's."
+      icon: tabler/bolt
+      attributes:
+        - {key: rated_voltage_kv, name: Rated voltage (kV), type: float}
+    - name: "RF Cable"
+      parent: "Cable Run"
+      description: "A coaxial cable carrying RF or a fast signal."
+      icon: tabler/antenna
+      attributes:
+        - {key: impedance_ohm, name: Impedance (Ω), type: float}
+    - name: "Signal Cable"
+      parent: "Cable Run"
+      description: "A multi-conductor cable for analogue or digital signals."
+      icon: tabler/activity
+      attributes:
+        - {key: n_conductors, name: Number of conductors, type: integer}
+    - name: "Mechanical Support"
+      parent: "Asset"
+      description: "A stand, girder or support."
+      icon: tabler/building-bridge
+    - name: "Spare Part"
+      parent: "Asset"
+      description: "Held on a shelf for a product model."
+      icon: tabler/box-multiple
+      attributes:
+        - {key: spare_for, name: Spare for, type: reference, reference: Product Model}
+        - {key: quantity, name: Quantity, type: integer}
+        - {key: minimum_stock, name: Minimum stock, type: integer}
+        - {key: storage_location, name: Stored in, type: reference, reference: Storage Location}
+    - name: "Other Equipment"
+      parent: "Asset"
+      description: "Equipment no type of its own describes yet. Its class says what it is; a class that grows (§5.5) is promoted to a type of its own."
+      icon: tabler/box
+      behaviors: [other_equipment]
+      attributes:
+        - {key: equipment_class, name: Equipment class, indexed: true}
+    - name: "Catalog Item"
+      parent: "Item"
+      description: "What a thing is an instance of."
+      abstract: true
+      icon: tabler/book
+    - name: "Product Model"
+      parent: "Catalog Item"
+      description: "A vendor's product. A procedure written once for it covers every unit."
+      icon: tabler/barcode
+      behaviors: [product_model]
+      attributes:
+        - {key: vendor, name: Vendor, indexed: true}
+        - {key: vendor_ref, name: Supplied by, type: reference, reference: Vendor}
+        - {key: model_code, name: Model code, indexed: true}
+        - {key: device_class, name: Device class, indexed: true}
+        - {key: datasheet_url, name: Datasheet}
+        - {key: firmware_version, name: Current firmware}
+        - {key: eol_date, name: End of life, type: date}
+        - {key: mtbf_hours, name: MTBF (h), type: integer}
+        - {key: typical_spares, name: Typical spares, indexed: true, multi: true}
+        - {key: inventory_url, name: Inventory link}
+    - name: "Vendor"
+      parent: "Catalog Item"
+      description: "The company, its support contract and RMA route."
+      icon: tabler/building-store
+      behaviors: [vendor]
+      attributes:
+        - {key: contact, name: Contact}
+        - {key: support_contract, name: Support contract}
+        - {key: support_expires, name: Support expires, type: date}
+        - {key: rma_procedure, name: RMA procedure, type: text}
+        - {key: website, name: Website}
+    - name: "Location"
+      parent: "Item"
+      description: "Where something is, and the rules for reaching it."
+      locatable: true
+      map_layer: places
+      abstract: true
+      icon: tabler/map-pin
+      attributes:
+        - {key: site, name: Site, indexed: true}
+        - {key: floor, name: Floor}
+        - {key: access_rule, name: Access rule, type: enumeration, options: [{id: free, value: Free}, {id: badge, value: Badge}, {id: interlocked, value: Interlocked}, {id: radiation_controlled, value: Radiation-controlled}]}
+    - name: "Building"
+      parent: "Location"
+      description: "A building."
+      icon: tabler/building
+    - name: "Area"
+      parent: "Location"
+      description: "A room, hall or tunnel."
+      icon: tabler/map-2
+      attributes:
+        - {key: zone, name: Zone, indexed: true}
+        - {key: radiation_classification, name: Radiation classification, type: enumeration, options: [{id: supervised, value: Supervised}, {id: controlled, value: Controlled}, {id: prohibited, value: Prohibited}]}
+        - {key: interlock_group, name: Interlock group}
+    - name: "Rack"
+      parent: "Location"
+      description: "An equipment rack."
+      icon: tabler/stack-2
+      attributes:
+        - {key: rack_units, name: Rack units, type: integer}
+        - {key: position, name: Position}
+        - {key: power_feed, name: Power feed}
+        - {key: cooling, name: Cooling}
+    - name: "Storage Location"
+      parent: "Location"
+      description: "A shelf or bin where spares are kept."
+      icon: tabler/packages
+      attributes:
+        - {key: shelf, name: Shelf}
+        - {key: bin, name: Bin}
+        - {key: climate_controlled, name: Climate controlled, type: boolean}
+    - name: "Equipment Port"
+      parent: "Engineered Item"
+      description: "One physical port of one unit: Ethernet, serial or a bus. It is `port of` the unit and moves with it; a Bus Segment is attached to it."
+      icon: tabler/plug-connected
+      behaviors: [equipment_port]
+      attributes:
+        - {key: port_label, name: Label, indexed: true}
+        - {key: port_role, name: Role, indexed: true}
+        - {key: port_kind, name: Kind, type: enumeration, options: [{id: rj45, value: RJ45}, {id: sfp, value: SFP}, {id: rs_232, value: RS-232}, {id: rs_422, value: RS-422}, {id: rs_485_2w, value: RS-485-2w}, {id: rs_485_4w, value: RS-485-4w}, {id: gpib, value: GPIB}, {id: can, value: CAN}, {id: usb, value: USB}, {id: ethercat, value: EtherCAT}, {id: other, value: Other}]}
+        - {key: mac, name: MAC address, indexed: true}
+        - {key: link_speed, name: Link speed}
+        - {key: supported_modes, name: Supported modes, multi: true}
+        - {key: operating_mode, name: Operating mode}
+        - {key: tcp_port, name: TCP port, type: integer, indexed: true}
+        - {key: signal_level, name: Signal level}
+        - {key: termination, name: Termination}

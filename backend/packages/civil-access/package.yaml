@@ -1,0 +1,16 @@
+id: civil-access
+version: 1.0.0
+name: Civil works, building infrastructure and access control
+description: >-
+  The buildings themselves and who may enter them: rooms, access zones, doors, badge readers and access
+  controllers; elevators and overhead cranes; building defects, civil works requests and access requests
+  with their approval workflows; building certificates. The core already has buildings, areas, racks and
+  stores — this package adds what civil engineering and access control need on top. Access rules,
+  certificates and workflows are to be approved by the site's facility manager and security officer; the
+  package establishes no compliance by itself.
+owner: INFN ARGUS — to be adopted by the site's technical services
+license: EUPL-1.2
+depends:
+  core-objects: ">=2.0,<3"
+provides: [building-catalogue, access-control]
+contents: [object_types.yaml, tickets.yaml, access.yaml, queries.yaml]

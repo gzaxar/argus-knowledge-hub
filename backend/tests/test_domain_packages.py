@@ -21,6 +21,7 @@ from app.services import asset_types
 
 DOMAINS = ("it", "electrical", "hydraulic", "hvac", "plant")
 OLD_ACCELERATOR = Path(__file__).parent / "fixtures" / "package_versions" / "accelerator-1.0.0"
+RELEASE_1_35_25 = Path(__file__).parent / "fixtures" / "package_versions" / "release-1.35.25"
 
 
 def _names(package_id: str) -> set[str]:
@@ -90,8 +91,8 @@ def test_supported_combinations_share_one_core_without_duplicates(spaces):
     names = _object_names(db, ws)
     assert len(names) == len(set(names))
     assert set(names) == _names("accelerator") | _names("plant")
-    assert set(installer.installed(db, ws)) == {"core-facility", "core-objects", "it", "accelerator", "electrical",
-                                                "hydraulic", "hvac", "plant"}
+    from app.packages import defaults
+    assert set(installer.installed(db, ws)) == set(defaults.closure("accelerator")) | set(defaults.closure("plant"))
     db.close()
 
 
@@ -130,12 +131,13 @@ def test_a_units_supply_is_a_power_edge_of_the_graph(spaces):
 
 
 def test_a_workspace_on_the_old_catalogue_moves_to_the_split_one_with_nothing_changed(spaces, tmp_path, monkeypatch):
-    """accelerator 1.0.0 held the whole catalogue; 2.0.0 stands on core-objects and it. The types that moved are
-    reported as moved, not removed; nothing in the workspace changes but the four new IT types."""
+    """accelerator 1.0.0 held the whole catalogue; now it stands on core-objects, it, safety, vacuum-cryo and
+    optics-alignment. The types that moved are reported as moved, not removed; every type the workspace had is
+    as it was; what is new is only the types those packages add."""
     ws = spaces()
     old = tmp_path / "old"
     old.mkdir()
-    shutil.copytree(available()["core-facility"].path, old / "core-facility")
+    shutil.copytree(RELEASE_1_35_25 / "core-facility", old / "core-facility")
     shutil.copytree(OLD_ACCELERATOR, old / "accelerator")
     monkeypatch.setenv("ARGUS_PACKAGES_DIR", str(old))
     loader.reload()
@@ -160,9 +162,17 @@ def test_a_workspace_on_the_old_catalogue_moves_to_the_split_one_with_nothing_ch
     db.commit()
     after = {s.uid: (s.name, s.parent_schema_uid, s.attributes) for s in db.scalars(
         select(Schema).where(Schema.workspace_id == ws, Schema.applies_to == "objects"))}
-    assert {u: v for u, v in after.items() if u in before} == before, "every type as it was"
-    assert {v[0] for u, v in after.items() if u not in before} == {"Firewall", "Wireless Access Point",
-                                                                    "Storage System", "Patch Panel"}
+    # Every type as it was; the it package adds its GLPI provenance fields to the root (an extension).
+    unprovenanced = {u: (v[0], v[1], [a for a in v[2] if a["key"] not in ("glpi_url", "glpi_unmapped")])
+                     for u, v in after.items() if u in before}
+    assert unprovenanced == before, "every type as it was"
+    item = next(v for v in after.values() if v[0] == "Item")
+    assert {"glpi_url", "glpi_unmapped"} <= {a["key"] for a in item[2]}
+    from app.packages import defaults
+    now_defined = {t.name for t in defaults.object_types("accelerator")}
+    old_names = {v[0] for v in before.values()}
+    assert {v[0] for u, v in after.items() if u not in before} == now_defined - old_names
+    assert {"Firewall", "Fire Extinguisher", "Cryostat", "Laser Oscillator", "Contract"} <= now_defined - old_names
     rows = installer.installed(db, ws)
     assert rows["accelerator"].version == available()["accelerator"].version
     assert {"core-objects", "it"} <= set(rows)

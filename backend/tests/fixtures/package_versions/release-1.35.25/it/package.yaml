@@ -1,0 +1,12 @@
+id: it
+version: 1.0.0
+name: IT
+description: >-
+  Network and computing equipment — switches, routers, firewalls, wireless access points, converters,
+  servers, workstations, storage, patch panels — and what the network registry knows (segments, addresses).
+owner: INFN ARGUS
+license: EUPL-1.2
+depends:
+  core-objects: ">=1.0,<2"
+provides: [it-catalogue]
+contents: [object_types.yaml]

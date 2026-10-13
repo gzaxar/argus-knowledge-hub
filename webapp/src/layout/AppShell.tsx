@@ -9,6 +9,8 @@ import { SchemaTree } from "../components/SchemaTree";
 import { WorkspaceSwitcher } from "../components/WorkspaceSwitcher";
 import { NotificationBell } from "../components/hub/WorkflowPanels";
 import { setShowKeys, useShowKeys } from "../api/displayPrefs";
+import { has, useCapabilities } from "../api/useCapabilities";
+import type { WorkspaceCapabilities } from "../api/client";
 
 /**
  * One application, three kinds of record. Assets, the service desk and the
@@ -24,7 +26,7 @@ interface SectionConfig {
   hint: string;
   icon: string;
   landing: string;
-  links: { to: string; label: string; end?: boolean }[];
+  links: { to: string; label: string; end?: boolean; needs?: keyof WorkspaceCapabilities["features"] }[];
   treeLabel: string;
   newTypeTo: string;
   newTypeTitle: string;
@@ -40,15 +42,15 @@ const SECTIONS: Record<SectionKey, SectionConfig> = {
     landing: "/assets/search",
     links: [
       { to: "/assets/search", label: "Browse & search" },
-      { to: "/map", label: "Map" },
+      { to: "/map", label: "Map", needs: "map" },
       { to: "/search/advanced?entity=assets", label: "Advanced search (JQL)" },
       { to: "/catalogue/types", label: "Type catalogue" },
-      { to: "/labels", label: "Labels & QR codes" },
+      { to: "/labels", label: "Labels & QR codes", needs: "equipment" },
       { to: "/global-values", label: "Global values" },
       { to: "/bulk-changes", label: "Bulk changes" },
-      { to: "/catalogue/equipment-classes", label: "Equipment classes" },
-      { to: "/migration/catalogue", label: "Map imported records" },
-      { to: "/control-bindings", label: "Channels ↔ hardware" },
+      { to: "/catalogue/equipment-classes", label: "Equipment classes", needs: "equipment" },
+      { to: "/migration/catalogue", label: "Map imported records", needs: "equipment" },
+      { to: "/control-bindings", label: "Channels ↔ hardware", needs: "control_system" },
     ],
     treeLabel: "Object types",
     newTypeTo: "/schemas/new",
@@ -154,6 +156,7 @@ function NavItem({
 }
 
 function NewMenu() {
+  const features = useCapabilities();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -164,11 +167,16 @@ function NewMenu() {
     window.addEventListener("mousedown", close);
     return () => window.removeEventListener("mousedown", close);
   }, [open]);
+  const equipment = has(features, "equipment");
   const items = [
     { to: "/tickets/new", label: "Ticket", hint: "Report an issue or request work", dot: "bg-amber-500" },
-    { to: "/assets/new", label: "Asset", hint: "Register equipment or a position", dot: "bg-indigo-500" },
+    equipment
+      ? { to: "/assets/new", label: "Asset", hint: "Register equipment or a position", dot: "bg-indigo-500" }
+      : { to: "/assets/new", label: "Record", hint: "An agreement, a party, a case", dot: "bg-indigo-500" },
     { to: "/documents/new", label: "Document", hint: "Procedure, manual, report", dot: "bg-emerald-500" },
-    { to: "/beam-model/new", label: "Beam model", hint: "Upload machine models, or write one", dot: "bg-violet-500" },
+    ...(has(features, "beam_model")
+      ? [{ to: "/beam-model/new", label: "Beam model", hint: "Upload machine models, or write one", dot: "bg-violet-500" }]
+      : []),
   ];
   return (
     <div className="relative" ref={ref}>
@@ -240,7 +248,18 @@ export function AppShell() {
   const openPalette = useCallback(() => setPaletteOpen(true), []);
   useCommandPaletteShortcut(openPalette);
 
-  const config = SECTIONS[activeSection];
+  // What this workspace's packages provide: a workspace of records only (technology transfer, contracts)
+  // has no equipment pages and no map; only an accelerator has the beam model.
+  const features = useCapabilities();
+  const sections: Record<SectionKey, SectionConfig> = {
+    ...SECTIONS,
+    assets: has(features, "equipment")
+      ? SECTIONS.assets
+      : { ...SECTIONS.assets, label: "Records", hint: "Agreements, parties, cases and the like",
+          links: SECTIONS.assets.links.filter((l) => !l.needs || has(features, l.needs)), treeLabel: "Record types" },
+  };
+  sections.assets = { ...sections.assets, links: sections.assets.links.filter((l) => !l.needs || has(features, l.needs)) };
+  const config = sections[activeSection];
   const accessLink = currentWorkspaceId ? `/workspaces/${currentWorkspaceId}/access` : null;
   const scopedMembersLink = membersLink ? `${membersLink}?section=${activeSection}` : null;
   const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -268,7 +287,7 @@ export function AppShell() {
             )}
           </NavItem>
           {ORDER.map((key) => {
-            const s = SECTIONS[key];
+            const s = sections[key];
             const selected = key === activeSection;
             return (
               <div key={key} className="mt-0.5">
@@ -305,9 +324,11 @@ export function AppShell() {
             <NavItem to="/graph">
               <span className="w-4 text-center text-slate-400">⌗</span> Knowledge graph
             </NavItem>
-            <NavItem to="/beam-model">
-              <span className="w-4 text-center text-slate-400">◎</span> Beam model
-            </NavItem>
+            {has(features, "beam_model") && (
+              <NavItem to="/beam-model">
+                <span className="w-4 text-center text-slate-400">◎</span> Beam model
+              </NavItem>
+            )}
             <NavItem to="/ask">
               <span className="w-4 text-center text-slate-400">?</span> Ask ARGUS
             </NavItem>

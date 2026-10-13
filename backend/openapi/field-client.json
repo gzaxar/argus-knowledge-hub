@@ -1105,6 +1105,71 @@
         "title": "Body_transcribe_recording_v1_ai_transcribe_post",
         "type": "object"
       },
+      "CapabilitiesOut": {
+        "properties": {
+          "document_kinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Document Kinds",
+            "type": "array"
+          },
+          "features": {
+            "$ref": "#/components/schemas/FeaturesOut"
+          },
+          "importers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Importers",
+            "type": "array"
+          },
+          "map_layers": {
+            "items": {
+              "$ref": "#/components/schemas/MapLayerOut"
+            },
+            "title": "Map Layers",
+            "type": "array"
+          },
+          "packages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Packages",
+            "type": "array"
+          },
+          "provides": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Provides",
+            "type": "array"
+          },
+          "ticket_kinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ticket Kinds",
+            "type": "array"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "packages",
+          "provides",
+          "features",
+          "map_layers",
+          "ticket_kinds",
+          "document_kinds",
+          "importers"
+        ],
+        "title": "CapabilitiesOut",
+        "type": "object"
+      },
       "ChatIn": {
         "properties": {
           "conversation_id": {
@@ -2046,6 +2111,54 @@
         "title": "DraftDocumentOut",
         "type": "object"
       },
+      "FeaturesOut": {
+        "properties": {
+          "beam_model": {
+            "title": "Beam Model",
+            "type": "boolean"
+          },
+          "control_system": {
+            "title": "Control System",
+            "type": "boolean"
+          },
+          "documents": {
+            "title": "Documents",
+            "type": "boolean"
+          },
+          "equipment": {
+            "title": "Equipment",
+            "type": "boolean"
+          },
+          "map": {
+            "title": "Map",
+            "type": "boolean"
+          },
+          "records": {
+            "title": "Records",
+            "type": "boolean"
+          },
+          "tickets": {
+            "title": "Tickets",
+            "type": "boolean"
+          },
+          "type_catalogue": {
+            "title": "Type Catalogue",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tickets",
+          "documents",
+          "equipment",
+          "records",
+          "map",
+          "beam_model",
+          "control_system",
+          "type_catalogue"
+        ],
+        "title": "FeaturesOut",
+        "type": "object"
+      },
       "GlobalValueOut": {
         "properties": {
           "allowed_egu_list": {
@@ -2835,6 +2948,35 @@
           }
         },
         "title": "IssueUpdate",
+        "type": "object"
+      },
+      "MapLayerOut": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "MapLayerOut",
         "type": "object"
       },
       "MeOut": {
@@ -12205,6 +12347,86 @@
         "summary": "Complete Upload",
         "tags": [
           "uploads"
+        ]
+      }
+    },
+    "/v1/workspaces/{workspace_id}/capabilities": {
+      "get": {
+        "description": "What this workspace's packages let it do: which pages to show (equipment, map, beam model, records), its\nmap layers, ticket and document kinds, and the importers its packages support.",
+        "operationId": "workspace_capabilities",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilitiesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Workspace Capabilities",
+        "tags": [
+          "packages"
         ]
       }
     }

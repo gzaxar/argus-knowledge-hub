@@ -1,0 +1,22 @@
+queries:
+  - id: class-4-lasers
+    title: Class 4 lasers
+    entity: assets
+    jql: 'laser_class = "4" ORDER BY key'
+    fixture: fixtures/laser.yaml
+    expect: [AMP-1, OSC-1]
+  - id: what-an-oscillator-seeds
+    title: What stops when the oscillator stops
+    entity: graph
+    from: OSC-1
+    relation: ["seeded by", "pumped by"]
+    direction: in
+    depth: 2
+    fixture: fixtures/laser.yaml
+    expect: [AMP-1, AMP-2]
+  - id: surveys-out-of-tolerance
+    title: Alignment surveys with a deviation above 100 µm
+    entity: tickets
+    jql: 'type = "Alignment Survey" AND max_deviation_um > 100 ORDER BY key'
+    fixture: fixtures/laser.yaml
+    expect: [SURV-2]

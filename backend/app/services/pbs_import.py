@@ -35,11 +35,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.asset import Asset, Relation
+from app.packages.importers import requires
 from app.services.asset_types import catalogue_of, resolve_type_uids
+from app.services.relations import rebuild_asset_relations
 
 # The packages a workspace must have before a PBS import (their `provides`).
-REQUIRES = ("accelerator-catalogue",)
-from app.services.relations import rebuild_asset_relations
+REQUIRES = requires("pbs")
 
 SOURCE_LABEL = "PBS workbook"
 MAX_WARNINGS = 200

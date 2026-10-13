@@ -1,0 +1,71 @@
+ticket_types:
+  kinds:
+    - name: "Access Request"
+      description: "A request for someone to enter access zones, for a period, and why."
+      icon: tabler/lock
+      attributes:
+        - {key: for_person, name: For, type: user, restricted: personnel}
+        - {key: requested_zones, name: Zones, type: reference, reference: Access Zone, multi: true}
+        - {key: access_from, name: From, type: date}
+        - {key: access_until, name: Until, type: date}
+        - {key: justification, name: Justification, type: text}
+    - name: "Building Defect"
+      description: "Something wrong with the building fabric: structure, water, doors, finishes."
+      icon: tabler/building
+      attributes:
+        - {key: defect_category, name: Category, type: enumeration, options: [{id: structural, value: Structural}, {id: water_ingress, value: Water ingress}, {id: doors_windows, value: Doors and windows}, {id: finishes, value: Finishes}, {id: accessibility, value: Accessibility}, {id: other, value: Other}]}
+        - {key: room, name: Room, type: reference, reference: Area, include_children: true}
+    - name: "Civil Works Request"
+      description: "New works, alterations, repairs or demolition: what, where, and what it may cost."
+      icon: tabler/tools
+      attributes:
+        - {key: works_kind, name: Kind, type: enumeration, options: [{id: new, value: New construction}, {id: alteration, value: Alteration}, {id: repair, value: Repair}, {id: demolition, value: Demolition}]}
+        - {key: estimated_cost_eur, name: Estimated cost (EUR), type: float, unit: EUR, restricted: costs}
+        - {key: required_by, name: Required by, type: date}
+
+workflows:
+  - id: access-request
+    name: "Access request"
+    description: "Requested, approved by someone who may approve, granted, then expired or revoked."
+    applies_to: ["Access Request"]
+    initial: requested
+    states:
+      - {key: requested, name: Requested, category: open}
+      - {key: approved, name: Approved, category: active}
+      - {key: granted, name: Granted, category: active}
+      - {key: refused, name: Refused, category: done}
+      - {key: expired, name: Expired, category: done}
+      - {key: revoked, name: Revoked, category: done}
+    transitions:
+      - {from: requested, to: approved, name: Approve, requires: [approver]}
+      - {from: requested, to: refused, name: Refuse, requires: [approver, comment]}
+      - {from: approved, to: granted, name: Grant on the system, requires: [assignee]}
+      - {from: granted, to: expired, name: Expire}
+      - {from: granted, to: revoked, name: Revoke, requires: [approver, comment]}
+  - id: civil-works
+    name: "Civil works"
+    description: "Requested, assessed, approved by someone who may approve, in progress, completed."
+    applies_to: ["Civil Works Request"]
+    initial: requested
+    states:
+      - {key: requested, name: Requested, category: open}
+      - {key: assessed, name: Assessed, category: active}
+      - {key: approved, name: Approved, category: active}
+      - {key: in_progress, name: In progress, category: active}
+      - {key: completed, name: Completed, category: done}
+      - {key: declined, name: Declined, category: done}
+    transitions:
+      - {from: requested, to: assessed, name: Assess, requires: [assignee]}
+      - {from: assessed, to: approved, name: Approve, requires: [approver]}
+      - {from: assessed, to: declined, name: Decline, requires: [approver, comment]}
+      - {from: approved, to: in_progress, name: Start works}
+      - {from: in_progress, to: completed, name: Complete, requires: [comment]}
+
+document_types:
+  kinds:
+    - name: "Building Certificate"
+      description: "A certificate a building or system holds: structural, fire, occupancy, energy, accessibility."
+      icon: tabler/file-certificate
+      attributes:
+        - {key: certificate_kind, name: Kind, type: enumeration, options: [{id: structural, value: Structural}, {id: fire, value: Fire prevention}, {id: occupancy, value: Occupancy}, {id: energy, value: Energy}, {id: accessibility, value: Accessibility}, {id: lifting, value: Lifting equipment}]}
+        - {key: valid_until, name: Valid until, type: date}

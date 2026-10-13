@@ -1,0 +1,36 @@
+# What GLPI holds that the IT catalogue did not: software, licences and peripherals, and the provenance every
+# record imported from GLPI carries. ARGUS owns these definitions; GLPI's own custom types and fields are
+# never written here — they become workspace types through a reviewed proposal (app/integrations/glpi).
+
+extends:
+  - area: ticket_types
+    type: base
+    options:
+      argus_source:
+        - {id: glpi, value: GLPI}
+  - type: Item
+    attributes:
+      - {key: glpi_url, name: GLPI link, readonly: true}
+      - {key: glpi_unmapped, name: Other GLPI fields, type: text, readonly: true, description: "GLPI fields ARGUS does not map, as GLPI gave them (JSON)."}
+  - type: Record
+    attributes:
+      - {key: glpi_url, name: GLPI link, readonly: true}
+      - {key: glpi_unmapped, name: Other GLPI fields, type: text, readonly: true, description: "GLPI fields ARGUS does not map, as GLPI gave them (JSON)."}
+
+reference_relations:
+  attached_to: "attached to"
+  of_product: "version of"
+  licensed_product: "licenses software"
+
+relation_types:
+  - {id: attached-to, verb: "attached to", from: IT Peripheral, to: Computing Node, layer: control, flows: reverse, carries: function, description: "a peripheral and the computer it is connected to"}
+  - {id: version-of, verb: "version of", from: Software Version, to: Software Product, layer: provenance, flows: none, description: "a version and its product"}
+  - {id: has-installed, verb: "has installed", from: IT Equipment, to: Software Version, layer: control, flows: reverse, carries: degradation, description: "a computer and a software version installed on it"}
+  - {id: licenses-software, verb: "licenses software", from: Software License, to: Software Product, layer: administrative, flows: none, description: "a licence and the product it licenses"}
+
+restricted_classes:
+  - {id: license_keys, description: "Software licence keys and activation codes."}
+
+imports:
+  - {importer: glpi, description: "GLPI 10 or 11 through its REST API: assets, network ports, software and licences, locations, contracts, tickets, problems, changes and documents; custom assets and fields through a reviewed schema proposal."}
+  - {importer: locations, description: "Where equipment is, from a survey file."}

@@ -1,0 +1,13 @@
+# The governed vocabulary of `Other Equipment` (services/equipment_classes.py): adding a class is a
+# catalogue decision; a class that is already a type of its own starts out promoted.
+
+equipment_classes:
+  classes: [I/O Module, Scope, Timing Module, PLC, Motion Controller, Laser System, Cryogenic Device, Cable, Rack PDU, Unclassified]
+  unclassified: "Unclassified"
+  already_a_type: {Cable: Cable Run}
+
+# Reference fields that are edges of the knowledge graph too, and the verb each one is.
+reference_relations:
+  product_model: "instance of"
+  argus_location: "located in"
+  vendor_ref: "supplied by"

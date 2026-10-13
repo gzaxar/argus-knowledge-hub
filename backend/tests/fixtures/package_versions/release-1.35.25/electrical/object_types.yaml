@@ -1,0 +1,89 @@
+# Electrical distribution, on the core backbone. Values carry their unit in the label and in `unit`.
+
+option_sets:
+  phases:
+    - {id: single, value: Single-phase}
+    - {id: three, value: Three-phase}
+    - {id: dc, value: DC}
+
+map_layers:
+  - {id: electrical, name: Electrical, description: "Switchboards, transformers, UPS and generators."}
+
+object_types:
+  types:
+    - name: "Electrical Equipment"
+      parent: "Asset"
+      description: "Equipment of the electrical distribution."
+      abstract: true
+      icon: tabler/bolt
+      locatable: true
+      map_layer: electrical
+      attributes:
+        - {key: rated_voltage_v, name: Rated voltage (V), type: float, unit: V}
+        - {key: rated_current_a, name: Rated current (A), type: float, unit: A}
+        - {key: phases, name: Phases, type: enumeration, option_set: phases}
+        - {key: ip_rating, name: IP rating, regex: '^IP[0-9X][0-9X]$'}
+        - {key: fed_from, name: Fed from, type: reference, reference: Electrical Equipment, include_children: true}
+    - name: "Switchboard"
+      parent: "Electrical Equipment"
+      description: "A main or secondary switchboard: where supply is divided into circuits."
+      icon: tabler/server-2
+      attributes:
+        - {key: short_circuit_rating_ka, name: Short-circuit rating (kA), type: float, unit: kA}
+        - {key: board_level, name: Level, type: enumeration, options: [{id: main, value: Main (MSB)}, {id: secondary, value: Secondary}, {id: final, value: Final distribution}]}
+    - name: "Distribution Panel"
+      parent: "Electrical Equipment"
+      description: "A panel of final circuits for a room, a rack row or a machine."
+      icon: tabler/stack-2
+      attributes:
+        - {key: n_ways, name: Number of ways, type: integer}
+    - name: "Circuit Breaker"
+      parent: "Electrical Equipment"
+      description: "Protects a circuit: trips on overload or fault."
+      icon: tabler/toggle-left
+      attributes:
+        - {key: breaker_kind, name: Kind, type: enumeration, options: [{id: mcb, value: Miniature (MCB)}, {id: mccb, value: Moulded case (MCCB)}, {id: acb, value: Air (ACB)}, {id: rcbo, value: Residual current (RCBO)}]}
+        - {key: trip_curve, name: Trip curve, type: enumeration, options: [{id: b, value: B}, {id: c, value: C}, {id: d, value: D}]}
+        - {key: breaking_capacity_ka, name: Breaking capacity (kA), type: float, unit: kA}
+    - name: "Transformer"
+      parent: "Electrical Equipment"
+      description: "Changes voltage between networks: MV/LV, isolation."
+      icon: tabler/transform
+      attributes:
+        - {key: rated_power_kva, name: Rated power (kVA), type: float, unit: kVA}
+        - {key: primary_voltage_v, name: Primary voltage (V), type: float, unit: V}
+        - {key: secondary_voltage_v, name: Secondary voltage (V), type: float, unit: V}
+        - {key: cooling_kind, name: Cooling, type: enumeration, options: [{id: dry, value: Dry}, {id: oil, value: Oil}]}
+    - name: "UPS"
+      parent: "Electrical Equipment"
+      description: "Keeps a supply on through a mains interruption."
+      icon: tabler/bolt
+      attributes:
+        - {key: rated_power_kva, name: Rated power (kVA), type: float, unit: kVA}
+        - {key: autonomy_min, name: Autonomy at full load (min), type: float, unit: min}
+        - {key: battery_installed_on, name: Batteries installed on, type: date}
+    - name: "Generator"
+      parent: "Electrical Equipment"
+      description: "Standby or prime power generation."
+      icon: tabler/engine
+      attributes:
+        - {key: rated_power_kva, name: Rated power (kVA), type: float, unit: kVA}
+        - {key: fuel, name: Fuel, type: enumeration, options: [{id: diesel, value: Diesel}, {id: gas, value: Gas}]}
+    - name: "Electrical Meter"
+      parent: "Electrical Equipment"
+      description: "Measures energy and power on a feeder."
+      icon: tabler/gauge
+      attributes:
+        - {key: meter_address, name: Bus address, indexed: true}
+    - name: "Electrical Circuit"
+      parent: "Engineered Item"
+      description: "A circuit from a board to its loads: what a breaker protects."
+      icon: tabler/route
+      attributes:
+        - {key: circuit_id, name: Circuit, indexed: true}
+        - {key: fed_from, name: Fed from, type: reference, reference: Electrical Equipment, include_children: true}
+        - {key: rated_current_a, name: Rated current (A), type: float, unit: A}
+
+# A unit's supply is an edge of the graph: the supply fails, so does what it feeds.
+reference_relations:
+  fed_from: "fed from"

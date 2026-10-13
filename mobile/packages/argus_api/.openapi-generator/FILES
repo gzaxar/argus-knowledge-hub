@@ -23,6 +23,7 @@ lib/api/locations_api.dart
 lib/api/lookup_api.dart
 lib/api/meta_api.dart
 lib/api/notifications_api.dart
+lib/api/packages_api.dart
 lib/api/schemas_api.dart
 lib/api/search_api.dart
 lib/api/uploads_api.dart
@@ -51,6 +52,7 @@ lib/model/asset_out.dart
 lib/model/asset_update.dart
 lib/model/assist_in.dart
 lib/model/attachment_out.dart
+lib/model/capabilities_out.dart
 lib/model/chat_in.dart
 lib/model/close_review_in.dart
 lib/model/decide_in.dart
@@ -67,6 +69,7 @@ lib/model/document_revision_update.dart
 lib/model/document_update.dart
 lib/model/draft_document_in.dart
 lib/model/draft_document_out.dart
+lib/model/features_out.dart
 lib/model/global_value_out.dart
 lib/model/graph_edge_out.dart
 lib/model/graph_node_out.dart
@@ -78,6 +81,7 @@ lib/model/issue_comment_out.dart
 lib/model/issue_create.dart
 lib/model/issue_out.dart
 lib/model/issue_update.dart
+lib/model/map_layer_out.dart
 lib/model/me_out.dart
 lib/model/mentioned_object.dart
 lib/model/my_workspace_out.dart

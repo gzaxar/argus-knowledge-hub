@@ -24,6 +24,7 @@ from app.routers import (
     equipment,
     export,
     global_values,
+    glpi,
     graph,
     groups,
     hub,
@@ -151,6 +152,7 @@ app.include_router(schemas.router)
 app.include_router(assets.router)
 app.include_router(assets.relations_router)
 app.include_router(issues.router)
+app.include_router(glpi.router)
 app.include_router(documents.router)
 app.include_router(asset_subresources.router)
 app.include_router(attachments.router)

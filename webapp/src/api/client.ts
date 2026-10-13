@@ -189,7 +189,8 @@ async function request<T>(
 
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${session.token}`);
-  if (session.workspaceId) headers.set("X-Workspace-Id", session.workspaceId);
+  // A call about a named workspace (a page under /workspaces/:id) says so itself; the rest act in the current one.
+  if (session.workspaceId && !headers.has("X-Workspace-Id")) headers.set("X-Workspace-Id", session.workspaceId);
   if (!(init.body instanceof FormData) && init.body !== undefined) {
     headers.set("Content-Type", "application/json");
   }
@@ -1841,7 +1842,7 @@ export interface PackagePlan {
   workspace_id: string;
   options: Record<string, string>;
   changes: boolean;
-  steps: { package_id: string; version: string; action: string; from_version: string | null; requested: boolean;
+  steps: { package_id: string; version: string; checksum: string; action: string; from_version: string | null; requested: boolean;
            result: Record<string, unknown> }[];
 }
 
@@ -1878,6 +1879,179 @@ export const packagesApi = {
     request<PackagePlan>(`/v1/workspaces/${workspaceId}/packages/preview`, { method: "POST", body: json(input) }),
   install: (workspaceId: string, input: PackagesInput) =>
     request<PackagePlan>(`/v1/workspaces/${workspaceId}/packages/install`, { method: "POST", body: json(input) }),
+  /** What a new workspace made from these packages would get, worked out and rolled back (administrators). */
+  previewNew: (input: PackagesInput) =>
+    request<PackagePlan>("/v1/packages/preview", { method: "POST", body: json(input) }),
+  capabilities: (workspaceId: string) =>
+    request<WorkspaceCapabilities>(`/v1/workspaces/${workspaceId}/capabilities`),
+};
+
+/** What a workspace's packages let it do: which pages to show. */
+export interface WorkspaceCapabilities {
+  workspace_id: string;
+  packages: string[];
+  provides: string[];
+  features: {
+    tickets: boolean;
+    documents: boolean;
+    equipment: boolean;
+    records: boolean;
+    map: boolean;
+    beam_model: boolean;
+    control_system: boolean;
+    type_catalogue: boolean;
+  };
+  map_layers: { id: string; name: string; description?: string }[];
+  ticket_kinds: string[];
+  document_kinds: string[];
+  importers: string[];
+}
+
+/** GLPI connections (backend app/integrations/glpi, routers/glpi). */
+export interface GlpiEntityMapEntry {
+  entity_id: number | string;
+  entity?: string;
+  workspace_id: string;
+  recursive: boolean;
+}
+
+export interface GlpiConnection {
+  uid: string;
+  name: string;
+  workspace_id: string;
+  base_url: string;
+  verify_tls: boolean;
+  key_prefix: string;
+  documents: boolean;
+  tickets: boolean;
+  has_credentials: boolean;
+  entity_map: GlpiEntityMapEntry[];
+  authority: { records: "argus" | "glpi"; tickets: "argus" | "glpi" };
+  discovery: GlpiDiscovery | null;
+  schema_status: string | null;
+  last_digest: string | null;
+  last_run_at: string | null;
+  last_import_job_uid: string | null;
+  schema?: GlpiSchemaState | null;
+}
+
+export interface GlpiDiscovery {
+  instance: string;
+  read_at: string;
+  version: string | null;
+  major: number | null;
+  api: { legacy: boolean; high_level: string | null; notes: string[] };
+  entities: { id: number; name: string; completename: string; entities_id: number | null; records: number }[];
+  itemtypes: Record<string, { count: number; status: string; maps_to: string | null; why?: string }>;
+  custom_assets: { system_name: string; label: string; itemtype: string; active: boolean; records: number }[];
+  custom_fields: { system_name: string; label: string; glpi_type: string; kind: string | null; note: string | null }[];
+  plugin_fields: { container: string; itemtypes: string[]; name: string; label: string; kind: string | null;
+                   note: string | null }[];
+  generic_types: { itemtype: string; name: string }[];
+  plugins: { directory: string; name: string; version: string; state: number }[];
+  capabilities: Record<string, unknown>;
+}
+
+export interface GlpiProposedField {
+  source: string;
+  label: string;
+  glpi_type: string;
+  kind: string | null;
+  argus_key: string;
+  action: "create" | "reuse" | "unsupported" | "conflict";
+  note: string | null;
+  options?: { id: string; value: string }[];
+}
+
+export interface GlpiSchemaProposal {
+  digest: string;
+  types: { source: string; system_name: string; label: string; action: "create" | "reuse"; argus_type: string;
+           parent: string | null; fields: GlpiProposedField[] }[];
+  extensions: (GlpiProposedField & { on_itemtype: string; argus_type: string; container: string })[];
+  unsupported: (Partial<GlpiProposedField> & { on: string })[];
+  changes: number;
+}
+
+export interface GlpiSchemaState {
+  proposal?: GlpiSchemaProposal;
+  approved?: { digest: string; at: string; by: string };
+  status?: string;
+  history?: { digest: string; at: string; by: string; changes: number }[];
+}
+
+export interface GlpiWorkspacePlan {
+  missing_packages: string[];
+  creates: { ref: string; key: string; type: string; name: string }[];
+  updates: { ref: string; key: string; type: string; name: string; fields: string[] }[];
+  unchanged: number;
+  conflicts: { ref: string; key: string; field: string; argus: unknown; glpi: unknown; previously: unknown;
+               outcome: string }[];
+  local_edits_kept: { ref: string; key: string; fields: string[] }[];
+  retirement_candidates: { ref: string; key: string; name: string; reason: string }[];
+  types_missing: { ref: string; type: string }[];
+  locations: number;
+  tickets: { creates: number; updates: number; unchanged: number;
+             conflicts: { ref: string; field: string; argus: unknown; glpi: unknown; outcome: string }[] };
+  documents: number;
+}
+
+export interface GlpiPlan {
+  instance: string;
+  version: string | null;
+  schema_status: string;
+  outside_entity_map: number;
+  awaiting_schema_review: { itemtype: string; records: number }[];
+  unsupported: unknown[];
+  workspaces: Record<string, GlpiWorkspacePlan>;
+  digest: string;
+  job_uid?: string;
+}
+
+export interface GlpiConnectionInput {
+  name: string;
+  base_url: string;
+  user_token?: string;
+  app_token?: string;
+  verify_tls: boolean;
+  key_prefix: string;
+  documents: boolean;
+  tickets: boolean;
+}
+
+const glpiHeaders = (workspaceId: string) => ({ "X-Workspace-Id": workspaceId });
+
+export const glpiApi = {
+  list: (ws: string) => request<GlpiConnection[]>("/v1/glpi/connections", { headers: glpiHeaders(ws) }),
+  get: (ws: string, uid: string) => request<GlpiConnection>(`/v1/glpi/connections/${uid}`, { headers: glpiHeaders(ws) }),
+  create: (ws: string, input: GlpiConnectionInput) =>
+    request<GlpiConnection>("/v1/glpi/connections", { method: "POST", body: json(input), headers: glpiHeaders(ws) }),
+  update: (ws: string, uid: string, input: GlpiConnectionInput) =>
+    request<GlpiConnection>(`/v1/glpi/connections/${uid}`, { method: "PUT", body: json(input), headers: glpiHeaders(ws) }),
+  remove: (ws: string, uid: string) =>
+    request<void>(`/v1/glpi/connections/${uid}`, { method: "DELETE", headers: glpiHeaders(ws) }),
+  discover: (ws: string, uid: string) =>
+    request<{ discovery: GlpiDiscovery; entity_map: GlpiEntityMapEntry[]; schema: GlpiSchemaState }>(
+      `/v1/glpi/connections/${uid}/discover`, { method: "POST", headers: glpiHeaders(ws) }),
+  setEntityMap: (ws: string, uid: string, entity_map: GlpiEntityMapEntry[]) =>
+    request<GlpiConnection>(`/v1/glpi/connections/${uid}/entity-map`,
+      { method: "PUT", body: json({ entity_map }), headers: glpiHeaders(ws) }),
+  setAuthority: (ws: string, uid: string, records: string, tickets: string) =>
+    request<GlpiConnection>(`/v1/glpi/connections/${uid}/authority`,
+      { method: "PUT", body: json({ records, tickets }), headers: glpiHeaders(ws) }),
+  approveSchema: (ws: string, uid: string, digest: string) =>
+    request<GlpiSchemaState>(`/v1/glpi/connections/${uid}/schema/approve`,
+      { method: "POST", body: json({ digest }), headers: glpiHeaders(ws) }),
+  preview: (ws: string, uid: string) =>
+    request<GlpiPlan>(`/v1/glpi/connections/${uid}/preview`, { method: "POST", headers: glpiHeaders(ws) }),
+  run: (ws: string, uid: string, expect_digest?: string) =>
+    request<GlpiPlan>(`/v1/glpi/connections/${uid}/run`,
+      { method: "POST", body: json({ expect_digest }), headers: glpiHeaders(ws) }),
+  candidates: (ws: string, uid: string) =>
+    request<{ ref: string; uid: string; key: string; name: string; type: string; reason: string }[]>(
+      `/v1/glpi/connections/${uid}/retirement-candidates`, { headers: glpiHeaders(ws) }),
+  decide: (ws: string, uid: string, ref: string, decision: "retire" | "keep", reason?: string) =>
+    request<unknown>(`/v1/glpi/connections/${uid}/retirement-candidates`,
+      { method: "POST", body: json({ ref, decision, reason }), headers: glpiHeaders(ws) }),
 };
 
 /** Places: approved locations, field observations and their review, the map (backend services/spatial). */

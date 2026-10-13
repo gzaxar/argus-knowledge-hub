@@ -33,8 +33,10 @@ def test_the_packages_that_ship_are_valid_and_report_what_they_hold(capsys):
     assert {"core-facility", "accelerator"} <= set(shipped)
     for p in shipped.values():
         assert validate(p) == [], p.id
-    assert shipped["accelerator"].depends == {"core-objects": ">=1.0,<2", "it": ">=1.0,<2"}
-    assert sum(shipped[p].summary()["object_types"] for p in ("core-objects", "it", "accelerator")) == \
+    assert shipped["accelerator"].depends == {"core-objects": ">=2.0,<3", "it": ">=1.1,<2", "safety": ">=1.0,<2",
+                                              "vacuum-cryo": ">=1.0,<2", "optics-alignment": ">=1.0,<2"}
+    from app.packages import defaults
+    assert sum(shipped[p].summary()["object_types"] for p in defaults.closure("accelerator")) == \
         len(asset_types.CATALOGUE)
     assert cli(["validate"]) == 0
     assert "✓ accelerator" in capsys.readouterr().out
@@ -98,6 +100,11 @@ def test_a_package_cannot_run_code(tmp_path):
 
 # --------------------------------------------------------------------------- parity with seeding before packages
 
+def _chain() -> list[str]:
+    """What installing the accelerator installs, in order: it and every package it stands on."""
+    return [p.id for p, _requested in installer.resolve(["accelerator"])]
+
+
 def _by_installer(db, kind, workspace_id, catalogue_id):
     if kind == "core":
         installer.install(db, workspace_id, ["core-facility"])
@@ -111,31 +118,92 @@ def _by_installer(db, kind, workspace_id, catalogue_id):
 
 # Types the it package added beyond the 1.x catalogue (an accelerator workspace gets them with it).
 NEW_IN_IT = {"Firewall", "Wireless Access Point", "Storage System", "Patch Panel"}
+# What 1.35.26 added on the way to the domain packages: the core vocabulary made neutral (the beam options
+# kept, now added by the accelerator package), the GLPI provenance fields, two IT types made concrete.
+NEUTRAL_OPTIONS = {"service_down", "service_degraded", "no_impact", "mission_critical", "degrades_service", "glpi"}
+GLPI_FIELDS = {"glpi_url", "glpi_unmapped"}
+# The beam's own options: a workspace without the accelerator package no longer has them.
+BEAM_OPTIONS = {"beam_down", "beam_degraded", "no_beam_impact", "beam_critical", "degrades"}
+MADE_CONCRETE = {"Network Device", "Computing Node"}
 
 
-def _without_placement(dump: dict) -> dict:
-    """core-objects 1.1.0 added map placement (`locatable`, `map_layer` in a type's metadata)."""
-    for part in dump.values():
-        for s in part["schemas"]:
-            if s.get("metadata"):
-                s["metadata"] = {k: v for k, v in s["metadata"].items() if k not in ("locatable", "map_layer")}
-    return dump
+def _new_names() -> set:
+    """Types and kinds the accelerator now brings that the catalogue before packages did not have: those of the
+    packages it stands on since 1.35.26 (but the types that moved into them), and the new IT ones."""
+    from app.packages import defaults
+    shipped = available()
+    before = json.loads((FIXTURES / "seeding.json").read_text())
+    had = {s["name"] for part in before.values() for s in part["schemas"]}
+    out = set(NEW_IN_IT)
+    for pid in defaults.closure("accelerator"):
+        p = shipped[pid]
+        out |= {t["name"] for t in (p.section("object_types") or {}).get("types") or []} - had
+        for area in ("ticket_types", "document_types"):
+            out |= {k["name"] for k in (p.section(area) or {}).get("kinds") or []} - had
+    return out
+
+
+def _as_before(schema: dict) -> dict:
+    """A schema with what 1.35.26 added taken out again."""
+    s = json.loads(json.dumps(schema))
+    if s.get("metadata"):
+        s["metadata"] = {k: v for k, v in s["metadata"].items() if k not in ("locatable", "map_layer")}
+    attrs = []
+    for a in s.get("attributes") or []:
+        if a.get("key") in GLPI_FIELDS:
+            continue
+        if a.get("key") in ("argus_impact", "argus_criticality", "argus_source") and a.get("options"):
+            a["options"] = sorted((o for o in a["options"] if o.get("id") not in NEUTRAL_OPTIONS),
+                                  key=lambda o: o["id"])
+        attrs.append(a)
+    s["attributes"] = attrs
+    if s["name"] in MADE_CONCRETE:
+        s["is_concrete"] = False
+    return s
+
+
+def _sorted_options(schema: dict, beam: bool = True) -> dict:
+    s = json.loads(json.dumps(schema))
+    for a in s.get("attributes") or []:
+        if a.get("key") in ("argus_impact", "argus_criticality", "argus_source") and a.get("options"):
+            a["options"] = sorted((o for o in a["options"] if beam or o["id"] not in BEAM_OPTIONS),
+                                  key=lambda o: o["id"])
+    if s.get("metadata"):
+        s["metadata"] = {k: v for k, v in s["metadata"].items() if k not in ("locatable", "map_layer")}
+    return s
 
 
 def test_installing_the_packages_writes_exactly_what_seeding_wrote_before_them():
     """The record in fixtures/package_parity was made from the Python definitions, before they moved to YAML.
-    Since then the catalogue was split into core-objects, it and accelerator (same types, same uids), it
-    gained four IT types, and core-objects 1.1.0 map placement (`locatable`, `map_layer`); nothing else."""
+    Since then: the catalogue was split into core-objects, it and accelerator (same types, same uids); it
+    gained four IT types; core-objects 1.1.0 map placement; and 1.35.26 made the core vocabulary neutral (the
+    beam options kept, with their ids and labels, by the accelerator package), added the GLPI provenance
+    fields, made two IT types concrete, and brought the types of the packages the accelerator now stands on
+    (safety, vacuum-cryo, optics-alignment, core-records). Nothing else changed: no type, field or option a
+    workspace had is gone or different."""
     before = json.loads((FIXTURES / "seeding.json").read_text())
     now = seed_every_way(_by_installer)
-    added = {s["name"] for part in now.values() for s in part["schemas"] if s["name"] in NEW_IN_IT}
-    assert added == NEW_IN_IT
+    allowed_new = _new_names()
     placed = {s["name"] for part in now.values() for s in part["schemas"]
               if (s.get("metadata") or {}).get("locatable")}
-    assert placed == {"Asset", "Location"}
-    for part in now.values():
-        part["schemas"] = [s for s in part["schemas"] if s["name"] not in NEW_IN_IT]
-    assert _without_placement(now) == before
+    assert {"Asset", "Location"} <= placed
+    for part, then in before.items():
+        old = {s["uid"]: s for s in then["schemas"]}
+        new = {s["uid"]: s for s in now[part]["schemas"]}
+        assert not set(old) - set(new), f"{part}: types gone"
+        added = {new[u]["name"] for u in set(new) - set(old)}
+        assert added <= allowed_new, f"{part}: unexpected new types {sorted(added - allowed_new)}"
+        for uid in old:
+            beam = part != "{core}"            # the core-only workspace: neutral, no beam vocabulary
+            assert _as_before(new[uid]) == _sorted_options(old[uid], beam), f"{part}: {old[uid]['name']} changed"
+        assert now[part]["global_values"] == then["global_values"]
+    impact = next(a for s in now["{core}"]["schemas"] if s["name"] == "Ticket" for a in s["attributes"]
+                  if a["key"] == "argus_impact")
+    assert {o["id"] for o in impact["options"]} == {"service_down", "service_degraded", "no_impact", "safety",
+                                                   "unknown"}, "a workspace without the accelerator: neutral"
+    beam = next(a for s in now["{accelerator}"]["schemas"] if s["name"] == "Ticket" for a in s["attributes"]
+                if a["key"] == "argus_impact")
+    assert {"beam_down", "beam_degraded", "no_beam_impact"} <= {o["id"] for o in beam["options"]}
 
 
 # --------------------------------------------------------------------------- the installer and the record
@@ -165,12 +233,13 @@ def test_a_workspace_records_exactly_which_versions_it_uses_and_reapplying_chang
     db = SessionLocal()
     plan = installer.install(db, ws, ["accelerator"], actor="tester")
     db.commit()
+    chain = _chain()
     assert [(s.package_id, s.action, s.requested) for s in plan.steps] == [
-        ("core-facility", "install", False), ("core-objects", "install", False), ("it", "install", False),
-        ("accelerator", "install", True)]
+        (pid, "install", pid == "accelerator") for pid in chain]
+    assert chain[0] == "core-facility" and chain[-1] == "accelerator"
     rows = installer.installed(db, ws)
     shipped = available()
-    for pid in ("core-facility", "core-objects", "it", "accelerator"):
+    for pid in chain:
         assert (rows[pid].version, rows[pid].checksum) == (shipped[pid].version, shipped[pid].checksum)
     assert rows["accelerator"].options == {"scope": "all"}
     created = [n for st in plan.steps[1:] for n in st.result["created"]]
@@ -238,13 +307,13 @@ def test_a_workspace_made_before_packages_is_recorded_once_from_what_it_has(ws):
     installer.detect(db)
     db.commit()
     rows = installer.installed(db, ws)
-    assert rows["core-facility"].version == "1.0.0"
-    assert {pid: rows[pid].options for pid in ("core-objects", "it", "accelerator")} == {
-        pid: {"scope": "global"} for pid in ("core-objects", "it", "accelerator")}
+    assert rows["core-facility"].version == available()["core-facility"].version
+    catalogues = [pid for pid in _chain() if pid != "core-facility"]
+    assert {pid: rows[pid].options for pid in catalogues} == {pid: {"scope": "global"} for pid in catalogues}
     assert {h.action for h in installer.history(db, ws)} == {"detected"}
     installer.detect(db)
     db.commit()
-    assert len(installer.history(db, ws)) == 4                    # core-facility, core-objects, it, accelerator: once
+    assert len(installer.history(db, ws)) == len(_chain())        # each package of the chain: once
     db.close()
 
 
@@ -283,8 +352,9 @@ def test_a_workspace_given_the_catalogue_before_the_record_is_recognised_not_rei
     schemas = _count(db, Schema, ws)
     require(db, ws, "accelerator-catalogue")
     db.commit()
+    from app.packages import defaults
     assert [(h.package_id, h.action) for h in installer.history(db, ws)] == [
-        ("core-objects", "detected"), ("it", "detected"), ("accelerator", "detected")]
+        (pid, "detected") for pid in defaults.ordered() if pid in _chain() and pid != "core-facility"]
     assert _count(db, Schema, ws) == schemas
     db.close()
 
@@ -312,7 +382,7 @@ def test_a_workspace_is_made_from_the_chosen_packages_and_says_which_it_uses():
         assert listed["accelerator"]["contents"]["object_types"] == len(asset_types.specs_of("accelerator"))
         resolved = client.post("/v1/packages/resolve", json={"packages": ["accelerator"]}).json()
         assert [(p["id"], p["requested"]) for p in resolved] == [
-            ("core-facility", True), ("core-objects", False), ("it", False), ("accelerator", True)]
+            (pid, pid in ("core-facility", "accelerator")) for pid in _chain()]
         assert client.post("/v1/packages/resolve", json={"packages": ["nowhere"]}).status_code == 422
 
         r = client.post("/v1/workspaces", json={"name": "Packages test", "id": wid, "packages": ["accelerator"]})
@@ -320,14 +390,14 @@ def test_a_workspace_is_made_from_the_chosen_packages_and_says_which_it_uses():
         mine = client.get(f"/v1/workspaces/{wid}/packages").json()
         shipped = available()
         assert [(p["package_id"], p["version"]) for p in mine["packages"]] == [
-            (pid, shipped[pid].version) for pid in ("accelerator", "core-facility", "core-objects", "it")]
+            (pid, shipped[pid].version) for pid in sorted(_chain())]
         assert all(len(p["checksum"]) == 64 and not p["upgrade_available"] for p in mine["packages"])
-        assert [h["action"] for h in mine["history"]] == ["install"] * 4
+        assert [h["action"] for h in mine["history"]] == ["install"] * len(_chain())
 
         preview = client.post(f"/v1/workspaces/{wid}/packages/preview", json={"packages": ["accelerator"]}).json()
         assert preview["changes"] is False
         done = client.post(f"/v1/workspaces/{wid}/packages/install", json={"packages": ["accelerator"]}).json()
-        assert {s["action"] for s in done["steps"]} == {"unchanged"} and len(done["history"]) == 4
+        assert {s["action"] for s in done["steps"]} == {"unchanged"} and len(done["history"]) == len(_chain())
     finally:
         app.dependency_overrides.pop(get_identity, None)
         db = SessionLocal()

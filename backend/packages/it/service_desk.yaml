@@ -1,0 +1,75 @@
+# The IT service desk's kinds of ticket (GLPI's tickets, problems and changes come in as these) and the
+# change workflow. The core's default workflow serves incidents and requests.
+ticket_types:
+  kinds:
+    - name: "Incident"
+      description: "Something that stopped or degraded a service."
+      icon: tabler/alert-triangle
+      attributes:
+        - {key: urgency, name: Urgency, type: enumeration, option_set: glpi_scale}
+        - {key: impact_level, name: Impact, type: enumeration, option_set: glpi_scale}
+    - name: "Service Request"
+      description: "A request for something new: an account, a machine, access, information."
+      icon: tabler/clipboard-list
+      attributes:
+        - {key: urgency, name: Urgency, type: enumeration, option_set: glpi_scale}
+    - name: "Problem"
+      description: "The cause behind one or more incidents, to be found and removed."
+      icon: tabler/bug
+      attributes:
+        - {key: impact_level, name: Impact, type: enumeration, option_set: glpi_scale}
+        - {key: known_error, name: Known error, type: boolean}
+    - name: "Change"
+      description: "A planned change to IT services or equipment: assessed, approved, carried out, reviewed."
+      icon: tabler/adjustments
+      attributes:
+        - {key: change_risk, name: Risk, type: enumeration, options: [{id: low, value: Low}, {id: medium, value: Medium}, {id: high, value: High}]}
+        - {key: planned_start, name: Planned start, type: datetime}
+        - {key: planned_end, name: Planned end, type: datetime}
+        - {key: rollback_plan, name: Rollback plan, type: text}
+
+option_sets:
+  glpi_scale:
+    - {id: very_low, value: Very low}
+    - {id: low, value: Low}
+    - {id: medium, value: Medium}
+    - {id: high, value: High}
+    - {id: very_high, value: Very high}
+    - {id: major, value: Major}
+
+workflows:
+  - id: it-change
+    name: "IT change"
+    description: "Requested, assessed, approved by someone who may approve, scheduled, implemented, reviewed."
+    applies_to: ["Change"]
+    initial: requested
+    states:
+      - {key: requested, name: Requested, category: open}
+      - {key: assessed, name: Assessed, category: active}
+      - {key: approved, name: Approved, category: active}
+      - {key: scheduled, name: Scheduled, category: waiting}
+      - {key: implemented, name: Implemented, category: active}
+      - {key: closed, name: Closed, category: done}
+      - {key: refused, name: Refused, category: done}
+    transitions:
+      - {from: requested, to: assessed, name: Assess, requires: [assignee, comment]}
+      - {from: assessed, to: approved, name: Approve, requires: [approver]}
+      - {from: assessed, to: refused, name: Refuse, requires: [approver, comment]}
+      - {from: approved, to: scheduled, name: Schedule}
+      - {from: scheduled, to: implemented, name: Implemented, requires: [comment]}
+      - {from: implemented, to: closed, name: Review and close, requires: [resolution]}
+
+roles:
+  - id: change-manager
+    name: Change manager
+    description: "Assesses and approves IT changes."
+    objects: [read]
+    tickets: [read, create, modify, approve]
+    documents: [read]
+  - id: license-manager
+    name: Licence manager
+    description: "Software, licences and their keys; sees costs."
+    objects: [read, create, modify]
+    tickets: [read, create]
+    documents: [read]
+    restricted: [license_keys, costs]

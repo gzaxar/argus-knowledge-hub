@@ -88,6 +88,20 @@ def base_attributes() -> list[dict]:
     return [dict(a) for a in _definitions().base_attributes]
 
 
+def workspace_base_attributes(db: Session, workspace_id: str) -> list[dict]:
+    """The base ticket type's fields as this workspace has them: the core's, with what its packages extend
+    (the accelerator's beam options) and its own edits. The core's when the workspace has no base type."""
+    base = db.get(Schema, f"{workspace_id}:{BASE_UID_SUFFIX}")
+    return [dict(a) for a in base.attributes] if base is not None and base.attributes else base_attributes()
+
+
+def options_in(attributes: list[dict], key: str) -> list[dict]:
+    for a in attributes:
+        if a.get("key") == key:
+            return [dict(o) for o in a.get("options") or []]
+    return []
+
+
 def ensure_ticket_types(db: Session, workspace_id: str, issue_type_names: set[str]) -> dict:
     """Create (or refresh) the base ticket type and a child per kind of
     work. Returns name -> schema uid.

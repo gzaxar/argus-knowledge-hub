@@ -85,8 +85,37 @@ def changes(db: Session, workspace_id: str, new: Package) -> list[d.Change]:
     old_sections = _old(db, row)
     old = d.definitions(old_sections, new.id, sets)
     newer = d.definitions(new.sections, new.id, sets)
-    found = _moved(new, d.compare(old, newer))
+    found = _kept_by_extensions(db, workspace_id, new, _moved(new, d.compare(old, newer)))
     return d.assess(db, workspace_id, found, old, _scope_names(row, old_sections, new)), old
+
+
+def _kept_by_extensions(db: Session, workspace_id: str, new: Package, found: list) -> list:
+    """An attribute or option a package no longer defines itself, because a package the workspace also has now
+    adds it as an extension (core-facility 2.0 left the beam vocabulary to the accelerator package), is not
+    removed: it stays, held by that package. Without such a package it is removed like any other (a decision)."""
+    from app.packages import compile as c
+    from app.packages.install import installed
+    held: dict = {}
+    for pid in installed(db, workspace_id):
+        p = available().get(pid)
+        if p is None or pid == new.id:
+            continue
+        for e in c.extensions(p, _shared_sets()):
+            for a in e.attributes:
+                held[(e.area, e.type, a["key"])] = pid
+            for key, opts in e.options.items():
+                for o in opts:
+                    held[(e.area, e.type, f"{key}:{o['id']}")] = pid
+    out = []
+    for ch in found:
+        owner = held.get((ch.area, ch.subject, ch.element)) if ch.element else None
+        if ch.what == "removed" and owner:
+            out.append(d.Change(ch.id.rsplit("/", 1)[0] + "/moved", d.DEFINITION, ch.area, ch.subject, ch.element,
+                                "moved", f"{ch.element.split(':')[-1]!r} on {ch.subject} is now added by {owner} "
+                                         f"(unchanged)"))
+            continue
+        out.append(ch)
+    return out
 
 
 def _moved(new: Package, found: list) -> list:
@@ -282,6 +311,11 @@ def _apply_automatic(db: Session, workspace_id: str, row: WorkspacePackage, new:
     for ch in found:
         if ch.category == d.BREAKING or (ch.area == "object_types" and ch.element is None and ch.what == "added"):
             continue
+        if ch.what == "moved":
+            continue                    # the same definition, held by another package
+        if ch.area == "workflows":
+            done += _apply_workflow(db, workspace_id, new, ch)
+            continue
         if ch.conflict and ch.category == d.DEFINITION:
             continue                    # the workspace's own edit wins
         if ch.area == "equipment_classes":
@@ -363,6 +397,50 @@ def _apply_automatic(db: Session, workspace_id: str, row: WorkspacePackage, new:
     return done
 
 
+def _apply_workflow(db: Session, workspace_id: str, new: Package, ch: d.Change) -> list[str]:
+    """A package's workflow added, or changed where the workspace has not edited its copy."""
+    from app.models.workflow import Workflow
+    from app.packages.install import add_workflows, workflow_uid
+    from app.services import workflows
+    uid = workflow_uid(workspace_id, new.id, ch.subject)
+    wf = db.get(Workflow, uid)
+    if wf is None:
+        add_workflows(db, workspace_id, new)
+        return [ch.id]
+    if wf.version == 1 and ch.what == "changed":
+        n = ch.after
+        workflows.save(db, workspace_id, {"name": n["name"], "initial": n["initial"], "states": n["states"],
+                                          "transitions": n["transitions"],
+                                          "source": {"package": new.id, "id": ch.subject, "version": new.version}},
+                       uid=uid)
+        wf.version = 1                  # still the package's: a later version may change it again
+        add_workflows(db, workspace_id, new)
+        return [ch.id]
+    ch.conflict = "the workspace edited this workflow itself"
+    return []
+
+
+def _fill_detected(db: Session, workspace_id: str, row: WorkspacePackage, new: Package) -> list[str]:
+    """A package recorded as `detected` (found in place, never installed by the installer) may lack types its
+    version defines — before 1.35.26 one type was enough to be detected. Nobody removed them: they were never
+    made. An upgrade makes them, in the scope the workspace holds."""
+    from app.models.package import PackageInstallation
+    from app.services import asset_types
+    installed_by_installer = db.scalar(select(PackageInstallation.id).where(
+        PackageInstallation.workspace_id == workspace_id, PackageInstallation.package_id == new.id,
+        PackageInstallation.action.in_(("install", "upgrade"))).limit(1))
+    if installed_by_installer is not None:
+        return []
+    old_sections = _old(db, row)
+    scope = _scope_names(row, old_sections, new)
+    names = [t["name"] for t in (new.section("object_types") or {}).get("types") or []]
+    missing = {n for n in names if (scope is None or n in scope)
+               and db.get(Schema, asset_types.type_uid(workspace_id, n)) is None}
+    if missing:
+        _add_types(db, workspace_id, row, new, missing)
+    return sorted(missing)
+
+
 def apply(db: Session, workspace_id: str, new: Package, decisions: Optional[dict]) -> dict:
     """The upgrade, with its plan. Every breaking change must be decided; the history keeps the decisions."""
     decisions = dict(decisions or {})
@@ -384,6 +462,9 @@ def apply(db: Session, workspace_id: str, new: Package, decisions: Optional[dict
     for c in breaking:          # renames and removals first, so additions land on the new names
         outcome[c.id] = _apply_breaking(db, workspace_id, c) if decisions[c.id] == APPLY else "kept as the workspace has it"
     automatic = _apply_automatic(db, workspace_id, row, new, found)
+    filled = _fill_detected(db, workspace_id, row, new)
+    if filled:
+        automatic.append(f"types a detected package lacked: {', '.join(filled)}")
     db.flush()
     return {"decisions": decisions, "outcome": outcome, "automatic": automatic,
             "conflicts": {c.id: c.conflict for c in found if c.conflict},

@@ -507,6 +507,19 @@ final assetLocationProvider = FutureProvider.autoDispose.family<AssetLocation, S
   return ref.watch(locationRepositoryProvider).get(uid);
 });
 
+/// The features of the current workspace (map, equipment, beam model…); null while unknown — everything is
+/// offered then, as before, so an older server or a slow answer hides nothing.
+final capabilitiesRepositoryProvider = Provider((ref) => CapabilitiesRepository(ref.watch(apiServiceProvider)));
+final workspaceFeaturesProvider = FutureProvider<Set<String>?>((ref) async {
+  final ws = ref.watch(workspaceIdProvider);
+  if (ws == null) return null;
+  try {
+    return await ref.watch(capabilitiesRepositoryProvider).features(ws);
+  } catch (_) {
+    return null;
+  }
+});
+
 /// Field observations of this workspace's records waiting for a decision.
 final locationReviewsProvider = FutureProvider.autoDispose<List<LocationObservationItem>>((ref) {
   ref.watch(workspaceIdProvider);

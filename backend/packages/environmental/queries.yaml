@@ -1,0 +1,29 @@
+queries:
+  - id: sensors-due-for-calibration
+    title: Sensors due for calibration before 2027
+    entity: assets
+    jql: 'type = "Environmental Sensor" AND calibration_due < "2027-01-01" ORDER BY key'
+    fixture: fixtures/network.yaml
+    expect: [S-PM10, S-RAIN]
+  - id: what-a-logger-loses
+    title: The sensors whose readings a failed logger loses
+    entity: graph
+    from: LOG-1
+    relation: "logged by"
+    direction: in
+    fixture: fixtures/network.yaml
+    expect: [S-GAMMA, S-PM10]
+  - id: stations-of-a-network
+    title: The stations of the air-quality network
+    entity: graph
+    from: NET-AIR
+    relation: "in network"
+    direction: in
+    fixture: fixtures/network.yaml
+    expect: [ST-NORTH, ST-SOUTH]
+  - id: exceedances-to-notify
+    title: Verified exceedances that need notifying
+    entity: tickets
+    jql: 'type = "Threshold Exceedance" AND status = verified AND notification_required = true ORDER BY key'
+    fixture: fixtures/network.yaml
+    expect: [EX-1]

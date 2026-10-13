@@ -1,0 +1,14 @@
+records:
+  - {key: SW-FF, type: Software Product, name: Firefox, attributes: {publisher: Mozilla}}
+  - {key: SW-FF-128, type: Software Version, name: Firefox 128.3, attributes: {version_label: "128.3", of_product: "@SW-FF"}}
+  - {key: SW-OFFICE, type: Software Product, name: Office suite}
+  - {key: PC-001, type: Workstation, name: pc-001, attributes: {hostname: pc-001}}
+  - {key: SRV-01, type: Server, name: srv-01, attributes: {hostname: srv-01}}
+  - {key: PC-002, type: Computing Node, name: pc-002}
+  - {key: LIC-OFFICE, type: Software License, name: Office 50 seats, attributes: {licensed_product: "@SW-OFFICE", seats: 50, end_date: "2026-09-30", contract_status: Active}}
+relations:
+  - {from: PC-001, verb: "has installed", to: SW-FF-128}
+  - {from: SRV-01, verb: "has installed", to: SW-FF-128}
+tickets:
+  - {key: INC-1, kind: Incident, title: Printer offline, state: new}
+  - {key: INC-2, kind: Incident, title: VPN down, state: closed}

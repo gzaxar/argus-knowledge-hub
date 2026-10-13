@@ -17,6 +17,34 @@ from app.packages.validate import validate
 router = APIRouter(prefix="/v1", tags=["packages"])
 
 
+class FeaturesOut(BaseModel):
+    tickets: bool
+    documents: bool
+    equipment: bool
+    records: bool
+    map: bool
+    beam_model: bool
+    control_system: bool
+    type_catalogue: bool
+
+
+class MapLayerOut(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+
+
+class CapabilitiesOut(BaseModel):
+    workspace_id: str
+    packages: list[str]
+    provides: list[str]
+    features: FeaturesOut
+    map_layers: list[MapLayerOut]
+    ticket_kinds: list[str]
+    document_kinds: list[str]
+    importers: list[str]
+
+
 class PackagesIn(BaseModel):
     packages: list[str]
     # for the accelerator catalogue: hang from this catalogue workspace's shared types
@@ -73,8 +101,19 @@ def get_package(package_id: str, identity=Depends(get_identity)):
             "ticket_types": [k.get("name") for k in (p.section("ticket_types") or {}).get("kinds") or []],
             "document_types": [k.get("name") for k in (p.section("document_types") or {}).get("kinds") or []],
             "enumerations": [f"{e.get('applies_to')}.{e.get('key')}" for e in p.section("enumerations") or []],
-            "workflows": [w.get("name") for w in p.section("workflows") or []],
-            "map_layers": p.section("map_layers") or []}
+            "workflows": [{"id": w.get("id"), "name": w.get("name"), "applies_to": w.get("applies_to") or []}
+                          for w in p.section("workflows") or []],
+            "map_layers": p.section("map_layers") or [],
+            "extends": [{"area": e.get("area", "object_types"), "type": e.get("type"),
+                         "attributes": [a.get("key") for a in e.get("attributes") or []],
+                         "options": {k: [o.get("id") for o in v] for k, v in (e.get("options") or {}).items()}}
+                        for e in p.section("extends") or []],
+            "relation_types": p.section("relation_types") or [],
+            "roles": p.section("roles") or [],
+            "restricted_classes": p.section("restricted_classes") or [],
+            "imports": p.section("imports") or [],
+            "queries": [{k: q.get(k) for k in ("id", "title", "entity", "jql", "from", "relation", "expect")}
+                        for q in p.section("queries") or []]}
 
 
 @router.post("/packages/resolve")
@@ -86,6 +125,31 @@ def resolve_packages(body: PackagesIn, identity=Depends(get_identity)):
     except installer.PackageProblem as e:
         raise HTTPException(status_code=422, detail={"error": str(e), "code": "package"})
     return [{**p.describe(), "requested": requested} for p, requested in order]
+
+
+@router.post("/packages/preview")
+def preview_new_workspace(body: PackagesIn, identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """What a new workspace made from these packages would get — each package (dependencies first) with its
+    exact version and checksum, and the types, kinds and workflows it would create — worked out in a workspace
+    made and rolled back. For the form that creates workspaces (administrators)."""
+    if isinstance(identity, PatIdentity) or not identity.user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can create workspaces")
+    try:
+        plan = installer.plan_new(db, body.packages, catalogue_workspace_id=body.catalogue_workspace_id,
+                                  scope=body.scope)
+    except installer.PackageProblem as e:
+        db.rollback()
+        raise HTTPException(status_code=422, detail={"error": str(e), "code": "package"})
+    db.rollback()
+    return plan.as_dict()
+
+
+@router.get("/workspaces/{workspace_id}/capabilities", response_model=CapabilitiesOut)
+def workspace_capabilities(workspace_id: str, identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """What this workspace's packages let it do: which pages to show (equipment, map, beam model, records), its
+    map layers, ticket and document kinds, and the importers its packages support."""
+    _may_read(db, identity, workspace_id)
+    return installer.capabilities(db, workspace_id)
 
 
 def _history(db: Session, workspace_id: str) -> list[dict]:

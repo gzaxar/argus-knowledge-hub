@@ -1,0 +1,21 @@
+queries:
+  - id: what-a-primary-pump-backs
+    title: The pumps that stop when a primary pump stops
+    entity: graph
+    from: PP-1
+    relation: "backed by"
+    direction: in
+    fixture: fixtures/vacuum.yaml
+    expect: [TP-1, TP-2]
+  - id: relief-devices-due
+    title: Relief devices with a test due before 2027
+    entity: assets
+    jql: 'type = "Pressure Relief Device" AND relief_test_due < "2027-01-01" ORDER BY key'
+    fixture: fixtures/vacuum.yaml
+    expect: [PRV-1]
+  - id: failed-leak-tests
+    title: Leak tests that failed
+    entity: tickets
+    jql: 'type = "Leak Test" AND leak_test_result = Fail ORDER BY key'
+    fixture: fixtures/vacuum.yaml
+    expect: [LT-2]

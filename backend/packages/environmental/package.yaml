@@ -1,0 +1,17 @@
+id: environmental
+version: 1.0.0
+name: Environmental and monitoring networks
+description: >-
+  Monitoring networks and what they are made of: stations, environmental sensors, data loggers and
+  sampling points, with what each measures, its range, sampling interval, thresholds and calibration.
+  Calibrations, field sampling and threshold exceedances as tickets (an exceedance is verified and, where
+  required, notified, by someone who may approve); monitoring reports and calibration certificates as
+  documents. The measurements themselves stay in the systems that record them. Thresholds and
+  notification duties are the site's to set with its environmental officer; the package establishes no
+  compliance by itself.
+owner: INFN ARGUS — to be adopted by the site's environmental service
+license: EUPL-1.2
+depends:
+  core-objects: ">=2.0,<3"
+provides: [monitoring-catalogue]
+contents: [object_types.yaml, tickets.yaml, access.yaml, queries.yaml]

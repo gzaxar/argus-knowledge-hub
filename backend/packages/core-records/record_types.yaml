@@ -1,0 +1,78 @@
+# The root of administrative records, parties and agreements. Like every package: never rename a type, an
+# attribute key or an option id here — stored records use them. A type's uid in a workspace is
+# <workspace>:argus-object:<name as a slug>.
+
+option_sets:
+  contract_status:
+    - {id: draft, value: Draft}
+    - {id: negotiation, value: In negotiation}
+    - {id: in_approval, value: In approval}
+    - {id: active, value: Active}
+    - {id: suspended, value: Suspended}
+    - {id: expired, value: Expired}
+    - {id: terminated, value: Terminated}
+
+object_types:
+  types:
+    - name: "Record"
+      description: "An administrative record: a party, an agreement, a case, a right. Not equipment."
+      abstract: true
+      icon: tabler/file-description
+      attributes:
+        - {key: description, name: Description, type: text}
+        - {key: record_reference, name: Reference, indexed: true, description: "The number it is filed under: a protocol, a case or a file number."}
+        - {key: argus_keywords, name: Keywords, indexed: true, multi: true}
+        - {key: argus_owner, name: Owning service, type: group, indexed: true}
+        - {key: argus_responsible, name: Responsible, type: user}
+        - {key: argus_source, name: Source, type: enumeration, readonly: true, options: [{id: manual, value: Created here}, {id: glpi, value: GLPI}, {id: import, value: Imported}]}
+        - {key: argus_source_ref, name: Source revision, readonly: true}
+    - name: "Organization"
+      parent: "Record"
+      description: "A company, university, research body or public agency: a party to agreements."
+      icon: tabler/building
+      attributes:
+        - {key: org_kind, name: Kind, type: enumeration, options: [{id: company, value: Company}, {id: university, value: University}, {id: research_body, value: Research body}, {id: public_body, value: Public body}, {id: funding_agency, value: Funding agency}, {id: other, value: Other}]}
+        - {key: country, name: Country, regex: '^[A-Z]{2}$', description: "ISO 3166-1 alpha-2 code, e.g. IT."}
+        - {key: vat_number, name: VAT number, indexed: true}
+        - {key: pic_code, name: EU PIC, regex: '^[0-9]{9}$', description: "The European Commission's Participant Identification Code."}
+        - {key: website, name: Website}
+    - name: "Contract"
+      parent: "Record"
+      description: "Any agreement with obligations and a term: a supply, a service, a licence, a collaboration."
+      icon: tabler/file-certificate
+      attributes:
+        - {key: contract_number, name: Contract number, indexed: true, unique: true}
+        - {key: counterparty, name: Counterparty, type: reference, reference: Organization, multi: true}
+        - {key: contract_status, name: Status, type: enumeration, option_set: contract_status}
+        - {key: start_date, name: Start, type: date}
+        - {key: end_date, name: End, type: date}
+        - {key: notice_period_days, name: Notice period (days), type: integer, unit: d}
+        - {key: renewal, name: Renewal, type: enumeration, options: [{id: none, value: None}, {id: tacit, value: Tacit}, {id: explicit, value: On request}]}
+        - {key: contract_value, name: Value, type: float, unit: EUR, restricted: costs}
+        - {key: currency, name: Currency, regex: '^[A-Z]{3}$', description: "ISO 4217 code, e.g. EUR."}
+
+reference_relations:
+  counterparty: "with party"
+
+relation_types:
+  - {id: with-party, verb: "with party", from: Contract, to: Organization, layer: administrative, flows: none, description: "an agreement and a party to it"}
+  - {id: governed-by, verb: "governed by", from: "*", to: Contract, layer: administrative, flows: none, description: "a record and the agreement that governs it: a service under a support contract, a licence under an agreement"}
+
+queries:
+  - id: contracts-ending-in-2026
+    title: Active contracts that end in 2026, soonest first
+    entity: assets
+    jql: 'type = Contract AND contract_status = Active AND end_date >= "2026-01-01" AND end_date <= "2026-12-31" ORDER BY end_date'
+    fixture: fixtures/contracts.yaml
+    expect: [C-002, C-001]
+  - id: contracts-with-a-party
+    title: Contracts with a given party
+    entity: graph
+    from: ORG-ACME
+    relation: "with party"
+    direction: in
+    fixture: fixtures/contracts.yaml
+    expect: [C-001, C-003]
+
+restricted_classes:
+  - {id: commercial_terms, description: "Negotiated prices, discounts, royalties, penalties and other commercially confidential terms."}

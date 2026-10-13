@@ -7,7 +7,8 @@ ticket_types:
     icon: tabler/ticket
     attributes:
       - {key: argus_category, name: Category, type: enumeration, options: [{id: fault, value: Fault}, {id: maintenance, value: Maintenance}, {id: upgrade, value: Upgrade}, {id: request, value: Request}, {id: investigation, value: Investigation}, {id: other, value: Other}]}
-      - {key: argus_impact, name: Operational impact, type: enumeration, options: [{id: beam_down, value: Beam down}, {id: beam_degraded, value: Beam degraded}, {id: no_beam_impact, value: No beam impact}, {id: safety, value: Safety}, {id: unknown, value: Unknown}]}
+      # Domain neutral since 2.0: the accelerator package adds Beam down, Beam degraded and No beam impact.
+      - {key: argus_impact, name: Operational impact, type: enumeration, options: [{id: service_down, value: Service down}, {id: service_degraded, value: Service degraded}, {id: no_impact, value: No operational impact}, {id: safety, value: Safety}, {id: unknown, value: Unknown}]}
       - {key: argus_detected_by, name: Detected by, type: enumeration, options: [{id: operator, value: Operator}, {id: alarm, value: Alarm}, {id: monitoring, value: Monitoring}, {id: inspection, value: Inspection}, {id: user_report, value: User report}]}
       - {key: argus_system, name: System, indexed: true}
       - {key: argus_subsystem, name: Subsystem, indexed: true}

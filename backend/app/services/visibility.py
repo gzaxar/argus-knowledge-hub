@@ -37,6 +37,18 @@ RESTRICTED_PREFIX = "restricted:"
 RESTRICTED_CLASSES = ("costs", "personnel", "security_incident", "safety_investigation", "sensitive_design")
 
 
+def restricted_classes() -> dict[str, str]:
+    """Every restricted class: ARGUS's own, and those the shipped template packages declare
+    (`restricted_classes:` — confidential contract terms, unpublished inventions…). id -> description."""
+    from app.packages import defaults
+    from app.packages.loader import available
+    out = {c: "" for c in RESTRICTED_CLASSES}
+    for pid in defaults.ordered():
+        for c in available()[pid].section("restricted_classes") or []:
+            out.setdefault(str(c["id"]), str(c.get("description") or ""))
+    return out
+
+
 class Grants(frozenset):
     """The restricted classes a viewer may see. `Grants.all()` for admins."""
     everything = False

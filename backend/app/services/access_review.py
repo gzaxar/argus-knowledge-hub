@@ -60,10 +60,35 @@ def now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def install_templates(db: Session) -> list[str]:
-    """Create the template roles that do not exist yet (ids `argus-<key>`)."""
+def package_templates(db: Session, workspace_id: Optional[str] = None) -> dict:
+    """The roles the template packages recommend (`roles:`) — of the packages this workspace has, or of every
+    shipped one — in TEMPLATES' shape, each with the package it comes from."""
+    from app.packages.install import installed
+    from app.packages.loader import available
+    ids = list(installed(db, workspace_id)) if workspace_id else list(available())
+    out = {}
+    for pid in ids:
+        p = available().get(pid)
+        for r in (p.section("roles") or []) if p else []:
+            perms = {res: list(r.get(res) or []) for res in ("objects", "tickets", "documents") if r.get(res)}
+            if r.get("restricted"):
+                perms["restricted"] = list(r["restricted"])
+            if r.get("manage_members"):
+                perms["workspace"] = ["manage_members"]
+            out[r["id"]] = (r["name"], r["description"], perms, pid)
+    return out
+
+
+def all_templates(db: Session, workspace_id: Optional[str] = None) -> dict:
+    """key -> (name, description, permissions, package or None): ARGUS's own, then the packages'."""
+    return {**{k: (*v, None) for k, v in TEMPLATES.items()}, **package_templates(db, workspace_id)}
+
+
+def install_templates(db: Session, workspace_id: Optional[str] = None) -> list[str]:
+    """Create the template roles that do not exist yet (ids `argus-<key>`): ARGUS's own and those the
+    packages of this workspace recommend. A template is a role to grant; installing it grants nothing."""
     added = []
-    for key, (name, description, permissions) in TEMPLATES.items():
+    for key, (name, description, permissions, _package) in all_templates(db, workspace_id).items():
         rid = f"argus-{key}"
         if db.get(Role, rid) is None:
             db.add(Role(id=rid, name=name, description=description, permissions=permissions, is_system=False,

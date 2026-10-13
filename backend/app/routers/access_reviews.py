@@ -17,13 +17,13 @@ router = APIRouter(prefix="/v1/access-reviews", tags=["access reviews"])
 
 @router.get("/templates")
 def templates(workspace_id: str = Depends(require_permission("read")), db: Session = Depends(get_db)):
-    return [{"id": f"argus-{k}", "name": n, "description": d, "permissions": p}
-            for k, (n, d, p) in access_review.TEMPLATES.items()]
+    return [{"id": f"argus-{k}", "name": n, "description": d, "permissions": p, "package": pkg}
+            for k, (n, d, p, pkg) in access_review.all_templates(db, workspace_id).items()]
 
 
 @router.post("/templates")
 def install_templates(workspace_id: str = Depends(require_permission("approve")), db: Session = Depends(get_db)):
-    added = access_review.install_templates(db)
+    added = access_review.install_templates(db, workspace_id)
     db.commit()
     return {"added": added}
 

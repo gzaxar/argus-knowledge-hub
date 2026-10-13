@@ -18,7 +18,6 @@ object_types:
     - name: "Network Device"
       parent: "IT Equipment"
       description: "A device that carries or converts network traffic."
-      abstract: true
       icon: tabler/network
     - name: "Switch"
       parent: "Network Device"
@@ -46,7 +45,6 @@ object_types:
     - name: "Computing Node"
       parent: "IT Equipment"
       description: "A server or workstation."
-      abstract: true
       icon: tabler/server
       attributes:
         - {key: cpu, name: CPU}
@@ -120,3 +118,33 @@ object_types:
       attributes:
         - {key: n_ports, name: Number of ports, type: integer}
         - {key: medium, name: Medium, type: enumeration, options: [{id: copper, value: Copper}, {id: fibre, value: Fibre}]}
+    - name: "IT Peripheral"
+      parent: "IT Equipment"
+      description: "A monitor, printer, phone or other peripheral."
+      icon: tabler/device-desktop
+      attributes:
+        - {key: peripheral_kind, name: Kind, type: enumeration, options: [{id: monitor, value: Monitor}, {id: printer, value: Printer}, {id: phone, value: Phone}, {id: other, value: Other}]}
+        - {key: attached_to, name: Attached to, type: reference, reference: Computing Node, include_children: true}
+    - name: "Software Product"
+      parent: "Catalog Item"
+      description: "A piece of software, by publisher: what is installed and licensed."
+      icon: tabler/package
+      attributes:
+        - {key: publisher, name: Publisher}
+        - {key: software_category, name: Category}
+    - name: "Software Version"
+      parent: "Catalog Item"
+      description: "One version of a software product: what a computer actually has installed."
+      icon: tabler/packages
+      attributes:
+        - {key: version_label, name: Version, indexed: true}
+        - {key: of_product, name: Product, type: reference, reference: Software Product}
+        - {key: operating_system, name: For operating system}
+    - name: "Software License"
+      parent: "Contract"
+      description: "The right to run a software product: seats, expiry and the key."
+      icon: tabler/file-certificate
+      attributes:
+        - {key: licensed_product, name: Product, type: reference, reference: Software Product}
+        - {key: seats, name: Seats, type: integer, description: "-1 for unlimited."}
+        - {key: license_key, name: Key, type: text, restricted: license_keys}

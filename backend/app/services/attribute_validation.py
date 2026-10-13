@@ -131,6 +131,15 @@ def _check_single_attribute(
                 if not pattern.search(str(v)):
                     return f"{name} does not match the required format"
 
+    if attr.get("validator"):
+        # A check a package names by id and ARGUS implements (app/packages/validators.py). An id this release
+        # does not know (a newer package's) is not enforced rather than blocking every save.
+        from app.packages.validators import VALIDATORS, check
+        if attr["validator"] in VALIDATORS:
+            problem = check(attr["validator"], values)
+            if problem:
+                return f"{name}: {problem}"
+
     if attr_type == "enumeration":
         options = attr.get("options") or []
         allowed_values = {str(o.get("value")).lower() for o in options if o.get("value") is not None}

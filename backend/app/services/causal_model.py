@@ -53,6 +53,12 @@ LAYERS = {
     "mechanical": "supports, girders and movers, and the components they carry",
     "environment": "rooms and racks",
     "provenance": "where a record came from; no failure crosses these",
+    "safety": "fire, radiation and personnel protection: what detects, suppresses or shields what",
+    "access": "doors, zones and the readers and interlocks that admit people",
+    "monitoring": "measurement networks: which station or sensor watches what",
+    "optics": "laser and optical paths, and the references they are aligned to",
+    "gas": "process and cryogenic gas supply",
+    "administrative": "contracts, orders and agreements; no failure crosses these",
 }
 
 
@@ -183,8 +189,11 @@ BASE_SEMANTICS = dict(SEMANTICS)
 
 
 def _with_extensions() -> None:
-    """The relations declared by extensions that pass the gate (§13 S8)."""
+    """The relations declared by the installed template packages (`relation_types`), then by extensions that
+    pass the gate (§13 S8); neither redefines a relation of the model itself."""
     from app import extensions
+    from app.packages import relations
+    SEMANTICS.update({k: v for k, v in relations.semantics().items() if k not in BASE_SEMANTICS})
     SEMANTICS.update(extensions.semantics())
 
 

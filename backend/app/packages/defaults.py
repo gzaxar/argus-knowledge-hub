@@ -140,3 +140,12 @@ def default_workflow() -> dict:
     return {"uid": None, "name": w["name"], "initial": w["initial"], "is_default": True,
             "states": [dict(s) for s in w["states"]],
             "transitions": [{"from": t["from"], "to": t["to"], "name": t["name"]} for t in w["transitions"]]}
+
+
+def reload() -> None:
+    """Forget what was compiled: the next call reads the packages again (after loader.reload)."""
+    for fn in (package, ordered, _sets, object_types_of, object_types, ticket_types, document_types):
+        fn.cache_clear()
+    from app.packages import relations
+    relations.declared.cache_clear()
+    relations._descendants.cache_clear()

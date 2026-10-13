@@ -1,0 +1,30 @@
+queries:
+  - id: doors-into-the-clean-room
+    title: The doors into the clean room
+    entity: graph
+    from: ZONE-CR
+    relation: "gives access to"
+    direction: in
+    fixture: fixtures/building.yaml
+    expect: [DOOR-1, DOOR-2]
+  - id: what-a-controller-failure-locks
+    title: The doors a failed access controller leaves shut
+    entity: graph
+    from: CTRL-1
+    relation: ["on access controller", "controls door"]
+    direction: in
+    depth: 1
+    fixture: fixtures/building.yaml
+    expect: [READER-1, READER-2]
+  - id: access-requests-waiting
+    title: Access requests waiting for approval
+    entity: tickets
+    jql: 'type = "Access Request" AND status = requested ORDER BY key'
+    fixture: fixtures/building.yaml
+    expect: [AR-1]
+  - id: lifting-inspections-due
+    title: Elevators and cranes with a statutory inspection due before 2027
+    entity: assets
+    jql: 'statutory_inspection_due < "2027-01-01" ORDER BY key'
+    fixture: fixtures/building.yaml
+    expect: [CRANE-1]

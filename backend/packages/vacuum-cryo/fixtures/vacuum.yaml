@@ -1,0 +1,11 @@
+records:
+  - {key: PP-1, type: Primary Pump, name: Scroll pump 1}
+  - {key: TP-1, type: Turbo Pump, name: Turbo 1, attributes: {backing_pump: "@PP-1"}}
+  - {key: TP-2, type: Turbo Pump, name: Turbo 2, attributes: {backing_pump: "@PP-1"}}
+  - {key: TP-3, type: Turbo Pump, name: Turbo 3}
+  - {key: CRY-1, type: Cryostat, name: Test cryostat, attributes: {cryogen: Liquid helium, operating_temperature_k: 4.2}}
+  - {key: PRV-1, type: Pressure Relief Device, name: Cryostat relief valve, attributes: {relief_kind: Relief valve, set_pressure_bar: 3.5, relief_test_due: "2026-11-30", protects_vessel: "@CRY-1"}}
+  - {key: PRV-2, type: Pressure Relief Device, name: Line burst disc, attributes: {relief_kind: Burst disc, relief_test_due: "2028-05-31"}}
+tickets:
+  - {key: LT-1, kind: Leak Test, title: Leak test sector 1, state: new, attributes: {leak_test_result: Pass, leak_rate_mbar_l_s: 1.0e-10}}
+  - {key: LT-2, kind: Leak Test, title: Leak test sector 2, state: new, attributes: {leak_test_result: Fail, leak_rate_mbar_l_s: 3.0e-8}}

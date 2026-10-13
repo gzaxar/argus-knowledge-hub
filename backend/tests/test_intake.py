@@ -223,7 +223,7 @@ def test_a_report_becomes_a_ticket_draft_with_causes_only_as_hypotheses(world, m
     w = world
     answer, seen = model
     answer({"title": "Gun ion pump tripped", "type": "Operational incident", "occurred_at": "2026-09-20T03:10:00Z",
-            "occurred_precision": "instant", "attributes": {"argus_impact": "beam_down", "argus_root_cause": "HV"},
+            "occurred_precision": "instant", "attributes": {"argus_impact": "service_down", "argus_root_cause": "HV"},
             "hypotheses": ["the HV cable may be damaged"],
             "evidence": {"occurred_at": "at 03:10", "type": "tripped"}, "confidence": {"type": 0.8}})
     report = "The Ion pump gun area tripped at 03:10 on 20 September, beam lost. The Secret ion pump was noisy."
@@ -231,7 +231,7 @@ def test_a_report_becomes_a_ticket_draft_with_causes_only_as_hypotheses(world, m
     f = out["fields"]
     assert f["schema_uid"]["value"] == w["incident"]
     assert f["attributes.occurred_from"]["value"]["precision"] == "instant"
-    assert f["attributes.argus_impact"]["value"] == "beam_down"
+    assert f["attributes.argus_impact"]["value"] == "service_down"
     assert "attributes.argus_root_cause" not in f                                    # a cause is not a field
     assert out["hypotheses"] == [{"text": "the HV cable may be damaged", "class": "unresolved hypothesis"}]
     assert f["asset_uid"]["value"] == w["pump"] and f["asset_uid"]["method"] == "resolved"

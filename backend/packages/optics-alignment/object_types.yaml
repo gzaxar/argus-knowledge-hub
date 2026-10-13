@@ -1,0 +1,172 @@
+# Lasers, optics and alignment, on the core backbone. Laser System and Optical Assembly moved here unchanged
+# from the accelerator catalogue; their kinds are new. A Mirror, Lens or Beam Splitter of the accelerator
+# package is a position on a beam line (a functional element); the optics here are the physical units.
+# Never rename a type, an attribute key or an option id: stored records use them.
+
+option_sets:
+  laser_class:
+    - {id: "1", value: "1"}
+    - {id: 1m, value: 1M}
+    - {id: "2", value: "2"}
+    - {id: 2m, value: 2M}
+    - {id: 3r, value: 3R}
+    - {id: 3b, value: 3B}
+    - {id: "4", value: "4"}
+
+map_layers:
+  - {id: optics, name: Lasers and optics, description: "Lasers, optical tables and laser controlled areas."}
+  - {id: survey, name: Survey network, description: "Reference points of the alignment network."}
+
+object_types:
+  types:
+    - name: "Laser System"
+      parent: "Asset"
+      description: "A laser and its delivery."
+      icon: tabler/flare
+    - name: "Optical Assembly"
+      parent: "Asset"
+      description: "The optics between a screen and its camera."
+      icon: tabler/eye
+      attributes:
+        - {key: focal_length_mm, name: Focal length (mm), type: float}
+        - {key: magnification, name: Magnification, type: float}
+        - {key: aperture_f, name: Aperture (f-number), type: float}
+        - {key: filters, name: Filters, indexed: true, multi: true}
+        - {key: mirror_count, name: Number of mirrors, type: integer}
+        - {key: working_distance_mm, name: Working distance (mm), type: float}
+    - name: "Laser Source"
+      parent: "Laser System"
+      description: "A laser that emits: an oscillator, an amplifier stage or a pump laser."
+      abstract: true
+      icon: tabler/flare
+      locatable: true
+      map_layer: optics
+      attributes:
+        - {key: laser_class, name: Laser class, type: enumeration, option_set: laser_class}
+        - {key: wavelength_nm, name: Wavelength (nm), type: float, unit: nm, validator: optics.wavelength_nm}
+        - {key: pulse_energy_mj, name: Pulse energy (mJ), type: float, unit: mJ}
+        - {key: pulse_duration_fs, name: Pulse duration (fs), type: float, unit: fs}
+        - {key: repetition_rate_hz, name: Repetition rate (Hz), type: float, unit: Hz}
+        - {key: average_power_w, name: Average power (W), type: float, unit: W}
+    - name: "Laser Oscillator"
+      parent: "Laser Source"
+      description: "Makes the pulses (or the beam) the rest of the system amplifies."
+      icon: tabler/wave-sine
+    - name: "Laser Amplifier"
+      parent: "Laser Source"
+      description: "A regenerative or multipass stage, seeded by an oscillator and pumped."
+      icon: tabler/chart-line
+      attributes:
+        - {key: seeded_by, name: Seeded by, type: reference, reference: Laser Source, include_children: true}
+        - {key: pumped_by, name: Pumped by, type: reference, reference: Laser Source, include_children: true}
+        - {key: n_passes, name: Passes, type: integer}
+    - name: "Pump Laser"
+      parent: "Laser Source"
+      description: "A laser whose job is to pump an amplifier."
+      icon: tabler/bolt
+    - name: "Optic"
+      parent: "Asset"
+      description: "A physical optical component: its wavelength range, coating and damage threshold."
+      abstract: true
+      icon: tabler/prism
+      attributes:
+        - {key: design_wavelength_nm, name: Design wavelength (nm), type: float, unit: nm, validator: optics.wavelength_nm}
+        - {key: clear_aperture_mm, name: Clear aperture (mm), type: float, unit: mm}
+        - {key: coating, name: Coating}
+        - {key: damage_threshold_j_cm2, name: Damage threshold (J/cm²), type: float, unit: J/cm²}
+        - {key: on_table, name: On table, type: reference, reference: Optical Table}
+    - name: "Optical Mirror"
+      parent: "Optic"
+      description: "A plane, curved or deformable mirror unit."
+      icon: tabler/flip-horizontal
+      attributes:
+        - {key: mirror_shape, name: Shape, type: enumeration, options: [{id: plane, value: Plane}, {id: spherical, value: Spherical}, {id: parabolic, value: Off-axis parabolic}, {id: deformable, value: Deformable}]}
+        - {key: focal_length_mm, name: Focal length (mm), type: float, unit: mm}
+    - name: "Optical Lens"
+      parent: "Optic"
+      description: "A lens unit."
+      icon: tabler/aperture
+      attributes:
+        - {key: focal_length_mm, name: Focal length (mm), type: float, unit: mm}
+    - name: "Optical Window"
+      parent: "Optic"
+      description: "A window between vacuum and air, or a protective window."
+      icon: tabler/focus-centered
+      attributes:
+        - {key: window_material, name: Material, type: enumeration, options: [{id: fused_silica, value: Fused silica}, {id: sapphire, value: Sapphire}, {id: caf2, value: CaF2}, {id: znse, value: ZnSe}, {id: other, value: Other}]}
+    - name: "Diffraction Grating"
+      parent: "Optic"
+      description: "A grating: for stretching, compressing or dispersing pulses."
+      icon: tabler/wave-square
+      attributes:
+        - {key: lines_per_mm, name: Lines per mm, type: float, unit: lines/mm}
+    - name: "Waveplate"
+      parent: "Optic"
+      description: "Changes polarisation: half- or quarter-wave."
+      icon: tabler/wave-sine
+      attributes:
+        - {key: retardance, name: Retardance, type: enumeration, options: [{id: half, value: λ/2}, {id: quarter, value: λ/4}]}
+    - name: "Optical Table"
+      parent: "Mechanical Support"
+      description: "An optical table or breadboard and how it is isolated from vibration."
+      icon: tabler/stack-2
+      locatable: true
+      map_layer: optics
+      attributes:
+        - {key: table_size_mm, name: Size (mm), regex: '^[0-9]+ ?x ?[0-9]+$', description: "Length x width, e.g. 3000 x 1500."}
+        - {key: isolation, name: Isolation, type: enumeration, options: [{id: passive, value: Passive}, {id: active, value: Active}, {id: none, value: None}]}
+    - name: "Alignment Instrument"
+      parent: "Instrument"
+      description: "An instrument the survey and alignment team measures with."
+      abstract: true
+      icon: tabler/crosshair
+      attributes:
+        - {key: accuracy_um, name: Accuracy (µm), type: float, unit: µm}
+        - {key: calibration_due, name: Calibration due, type: date}
+    - name: "Laser Tracker"
+      parent: "Alignment Instrument"
+      description: "Measures 3D positions to a reflector by laser interferometry."
+      icon: tabler/crosshair
+    - name: "Total Station"
+      parent: "Alignment Instrument"
+      description: "Measures angles and distances to survey targets."
+      icon: tabler/ruler-measure
+    - name: "Autocollimator"
+      parent: "Alignment Instrument"
+      description: "Measures small angles of a reflecting surface."
+      icon: tabler/focus-centered
+    - name: "Survey Reference Point"
+      parent: "Location"
+      description: "A point of the alignment network: a monument, a floor socket, a wall bracket."
+      icon: tabler/map-pin
+      locatable: true
+      map_layer: survey
+      attributes:
+        - {key: point_id, name: Point id, indexed: true, unique: true}
+        - {key: coordinate_frame, name: Frame, description: "The network's local frame the coordinates are in."}
+        - {key: x_m, name: X (m), type: float, unit: m}
+        - {key: y_m, name: Y (m), type: float, unit: m}
+        - {key: z_m, name: Z (m), type: float, unit: m}
+        - {key: uncertainty_mm, name: Uncertainty (mm), type: float, unit: mm}
+    - name: "Laser Controlled Area"
+      parent: "Area"
+      description: "An area where a class 3B or 4 laser may be operated, with its access control."
+      icon: tabler/flare
+      locatable: true
+      map_layer: optics
+      attributes:
+        - {key: max_laser_class, name: Highest class allowed, type: enumeration, option_set: laser_class}
+        - {key: entry_interlocked, name: Entry interlocked, type: boolean}
+        - {key: laser_safety_officer, name: Laser safety officer, type: user}
+
+reference_relations:
+  seeded_by: "seeded by"
+  pumped_by: "pumped by"
+  on_table: "on table"
+
+relation_types:
+  - {id: seeded-by, verb: "seeded by", from: Laser Source, to: Laser Source, layer: optics, flows: reverse, carries: function, description: "an amplifier and the oscillator that seeds it"}
+  - {id: pumped-by, verb: "pumped by", from: Laser Source, to: Laser Source, layer: optics, flows: reverse, carries: function, description: "an amplifier and the laser that pumps it"}
+  - {id: aligned-to, verb: "aligned to", from: "*", to: Survey Reference Point, layer: optics, flows: reverse, carries: degradation, description: "a component and the reference it is aligned to: if the reference moves, its alignment is lost"}
+  - {id: on-table, verb: "on table", from: Optic, to: Optical Table, layer: mechanical, flows: reverse, carries: degradation, description: "an optic and the table it is mounted on"}
+  - {id: illuminates, verb: "illuminates", from: [Laser System, Optic], to: "*", layer: optics, flows: forward, carries: function, description: "a laser or optic and what its beam goes to next"}

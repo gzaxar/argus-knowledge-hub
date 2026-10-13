@@ -1,0 +1,17 @@
+id: administration
+version: 1.0.0
+name: Administrative and contract management
+description: >-
+  Procurement and contracts on the core records: what the core Contract needs for public procurement
+  (tender and project codes, procedure, responsible person, guarantees), grant agreements, budget
+  lines, purchase orders and invoices; procurement requests through budget check and approval, contract
+  renewals and goods receipts; signed contracts and tender documents. Amounts are restricted to those who
+  may see costs, special terms to those who may see commercial terms. Procedures and approval steps
+  follow no particular regulation until the site's administration approves them; the package establishes
+  no compliance by itself.
+owner: INFN ARGUS — to be adopted by the site's administration
+license: EUPL-1.2
+depends:
+  core-records: ">=1.0,<2"
+provides: [administration]
+contents: [record_types.yaml, tickets.yaml, access.yaml, queries.yaml]

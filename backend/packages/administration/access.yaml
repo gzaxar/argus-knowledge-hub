@@ -1,0 +1,21 @@
+roles:
+  - id: contract-manager
+    name: Contract manager
+    description: "Contracts, orders and invoices; sees costs and commercial terms; approves procurement and renewals."
+    objects: [read, create, modify]
+    tickets: [read, create, modify, approve]
+    documents: [read, create, modify, approve]
+    restricted: [costs, commercial_terms]
+  - id: budget-holder
+    name: Budget holder
+    description: "Approves the requests charged to their budget lines; sees costs."
+    objects: [read]
+    tickets: [read, modify, approve]
+    documents: [read]
+    restricted: [costs]
+  - id: requester
+    name: Requester
+    description: "Raises procurement requests and records goods receipts; sees no amounts."
+    objects: [read]
+    tickets: [read, create, modify]
+    documents: [read]

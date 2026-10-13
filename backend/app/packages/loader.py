@@ -14,7 +14,8 @@ from app.packages.model import Package, Problem
 MANIFEST = "package.yaml"
 MANIFEST_KEYS = {"id", "version", "name", "description", "owner", "depends", "provides", "contents", "license"}
 SECTIONS = {"option_sets", "enumerations", "object_types", "ticket_types", "document_types", "workflows",
-            "equipment_classes", "reference_relations", "map_layers"}
+            "equipment_classes", "reference_relations", "map_layers", "extends", "relation_types", "roles",
+            "restricted_classes", "imports", "queries"}
 
 
 def packages_dir() -> Path:
@@ -119,4 +120,7 @@ def get(package_id: str) -> Package:
 
 
 def reload() -> None:
+    """Read the packages again, and forget everything compiled from them."""
     _available.cache_clear()
+    from app.packages import defaults
+    defaults.reload()

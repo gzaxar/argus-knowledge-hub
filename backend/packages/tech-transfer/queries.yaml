@@ -1,0 +1,28 @@
+queries:
+  - id: annuities-due-in-2026
+    title: Granted or pending patents with an annuity due in 2026
+    entity: assets
+    jql: 'type = Patent AND patent_status in (Filed, Published, Granted) AND next_annuity_due >= "2026-01-01" AND next_annuity_due <= "2026-12-31" ORDER BY next_annuity_due'
+    fixture: fixtures/portfolio.yaml
+    expect: [PAT-EP, PAT-US]
+  - id: patents-of-a-family
+    title: The patents of a family
+    entity: graph
+    from: FAM-1
+    relation: "member of family"
+    direction: in
+    fixture: fixtures/portfolio.yaml
+    expect: [PAT-EP, PAT-IT, PAT-US]
+  - id: what-a-licence-covers
+    title: What a licence covers
+    entity: graph
+    from: LIC-1
+    relation: licenses
+    fixture: fixtures/portfolio.yaml
+    expect: [PAT-EP, PAT-US]
+  - id: disclosures-awaiting-decision
+    title: Disclosures waiting for the committee
+    entity: tickets
+    jql: 'type = "Disclosure Evaluation" AND status = awaiting_decision ORDER BY key'
+    fixture: fixtures/portfolio.yaml
+    expect: [EVAL-1]

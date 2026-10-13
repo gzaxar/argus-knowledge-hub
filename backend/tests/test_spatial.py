@@ -170,7 +170,9 @@ def test_the_map_and_nearby_search_show_only_what_the_person_may_see(world):
     secret = client.get(f"/v1/assets/{world['secret']}/location", headers=world["headers"]).json()
     assert secret["hidden"] is True and secret["location"] is None
     layers = client.get("/v1/map/layers", headers=world["headers"]).json()
-    assert {layer["id"] for layer in layers} == {"equipment", "places"}
+    # core-objects' layers, and those of the packages the accelerator stands on since 1.35.26
+    assert {layer["id"] for layer in layers} == {"equipment", "places", "safety", "safety-zones", "cryogenics",
+                                                 "gas-handling", "optics", "survey"}
 
 
 # --------------------------------------------------------------------------- importing locations

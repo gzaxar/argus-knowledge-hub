@@ -24,21 +24,37 @@ KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 ATTRIBUTE_TYPES = {"string", "text", "integer", "float", "boolean", "date", "datetime", "enumeration", "user",
                    "group", "reference"}
 ATTRIBUTE_KEYS = {"key", "name", "type", "required", "indexed", "multi", "unique", "readonly", "options",
-                  "option_set", "reference", "include_children", "regex", "renamed_from", "unit"}
+                  "option_set", "reference", "include_children", "regex", "renamed_from", "unit", "validator",
+                  "restricted", "description"}
 OPTION_KEYS = {"id", "value", "responsible", "meaning"}
 TYPE_KEYS = {"name", "parent", "description", "abstract", "aliases", "icon", "behaviors", "map_layer", "locatable",
              "attributes"}
 OBJECT_SECTION_KEYS = {"types", "beamline_roots", "former_names"}
 KIND_SECTION_KEYS = {"base", "kinds"}
 BASE_KEYS = {"name", "description", "icon", "attributes"}
-KIND_KEYS = {"name", "description", "icon"}
+KIND_KEYS = {"name", "description", "icon", "attributes"}
 ENUMERATION_KEYS = {"key", "name", "applies_to", "type", "default", "options", "option_set"}
-WORKFLOW_KEYS = {"id", "name", "initial", "default", "states", "transitions"}
+WORKFLOW_KEYS = {"id", "name", "initial", "default", "states", "transitions", "applies_to", "description"}
 STATE_KEYS = {"key", "name", "category"}
 STATE_CATEGORIES = {"open", "active", "waiting", "done"}
-TRANSITION_KEYS = {"from", "to", "name"}
+TRANSITION_KEYS = {"from", "to", "name", "requires"}
+REQUIREMENTS = {"assignee", "resolution", "comment", "approver"}
 CLASS_SECTION_KEYS = {"classes", "already_a_type", "unclassified"}
 LAYER_KEYS = {"id", "name", "description"}
+EXTEND_KEYS = {"type", "area", "attributes", "options"}
+RELATION_KEYS = {"id", "verb", "from", "to", "description", "layer", "flows", "carries", "inverse"}
+FLOWS = {"forward", "reverse", "none"}
+CARRIES = {"control", "function", "permit", "degradation"}
+ROLE_KEYS = {"id", "name", "description", "objects", "tickets", "documents", "restricted", "manage_members"}
+ACTIONS = {"read", "create", "modify", "delete", "approve"}
+CLASS_KEYS = {"id", "description"}
+IMPORT_KEYS = {"importer", "description", "maps"}
+QUERY_KEYS = {"id", "title", "entity", "jql", "fixture", "expect", "from", "relation", "direction", "depth"}
+QUERY_ENTITIES = {"tickets", "assets", "documents", "graph"}
+# The domain role templates ARGUS defines itself (services/access_review.TEMPLATES; a test keeps them equal).
+BUILTIN_TEMPLATES = {"inventory-steward", "it-steward", "beamline-operator", "service-desk-agent",
+                     "document-controller", "safety-investigator", "procurement-officer", "auditor"}
+BUILTIN_CLASSES = {"costs", "personnel", "security_incident", "safety_investigation", "sensitive_design"}
 APPLIES_TO = {"objects", "tickets", "documents"}
 ICON_DIR = Path(__file__).resolve().parents[1] / "catalogue_icons"
 
@@ -47,6 +63,7 @@ class _Report:
     def __init__(self, package: Package):
         self.package = package
         self.problems: list[Problem] = list(package.read_problems)
+        self.classes: set[str] = set(BUILTIN_CLASSES)
 
     def add(self, section: Optional[str], where: str, message: str) -> None:
         file = self.package.origin.get(section, MANIFEST) if section else MANIFEST
@@ -139,6 +156,14 @@ def _attributes(report: _Report, section: str, where: str, attrs, sets: dict, ty
                 re.compile(str(a["regex"]))
             except re.error as e:
                 report.add(section, at, f"regex does not compile: {e}")
+        if a.get("validator") is not None:
+            from app.packages.validators import VALIDATORS
+            if a["validator"] not in VALIDATORS:
+                report.add(section, at, f"no validator {a['validator']!r} in this release "
+                                        f"(app/packages/validators.py: {', '.join(sorted(VALIDATORS))})")
+        if a.get("restricted") is not None and a["restricted"] not in report.classes:
+            report.add(section, at, f"no restricted class {a['restricted']!r} (built in, or declared by a package "
+                                    f"this one stands on)")
 
 
 def _options(report: _Report, section: str, where: str, options) -> None:
@@ -200,6 +225,22 @@ def validate(package: Package, catalog: Optional[dict[str, Package]] = None) -> 
                 for b in t.get("behaviors") or []:
                     dep_behaviors[str(b)] = f"{t['name']} in {p.id}"
         dep_layers |= {str(m.get("id")) for m in p.section("map_layers") or [] if isinstance(m, dict)}
+
+    # restricted classes: the built-in ones, and those this package and its dependencies declare
+    for p in deps:
+        r.classes |= {str(c.get("id")) for c in p.section("restricted_classes") or [] if isinstance(c, dict)}
+    for i, c in enumerate(package.section("restricted_classes") or []):
+        at = f"restricted_classes[{i}]"
+        if not r.keys("restricted_classes", at, c, CLASS_KEYS):
+            continue
+        cid = str(c.get("id") or "")
+        if not KEY.match(cid) or cid != cid.lower():
+            r.add("restricted_classes", at, f"class id {cid!r}: lower-case letters, digits and _")
+        elif cid in r.classes:
+            r.add("restricted_classes", at, f"class {cid!r} already exists")
+        if not c.get("description"):
+            r.add("restricted_classes", at, "say what the class covers (description)")
+        r.classes.add(cid)
 
     # option sets
     raw_sets = package.section("option_sets")
@@ -310,6 +351,7 @@ def validate(package: Package, catalog: Optional[dict[str, Package]] = None) -> 
                 r.add(section_name, k["name"], "duplicate kind")
             kinds.add(k["name"])
             _icon(r, section_name, k["name"], k.get("icon"))
+            _attributes(r, section_name, k["name"], k.get("attributes"), sets, names)
 
     # enumerations
     seen_enums: set[tuple] = set()
@@ -334,7 +376,9 @@ def validate(package: Package, catalog: Optional[dict[str, Package]] = None) -> 
                 isinstance(o, dict) and str(o.get("id")) == str(e["default"]) for o in options or []):
             r.add("enumerations", at, f"default {e['default']!r} is not one of its options")
 
-    # workflows
+    # workflows (a package's own workflow names the ticket kinds it is for)
+    every_kinds = {str(k.get("name")) for p in stack for k in (p.section("ticket_types") or {}).get("kinds") or []
+                   if isinstance(k, dict)}
     wf_ids: set[str] = set()
     defaults = 0
     for i, w in enumerate(package.section("workflows") or []):
@@ -362,6 +406,8 @@ def validate(package: Package, catalog: Optional[dict[str, Package]] = None) -> 
             r.add("workflows", at, "a workflow has states")
         if w.get("initial") not in states:
             r.add("workflows", at, f"initial state {w.get('initial')!r} is not one of its states")
+        if states and not any(isinstance(s, dict) and s.get("category") == "done" for s in w.get("states") or []):
+            r.add("workflows", at, "a workflow needs a done state")
         for j, tr in enumerate(w.get("transitions") or []):
             tat = f"{at} › transitions[{j}]"
             if not r.keys("workflows", tat, tr, TRANSITION_KEYS):
@@ -369,8 +415,16 @@ def validate(package: Package, catalog: Optional[dict[str, Package]] = None) -> 
             for end in ("from", "to"):
                 if tr.get(end) != "*" and tr.get(end) not in states:
                     r.add("workflows", tat, f"{end} {tr.get(end)!r} is not a state")
+            bad = set(tr.get("requires") or []) - REQUIREMENTS
+            if bad or (tr.get("requires") is not None and not isinstance(tr["requires"], list)):
+                r.add("workflows", tat, f"requires: a list of {', '.join(sorted(REQUIREMENTS))}")
+        for kind in w.get("applies_to") or []:
+            if kind not in every_kinds:
+                r.add("workflows", at, f"applies_to {kind!r}: no ticket kind of that name here or in a dependency")
     if defaults > 1:
         r.add("workflows", "", "only one workflow can be the default")
+    if defaults and package.id != "core-facility":
+        r.add("workflows", "", "only the core's workflow is the default; a package's names its kinds (applies_to)")
 
     # equipment classes
     classes = package.section("equipment_classes")
@@ -400,7 +454,204 @@ def validate(package: Package, catalog: Optional[dict[str, Package]] = None) -> 
                     r.add("reference_relations", str(key), "no type has a reference attribute with this key")
                 if not isinstance(verb, str) or not verb.strip():
                     r.add("reference_relations", str(key), "the verb is text, e.g. located in")
+    _extensions(r, package, stack, deps, sets, names)
+    _relation_types(r, package, deps, names)
+    _roles(r, package)
+    _imports(r, package)
+    _queries(r, package)
     return r.problems
+
+
+def _type_attrs(p: Package, area: str, type_name: str) -> Optional[list]:
+    """The attributes `type_name` has in package `p` (`base` for a ticket or document base), or None."""
+    if area == "object_types":
+        t = next((t for t in (p.section("object_types") or {}).get("types") or []
+                  if isinstance(t, dict) and t.get("name") == type_name), None)
+        return None if t is None else list(t.get("attributes") or [])
+    section = p.section(area) or {}
+    if type_name == "base":
+        return list((section.get("base") or {}).get("attributes") or []) if section.get("base") else None
+    k = next((k for k in section.get("kinds") or [] if isinstance(k, dict) and k.get("name") == type_name), None)
+    return None if k is None else list(k.get("attributes") or [])
+
+
+def _extensions(r: _Report, package: Package, stack: list, deps: list, sets: dict, names: set) -> None:
+    """What a package adds to a type another package (one it stands on) defines: attributes, and options of
+    an enumeration that type has. Never changes what is there."""
+    seen: set[tuple] = set()
+    for i, e in enumerate(package.section("extends") or []):
+        at = f"extends[{i}]"
+        if not r.keys("extends", at, e, EXTEND_KEYS):
+            continue
+        area = e.get("area", "object_types")
+        if area not in ("object_types", "ticket_types", "document_types"):
+            r.add("extends", at, "area is object_types, ticket_types or document_types")
+            continue
+        target = str(e.get("type") or "")
+        at = f"{area} › {target}"
+        owner = next((p for p in deps if _type_attrs(p, area, target) is not None), None)
+        if owner is None:
+            r.add("extends", at, "no package this one depends on defines it")
+            continue
+        if (area, target) in seen:
+            r.add("extends", at, "extended twice: put it in one entry")
+        seen.add((area, target))
+        # what the type already has: its own attributes and those its dependencies' extensions add
+        have = {str(a.get("key")): a for a in _type_attrs(owner, area, target) if isinstance(a, dict)}
+        for p in deps:
+            for x in p.section("extends") or []:
+                if isinstance(x, dict) and x.get("type") == target and x.get("area", "object_types") == area:
+                    have.update({str(a.get("key")): a for a in x.get("attributes") or [] if isinstance(a, dict)})
+        _attributes(r, "extends", at, e.get("attributes"), sets, names)
+        for a in e.get("attributes") or []:
+            if isinstance(a, dict) and a.get("key") in have:
+                r.add("extends", f"{at} › {a['key']}", f"{target} already has {a['key']!r}")
+        options = e.get("options") or {}
+        if not isinstance(options, dict):
+            r.add("extends", at, "options: a mapping of attribute key → the options to add")
+            continue
+        for key, extra in options.items():
+            attr = have.get(str(key))
+            if attr is None or attr.get("type") != "enumeration":
+                r.add("extends", f"{at} › {key}", f"{target} has no enumeration {key!r}")
+                continue
+            _options(r, "extends", f"{at} › {key}", extra)
+            present = {str(o.get("id")) for o in (sets.get(attr["option_set"]) if attr.get("option_set")
+                                                   else attr.get("options")) or [] if isinstance(o, dict)}
+            for o in extra or []:
+                if isinstance(o, dict) and str(o.get("id")) in present:
+                    r.add("extends", f"{at} › {key}", f"option {o['id']!r} is already there")
+
+
+def _relation_types(r: _Report, package: Package, deps: list, names: set) -> None:
+    from app.services.causal_model import BASE_SEMANTICS, LAYERS
+    known = {str(x.get("verb")).lower(): p.id for p in deps for x in p.section("relation_types") or []
+             if isinstance(x, dict)}
+    ids: set[str] = set()
+    for i, x in enumerate(package.section("relation_types") or []):
+        at = f"relation_types[{i}]"
+        if not r.keys("relation_types", at, x, RELATION_KEYS):
+            continue
+        rid, verb = str(x.get("id") or ""), str(x.get("verb") or "").strip().lower()
+        at = rid or at
+        if not ID.match(rid):
+            r.add("relation_types", at, "an id: lower-case words joined by -")
+        if rid in ids:
+            r.add("relation_types", at, "duplicate id")
+        ids.add(rid)
+        if not verb:
+            r.add("relation_types", at, "the verb is how the relation reads, e.g. protected by")
+        elif verb in BASE_SEMANTICS:
+            r.add("relation_types", at, f"{verb!r} is defined by ARGUS itself; use it without declaring it")
+        elif verb in known:
+            r.add("relation_types", at, f"{verb!r} is already declared by {known[verb]}")
+        for end in ("from", "to"):
+            for t in (x.get(end) if isinstance(x.get(end), list) else [x.get(end)]):
+                if t != "*" and t not in names:
+                    r.add("relation_types", at, f"{end} {t!r} is not a type here or in a dependency")
+        if x.get("layer") not in LAYERS:
+            r.add("relation_types", at, f"layer must be one of {', '.join(sorted(LAYERS))}")
+        if x.get("flows", "none") not in FLOWS:
+            r.add("relation_types", at, f"flows must be one of {', '.join(sorted(FLOWS))}")
+        if x.get("carries") is not None and x["carries"] not in CARRIES:
+            r.add("relation_types", at, f"carries must be one of {', '.join(sorted(CARRIES))}")
+        if x.get("flows", "none") != "none" and x.get("carries") is None:
+            r.add("relation_types", at, "a relation failures cross says what it carries (carries)")
+
+
+def _roles(r: _Report, package: Package) -> None:
+    ids: set[str] = set()
+    for i, x in enumerate(package.section("roles") or []):
+        at = f"roles[{i}]"
+        if not r.keys("roles", at, x, ROLE_KEYS):
+            continue
+        rid = str(x.get("id") or "")
+        at = rid or at
+        if not ID.match(rid):
+            r.add("roles", at, "an id: lower-case words joined by -")
+        elif rid in ids or rid in BUILTIN_TEMPLATES:
+            r.add("roles", at, "this role id is taken")
+        ids.add(rid)
+        if not x.get("name") or not x.get("description"):
+            r.add("roles", at, "a role has a name and says who it is for (description)")
+        for res in ("objects", "tickets", "documents"):
+            bad = set(x.get(res) or []) - ACTIONS
+            if bad:
+                r.add("roles", at, f"{res}: unknown actions {', '.join(sorted(bad))}")
+        for c in x.get("restricted") or []:
+            if c not in r.classes:
+                r.add("roles", at, f"no restricted class {c!r}")
+
+
+def _imports(r: _Report, package: Package) -> None:
+    from app.packages.importers import IMPORTERS
+    for i, x in enumerate(package.section("imports") or []):
+        at = f"imports[{i}]"
+        if not r.keys("imports", at, x, IMPORT_KEYS):
+            continue
+        imp = x.get("importer")
+        if imp not in IMPORTERS:
+            r.add("imports", at, f"no importer {imp!r} (one of {', '.join(sorted(IMPORTERS))})")
+            continue
+        missing = set(IMPORTERS[imp]["requires"]) - set(package.provides) - _provided_below(package)
+        if missing:
+            r.add("imports", at, f"{imp} needs {', '.join(sorted(missing))}, which neither this package nor what "
+                                 f"it stands on provides")
+
+
+def _provided_below(package: Package) -> set:
+    out: set = set()
+    catalog = available()
+
+    def walk(p: Package, seen: set) -> None:
+        for dep in p.depends:
+            if dep in seen or dep not in catalog:
+                continue
+            seen.add(dep)
+            out.update(catalog[dep].provides)
+            walk(catalog[dep], seen)
+    walk(package, set())
+    return out
+
+
+def _queries(r: _Report, package: Package) -> None:
+    ids: set[str] = set()
+    for i, q in enumerate(package.section("queries") or []):
+        at = f"queries[{i}]"
+        if not r.keys("queries", at, q, QUERY_KEYS):
+            continue
+        qid = str(q.get("id") or "")
+        at = qid or at
+        if not ID.match(qid) or qid in ids:
+            r.add("queries", at, "each query has its own id: lower-case words joined by -")
+        ids.add(qid)
+        if not q.get("title"):
+            r.add("queries", at, "say what the query answers (title)")
+        entity = q.get("entity")
+        if entity not in QUERY_ENTITIES:
+            r.add("queries", at, f"entity must be one of {', '.join(sorted(QUERY_ENTITIES))}")
+        elif entity == "graph":
+            if not q.get("from") or not q.get("relation"):
+                r.add("queries", at, "a graph query starts from a record key (from) and follows a relation")
+            if q.get("direction", "out") not in ("out", "in"):
+                r.add("queries", at, "direction is out or in")
+        elif not q.get("jql"):
+            r.add("queries", at, "a search query is written in JQL (jql)")
+        else:
+            try:
+                from app.services.jql import JqlError, parse
+            except ImportError:             # validating outside ARGUS (no database libraries): the tests parse it
+                parse = None
+            if parse is not None:
+                try:
+                    parse(str(q["jql"]))
+                except JqlError as e:
+                    r.add("queries", at, f"jql does not parse: {e.message}")
+        fixture = q.get("fixture")
+        if not fixture or not (package.path / str(fixture)).is_file():
+            r.add("queries", at, f"fixture {fixture!r}: a file in the package with the records the query runs on")
+        if not isinstance(q.get("expect"), list):
+            r.add("queries", at, "expect: the keys of the records the query returns, in order")
 
 
 def validate_all(packages: Iterable[Package]) -> list[Problem]:

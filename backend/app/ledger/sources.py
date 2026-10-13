@@ -212,6 +212,26 @@ def parse_registry(content: bytes, stream: LedgerStream, ruleset: Ruleset) -> li
     return out
 
 
+def parse_glpi(content: bytes, stream: LedgerStream, ruleset: Ruleset) -> list[ParsedClaim]:
+    """A GLPI import (app/integrations/glpi): records in the registry form, each named by its GLPI identity
+    (glpi:<instance>:<itemtype>:<id>), its link in GLPI as the evidence."""
+    data = json.loads(content)
+    out: list[ParsedClaim] = []
+    for rec in data.get("records", []):
+        ref = rec["ref"]
+        evidence = {"ref": ref, "url": (rec.get("attributes") or {}).get("glpi_url")}
+        kw = {"rule_id": "glpi.record/1", "evidence": evidence}
+        out.append(ParsedClaim(ref, "exists", {"type": rec["type"], "key": rec.get("key"), "name": rec.get("name")},
+                               **kw))
+        out.append(ParsedClaim(ref, "name", rec.get("name"), **kw))
+        for k, v in (rec.get("attributes") or {}).items():
+            out.append(ParsedClaim(ref, f"attr:{k}", v, **kw))
+        for rel, targets in (rec.get("relations") or {}).items():
+            for t in targets if isinstance(targets, list) else [targets]:
+                out.append(ParsedClaim(ref, f"rel:{rel}", {"ref": t}, **kw))
+    return out
+
+
 def parse_resolved(content: bytes, stream: LedgerStream, ruleset: Ruleset) -> list[ParsedClaim]:
     return [ParsedClaim(**c) for c in json.loads(content)]
 
@@ -220,6 +240,7 @@ PARSERS = {
     "epik8s-slice": Parser("epik8s-slice/2", "slice-impl/2", parse_epik8s, ("infer.vac.sip", "infer.mag.ps")),
     "insight-fixture": Parser("insight-fixture/1", "slice-impl/1", parse_insight),
     "registry-fixture": Parser("registry-fixture/1", "slice-impl/1", parse_registry),
+    "glpi": Parser("glpi/1", "glpi-impl/1", parse_glpi),
     "resolved": Parser("resolved/1", "resolver/1", parse_resolved),
 }
 

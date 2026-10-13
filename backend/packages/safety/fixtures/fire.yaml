@@ -1,0 +1,14 @@
+records:
+  - {key: ZONE-KH, type: Fire Zone, name: Klystron hall, attributes: {fire_resistance_min: 120}}
+  - {key: ZONE-OF, type: Fire Zone, name: Offices}
+  - {key: RA-1, type: Radiation Area, name: Linac tunnel, attributes: {radiation_classification: Controlled, access_rule: Radiation-controlled, dose_rate_limit_usv_h: 25}}
+  - {key: RA-2, type: Radiation Area, name: Klystron gallery, attributes: {radiation_classification: Supervised}}
+  - {key: PANEL-1, type: Fire Alarm Panel, name: Panel 1, attributes: {n_loops: 4}}
+  - {key: DET-01, type: Fire Detector, name: Smoke detector 01, attributes: {detector_type: Optical smoke, fire_zone: "@ZONE-KH", alarm_panel: "@PANEL-1"}}
+  - {key: DET-02, type: Fire Detector, name: Heat detector 02, attributes: {detector_type: Heat, fire_zone: "@ZONE-OF", alarm_panel: "@PANEL-1"}}
+  - {key: SPR-01, type: Fire Suppression System, name: Gas suppression, attributes: {suppression_agent: Inert gas, alarm_panel: "@PANEL-1"}}
+  - {key: EXT-01, type: Fire Extinguisher, name: CO2 6 kg, attributes: {agent: CO2, capacity_kg: 6, next_inspection: "2026-03-31", fire_zone: "@ZONE-KH"}}
+  - {key: EXT-02, type: Fire Extinguisher, name: Powder 9 kg, attributes: {agent: ABC powder, capacity_kg: 9, next_inspection: "2026-09-30"}}
+  - {key: EXT-03, type: Fire Extinguisher, name: Foam 9 l, attributes: {agent: Foam, capacity_kg: 9, next_inspection: "2026-06-30"}}
+relations:
+  - {from: SPR-01, verb: protects, to: ZONE-KH}

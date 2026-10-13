@@ -1,0 +1,14 @@
+id: core-records
+version: 1.0.0
+name: Core records
+description: >-
+  Records that are not equipment, for the domains that keep them: the parties a site deals with
+  (companies, universities, agencies) and the agreements it makes with them. Nothing in it has a place on
+  the map or is installed anywhere. Administrative and contract management, technology transfer and the
+  IT package's licences and support contracts build on it.
+owner: INFN ARGUS
+license: EUPL-1.2
+depends:
+  core-facility: ">=2.0,<3"
+provides: [records]
+contents: [record_types.yaml]

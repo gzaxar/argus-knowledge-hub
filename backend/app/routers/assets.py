@@ -519,8 +519,12 @@ def create_relation(
     # from_asset_uid must belong to the acting workspace (it's what this relation
     # is attached to); to_asset_uid may point at another workspace's asset only if
     # that asset is global.
-    _get_owned_asset(body.from_asset_uid, workspace_id, db)
-    _get_visible_asset(body.to_asset_uid, workspace_id, db)
+    source = _get_owned_asset(body.from_asset_uid, workspace_id, db)
+    target = _get_visible_asset(body.to_asset_uid, workspace_id, db)
+    from app.packages import relations
+    wrong = relations.check(db, body.relation_type, source.schema_uid, target.schema_uid)
+    if wrong:
+        raise HTTPException(status_code=422, detail={"error": wrong, "code": "relation_type"})
 
     # An asserted edge is a person's statement in the fact ledger (§13 S5).
     try:

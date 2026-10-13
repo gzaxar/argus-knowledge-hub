@@ -539,73 +539,6 @@ object_types:
       attributes:
         - {key: mode_in, name: Mode in}
         - {key: mode_out, name: Mode out}
-    - name: "Vacuum Pump"
-      parent: "Asset"
-      description: "Any vacuum pump."
-      abstract: true
-      icon: tabler/propeller
-    - name: "Ion Pump"
-      parent: "Vacuum Pump"
-      description: "A sputter-ion pump: the thing that trips when the pressure rises."
-      attributes:
-        - {key: pumping_speed, name: Pumping speed (l/s), type: float}
-        - {key: nominal_voltage, name: Nominal voltage (V), type: integer}
-        - {key: element_count, name: Number of elements, type: integer}
-    - name: "Turbo Pump"
-      parent: "Vacuum Pump"
-      description: "A turbomolecular pump."
-      attributes:
-        - {key: pumping_speed, name: Pumping speed (l/s), type: float}
-        - {key: rotation_speed, name: Rotation speed (Hz), type: float}
-        - {key: backing_pump, name: Backed by, type: reference, reference: Primary Pump}
-    - name: "Primary Pump"
-      parent: "Vacuum Pump"
-      description: "A roughing or backing pump."
-    - name: "NEG Cartridge"
-      parent: "Vacuum Pump"
-      description: "A non-evaporable getter pump."
-    - name: "Vacuum Gauge"
-      parent: "Asset"
-      description: "Measures pressure."
-      icon: tabler/gauge
-      attributes:
-        - {key: gauge_kind, name: Gauge kind, type: enumeration, options: [{id: pirani, value: Pirani}, {id: penning, value: Penning}, {id: cold_cathode, value: Cold cathode}, {id: capacitive, value: Capacitive}]}
-        - {key: range_min, name: Range minimum (mbar), type: float}
-        - {key: range_max, name: Range maximum (mbar), type: float}
-    - name: "Vacuum Valve"
-      parent: "Asset"
-      description: "Isolates a vacuum sector."
-      icon: argus/vacuum-valve
-      attributes:
-        - {key: valve_kind, name: Valve kind, type: enumeration, options: [{id: gate, value: Gate}, {id: angle, value: Angle}, {id: all_metal, value: All-metal}]}
-        - {key: actuation, name: Actuation, type: enumeration, options: [{id: manual, value: Manual}, {id: pneumatic, value: Pneumatic}, {id: electric, value: Electric}]}
-        - {key: interlocked, name: Interlocked, type: boolean}
-    - name: "Vacuum Chamber"
-      parent: "Asset"
-      description: "What you unbolt."
-      icon: tabler/cylinder
-    - name: "Vacuum Controller"
-      parent: "Asset"
-      description: "The box between a control line and the vacuum equipment it runs: an ion pump controller, a turbo controller, a gauge controller. It powers and reads what is connected to it, so when it stops, all of that does."
-      aliases: [ion pump controller, turbo pump controller, ipcmini]
-      icon: tabler/settings-automation
-      attributes:
-        - {key: n_channels, name: Channels, type: integer}
-        - {key: firmware_version, name: Firmware}
-    - name: "Vacuum Component"
-      parent: "Asset"
-      description: "A passive part of the vacuum line: a length of pipe, a bellows, a cross or a tee. Gauges, pumps and valves are mounted on it; a Vacuum Sector says which ones a valve isolates."
-      aliases: [pipe, vacuum pipe, beam pipe, vacuum tube, bellows, cross, tee, elbow, nipple, spool, vacuum line]
-      icon: argus/vacuum-cross
-      attributes:
-        - {key: component_kind, name: Kind, type: enumeration, options: [{id: pipe, value: Pipe}, {id: bellows, value: Bellows}, {id: cross, value: Cross}, {id: tee, value: Tee}, {id: elbow, value: Elbow}, {id: nipple, value: Nipple}, {id: reducer, value: Reducer}, {id: adapter, value: Adapter}, {id: viewport, value: Viewport}, {id: feedthrough, value: Feedthrough}, {id: other, value: Other}]}
-        - {key: length_mm, name: Length (mm), type: float}
-        - {key: inner_diameter_mm, name: Inner diameter (mm), type: float}
-        - {key: flange_type, name: Flange type, type: enumeration, options: [{id: cf, value: CF}, {id: kf, value: KF}, {id: iso_k, value: ISO-K}, {id: iso_f, value: ISO-F}, {id: vcr, value: VCR}, {id: other, value: Other}]}
-        - {key: flange_size, name: Flange size}
-        - {key: material, name: Material}
-        - {key: bakeable, name: Bakeable, type: boolean}
-        - {key: bake_temperature_c, name: Bake-out temperature (°C), type: float}
     - name: "Motion Controller"
       parent: "Asset"
       description: "Drives one or more motor axes."
@@ -648,17 +581,6 @@ object_types:
         - {key: interface, name: Interface, type: enumeration, options: [{id: gige, value: GigE}, {id: usb3, value: USB3}, {id: cameralink, value: CameraLink}, {id: coaxpress, value: CoaXPress}]}
         - {key: lens, name: Lens}
         - {key: px_calibration, name: Calibration (µm/px), type: float}
-    - name: "Optical Assembly"
-      parent: "Asset"
-      description: "The optics between a screen and its camera."
-      icon: tabler/eye
-      attributes:
-        - {key: focal_length_mm, name: Focal length (mm), type: float}
-        - {key: magnification, name: Magnification, type: float}
-        - {key: aperture_f, name: Aperture (f-number), type: float}
-        - {key: filters, name: Filters, indexed: true, multi: true}
-        - {key: mirror_count, name: Number of mirrors, type: integer}
-        - {key: working_distance_mm, name: Working distance (mm), type: float}
     - name: "Scintillator Screen"
       parent: "Asset"
       description: "The screen the beam strikes."
@@ -694,30 +616,6 @@ object_types:
       parent: "Asset"
       description: "A board in a crate."
       icon: tabler/cpu
-    - name: "Cryogenic Device"
-      parent: "Asset"
-      description: "A cryostat, cold head or transfer line."
-      icon: tabler/temperature-minus
-    - name: "Interlock Unit"
-      parent: "Asset"
-      description: "A safety or machine-protection interlock."
-      icon: tabler/lock
-      attributes:
-        - {key: interlock_kind, name: Interlock kind, type: enumeration, options: [{id: pss, value: PSS}, {id: mps, value: MPS}, {id: vacuum, value: Vacuum}, {id: thermal, value: Thermal}]}
-        - {key: sil_level, name: SIL level}
-        - {key: test_interval_months, name: Test interval (months), type: integer}
-    - name: "Radiation Monitor"
-      parent: "Asset"
-      description: "Measures radiation."
-      icon: tabler/radioactive
-      attributes:
-        - {key: detector_kind, name: Detector kind}
-        - {key: alarm_threshold, name: Alarm threshold, type: float}
-        - {key: calibration_due, name: Calibration due, type: date}
-    - name: "Laser System"
-      parent: "Asset"
-      description: "A laser and its delivery."
-      icon: tabler/flare
     - name: "Observable"
       parent: "Catalog Item"
       description: "A physical quantity a model predicts and a diagnostic measures: beam.position.x, beam.intensity, optical.power. The meaning, not a value: live values stay in the control system."

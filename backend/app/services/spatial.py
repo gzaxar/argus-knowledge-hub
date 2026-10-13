@@ -310,7 +310,10 @@ def import_locations(db: Session, workspace_id: str, rows: list[dict], *, source
     import hashlib
     import json as _json
     from datetime import datetime as _dt
+    from app.packages.importers import requires
+    from app.packages.requirements import require
     from app.services.identifiers import exact_clause
+    require(db, workspace_id, *requires("locations"))
     from app.services.visibility import visible_assets_clause
     results, counts = [], {"set": 0, "to_review": 0, "consistent": 0, "rejected": 0}
     digest = hashlib.sha256(_json.dumps(rows, sort_keys=True, default=str).encode()).hexdigest()[:16]

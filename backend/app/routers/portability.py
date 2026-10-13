@@ -131,7 +131,7 @@ def portability_config(identity=Depends(get_identity)):
     from app.portability import closure, envelope, exporter, identity_policy
     from app.portability import policy as policy_mod
     from app.portability.blob_scan import DECISIONS as BLOB_OUTCOMES
-    from app.services.visibility import RESTRICTED_CLASSES
+    from app.services.visibility import restricted_classes
     cfg = service.config()
     return {"repositories": sorted(cfg.repositories), "artifact_stores": sorted(cfg.stores),
             # Chosen as the artifact store: the data is committed with the checkpoint in its repository.
@@ -143,7 +143,7 @@ def portability_config(identity=Depends(get_identity)):
                         "public_line": (signing.allowed_signers_line(cfg.signer).strip()
                                         if cfg.signer is not None and cfg.signer.key_path.exists() else None)},
             "trusted_keys": cfg.trusted is not None and cfg.trusted.exists(),
-            "restricted_classes": list(RESTRICTED_CLASSES),
+            "restricted_classes": list(restricted_classes()),
             "restricted_destinations": {k: sorted(v) for k, v in cfg.restricted_destinations.items()
                                         if k in cfg.repositories},
             "encryption_recipients": sorted(k for k, v in cfg.recipients.items() if v.exists()),

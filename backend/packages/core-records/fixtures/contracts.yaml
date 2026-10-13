@@ -1,0 +1,6 @@
+records:
+  - {key: ORG-ACME, type: Organization, name: Acme Vacuum S.r.l., attributes: {org_kind: Company, country: IT}}
+  - {key: ORG-UNI, type: Organization, name: Università di Esempio, attributes: {org_kind: University, country: IT}}
+  - {key: C-001, type: Contract, name: Pump maintenance 2024-26, attributes: {contract_number: "2024/017", contract_status: Active, start_date: "2024-01-01", end_date: "2026-12-31", counterparty: ["@ORG-ACME"]}}
+  - {key: C-002, type: Contract, name: Collaboration agreement, attributes: {contract_number: "2023/104", contract_status: Active, start_date: "2023-03-01", end_date: "2026-02-28", counterparty: ["@ORG-UNI"]}}
+  - {key: C-003, type: Contract, name: Old supply, attributes: {contract_number: "2019/002", contract_status: Expired, start_date: "2019-01-01", end_date: "2026-06-30", counterparty: ["@ORG-ACME"]}}

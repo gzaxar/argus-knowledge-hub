@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { packagesApi, workspacesApi, type PackageInfo } from "../api/client";
 
 const CONTENT_LABELS: Record<string, string> = {
@@ -9,6 +10,11 @@ const CONTENT_LABELS: Record<string, string> = {
   workflows: "workflows",
   equipment_classes: "equipment classes",
   map_layers: "map layers",
+  extensions: "extensions",
+  relation_types: "relation types",
+  roles: "role templates",
+  restricted_classes: "restricted classes",
+  queries: "example queries",
 };
 
 export function contentsLine(p: Pick<PackageInfo, "contents">): string {
@@ -89,6 +95,58 @@ export function PackagePicker({
         </ul>
       )}
       {resolved.isError && <p className="mt-1 text-xs text-red-600">These packages cannot be combined.</p>}
+      <InstallPreview chosen={chosen} catalogue={catalogue} />
+    </div>
+  );
+}
+
+/** The installation itself, tried and rolled back: each package's exact version and checksum, and the types,
+ *  kinds and workflows it would create. Nothing is kept. */
+function InstallPreview({ chosen, catalogue }: { chosen: string[]; catalogue: string }) {
+  const [shown, setShown] = useState(false);
+  const plan = useQuery({
+    queryKey: ["packages-preview-new", chosen, catalogue],
+    queryFn: () => packagesApi.previewNew({ packages: chosen, catalogue_workspace_id: catalogue || undefined }),
+    enabled: shown,
+  });
+  if (!shown) {
+    return (
+      <button type="button" onClick={() => setShown(true)} className="mt-2 text-xs text-slate-600 underline">
+        Preview the installation
+      </button>
+    );
+  }
+  if (plan.isLoading) return <p className="mt-2 text-xs text-slate-500">Working out the installation…</p>;
+  if (plan.isError) return <p className="mt-2 text-xs text-red-600">The installation cannot be previewed.</p>;
+  const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : []);
+  return (
+    <div className="mt-2 rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
+      <p className="font-medium text-slate-700">The new workspace would get</p>
+      <ul className="mt-1 space-y-1">
+        {plan.data?.steps.map((s) => {
+          const created = list(s.result.created);
+          const kinds = [...list(s.result.ticket_types_added), ...list(s.result.document_types_added)];
+          const flows = list(s.result.workflows_added);
+          return (
+            <li key={s.package_id}>
+              <span className="font-mono text-slate-800">{s.package_id} {s.version}</span>{" "}
+              <span className="font-mono text-slate-400" title={s.checksum}>
+                {(s.checksum ?? "").slice(0, 12)}
+              </span>
+              <span className="block">
+                {[created.length && `${created.length} types`, kinds.length && `${kinds.length} kinds`,
+                  flows.length && `${flows.length} workflows`].filter(Boolean).join(" · ") || "definitions only"}
+                {created.length > 0 && (
+                  <span className="text-slate-400"> — {created.slice(0, 8).join(", ")}{created.length > 8 ? "…" : ""}</span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-1 text-slate-400">
+        Private: nobody but you can see it until you give roles. No records: only their types.
+      </p>
     </div>
   );
 }

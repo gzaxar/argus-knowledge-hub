@@ -35,6 +35,12 @@ def attribute(spec: dict, option_sets: dict) -> dict:
         out["regex"] = str(spec["regex"])
     if spec.get("unit"):
         out["unit"] = str(spec["unit"])
+    if spec.get("validator"):
+        out["validator"] = str(spec["validator"])
+    if spec.get("restricted"):
+        out["restricted"] = str(spec["restricted"])
+    if spec.get("description"):
+        out["description"] = str(spec["description"])
     return out
 
 
@@ -82,6 +88,7 @@ class KindSet:
     base_attributes: list
     base_icon: Optional[str]
     kinds: list  # [(name, description or None, icon or None)]
+    kind_attributes: dict = field(default_factory=dict)  # kind name -> its own attributes
 
 
 def kind_set(package: Package, section_name: str, sets: dict) -> Optional[KindSet]:
@@ -92,7 +99,27 @@ def kind_set(package: Package, section_name: str, sets: dict) -> Optional[KindSe
     return KindSet(
         base_name=str(base.get("name") or ""), base_description=str(base.get("description") or ""),
         base_attributes=[attribute(a, sets) for a in base.get("attributes") or []], base_icon=base.get("icon"),
-        kinds=[(str(k["name"]), k.get("description"), k.get("icon")) for k in section.get("kinds") or []])
+        kinds=[(str(k["name"]), k.get("description"), k.get("icon")) for k in section.get("kinds") or []],
+        kind_attributes={str(k["name"]): [attribute(a, sets) for a in k.get("attributes") or []]
+                         for k in section.get("kinds") or [] if k.get("attributes")})
+
+
+@dataclass
+class Extension:
+    """What a package adds to a type another package defines."""
+    area: str                 # object_types | ticket_types | document_types
+    type: str                 # the type's name; `base` for the base ticket or document type
+    attributes: list
+    options: dict             # attribute key -> [option]
+    package: str = ""
+
+
+def extensions(package: Package, sets: dict) -> list[Extension]:
+    return [Extension(area=str(e.get("area") or "object_types"), type=str(e["type"]),
+                      attributes=[attribute(a, sets) for a in e.get("attributes") or []],
+                      options={str(k): option_list(v) for k, v in (e.get("options") or {}).items()},
+                      package=package.id)
+            for e in package.section("extends") or []]
 
 
 def enumerations(package: Package, sets: dict) -> list[dict]:
