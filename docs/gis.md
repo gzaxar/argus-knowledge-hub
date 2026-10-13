@@ -15,8 +15,9 @@ Where records are on the earth, kept apart from what they are connected to (the 
   `distance_m` to the approved location at the time.
 
 Which types have a location comes from the packages: `locatable: true` on a type (inherited down the
-tree), `map_layer` naming one of the package's `map_layers`. accelerator 1.1.0 places Asset (equipment)
-and Location (places).
+tree), `map_layer` naming one of the packages' `map_layers` (the nearest up the tree wins). core-objects 1.1.0
+places Asset (equipment) and Location (places); electrical, hydraulic and hvac give their equipment their own
+layers. A workspace on core-objects 1.0.0 gets placement through an upgrade with no decision to take.
 
 ## Access
 

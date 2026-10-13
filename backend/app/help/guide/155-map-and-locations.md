@@ -6,9 +6,9 @@ order: 155
 ---
 
 Equipment and places can have a **location** on the earth: latitude and longitude in WGS 84 (the GPS system),
-with how accurate it is. Only types their package places on the map have one — in the accelerator catalogue,
-**equipment** (every type under Asset, on the *Equipment* layer) and **places** (buildings, halls, racks,
-stores, on the *Places* layer). A location is where a unit physically is; what it is connected to is the
+with how accurate it is. Only types their package places on the map have one: **equipment** (every type
+under Asset, on the *Equipment* layer) and **places** (buildings, halls, racks, stores, on the *Places* layer),
+from Core objects; the electrical, hydraulic and HVAC packages show their equipment on layers of their own. A location is where a unit physically is; what it is connected to is the
 knowledge graph's, and the two are kept apart.
 
 ## A record's location
