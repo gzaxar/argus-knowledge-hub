@@ -7,9 +7,9 @@ hosts:
 
 images:
   backend:
-    tag: "1.35.23"
+    tag: "1.35.24"
   web:
-    tag: "1.35.23"
+    tag: "1.35.24"
 
 # local-path volumes live on one node's disk and do not enforce their size: these are the room planned on
 # each worker. vnode-0, the control plane, has under 2 GB free and takes none.
