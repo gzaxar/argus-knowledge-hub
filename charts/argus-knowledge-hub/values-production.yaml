@@ -10,6 +10,11 @@ images:
     tag: "1.35.24"
   web:
     tag: "1.35.24"
+  # PostgreSQL 16 with pgvector and PostGIS (deploy/postgres): rehearsed on this installation's data with
+  # tools/db-image-rehearsal on 2026-10-13 (every check passed but the administrator sign-in, not run). The
+  # data directory is the same; going back is setting pgvector/pgvector:pg16-trixie again, until the GIS
+  # release has created the PostGIS extension.
+  postgres: ghcr.io/infn-argus/argus-knowledge-hub-postgres:1.35.24
 
 # local-path volumes live on one node's disk and do not enforce their size: these are the room planned on
 # each worker. vnode-0, the control plane, has under 2 GB free and takes none.
