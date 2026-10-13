@@ -1,0 +1,61 @@
+# HVAC, on the core backbone.
+
+map_layers:
+  - {id: hvac, name: HVAC, description: "Air handling, fan coils, cooling towers and heat pumps."}
+
+object_types:
+  types:
+    - name: "HVAC Equipment"
+      parent: "Asset"
+      description: "Equipment that heats, cools or ventilates."
+      abstract: true
+      icon: tabler/snowflake
+      locatable: true
+      map_layer: hvac
+      attributes:
+        - {key: served_area, name: Area served, type: reference, reference: Location, include_children: true}
+        - {key: cooling_capacity_kw, name: Cooling capacity (kW), type: float, unit: kW}
+        - {key: heating_capacity_kw, name: Heating capacity (kW), type: float, unit: kW}
+        - {key: cooled_by, name: Cooled by, type: reference, reference: Asset, include_children: true}
+    - name: "Air Handling Unit"
+      parent: "HVAC Equipment"
+      description: "Conditions and moves air for a building or a hall."
+      icon: tabler/propeller
+      attributes:
+        - {key: airflow_m3h, name: Airflow (m³/h), type: float, unit: m3/h}
+        - {key: filter_class, name: Filter class, indexed: true}
+    - name: "Fan Coil Unit"
+      parent: "HVAC Equipment"
+      description: "Heats or cools one room."
+      icon: tabler/propeller
+    - name: "Damper"
+      parent: "HVAC Equipment"
+      description: "Regulates or shuts air flow in a duct; a fire damper closes on alarm."
+      icon: tabler/adjustments-horizontal
+      attributes:
+        - {key: damper_kind, name: Kind, type: enumeration, options: [{id: control, value: Control}, {id: fire, value: Fire}, {id: smoke, value: Smoke}]}
+    - name: "Cooling Tower"
+      parent: "HVAC Equipment"
+      description: "Rejects heat from a cooling-water circuit to the air."
+      icon: tabler/building-factory-2
+    - name: "Heat Pump"
+      parent: "HVAC Equipment"
+      description: "Moves heat for heating or cooling."
+      icon: tabler/temperature-minus
+      attributes:
+        - {key: cop, name: Coefficient of performance, type: float}
+    - name: "Duct Segment"
+      parent: "HVAC Equipment"
+      description: "A run of air duct."
+      icon: tabler/line-dashed
+      attributes:
+        - {key: section_mm, name: Section (mm), indexed: true}
+    - name: "HVAC Sensor"
+      parent: "HVAC Equipment"
+      description: "Temperature, humidity or CO₂ sensing for control."
+      icon: tabler/temperature-minus
+      attributes:
+        - {key: measures, name: Measures, type: enumeration, multi: true, options: [{id: temperature, value: Temperature}, {id: humidity, value: Humidity}, {id: co2, value: CO₂}, {id: pressure, value: Differential pressure}]}
+
+reference_relations:
+  cooled_by: "cooled by"

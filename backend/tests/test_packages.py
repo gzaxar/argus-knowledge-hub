@@ -33,8 +33,9 @@ def test_the_packages_that_ship_are_valid_and_report_what_they_hold(capsys):
     assert {"core-facility", "accelerator"} <= set(shipped)
     for p in shipped.values():
         assert validate(p) == [], p.id
-    assert shipped["accelerator"].depends == {"core-facility": ">=1.0,<2"}
-    assert shipped["accelerator"].summary()["object_types"] == len(asset_types.CATALOGUE)
+    assert shipped["accelerator"].depends == {"core-objects": ">=1.0,<2", "it": ">=1.0,<2"}
+    assert sum(shipped[p].summary()["object_types"] for p in ("core-objects", "it", "accelerator")) == \
+        len(asset_types.CATALOGUE)
     assert cli(["validate"]) == 0
     assert "✓ accelerator" in capsys.readouterr().out
 
@@ -49,7 +50,7 @@ def _package(tmp_path: Path, files: dict) -> Path:
 
 def test_a_broken_package_is_reported_precisely(tmp_path, capsys):
     root = _package(tmp_path, {
-        "package.yaml": "id: broken-pkg\nversion: one\nowner: ''\ndepends: {accelerator: '>=2.0', nowhere: '*'}\n"
+        "package.yaml": "id: broken-pkg\nversion: one\nowner: ''\ndepends: {accelerator: '>=9.0', nowhere: '*'}\n"
                         "contents: [types.yaml, ../escape.yaml]\ncoordinates: [41.8, 12.6]\n",
         "types.yaml": "object_types:\n  types:\n"
                       "    - {name: Pump Station, parent: Plant Item, behaviors: [teleport], map_layer: pumps, latitude: 41.8,\n"
@@ -64,7 +65,7 @@ def test_a_broken_package_is_reported_precisely(tmp_path, capsys):
         ("contents › ../escape.yaml", "must be a .yaml file inside the package"),
         ("version", "'one' is not a version (e.g. 1.0.0)"),
         ("owner", "say who answers for the package"),
-        ("depends › accelerator", "needs accelerator >=2.0, this installation has 1.0.0"),
+        ("depends › accelerator", f"needs accelerator >=9.0, this installation has {available()['accelerator'].version}"),
         ("depends › nowhere", "no such package"),
         ("types[0] › latitude", "unknown key"),
         ("Pump Station", "parent 'Plant Item' is defined later: list parents before children"),
@@ -72,7 +73,7 @@ def test_a_broken_package_is_reported_precisely(tmp_path, capsys):
         ("Pump Station › site", "refers to 'Nowhere', which no package here defines"),
         ("Pump Station › mode", "an enumeration needs options or an option_set"),
         ("Pump Station", "no map layer 'pumps'"),
-        ("Asset", "already defined by accelerator"),
+        ("Asset", "already defined by core-objects"),
         ("wf › transitions[0]", "to 'gone' is not a state"),
     ]
     for item in expected:
@@ -108,10 +109,21 @@ def _by_installer(db, kind, workspace_id, catalogue_id):
         installer.install(db, workspace_id, ["accelerator"], catalogue_workspace_id=catalogue_id)
 
 
+# Types the it package added beyond the 1.x catalogue (an accelerator workspace gets them with it).
+NEW_IN_IT = {"Firewall", "Wireless Access Point", "Storage System", "Patch Panel"}
+
+
 def test_installing_the_packages_writes_exactly_what_seeding_wrote_before_them():
-    """The record in fixtures/package_parity was made from the Python definitions, before they moved to YAML."""
+    """The record in fixtures/package_parity was made from the Python definitions, before they moved to YAML.
+    Since then the catalogue was split into core-objects, it and accelerator (same types, same uids) and it
+    gained four IT types; nothing else changed."""
     before = json.loads((FIXTURES / "seeding.json").read_text())
-    assert seed_every_way(_by_installer) == before
+    now = seed_every_way(_by_installer)
+    added = {s["name"] for part in now.values() for s in part["schemas"] if s["name"] in NEW_IN_IT}
+    assert added == NEW_IN_IT
+    for part in now.values():
+        part["schemas"] = [s for s in part["schemas"] if s["name"] not in NEW_IN_IT]
+    assert now == before
 
 
 # --------------------------------------------------------------------------- the installer and the record
@@ -142,13 +154,14 @@ def test_a_workspace_records_exactly_which_versions_it_uses_and_reapplying_chang
     plan = installer.install(db, ws, ["accelerator"], actor="tester")
     db.commit()
     assert [(s.package_id, s.action, s.requested) for s in plan.steps] == [
-        ("core-facility", "install", False), ("accelerator", "install", True)]
+        ("core-facility", "install", False), ("core-objects", "install", False), ("it", "install", False),
+        ("accelerator", "install", True)]
     rows = installer.installed(db, ws)
     shipped = available()
-    for pid in ("core-facility", "accelerator"):
+    for pid in ("core-facility", "core-objects", "it", "accelerator"):
         assert (rows[pid].version, rows[pid].checksum) == (shipped[pid].version, shipped[pid].checksum)
     assert rows["accelerator"].options == {"scope": "all"}
-    created = plan.steps[1].result["created"]
+    created = [n for st in plan.steps[1:] for n in st.result["created"]]
     assert "Item" in created and len(created) == len(asset_types.CATALOGUE)
 
     schemas, history = _count(db, Schema, ws), len(installer.history(db, ws))
@@ -163,7 +176,7 @@ def test_a_preview_keeps_nothing_and_an_install_that_fails_applies_nothing(ws):
     db = SessionLocal()
     plan = installer.plan(db, ws, ["accelerator"])
     db.rollback()
-    assert plan.changes and len(plan.steps[1].result["created"]) == len(asset_types.CATALOGUE)
+    assert plan.changes and sum(len(st.result["created"]) for st in plan.steps[1:]) == len(asset_types.CATALOGUE)
     assert _count(db, Schema, ws) == 0 and _count(db, WorkspacePackage, ws) == 0
 
     # Hanging from a "catalogue" that holds none of the shared types: the accelerator step fails, and the core
@@ -213,11 +226,13 @@ def test_a_workspace_made_before_packages_is_recorded_once_from_what_it_has(ws):
     installer.detect(db)
     db.commit()
     rows = installer.installed(db, ws)
-    assert rows["core-facility"].version == "1.0.0" and rows["accelerator"].options == {"scope": "global"}
+    assert rows["core-facility"].version == "1.0.0"
+    assert {pid: rows[pid].options for pid in ("core-objects", "it", "accelerator")} == {
+        pid: {"scope": "global"} for pid in ("core-objects", "it", "accelerator")}
     assert {h.action for h in installer.history(db, ws)} == {"detected"}
     installer.detect(db)
     db.commit()
-    assert len(installer.history(db, ws)) == 2
+    assert len(installer.history(db, ws)) == 4                    # core-facility, core-objects, it, accelerator: once
     db.close()
 
 
@@ -256,7 +271,8 @@ def test_a_workspace_given_the_catalogue_before_the_record_is_recognised_not_rei
     schemas = _count(db, Schema, ws)
     require(db, ws, "accelerator-catalogue")
     db.commit()
-    assert [(h.package_id, h.action) for h in installer.history(db, ws)] == [("accelerator", "detected")]
+    assert [(h.package_id, h.action) for h in installer.history(db, ws)] == [
+        ("core-objects", "detected"), ("it", "detected"), ("accelerator", "detected")]
     assert _count(db, Schema, ws) == schemas
     db.close()
 
@@ -281,23 +297,25 @@ def test_a_workspace_is_made_from_the_chosen_packages_and_says_which_it_uses():
     try:
         listed = {p["id"]: p for p in client.get("/v1/packages").json()}
         assert listed["accelerator"]["installable"] and listed["accelerator"]["problems"] == []
-        assert listed["accelerator"]["contents"]["object_types"] == len(asset_types.CATALOGUE)
+        assert listed["accelerator"]["contents"]["object_types"] == len(asset_types.specs_of("accelerator"))
         resolved = client.post("/v1/packages/resolve", json={"packages": ["accelerator"]}).json()
-        assert [(p["id"], p["requested"]) for p in resolved] == [("core-facility", True), ("accelerator", True)]
+        assert [(p["id"], p["requested"]) for p in resolved] == [
+            ("core-facility", True), ("core-objects", False), ("it", False), ("accelerator", True)]
         assert client.post("/v1/packages/resolve", json={"packages": ["nowhere"]}).status_code == 422
 
         r = client.post("/v1/workspaces", json={"name": "Packages test", "id": wid, "packages": ["accelerator"]})
         assert r.status_code == 201, r.text
         mine = client.get(f"/v1/workspaces/{wid}/packages").json()
+        shipped = available()
         assert [(p["package_id"], p["version"]) for p in mine["packages"]] == [
-            ("accelerator", "1.0.0"), ("core-facility", "1.0.0")]
+            (pid, shipped[pid].version) for pid in ("accelerator", "core-facility", "core-objects", "it")]
         assert all(len(p["checksum"]) == 64 and not p["upgrade_available"] for p in mine["packages"])
-        assert [h["action"] for h in mine["history"]] == ["install", "install"]
+        assert [h["action"] for h in mine["history"]] == ["install"] * 4
 
         preview = client.post(f"/v1/workspaces/{wid}/packages/preview", json={"packages": ["accelerator"]}).json()
         assert preview["changes"] is False
         done = client.post(f"/v1/workspaces/{wid}/packages/install", json={"packages": ["accelerator"]}).json()
-        assert {s["action"] for s in done["steps"]} == {"unchanged"} and len(done["history"]) == 2
+        assert {s["action"] for s in done["steps"]} == {"unchanged"} and len(done["history"]) == 4
     finally:
         app.dependency_overrides.pop(get_identity, None)
         db = SessionLocal()

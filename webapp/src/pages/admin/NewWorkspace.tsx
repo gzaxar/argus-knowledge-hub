@@ -37,7 +37,7 @@ export function NewWorkspace() {
     // Sent only when overridden: otherwise the server derives it, so a form
     // left open since the rule changed cannot produce a stale identifier.
     mutationFn: () => workspacesApi.create(trimmed, customId?.trim() || undefined, packages,
-                                           packages.includes("accelerator") ? catalogue || undefined : undefined),
+                                           packages.length ? catalogue || undefined : undefined),
     onSuccess: (ws) => navigate(`/workspaces/${ws.id}/members`),
   });
 

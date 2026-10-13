@@ -1,0 +1,14 @@
+id: plant
+version: 1.0.0
+name: Technical plant
+description: >-
+  A site's technical plant as one set: electrical distribution, hydraulic networks and HVAC, with the plant
+  systems they make up and the technical rooms that house them.
+owner: INFN ARGUS
+license: EUPL-1.2
+depends:
+  electrical: ">=1.0,<2"
+  hydraulic: ">=1.0,<2"
+  hvac: ">=1.0,<2"
+provides: [plant-catalogue]
+contents: [object_types.yaml]

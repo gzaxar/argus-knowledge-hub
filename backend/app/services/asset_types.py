@@ -142,15 +142,33 @@ def type_uid(workspace_id: str, name: str) -> str:
 # Defined in the accelerator package (backend/packages/accelerator/object_types.yaml), not here: this is the
 # same list, read from it. A type's name, attribute keys and option ids are what stored records use.
 
+def _spec(t) -> TypeSpec:
+    return TypeSpec(t.name, t.parent, t.description, list(t.attributes), t.abstract, list(t.aliases))
+
+
+def specs_of(package_id: str) -> list[TypeSpec]:
+    """The object types one package itself defines (not those of what it depends on)."""
+    from app.packages import defaults
+    return [_spec(t) for t in defaults.object_types_of(package_id)]
+
+
 def _load_catalogue() -> list[TypeSpec]:
     from app.packages import defaults
-    return [TypeSpec(t.name, t.parent, t.description, list(t.attributes), t.abstract, list(t.aliases))
-            for t in defaults.object_types()]
+    return [_spec(t) for t in defaults.object_types(defaults.ACCELERATOR)]
 
 
+def _load_all() -> list[TypeSpec]:
+    from app.packages import defaults
+    return [_spec(t) for t in defaults.object_types()]
+
+
+# The accelerator catalogue: the accelerator package with what it stands on (core-objects, it) — what the
+# code has always called the catalogue, and what seeding puts in when not told which package.
 CATALOGUE: list[TypeSpec] = _load_catalogue()
+# Every object type any shipped package defines (the domains too): what a type is, by name.
+ALL_TYPES: list[TypeSpec] = _load_all()
 
-BY_NAME: dict[str, TypeSpec] = {spec.name: spec for spec in CATALOGUE}
+BY_NAME: dict[str, TypeSpec] = {spec.name: spec for spec in ALL_TYPES}
 
 
 def depth(name: str) -> int:
@@ -306,7 +324,7 @@ def resolve_type_uids(db: Session, workspace_id: str,
 
 def ensure_asset_types(db: Session, workspace_id: str, scope: str = SCOPE_ALL,
                        catalogue_workspace_id: Optional[str] = None,
-                       only: Optional[set] = None) -> SeedResult:
+                       only: Optional[set] = None, specs: Optional[list] = None) -> SeedResult:
     """Create the catalogue, or bring it up to date.
 
     scope "all"      every type, in this one workspace (a single-workspace hub)
@@ -315,6 +333,8 @@ def ensure_asset_types(db: Session, workspace_id: str, scope: str = SCOPE_ALL,
                      found in `catalogue_workspace_id`
 
     `only`: write just these types (an upgrade adding new ones), leaving every other type as it is.
+    `specs`: the types to seed (one package's, app/packages/install.py); their parents and references to types
+    of the packages they stand on are found where those were put. Left out: the accelerator catalogue.
 
     Idempotent and additive: types that exist keep their attributes and gain any
     they lack. A type the EPIK8s importers made (uid `epik8s-...`, no parent) is
@@ -341,7 +361,9 @@ def ensure_asset_types(db: Session, workspace_id: str, scope: str = SCOPE_ALL,
                 f"per-beamline scope with that catalogue.")
 
     result = SeedResult()
-    specs = [s for s in CATALOGUE if scope == SCOPE_ALL or scope_of(s.name) == scope]
+    catalogue = list(specs) if specs is not None else CATALOGUE
+    global_names = [t.name for t in catalogue if scope_of(t.name) == SCOPE_GLOBAL]
+    specs = [s for s in catalogue if scope == SCOPE_ALL or scope_of(s.name) == scope]
     share = scope == SCOPE_GLOBAL
 
     if scope == SCOPE_BEAMLINE:
@@ -349,14 +371,14 @@ def ensure_asset_types(db: Session, workspace_id: str, scope: str = SCOPE_ALL,
             row.name: row.uid for row in db.scalars(select(Schema).where(
                 Schema.workspace_id == catalogue_workspace_id, Schema.applies_to == "objects"))
         }
-        missing = [n for n in GLOBAL_TYPES if n not in shared]
+        missing = [n for n in global_names if n not in shared]
         if missing:
             raise CatalogueMissing(
                 f"workspace {catalogue_workspace_id!r} does not hold the global types "
                 f"({len(missing)} missing, e.g. {', '.join(missing[:4])}). Seed it first with "
                 f"the global scope; if it was seeded before Equipment Item and Place were "
                 f"renamed, seed it again.")
-        result.uids.update({name: shared[name] for name in GLOBAL_TYPES})
+        result.uids.update({name: shared[name] for name in global_names})
 
     others = {
         s.name: s for s in db.scalars(select(Schema).where(
@@ -377,6 +399,10 @@ def ensure_asset_types(db: Session, workspace_id: str, scope: str = SCOPE_ALL,
     # References need every uid up front, before any type is written.
     for spec in specs:
         result.uids[spec.name] = _uid_for(db, workspace_id, spec, others)
+    # The parents and reference targets in the packages these stand on: where those were put.
+    if catalogue is not CATALOGUE:
+        for name, uid in resolve_type_uids(db, workspace_id, catalogue_workspace_id).items():
+            result.uids.setdefault(name, uid)
 
     for spec in specs:
         if only is not None and spec.name not in only:

@@ -85,7 +85,39 @@ def changes(db: Session, workspace_id: str, new: Package) -> list[d.Change]:
     old_sections = _old(db, row)
     old = d.definitions(old_sections, new.id, sets)
     newer = d.definitions(new.sections, new.id, sets)
-    return d.assess(db, workspace_id, d.compare(old, newer), old, _scope_names(row, old_sections, new)), old
+    found = _moved(new, d.compare(old, newer))
+    return d.assess(db, workspace_id, found, old, _scope_names(row, old_sections, new)), old
+
+
+def _moved(new: Package, found: list) -> list:
+    """A type (or an Other Equipment class) the package no longer holds because it moved to a package it now
+    stands on (accelerator 2.0: the backbone to core-objects, IT to it) is not removed: it is the same type,
+    in the workspace as it was, held by that package — which the same installation installs first."""
+    from app.packages import defaults
+    types: dict = {}
+    classes: dict = {}
+    for pid in defaults.closure(new.id):
+        if pid == new.id:
+            continue
+        p = available()[pid]
+        for t in (p.section("object_types") or {}).get("types") or []:
+            types[t["name"]] = pid
+        for cls in (p.section("equipment_classes") or {}).get("classes") or []:
+            classes[cls] = pid
+    out = []
+    for ch in found:
+        if ch.area == "object_types" and ch.subject in types:
+            if ch.element is None and ch.what == "removed":
+                out.append(d.Change(f"object_types/{ch.subject}/moved", d.DEFINITION, "object_types", ch.subject, None,
+                                    "moved", f"type {ch.subject!r} is now in the package {types[ch.subject]} "
+                                             f"(the same type, unchanged)"))
+            continue                 # its attributes went with it: nothing to compare here
+        if ch.area == "equipment_classes" and ch.what == "removed" and ch.subject in classes:
+            out.append(d.Change(f"equipment_classes/{ch.subject}/moved", d.DEFINITION, "equipment_classes",
+                                ch.subject, None, "moved", f"class {ch.subject!r} is now in {classes[ch.subject]}"))
+            continue
+        out.append(ch)
+    return out
 
 
 def preview(db: Session, workspace_id: str, new: Package, decisions: Optional[dict] = None) -> dict:

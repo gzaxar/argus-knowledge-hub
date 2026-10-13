@@ -70,7 +70,9 @@ def effective_keys(db, ws, name):
 # --- the shape --------------------------------------------------------------
 
 def test_the_catalogue_is_the_size_the_design_says():
-    assert len(at.CATALOGUE) == 153
+    # 153 in the 1.x catalogue, and the four IT types (firewall, Wi-Fi access point, storage, patch panel)
+    # the it package added when the catalogue was split into core-objects, it and accelerator.
+    assert len(at.CATALOGUE) == 157
     assert sum(t.abstract for t in at.CATALOGUE) == 18
     assert max(at.depth(t.name) for t in at.CATALOGUE) == 6
 
@@ -154,9 +156,9 @@ def test_the_source_options_include_the_ones_the_importers_write():
 def test_seeding_creates_the_whole_tree(db, workspace):
     result = at.ensure_asset_types(db, workspace)
     db.commit()
-    assert len(result.created) == 153 and not result.adopted and not result.duplicates
+    assert len(result.created) == len(at.CATALOGUE) and not result.adopted and not result.duplicates
     rows = db.query(Schema).filter(Schema.workspace_id == workspace).all()
-    assert len(rows) == 153
+    assert len(rows) == len(at.CATALOGUE)
     by_name = {s.name: s for s in rows}
     assert by_name["Ion Pump"].parent_schema_uid == at.type_uid(workspace, "Vacuum Pump")
     assert by_name["Vacuum Pump"].parent_schema_uid == at.type_uid(workspace, "Asset")
@@ -171,7 +173,7 @@ def test_seeding_twice_changes_nothing(db, workspace):
     again = at.ensure_asset_types(db, workspace)
     db.commit()
     assert not again.created and not again.adopted and not again.extended
-    assert db.query(Schema).filter(Schema.workspace_id == workspace).count() == 153
+    assert db.query(Schema).filter(Schema.workspace_id == workspace).count() == len(at.CATALOGUE)
 
 
 def test_a_leaf_inherits_what_the_ancestors_declare(db, workspace):
@@ -225,7 +227,7 @@ def test_a_type_an_importer_made_is_adopted_not_duplicated(db, workspace):
     assert sorted(result.adopted) == ["IOC", "Power Supply"]
     assert result.uids["IOC"] == ioc_uid
     rows = db.query(Schema).filter(Schema.workspace_id == workspace).all()
-    assert len(rows) == 153 and sum(1 for s in rows if s.name == "IOC") == 1
+    assert len(rows) == len(at.CATALOGUE) and sum(1 for s in rows if s.name == "IOC") == 1
     ioc = db.get(Schema, ioc_uid)
     assert ioc.parent_schema_uid == at.type_uid(workspace, "Control Item")
     assert {a["key"] for a in ioc.attributes} == keys_of("IOC")
@@ -349,7 +351,7 @@ def make(ws, headers, type_name, prefix, attributes=None, name=None):
 def test_the_seeded_types_are_listed_and_an_object_of_one_can_be_made(seeded):
     ws, headers = seeded
     listed = client.get("/v1/schemas", headers=headers).json()
-    assert len([s for s in listed if s["workspace_id"] == ws]) == 153
+    assert len([s for s in listed if s["workspace_id"] == ws]) == len(at.CATALOGUE)
     _, resp = make(ws, headers, "Ion Pump", "pump", {
         "serial": "IPC-1234", "manufacturer": "Agilent", "pumping_speed": 55.0,
         "argus_lifecycle": "In service", "pbs_code": "INJ-A-VAC-PUMP-001"})
@@ -396,9 +398,9 @@ def test_a_screen_station_is_composed_of_its_parts(seeded):
 # --- two sets: shared, and one machine's own ------------------------------------
 
 def test_the_two_sets_partition_the_catalogue():
-    assert set(at.GLOBAL_TYPES) | set(at.BEAMLINE_TYPES) == set(at.BY_NAME)
+    assert set(at.GLOBAL_TYPES) | set(at.BEAMLINE_TYPES) == {t.name for t in at.CATALOGUE}
     assert not set(at.GLOBAL_TYPES) & set(at.BEAMLINE_TYPES)
-    assert (len(at.GLOBAL_TYPES), len(at.BEAMLINE_TYPES)) == (84, 69)
+    assert (len(at.GLOBAL_TYPES), len(at.BEAMLINE_TYPES)) == (88, 69)  # the it package's four new types are shared equipment
 
 
 def test_a_machines_structure_and_control_are_its_own_and_the_rest_is_shared():
@@ -534,7 +536,7 @@ def test_the_beamline_set_hangs_from_the_global_one(db, catalogue, workspace):
     isolated = next(a for a in rows["Vacuum Sector"].attributes if a["key"] == "isolated_by")
     assert isolated["referenceSchemaUid"] == at.type_uid(cat, "Vacuum Valve")
     # every type is usable from here, by name
-    assert set(result.uids) == set(at.BY_NAME)
+    assert set(result.uids) >= {t.name for t in at.CATALOGUE}
     assert result.uids["Ion Pump"] == at.type_uid(cat, "Ion Pump")
     assert result.uids["IOC"] == at.type_uid(workspace, "IOC")
 
@@ -622,7 +624,7 @@ def test_a_workspace_seeded_under_the_old_names_is_carried_across_in_place(db, w
     db.expire_all()
 
     assert sorted(result.renamed) == ["Asset", "Location"] and not result.created
-    assert db.query(Schema).filter(Schema.workspace_id == workspace).count() == 153
+    assert db.query(Schema).filter(Schema.workspace_id == workspace).count() == len(at.CATALOGUE)
     asset = db.get(Schema, at.type_uid(workspace, "Equipment Item"))    # same row, same uid
     assert asset.name == "Asset"
     assert db.get(Schema, at.type_uid(workspace, "Place")).name == "Location"

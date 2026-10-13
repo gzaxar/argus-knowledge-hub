@@ -1,7 +1,7 @@
 ---
 title: Administration and the production installation
 summary: The administration pages, the production installation (addresses, sign-in, releases, the mobile app's distribution), backups, and where operators find the details.
-keywords: [administration, package, packages, template, workspace template, catalogue package, accelerator catalogue, core facility, admin, settings, workspace identifiers, users, production, deployment, release, version, argo cd, keycloak, kubernetes, backup, restore, disk, operations, google play, apk, privacy, mirror]
+keywords: [administration, package, packages, it, electrical, hydraulic, hvac, plant, domain, template, workspace template, catalogue package, accelerator catalogue, core facility, admin, settings, workspace identifiers, users, production, deployment, release, version, argo cd, keycloak, kubernetes, backup, restore, disk, operations, google play, apk, privacy, mirror]
 order: 140
 ---
 
@@ -28,7 +28,16 @@ A workspace's types come from **template packages**, versioned definitions that 
 | Package | Gives a workspace |
 |---|---|
 | **Core facility** | ticket and document types and their fields, status and priority, the default ticket workflow (every workspace) |
-| **Accelerator catalogue** | the object types of an accelerator facility: sections, modules, beam elements, equipment, products, vendors, control, locations, network records, ports |
+| **Core objects** | equipment, products, vendors, places, cables, spares: what every object catalogue stands on |
+| **IT** | network and computing equipment, network segments and addresses |
+| **Electrical distribution** | switchboards, panels, breakers, transformers, UPS, generators, meters, circuits |
+| **Hydraulic networks** | pumps, valves, pipes, tanks, flow and pressure transmitters, heat exchangers |
+| **HVAC** | air handling, fan coils, dampers, cooling towers, heat pumps, ducts, sensors |
+| **Technical plant** | electrical, hydraulic and HVAC together, with plant systems and technical rooms |
+| **Accelerator catalogue** | the machine as functions (sections, modules, beam elements), its equipment, control and engineering records |
+
+Packages combine: an accelerator site can add the technical plant; an IT department needs only IT. Each brings
+what it stands on (Core objects first), and no type is ever defined twice.
 
 - **New workspace → Starts from**: tick the packages; the form lists each one (and what it needs) with what it
   holds before anything is created. With the accelerator catalogue, choose whether the workspace keeps the

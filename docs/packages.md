@@ -6,9 +6,18 @@ from **template packages**: versioned YAML in `backend/packages/<id>/`, read by 
 | Package | Holds | Depends on |
 |---|---|---|
 | `core-facility` | the base ticket and document types and their kinds, the status and priority enumerations, the default ticket workflow | — |
-| `accelerator` | the object catalogue of an accelerator facility (153 types: functional, physical, catalogue, control, engineering, location, IT records, ports) and the Other Equipment classes | `core-facility` |
+| `core-objects` | the object backbone: the root and its branches, equipment (Asset) and what is generic about it — ports, cables, supports, spares, instruments, chillers and cooling-circuit components — products and vendors, places; the Other Equipment classes | `core-facility` |
+| `it` | network and computing equipment (switches, routers, firewalls, Wi-Fi access points, converters, servers, workstations, storage, patch panels) and network records | `core-objects` |
+| `electrical` | switchboards, distribution panels, breakers, transformers, UPS, generators, meters, circuits; `fed from` is a power edge | `core-objects` |
+| `hydraulic` | water pumps, valves, pipe segments, tanks, flow and pressure transmitters, heat exchangers; `cooled by` is a cooling edge | `core-objects` |
+| `hvac` | air handling units, fan coils, dampers, cooling towers, heat pumps, ducts, sensors | `core-objects` |
+| `plant` | electrical, hydraulic and HVAC together, with plant systems and technical rooms | `electrical`, `hydraulic`, `hvac` |
+| `accelerator` | the accelerator facility: the machine as functions, its equipment (magnets, RF, vacuum, diagnostics, motion, timing), control and engineering records | `core-objects`, `it` |
 
-Every workspace has `core-facility`; `accelerator` is chosen when the workspace is made, or installed later.
+Every workspace has `core-facility`; the others are chosen when the workspace is made, or installed later, alone
+or together: no two packages define the same type, so any combination shares one core. Accelerator 2.0 is the
+1.x catalogue split in three — core-objects, it, accelerator — with the same types and uids: a workspace on 1.x
+upgrades with every moved type reported as *moved* (no decision, nothing changed) and gains the four new IT types.
 
 ## Format
 
@@ -42,6 +51,7 @@ Each content file holds one or more sections: `option_sets`, `enumerations`, `ob
   attributes:
     - {key: pump_kind, name: Pump kind, type: enumeration, option_set: pump_kinds}
     - {key: vendor_ref, name: Vendor, type: reference, reference: Vendor}
+    - {key: rated_power_kva, name: Rated power (kVA), type: float, unit: kVA}   # a number's unit
 ```
 
 A package holds **definitions only**: no site data (coordinates, records) and no code. It is read with a safe

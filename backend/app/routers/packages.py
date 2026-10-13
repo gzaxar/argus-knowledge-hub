@@ -50,7 +50,7 @@ def _may_install(db: Session, identity: Identity, workspace_id: str) -> None:
 def list_packages(identity: Identity = Depends(get_identity)):
     """The template packages this installation ships, each with what it holds and whether it is valid."""
     catalog = available()
-    return [{**p.describe(), "installable": p.id in installer.APPLIERS,
+    return [{**p.describe(), "installable": True,
              "problems": [str(x) for x in validate(p, catalog)]} for p in catalog.values()]
 
 

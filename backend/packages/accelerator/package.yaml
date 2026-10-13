@@ -1,13 +1,15 @@
 id: accelerator
-version: 1.0.0
+version: 2.0.0
 name: Accelerator catalogue
 description: >-
   The object types of an accelerator facility: the machine as functions (sections, modules, beam
-  elements), the equipment that implements them, products and vendors, the control system, engineering
-  records, locations, network records and ports; and the vocabulary of Other Equipment.
+  elements), the equipment that implements them (magnets, RF, vacuum, diagnostics, motion, timing), the
+  control system and engineering records. Since 2.0 the generic backbone (equipment, products, places) is
+  in core-objects and IT equipment in it: the same types, in those packages.
 owner: INFN ARGUS
 license: EUPL-1.2
 depends:
-  core-facility: ">=1.0,<2"
-provides: [object-catalogue, accelerator-catalogue]
-contents: [object_types.yaml, vocabulary.yaml]
+  core-objects: ">=1.0,<2"
+  it: ">=1.0,<2"
+provides: [accelerator-catalogue]
+contents: [object_types.yaml]

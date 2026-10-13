@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Callable, Optional
+from typing import Optional
 
 from packaging.version import Version
 from sqlalchemy import select
@@ -83,23 +83,73 @@ def _apply_core(db: Session, workspace_id: str, options: dict) -> dict:
     return _added(db, workspace_id, before)
 
 
-def _apply_accelerator(db: Session, workspace_id: str, options: dict) -> dict:
+def has_objects(p: Package) -> bool:
+    return bool((p.section("object_types") or {}).get("types"))
+
+
+def _apply_package(db: Session, workspace_id: str, p: Package, options: dict) -> dict:
+    """Any package but the core: its object types (in the scope the workspace takes them: self-contained, as
+    the shared catalogue, or hanging from one), its Other Equipment classes, enumerations, and ticket and
+    document kinds. Types the workspace already has (from the package that held them before) are left as they
+    are: they are its, edits included; only the missing ones are made."""
     from app.services import asset_types, equipment_classes
+    out: dict = {}
     scope = options.get("scope") or asset_types.SCOPE_ALL
-    result = asset_types.ensure_asset_types(db, workspace_id, scope=scope,
-                                            catalogue_workspace_id=options.get("catalogue_workspace_id"))
-    classes = equipment_classes.seed(db) if scope != asset_types.SCOPE_BEAMLINE else []
-    return {"created": result.created, "extended": result.extended, "adopted": result.adopted,
-            "renamed": result.renamed, "reused": result.reused, "duplicates": result.duplicates,
-            "equipment_classes_added": classes}
+    if has_objects(p):
+        from app.packages import compile as c
+        sets = {**defaults.option_sets(), **(p.section("option_sets") or {})}
+        specs = [asset_types._spec(t) for t in c.object_types(p, sets)]      # this package's own, as given
+        mine = [t for t in specs if scope == asset_types.SCOPE_ALL or asset_types.scope_of(t.name) == scope]
+        here = {t.name for t in mine if db.get(Schema, asset_types.type_uid(workspace_id, t.name)) is not None}
+        only = None if not here else {t.name for t in mine if t.name not in here}
+        if only != set():
+            r = asset_types.ensure_asset_types(db, workspace_id, scope=scope,
+                                               catalogue_workspace_id=options.get("catalogue_workspace_id"),
+                                               specs=specs, only=only)
+            out.update({"created": r.created, "extended": r.extended, "adopted": r.adopted, "renamed": r.renamed,
+                        "reused": r.reused, "duplicates": r.duplicates})
+        if here:
+            out["already_in_place"] = sorted(here)
+    if p.section("equipment_classes") and scope != asset_types.SCOPE_BEAMLINE:
+        out["equipment_classes_added"] = equipment_classes.seed(db)
+    if p.section("enumerations"):
+        out["enumerations_added"] = _add_enumerations(db, workspace_id, p)
+    for area in ("ticket_types", "document_types"):
+        kinds = [k["name"] for k in (p.section(area) or {}).get("kinds") or []]
+        if kinds:
+            out[f"{area}_added"] = _add_kinds(db, workspace_id, area, kinds)
+    db.flush()
+    return out
 
 
-# Each installable package and how it is applied. A package is installable once ARGUS knows how to apply
-# what it holds; the domain packages (IT, plant…) come with the release that applies them.
-APPLIERS: dict[str, Callable[[Session, str, dict], dict]] = {
-    defaults.CORE: _apply_core,
-    defaults.ACCELERATOR: _apply_accelerator,
-}
+def _add_enumerations(db: Session, workspace_id: str, p: Package) -> list[str]:
+    import uuid
+    from app.models.global_value import GlobalValue
+    from app.packages import compile as c
+    have = {(g.applies_to, g.key) for g in db.scalars(select(GlobalValue).where(GlobalValue.workspace_id == workspace_id))}
+    added = []
+    for e in c.enumerations(p, defaults.option_sets()):
+        if (e["applies_to"], e["key"]) in have:
+            continue
+        db.add(GlobalValue(uid=str(uuid.uuid4()), workspace_id=workspace_id, key=e["key"], name=e["name"],
+                           type=e["type"], applies_to=e["applies_to"], is_system_default=True,
+                           default_value=e["default"], options=e["options"]))
+        added.append(f"{e['applies_to']}.{e['key']}")
+    return added
+
+
+def _add_kinds(db: Session, workspace_id: str, area: str, kinds: list[str]) -> list[str]:
+    if area == "ticket_types":
+        from app.services.ticket_types import ensure_ticket_kinds as ensure
+    else:
+        from app.services.document_types import ensure_document_kinds as ensure
+    before = {s.name for s in db.scalars(select(Schema).where(Schema.workspace_id == workspace_id))}
+    ensure(db, workspace_id, set(kinds))
+    return [k for k in kinds if k not in before]
+
+
+def _apply(db: Session, workspace_id: str, p: Package, options: dict) -> dict:
+    return _apply_core(db, workspace_id, options) if p.id == defaults.CORE else _apply_package(db, workspace_id, p, options)
 
 
 def _count(db: Session, workspace_id: str) -> dict:
@@ -132,8 +182,6 @@ def resolve(package_ids: list[str], catalog: Optional[dict[str, Package]] = None
         problems = validate(p, catalog)
         if problems:
             raise PackageProblem(f"package {pid} is not valid: " + "; ".join(str(x) for x in problems[:5]))
-        if pid not in APPLIERS:
-            raise PackageProblem(f"package {pid} cannot be installed by this release of ARGUS")
         for dep in p.depends:
             visit(dep, False, trail + (pid,))
         if pid not in placed:
@@ -152,7 +200,7 @@ def installed(db: Session, workspace_id: str) -> dict[str, WorkspacePackage]:
         WorkspacePackage.workspace_id == workspace_id))}
 
 
-def _accelerator_options(db: Session, workspace_id: str, catalogue_workspace_id: Optional[str],
+def _object_options(db: Session, workspace_id: str, catalogue_workspace_id: Optional[str],
                          scope: Optional[str]) -> dict:
     """How the object catalogue goes in: hanging from a catalogue workspace (beamline), as the catalogue
     others hang from (global), or self-contained (all)."""
@@ -197,8 +245,8 @@ def _run(db: Session, workspace_id: str, package_ids: list[str], *, catalogue_wo
         raise PackageProblem(f"no workspace {workspace_id!r}")
     steps = _steps(db, workspace_id, package_ids)
     options = {}
-    if any(p.id == defaults.ACCELERATOR for p, _ in steps):
-        options = _accelerator_options(db, workspace_id, catalogue_workspace_id, scope)
+    if any(has_objects(p) for p, _ in steps):
+        options = _object_options(db, workspace_id, catalogue_workspace_id, scope)
     from app.services import catalogue_icons
     token = catalogue_icons.PREVIEW.set(not keep)
     savepoint = db.begin_nested()
@@ -206,14 +254,14 @@ def _run(db: Session, workspace_id: str, package_ids: list[str], *, catalogue_wo
         for p, step in steps:
             if step.action == "unchanged":
                 continue
-            own = options if p.id == defaults.ACCELERATOR else {}
+            own = options if has_objects(p) else {}
             if step.action == "upgrade":
                 from app.packages import upgrade
                 own = installed(db, workspace_id)[p.id].options or {}
                 step.result = upgrade.apply(db, workspace_id, p, decisions) if keep else \
                     upgrade.preview(db, workspace_id, p, decisions)
             else:
-                step.result = APPLIERS[p.id](db, workspace_id, own)
+                step.result = _apply(db, workspace_id, p, own)
             if keep:
                 _record(db, workspace_id, p, step.action, step.from_version, own, step.result, actor)
         db.flush()
@@ -268,10 +316,9 @@ def _record(db: Session, workspace_id: str, p: Package, action: str, from_versio
 
 
 def detect_workspace(db: Session, ws: str) -> int:
-    """Record the packages one workspace evidently has but no record names (core facility when it has the
-    base ticket type; the accelerator catalogue when it has the catalogue's root type, or hangs from a
-    catalogue that has), as `detected`, at the version this release ships. Installs nothing. Returns how
-    many it recorded."""
+    """Record the packages one workspace evidently has but no record names, as `detected`, at the version this
+    release ships: core facility when it has the base ticket type; a package of object types when one of its
+    types is here (or in the catalogue the workspace hangs from). Installs nothing. Returns how many."""
     from app.services import asset_types
     from app.services.ticket_types import BASE_UID_SUFFIX
     have = installed(db, ws)
@@ -279,18 +326,27 @@ def detect_workspace(db: Session, ws: str) -> int:
     if defaults.CORE not in have and db.get(Schema, f"{ws}:{BASE_UID_SUFFIX}") is not None:
         _record(db, ws, available()[defaults.CORE], "detected", None, {}, None, None)
         n += 1
-    if defaults.ACCELERATOR not in have:
-        own_root = db.get(Schema, asset_types.type_uid(ws, asset_types.ROOT_NAME))
-        hangs_from = asset_types.catalogue_of(db, ws)
-        if own_root is not None or hangs_from:
-            if hangs_from:
-                options = {"scope": asset_types.SCOPE_BEAMLINE, "catalogue_workspace_id": hangs_from}
-            elif own_root.is_global:
-                options = {"scope": asset_types.SCOPE_GLOBAL}
-            else:
-                options = {"scope": asset_types.SCOPE_ALL}
-            _record(db, ws, available()[defaults.ACCELERATOR], "detected", None, options, None, None)
-            n += 1
+    hangs_from = None
+    usable = None
+    for pid in defaults.ordered():
+        p = available()[pid]
+        if pid in have or not has_objects(p):
+            continue
+        names = [t["name"] for t in p.section("object_types")["types"]]
+        if usable is None:
+            hangs_from = asset_types.catalogue_of(db, ws)
+            usable = asset_types.resolve_type_uids(db, ws, hangs_from)
+        own = next((r for r in (db.get(Schema, asset_types.type_uid(ws, n)) for n in names) if r is not None), None)
+        if own is None and not (hangs_from and any(n in usable for n in names)):
+            continue
+        if own is not None and own.is_global:
+            options = {"scope": asset_types.SCOPE_GLOBAL}
+        elif hangs_from:
+            options = {"scope": asset_types.SCOPE_BEAMLINE, "catalogue_workspace_id": hangs_from}
+        else:
+            options = {"scope": asset_types.SCOPE_ALL}
+        _record(db, ws, p, "detected", None, options, None, None)
+        n += 1
     if n:
         db.flush()
     return n

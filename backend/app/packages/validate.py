@@ -24,7 +24,7 @@ KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 ATTRIBUTE_TYPES = {"string", "text", "integer", "float", "boolean", "date", "datetime", "enumeration", "user",
                    "group", "reference"}
 ATTRIBUTE_KEYS = {"key", "name", "type", "required", "indexed", "multi", "unique", "readonly", "options",
-                  "option_set", "reference", "include_children", "regex", "renamed_from"}
+                  "option_set", "reference", "include_children", "regex", "renamed_from", "unit"}
 OPTION_KEYS = {"id", "value", "responsible", "meaning"}
 TYPE_KEYS = {"name", "parent", "description", "abstract", "aliases", "icon", "behaviors", "map_layer", "locatable",
              "attributes"}
@@ -132,6 +132,8 @@ def _attributes(report: _Report, section: str, where: str, attrs, sets: dict, ty
                 report.add(section, at, f"refers to {target!r}, which no package here defines")
         elif a.get("reference"):
             report.add(section, at, "reference is only for type: reference")
+        if a.get("unit") is not None and (kind not in ("integer", "float") or not str(a["unit"]).strip()):
+            report.add(section, at, "a unit is for an integer or float attribute, e.g. unit: kV")
         if a.get("regex"):
             try:
                 re.compile(str(a["regex"]))

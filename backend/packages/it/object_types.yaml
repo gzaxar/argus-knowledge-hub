@@ -1,0 +1,122 @@
+# IT: network and computing equipment, and what the network registry knows about it (segments, addresses).
+# Moved here unchanged from the accelerator catalogue 1.x, plus what an IT-only workspace needs.
+
+object_types:
+  types:
+    - name: "IT Equipment"
+      parent: "Asset"
+      description: "Anything on the network: a switch, a converter, a server, a console. Site-wide: one box is one object however many beamlines reach it."
+      abstract: true
+      icon: tabler/device-desktop
+      attributes:
+        - {key: hostname, name: Hostname, indexed: true}
+        - {key: fqdn, name: FQDN, indexed: true}
+        - {key: ip, name: IP address (primary), indexed: true}
+        - {key: mac, name: MAC address, indexed: true}
+        - {key: firmware_version, name: Firmware version}
+        - {key: management_url, name: Management URL}
+    - name: "Network Device"
+      parent: "IT Equipment"
+      description: "A device that carries or converts network traffic."
+      abstract: true
+      icon: tabler/network
+    - name: "Switch"
+      parent: "Network Device"
+      description: "A network switch."
+      attributes:
+        - {key: n_ports, name: Number of ports, type: integer}
+        - {key: is_managed, name: Managed, type: boolean}
+        - {key: supports_poe, name: Supplies PoE, type: boolean}
+    - name: "Router"
+      parent: "Network Device"
+      description: "A router."
+      icon: tabler/router
+    - name: "Serial Converter"
+      parent: "Network Device"
+      description: "An Ethernet-to-serial converter (a Moxa NPort). The serial lines behind it are objects of their own."
+      icon: tabler/plug-connected
+      attributes:
+        - {key: n_serial_ports, name: Number of serial ports, type: integer}
+        - {key: serial_modes, name: Serial modes (RS-232/422/485), indexed: true, multi: true}
+        - {key: tcp_port_base, name: TCP port of serial port 1, type: integer}
+    - name: "Media Converter"
+      parent: "Network Device"
+      description: "A fibre/copper media converter."
+      icon: tabler/transform
+    - name: "Computing Node"
+      parent: "IT Equipment"
+      description: "A server or workstation."
+      abstract: true
+      icon: tabler/server
+      attributes:
+        - {key: cpu, name: CPU}
+        - {key: ram_gb, name: RAM (GB), type: float}
+        - {key: os, name: Operating system}
+        - {key: role, name: Role}
+    - name: "Server"
+      parent: "Computing Node"
+      description: "A physical or virtual server, or a container host."
+      attributes:
+        - {key: is_virtual, name: Virtual, type: boolean}
+        - {key: hypervisor, name: Hypervisor}
+    - name: "Workstation"
+      parent: "Computing Node"
+      description: "A console or engineering workstation."
+      icon: tabler/device-desktop
+      attributes:
+        - {key: workstation_role, name: Workstation role, type: enumeration, options: [{id: operator_console, value: Operator console}, {id: engineering, value: Engineering}, {id: kiosk, value: Kiosk}, {id: test, value: Test}]}
+        - {key: console_group, name: Console group, indexed: true}
+    - name: "IT Record"
+      parent: "Item"
+      description: "A fact the network registry holds about equipment or a place on the network."
+      abstract: true
+      icon: tabler/address-book
+    - name: "Network Segment"
+      parent: "IT Record"
+      description: "A VLAN or a subnet."
+      icon: tabler/network
+      attributes:
+        - {key: vlan_id, name: VLAN id, type: integer, indexed: true}
+        - {key: cidr, name: CIDR, indexed: true}
+        - {key: gateway, name: Gateway}
+        - {key: purpose, name: Purpose, type: enumeration, options: [{id: control, value: Control}, {id: cameras, value: Cameras}, {id: magnets, value: Magnets}, {id: management, value: Management}, {id: office, value: Office}, {id: other, value: Other}]}
+        - {key: is_dhcp, name: Served by DHCP, type: boolean}
+    - name: "Address Record"
+      parent: "IT Record"
+      description: "One registered address: a registered node, a lease, a name. A unit with a network presence is `described by` it. The MAC here is the one the registration names; the unit's own MAC is on its Ethernet port."
+      icon: tabler/at
+      attributes:
+        - {key: record_kind, name: Record kind, type: enumeration, options: [{id: registered_node, value: Registered node}, {id: dhcp_lease, value: DHCP lease}, {id: dns_name, value: DNS name}, {id: ethernet_configuration, value: Ethernet configuration}]}
+        - {key: hostname, name: Hostname, indexed: true}
+        - {key: ip, name: IP address, indexed: true}
+        - {key: mac, name: MAC address (as registered), indexed: true}
+        - {key: registered_on, name: Registered on, type: date}
+        - {key: owner, name: Owner}
+    - name: "Firewall"
+      parent: "Network Device"
+      description: "Filters traffic between network zones."
+      icon: tabler/shield-check
+      attributes:
+        - {key: throughput_gbps, name: Throughput (Gbit/s), type: float, unit: Gbit/s}
+        - {key: ha_pair, name: In a high-availability pair, type: boolean}
+    - name: "Wireless Access Point"
+      parent: "Network Device"
+      description: "Gives Wi-Fi to a room or an area."
+      icon: tabler/antenna
+      attributes:
+        - {key: ssids, name: SSIDs, indexed: true, multi: true}
+        - {key: wifi_standard, name: Wi-Fi standard, type: enumeration, options: [{id: wifi5, value: Wi-Fi 5 (802.11ac)}, {id: wifi6, value: Wi-Fi 6 (802.11ax)}, {id: wifi6e, value: Wi-Fi 6E}, {id: wifi7, value: Wi-Fi 7 (802.11be)}]}
+    - name: "Storage System"
+      parent: "IT Equipment"
+      description: "A disk array, a NAS or a tape library."
+      icon: tabler/database
+      attributes:
+        - {key: capacity_tb, name: Usable capacity (TB), type: float, unit: TB}
+        - {key: protocols, name: "Protocols (NFS, SMB, iSCSI…)", indexed: true, multi: true}
+    - name: "Patch Panel"
+      parent: "IT Equipment"
+      description: "Where cables end in a rack, port by port."
+      icon: tabler/plug-connected
+      attributes:
+        - {key: n_ports, name: Number of ports, type: integer}
+        - {key: medium, name: Medium, type: enumeration, options: [{id: copper, value: Copper}, {id: fibre, value: Fibre}]}

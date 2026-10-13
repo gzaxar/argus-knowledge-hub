@@ -103,6 +103,10 @@ SEMANTICS: dict = {
     # --- physical supply ------------------------------------------------------------------------
     "powers": RelationSemantics("power", FORWARD, FUNCTION, note="supply → magnet"),
     "cools": RelationSemantics("cooling", FORWARD, FUNCTION, note="chiller → what it cools"),
+    # Stored from the consumer's reference field (a breaker's `fed_from`): the other way round from `powers`
+    # and `cools`, failing the same way — the supply fails, so does what it feeds.
+    "fed from": RelationSemantics("power", REVERSE, FUNCTION, note="consumer → its electrical supply"),
+    "cooled by": RelationSemantics("cooling", REVERSE, FUNCTION, note="consumer → the plant that cools it"),
     "triggers": RelationSemantics("timing", FORWARD, FUNCTION, note="timing receiver → what it triggers"),
     "timed by": RelationSemantics("timing", REVERSE, FUNCTION,
                                   note="receiver → the generator whose events it receives"),

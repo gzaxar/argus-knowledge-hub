@@ -33,6 +33,8 @@ def attribute(spec: dict, option_sets: dict) -> dict:
         out["includeChildren"] = bool(spec.get("include_children", False))
     if spec.get("regex"):
         out["regex"] = str(spec["regex"])
+    if spec.get("unit"):
+        out["unit"] = str(spec["unit"])
     return out
 
 
