@@ -426,7 +426,7 @@ class CockpitItem {
       }, workspaceId);
 }
 
-/// A row of an advanced (JQL) search.
+/// A row of an advanced query.
 class QueryHit {
   const QueryHit({required this.kind, required this.uid, required this.key, required this.title, this.sub,
       this.workspaceId, this.workspaceName});

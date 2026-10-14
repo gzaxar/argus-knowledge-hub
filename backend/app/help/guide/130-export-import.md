@@ -1,7 +1,7 @@
 ---
 title: Export and import (portability)
 summary: Moving workspaces or a whole instance between ARGUS installations, step by step: by downloaded file or through a GitHub or GitLab repository, and from a local ARGUS to production.
-keywords: [rebuild, recover, recovery, disaster, lost, wiped, clean installation, reinstall, re-populate, repopulate, set-up, setup, deploy key, host key, fingerprint, register repository, export, import, portability, backup, restore, clone, migrate, migration, move, copy, transfer, git, github, gitlab, repository, escrow, escrow-dev, artifact store, signing key, trusted keys, allowed_signers, deploy key, token, checkpoint, tar, download, upload, dry run, finalize, local to production]
+keywords: [periodic, periodically, schedule, scheduled, recurring, every day, automatic export, rebuild, recover, recovery, disaster, lost, wiped, clean installation, reinstall, re-populate, repopulate, set-up, setup, deploy key, host key, fingerprint, register repository, export, import, portability, backup, restore, clone, migrate, migration, move, copy, transfer, git, github, gitlab, repository, escrow, escrow-dev, artifact store, signing key, trusted keys, allowed_signers, deploy key, token, checkpoint, tar, download, upload, dry run, finalize, local to production]
 order: 130
 ---
 
@@ -85,6 +85,30 @@ top. Everything already imported is found identical and left as it is; only what
    - **Publish to Git** (with a repository): commits it and pushes a signed tag such as
      `export/full/2026-10-05@cp12-3f9a…`. Note the tag: the import asks for it.
    - **Download checkpoint (.tar)** (without a repository).
+
+## Repeat an export periodically
+
+Once an export is **published to a Git repository**, its page offers **Repeat periodically** (administrators):
+every hour, 6 or 12 hours, day or week, ARGUS makes a new export with the same scope, destination and
+outcomes and publishes it to the same repository — analysed, approved, generated, verified and audited as the
+first one was.
+
+- **As increments on the last publication** (the default): the repository holds the first export and a chain of
+  increments, each a signed tag naming the one before; an import applies them in order. Or **a complete export
+  each time**.
+- **Only when something changed** (the default): a run finds nothing recorded since the last publication and
+  does nothing.
+- Setting it is the **standing approval** of its runs. For a high-risk export (a full one, or one carrying
+  people's identities) it needs a recent sign-in and, under separation of duties, an administrator other than
+  the export's requester. An export carrying **restricted classes** is not repeated: generating one needs a
+  recent sign-in every time.
+- A run whose analysis needs a decision (a new dependency, an attachment to inspect, a secret found) **waits for
+  you**: the new export is on the Portability page, and no other run starts until it is published or revoked.
+  Three failures in a row switch the schedule off; switch it on again once the cause is fixed.
+
+**Administration → Portability → Exports** lists the periodic exports, with their last and next run, **On**,
+how often, **Run now** and **Remove** (what was published stays published). Runs are started every 15 minutes
+by the deployment's scheduled job (`python -m app.portability scheduled`).
 
 ## Import, step by step
 

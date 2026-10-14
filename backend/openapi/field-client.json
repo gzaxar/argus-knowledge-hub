@@ -11571,7 +11571,7 @@
     },
     "/v1/search/jql": {
       "get": {
-        "description": "Tickets, equipment or documents selected by a JQL query. Without `project = …` the query searches the\ncurrent workspace (and what is shared with every workspace); `project in (a, b)` searches those the person\nmay read. A query that cannot be read answers 422 with where it went wrong.",
+        "description": "Tickets, equipment or documents selected by an advanced query. Without `project = …` the query searches the\ncurrent workspace (and what is shared with every workspace); `project in (a, b)` searches those the person\nmay read. A query that cannot be read answers 422 with where it went wrong.",
         "operationId": "search_jql",
         "parameters": [
           {

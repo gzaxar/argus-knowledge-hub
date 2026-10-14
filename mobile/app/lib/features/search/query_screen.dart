@@ -7,7 +7,7 @@ import '../../core/problem.dart';
 import '../../domain/models.dart';
 import '../../widgets/common.dart';
 
-/// Advanced search in the Jira Query Language: tickets, equipment or documents selected by a query such as
+/// Advanced query: tickets, equipment or documents selected by a query such as
 /// `status = Open AND assignee = currentUser() ORDER BY priority DESC`. Without `project = …` it searches
 /// this workspace (and what is shared); `project in (a, b)` searches those.
 class QueryScreen extends ConsumerStatefulWidget {
@@ -88,7 +88,7 @@ class _QueryScreenState extends ConsumerState<QueryScreen> {
     final error = _error;
     final position = error is Problem ? error.position : null;
     return Scaffold(
-      appBar: AppBar(title: const Text('Advanced search (JQL)')),
+      appBar: AppBar(title: const Text('Advanced query')),
       body: ListView(padding: const EdgeInsets.only(bottom: 24), children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),

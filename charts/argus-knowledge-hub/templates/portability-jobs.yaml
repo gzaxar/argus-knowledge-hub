@@ -4,6 +4,10 @@
 {{- $jobs = append $jobs (dict "name" "argus-portability-cleanup" "schedule" .Values.portabilityJobs.cleanup.schedule
       "suspend" false "command" (list "python" "-m" "app.portability" "cleanup") "deadline" 3600 "active" 0) -}}
 {{- end -}}
+{{- if .Values.portabilityJobs.scheduled.enabled -}}
+{{- $jobs = append $jobs (dict "name" "argus-portability-scheduled" "schedule" .Values.portabilityJobs.scheduled.schedule
+      "suspend" false "command" (list "python" "-m" "app.portability" "scheduled") "deadline" 600 "active" 21600) -}}
+{{- end -}}
 {{- if .Values.portabilityJobs.restoreDrill.enabled -}}
 {{- $jobs = append $jobs (dict "name" "argus-portability-restore-drill" "schedule" .Values.portabilityJobs.restoreDrill.schedule
       "suspend" .Values.portabilityJobs.restoreDrill.suspend

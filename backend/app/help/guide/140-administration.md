@@ -10,7 +10,7 @@ the sign-in service only says who they are.
 
 ## The administration pages
 
-For administrators, **Administration** (bottom of the side bar):
+For administrators, **Administration** (**⚙ Workspace** menu, top right):
 
 | Page | For |
 |---|---|
@@ -42,7 +42,7 @@ what it stands on (Core objects first), and no type is ever defined twice.
 - **New workspace → Starts from**: tick the packages; the form lists each one (and what it needs) with what it
   holds before anything is created. With the accelerator catalogue, choose whether the workspace keeps the
   whole catalogue or hangs from a catalogue workspace, sharing its equipment, products and locations.
-- The workspace's **Packages** page (link at the bottom of the side bar) says exactly which version of each it
+- The workspace's **Packages** page (**⚙ Workspace → Packages**) says exactly which version of each it
   uses, with a checksum of what was applied, how it was put in, and the history: installed, upgraded, seeded
   by an import, or found in place when the record began. **Add a package** previews what it would create
   before anything changes; installing is all or nothing.

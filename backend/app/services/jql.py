@@ -1,4 +1,4 @@
-"""Advanced search in the Jira Query Language (JQL), over tickets, equipment and documents.
+"""Advanced query over tickets, equipment and documents, in the query language Jira's searches use.
 
 What a Jira user already writes works here:
 
@@ -7,7 +7,7 @@ What a Jira user already writes works here:
     type = "Ion Pump" AND serial ~ "VPI-" AND label = LNFMAC-128463
     status = published AND updated > startOfMonth() ORDER BY key
 
-The grammar is JQL's: clauses `field operator value` joined by AND, OR and NOT, grouped with parentheses,
+The grammar is Jira's: clauses `field operator value` joined by AND, OR and NOT, grouped with parentheses,
 then an optional ORDER BY. Operators: = != ~ !~ > >= < <= IN, NOT IN, IS EMPTY, IS NOT EMPTY (NULL is EMPTY).
 Values: words, "quoted strings", numbers, lists `(a, b)`, dates (`2026-10-01`, `"2026-10-01 14:00"`), relative
 dates (`-7d`, `-2w`, `-4h`, `-30m`, `1y`) and the functions currentUser(), now(), startOfDay(),

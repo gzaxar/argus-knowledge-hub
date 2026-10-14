@@ -743,4 +743,92 @@ def evidence(import_id: str, family: str, offset: int = 0, limit: int = Query(50
     return _commit(db, out)
 
 
+
+# --------------------------------------------------------------------------- periodic exports
+
+class ScheduleIn(BaseModel):
+    export_id: str
+    every_minutes: int = Field(1440, description="at least 60, at most 31 days")
+    chain: str = Field("incremental", description="incremental: an increment on the last publication; "
+                                                  "complete: a complete export each time")
+    skip_unchanged: bool = True
+    confirm: bool = False
+
+
+class ScheduleChangeIn(BaseModel):
+    enabled: Optional[bool] = None
+    every_minutes: Optional[int] = None
+    chain: Optional[str] = None
+    skip_unchanged: Optional[bool] = None
+
+
+def _schedule(db: Session, schedule_id: str):
+    from app.models.portability import PortabilitySchedule
+    sched = db.get(PortabilitySchedule, schedule_id)
+    if sched is None:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    return sched
+
+
+@config_router.get("/schedules")
+def list_schedules(identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """Exports repeated at an interval (app/portability/schedules.py). Administrators."""
+    from app.models.portability import PortabilitySchedule
+    from app.portability import schedules
+    _admin(identity)
+    return [schedules.view(s) for s in db.scalars(select(PortabilitySchedule).order_by(PortabilitySchedule.created_at))]
+
+
+@config_router.post("/schedules", status_code=201)
+def create_schedule(body: ScheduleIn, identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """Repeat a published Git export every `every_minutes`. Setting it is the standing approval of its runs: an
+    administrator; for a high-risk export, a recent sign-in and (with separation of duties) not its requester."""
+    from app.portability import schedules
+    person = _admin(identity)
+    exp = _export(db, body.export_id, identity)
+    ok, how = _step_up(identity, body.confirm)
+    sched = _guard(lambda: schedules.create(db, exp, actor_of(person), every_minutes=body.every_minutes,
+                                            chain=body.chain, skip_unchanged=body.skip_unchanged, admin=True,
+                                            fresh_auth=ok, step_up_how=how, cfg=service.config()))
+    return _commit(db, schedules.view(sched))
+
+
+@config_router.put("/schedules/{schedule_id}")
+def change_schedule(schedule_id: str, body: ScheduleChangeIn, identity=Depends(get_identity),
+                    db: Session = Depends(get_db)):
+    """Switch a schedule off or on, or change how often and how it runs."""
+    from app.portability import schedules
+    person = _admin(identity)
+    sched = _schedule(db, schedule_id)
+    _guard(lambda: schedules.change(db, sched, actor_of(person), enabled=body.enabled,
+                                    every_minutes=body.every_minutes, skip_unchanged=body.skip_unchanged,
+                                    chain=body.chain))
+    return _commit(db, schedules.view(sched))
+
+
+@config_router.delete("/schedules/{schedule_id}", status_code=204)
+def delete_schedule(schedule_id: str, identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """Stop repeating the export. What it published stays published."""
+    from app.portability import schedules
+    person = _admin(identity)
+    schedules.remove(db, _schedule(db, schedule_id), actor_of(person))
+    db.commit()
+    return Response(status_code=204)
+
+
+@config_router.post("/schedules/{schedule_id}/run", status_code=202)
+def run_schedule(schedule_id: str, identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """Run it now, in the background, as its next run would."""
+    from app.portability import schedules
+    person = _admin(identity)
+    _schedule(db, schedule_id)
+
+    def run(s: Session):
+        from app.models.portability import PortabilitySchedule
+        out = schedules.run_now(db_engine, s, s.get(PortabilitySchedule, schedule_id), service.config())
+        if out["outcome"] == "failed":
+            raise service.ServiceError(out["message"], "schedule_run_failed", 409)
+        return out
+    return _background("schedule", schedule_id, "run-schedule", actor_of(person), run)
+
 ROUTERS = (config_router, exports_router, imports_router)

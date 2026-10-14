@@ -4,7 +4,7 @@ import type {
   ExportView,
   ImportView,
   OriginChainCheck,
-  PortabilityConfig, PortabilityJob, PortabilitySetup, SetupRepository,
+  PortabilityConfig, PortabilityJob, PortabilitySchedule, PortabilitySetup, SetupRepository,
   ProvenanceView,
   ReconciliationReport,
 } from "./portabilityTypes";
@@ -1535,6 +1535,17 @@ const P = "/v1/portability";
 /** Portable exports and imports (docs/export-import-design.md §14). */
 export const portabilityApi = {
   config: () => request<PortabilityConfig>(`${P}/config`),
+  schedules: () => request<PortabilitySchedule[]>(`${P}/schedules`),
+  createSchedule: (body: { export_id: string; every_minutes: number; chain: "incremental" | "complete";
+                           skip_unchanged: boolean; confirm?: boolean }) =>
+    request<PortabilitySchedule>(`${P}/schedules`, { method: "POST", body: json(body) }),
+  changeSchedule: (id: string, body: { enabled?: boolean; every_minutes?: number; chain?: "incremental" | "complete";
+                                       skip_unchanged?: boolean }) =>
+    request<PortabilitySchedule>(`${P}/schedules/${encodeURIComponent(id)}`, { method: "PUT", body: json(body) }),
+  removeSchedule: (id: string) =>
+    request<void>(`${P}/schedules/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  runSchedule: (id: string) =>
+    request<{ job: PortabilityJob }>(`${P}/schedules/${encodeURIComponent(id)}/run`, { method: "POST" }),
   setup: () => request<PortabilitySetup>(`${P}/setup`),
   addRepository: (body: { name: string; url: string; provider?: string | null; token?: string | null }) =>
     request<SetupRepository>(`${P}/setup/repositories`, { method: "POST", body: json({ ...body, confirm: true }) }),
@@ -1742,7 +1753,7 @@ export const metaApi = {
       "/v1/meta/version"),
 };
 
-/** Advanced search in the Jira Query Language (backend services/jql.py). */
+/** Advanced query (backend services/jql.py). */
 export type JqlEntity = "tickets" | "assets" | "documents";
 
 export interface JqlItem {
@@ -2154,4 +2165,86 @@ export const MAP_TILES = {
   url: import.meta.env.VITE_MAP_TILES_URL || "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
   attribution: import.meta.env.VITE_MAP_TILES_ATTRIBUTION ||
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+};
+
+// --- Spreadsheet import (backend services/spreadsheet_import.py) -------------------------------------
+
+export const SHEET_NAME = "__name__";
+export const SHEET_KEY = "__key__";
+export const SHEET_DROP = "__drop__";
+export const SHEET_NEW = "__new__";
+
+export type SheetColumnProfile = {
+  column: string;
+  filled: number;
+  distinct: number;
+  samples: string[];
+  kind: string;
+  unique: boolean;
+  options?: string[];
+};
+export type SheetNewProperty = { key: string; name: string; type: string; options?: string[] };
+export type SheetColumnPlan = {
+  column: string;
+  target: string;
+  new?: SheetNewProperty;
+  source?: "rule" | "ai" | "person";
+  confidence?: number;
+  reason?: string;
+};
+export type SheetTarget =
+  | { mode: "existing"; schema_uid: string; source?: string; confidence?: number; reason?: string }
+  | { mode: "new"; name: string; parent_uid: string | null; source?: string; confidence?: number; reason?: string };
+export type SheetPlan = { target: SheetTarget; columns: SheetColumnPlan[]; update_existing: boolean };
+export type SheetProperty = {
+  key: string;
+  name: string;
+  type: string;
+  required: boolean;
+  options: string[];
+  reference: string | null;
+};
+export type SheetAnalysis = {
+  file: { name: string; sheets: string[]; sheet: string | null; rows: number; title: string; digest: string };
+  columns: SheetColumnProfile[];
+  candidates: { uid: string; name: string; path: string; score: number; name_match: boolean; matched: string[]; own_workspace: boolean }[];
+  parents: { uid: string; name: string; path: string; abstract: boolean }[];
+  properties: SheetProperty[];
+  plan: SheetPlan;
+  ai: { used: boolean; reason?: string; model?: string };
+};
+export type SheetRowOutcome = {
+  row: number;
+  action: "create" | "update" | "unchanged" | "error";
+  key: string | null;
+  name: string | null;
+  attributes: Record<string, unknown>;
+  problems: string[];
+};
+export type SheetPreview = {
+  type: { mode: string; name: string; uid: string | null; parent: string | null; new_properties: SheetProperty[] };
+  counts: { create: number; update: number; unchanged: number; error: number };
+  rows: SheetRowOutcome[];
+  total_rows: number;
+  digest: string;
+};
+export type SheetRun = { job_uid: string; type_uid: string; type: string; new_properties: string[]; rows: number };
+
+export const spreadsheetImportApi = {
+  analyse: (file: File, opts: { sheet?: string; useAi: boolean; target?: SheetTarget }) =>
+    upload<SheetAnalysis>("/v1/spreadsheet-imports/analyse", {
+      file,
+      sheet: opts.sheet,
+      use_ai: String(opts.useAi),
+      target: opts.target ? JSON.stringify(opts.target) : undefined,
+    }),
+  preview: (file: File, sheet: string | undefined, plan: SheetPlan) =>
+    upload<SheetPreview>("/v1/spreadsheet-imports/preview", { file, sheet, plan: JSON.stringify(plan) }),
+  run: (file: File, sheet: string | undefined, plan: SheetPlan, digest: string) =>
+    upload<SheetRun>("/v1/spreadsheet-imports/run", {
+      file,
+      sheet,
+      plan: JSON.stringify(plan),
+      expect_digest: digest,
+    }),
 };

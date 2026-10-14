@@ -306,7 +306,7 @@ export type ImportSource = "jira" | "jira-issues" | "confluence" | "git";
 export interface ImportJob {
   uid: string;
   workspace_id: string;
-  source: ImportSource;
+  source: ImportSource | "spreadsheet";
   status: "pending" | "running" | "succeeded" | "failed";
   progress: string | null;
   counts: Record<string, number>;
@@ -1077,6 +1077,7 @@ export function importSourceLabel(source: string): string {
   if (source === "jira-issues") return "Jira tickets";
   if (source === "confluence") return "Confluence";
   if (source === "git") return "Git";
+  if (source === "spreadsheet") return "Spreadsheet";
   return source;
 }
 

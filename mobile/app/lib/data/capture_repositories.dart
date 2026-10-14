@@ -413,7 +413,7 @@ class NotificationRepository {
           )).toList();
 }
 
-/// Advanced search in the Jira Query Language, over tickets, equipment or documents.
+/// Advanced query, over tickets, equipment or documents.
 class QueryRepository {
   QueryRepository(this._api);
   final ApiService _api;

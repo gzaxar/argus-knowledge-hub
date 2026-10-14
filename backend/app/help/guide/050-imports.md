@@ -11,7 +11,7 @@ strategy** (by default, the person's value is kept).
 
 ## Where
 
-The workspace's **Imports** page (bottom of the side bar) lists saved import configurations and past
+The workspace's **Imports** page (**⚙ Workspace → Administration → Imports**) lists saved import configurations and past
 runs. **New** starts one. Choose the source:
 
 | Source | What it brings |
@@ -32,7 +32,7 @@ An import writes records of the types the workspace already has; it never instal
 **PBS** import needs the **Accelerator catalogue** package; Jira, Confluence, Markdown and Olog imports need
 **Core facility** (every workspace made in the web app has it). If the workspace lacks it, the import stops
 before writing anything and says which package to install: install it on the workspace's **Packages** page
-(at the bottom of the side bar), preview first, then import again. An import still creates the kinds its
+(**⚙ Workspace** menu, top right), preview first, then import again. An import still creates the kinds its
 own data names (a Jira issue type the workspace lacks), never a whole catalogue, and leaves the fields of
 the workspace's ticket and document types as they are.
 

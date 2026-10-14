@@ -198,3 +198,38 @@ class PortabilityJob(Base):
     error: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     metrics: Mapped[dict] = mapped_column(JSONB, default=dict)   # duration, peak memory
 
+
+
+class PortabilitySchedule(Base):
+    """A published Git export, repeated at an interval (app.portability.schedules).
+
+    Each run makes a new export with the same scope and destination — an increment on the last one published,
+    or a complete one — and takes it through analysis, approval, generation and publication. Setting the schedule
+    is the standing approval of its runs, given by an administrator; a run whose analysis needs a person's
+    decision stops there and waits for one. Only normal-risk exports can be scheduled."""
+    __tablename__ = "portability_schedules"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    source_export_id: Mapped[str] = mapped_column(String, index=True)
+    chain: Mapped[str] = mapped_column(String, default="incremental")      # incremental | complete
+    every_minutes: Mapped[int] = mapped_column(Integer)
+    skip_unchanged: Mapped[bool] = mapped_column(Boolean, default=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    # The export each run repeats: scope, destination, outcomes and identity profile, as approved.
+    mode: Mapped[str] = mapped_column(String)
+    workspaces: Mapped[list] = mapped_column(JSONB, default=list)
+    destination: Mapped[dict] = mapped_column(JSONB, default=dict)
+    decisions: Mapped[dict] = mapped_column(JSONB, default=dict)
+    next_run_at: Mapped[Optional[object]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    running_since: Mapped[Optional[object]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_run_at: Mapped[Optional[object]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_outcome: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # published | unchanged | waiting | failed
+    last_message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    last_export_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    last_published_export_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    failures: Mapped[int] = mapped_column(Integer, default=0)
+    runs: Mapped[int] = mapped_column(Integer, default=0)
+    created_by: Mapped[str] = mapped_column(String)
+    updated_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

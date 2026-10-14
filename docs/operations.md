@@ -410,6 +410,21 @@ A discard does the following:
 stays, append-only.** No audit purge is used. A finalized import cannot be discarded: correct it
 with ledger decisions.
 
+### Periodic exports
+
+An administrator can repeat a published Git export at an interval (the export's page, *Repeat periodically*;
+`/v1/portability/schedules`; `app/portability/schedules.py`). Each run makes a new export with the same scope,
+destination, outcomes and identity profile — an increment on the last publication, or a complete export — and
+takes it through analysis, approval (the schedule is its standing approval), generation, verification and
+publication, audited as usual (`portability_events`, subject `schedule`). A run is skipped when nothing was
+recorded since the last publication, waits when the analysis needs a person, and three failures in a row switch
+the schedule off. Exports carrying restricted classes are not schedulable.
+
+`python -m app.portability scheduled` runs the schedules that are due. The Helm chart runs it every 15 minutes
+as the CronJob `argus-portability-scheduled` (`portabilityJobs.scheduled`), on the API's node with its volumes
+and environment; a run claims its schedule in the database, so overlapping runners never run one twice. Without
+Kubernetes, run the same command from cron with the API's environment.
+
 ### Retention and legal holds
 
 `python -m app.portability cleanup` deletes, for exports and imports older than `retention_days` (90):

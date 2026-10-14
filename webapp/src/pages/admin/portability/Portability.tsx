@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { portabilityApi, problemText, workspacesApi } from "../../../api/client";
 import type { PortabilityConfig } from "../../../api/portabilityTypes";
+import { SchedulesList } from "./Schedules";
 import { Setup } from "./Setup";
 import { Labels, StateBadge, when } from "./shared";
 
@@ -79,6 +80,7 @@ function Exports({ c }: { c: PortabilityConfig }) {
         </button>
       </div>
       {open && <NewExport c={c} exports={list.data ?? []} />}
+      {c.is_admin && <SchedulesList />}
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">

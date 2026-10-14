@@ -1,4 +1,4 @@
-"""Advanced search in the Jira Query Language (services/jql.py), over tickets, equipment and documents."""
+"""Advanced query (services/jql.py), over tickets, equipment and documents."""
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -32,7 +32,7 @@ def search_jql(
     db: Session = Depends(get_db),
     x_workspace_id: Optional[str] = Header(default=None, alias="X-Workspace-Id"),
 ):
-    """Tickets, equipment or documents selected by a JQL query. Without `project = …` the query searches the
+    """Tickets, equipment or documents selected by an advanced query. Without `project = …` the query searches the
     current workspace (and what is shared with every workspace); `project in (a, b)` searches those the person
     may read. A query that cannot be read answers 422 with where it went wrong."""
     from app.models.workspace import Workspace

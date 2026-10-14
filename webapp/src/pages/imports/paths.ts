@@ -16,6 +16,13 @@ export const importPaths = {
  * from the Assets and Tickets sections. */
 export const IMPORT_SOURCES = [
   {
+    source: "spreadsheet",
+    label: "Spreadsheet (Excel or CSV)",
+    blurb:
+      "A list you keep in a sheet: each row a record, each column a property. Finds the type that fits or creates one, and places the columns by rules and the AI.",
+    href: "/assets/import",
+  },
+  {
     source: "jira",
     label: "Jira objects",
     blurb: "Schemas and objects from a Jira Insight schema.",

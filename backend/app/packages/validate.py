@@ -636,7 +636,7 @@ def _queries(r: _Report, package: Package) -> None:
             if q.get("direction", "out") not in ("out", "in"):
                 r.add("queries", at, "direction is out or in")
         elif not q.get("jql"):
-            r.add("queries", at, "a search query is written in JQL (jql)")
+            r.add("queries", at, "a search query needs its query (jql)")
         else:
             try:
                 from app.services.jql import JqlError, parse

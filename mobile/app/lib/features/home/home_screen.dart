@@ -81,7 +81,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               suffixIcon: _query.text.isEmpty
                   ? IconButton(
                       key: const Key('home-advanced-search'),
-                      tooltip: 'Advanced search (JQL)',
+                      tooltip: 'Advanced query',
                       icon: const Icon(Icons.manage_search),
                       onPressed: () => context.push('/query'))
                   : IconButton(

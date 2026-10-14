@@ -57,7 +57,7 @@ function remember(entity: JqlEntity, jql: string) {
 
 const PAGE = 50;
 
-/** Advanced search in the Jira Query Language over tickets, equipment and documents. The query is in the
+/** Advanced query over tickets, equipment and documents. The query is in the
  *  address, so a search can be bookmarked or sent to a colleague. */
 export function AdvancedSearch() {
   const [params, setParams] = useSearchParams();
@@ -90,10 +90,10 @@ export function AdvancedSearch() {
   return (
     <div className="max-w-6xl space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Advanced search</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">Advanced query</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Queries in the Jira Query Language (JQL). Without <code>project = …</code> they search this workspace and
-          what is shared with every workspace.
+          Fields, operators and functions, written as Jira's searches are, so a query copied from Jira works here.
+          Without <code>project = …</code> a query searches this workspace and what is shared with every workspace.
         </p>
       </div>
 

@@ -323,7 +323,7 @@ export function ImportConfigForm() {
               <>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">
-                    Which issues (JQL)
+                    Which issues (a Jira search query)
                   </label>
                   <input
                     value={jql}

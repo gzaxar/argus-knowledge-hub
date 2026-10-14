@@ -26,7 +26,8 @@ interface SectionConfig {
   hint: string;
   icon: string;
   landing: string;
-  links: { to: string; label: string; end?: boolean; needs?: keyof WorkspaceCapabilities["features"] }[];
+  /** `more`: a tool used now and then, folded under "More tools" so the type tree keeps its room. */
+  links: { to: string; label: string; end?: boolean; more?: boolean; needs?: keyof WorkspaceCapabilities["features"] }[];
   treeLabel: string;
   newTypeTo: string;
   newTypeTitle: string;
@@ -43,14 +44,15 @@ const SECTIONS: Record<SectionKey, SectionConfig> = {
     links: [
       { to: "/assets/search", label: "Browse & search" },
       { to: "/map", label: "Map", needs: "map" },
-      { to: "/search/advanced?entity=assets", label: "Advanced search (JQL)" },
+      { to: "/search/advanced?entity=assets", label: "Advanced query" },
       { to: "/catalogue/types", label: "Type catalogue" },
-      { to: "/labels", label: "Labels & QR codes", needs: "equipment" },
-      { to: "/global-values", label: "Global values" },
-      { to: "/bulk-changes", label: "Bulk changes" },
-      { to: "/catalogue/equipment-classes", label: "Equipment classes", needs: "equipment" },
-      { to: "/migration/catalogue", label: "Map imported records", needs: "equipment" },
-      { to: "/control-bindings", label: "Channels ↔ hardware", needs: "control_system" },
+      { to: "/assets/import", label: "Import a spreadsheet" },
+      { to: "/labels", label: "Labels & QR codes", needs: "equipment", more: true },
+      { to: "/global-values", label: "Global values", more: true },
+      { to: "/bulk-changes", label: "Bulk changes", more: true },
+      { to: "/catalogue/equipment-classes", label: "Equipment classes", needs: "equipment", more: true },
+      { to: "/migration/catalogue", label: "Map imported records", needs: "equipment", more: true },
+      { to: "/control-bindings", label: "Channels ↔ hardware", needs: "control_system", more: true },
     ],
     treeLabel: "Object types",
     newTypeTo: "/schemas/new",
@@ -67,7 +69,7 @@ const SECTIONS: Record<SectionKey, SectionConfig> = {
       { to: "/tickets", label: "All tickets", end: true },
       { to: "/tickets/board", label: "Board" },
       { to: "/tickets/search", label: "Search" },
-      { to: "/search/advanced?entity=tickets", label: "Advanced search (JQL)" },
+      { to: "/search/advanced?entity=tickets", label: "Advanced query" },
       { to: "/tickets/workflows", label: "Workflows" },
     ],
     treeLabel: "Ticket types",
@@ -83,7 +85,7 @@ const SECTIONS: Record<SectionKey, SectionConfig> = {
     landing: "/documents",
     links: [
       { to: "/documents", label: "All documents", end: true },
-      { to: "/search/advanced?entity=documents", label: "Advanced search (JQL)" },
+      { to: "/search/advanced?entity=documents", label: "Advanced query" },
       { to: "/documents/search", label: "Search" },
       { to: "/documents/suggestions", label: "Type suggestions" },
     ],
@@ -97,12 +99,35 @@ const SECTIONS: Record<SectionKey, SectionConfig> = {
 
 const ORDER: SectionKey[] = ["assets", "tickets", "documents"];
 const SECTION_KEY = "assetmanagement.activeSection";
+const MORE_KEY = "argus.sidebar.moreTools";
+const TREE_KEY = "argus.sidebar.typesOpen";
+
+function readFlag(key: string, fallback: boolean): boolean {
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : v === "1";
+  } catch {
+    return fallback;
+  }
+}
+
+function writeFlag(key: string, value: boolean) {
+  try {
+    localStorage.setItem(key, value ? "1" : "0");
+  } catch {
+    // ignore
+  }
+}
 
 function sectionOfPath(pathname: string, search: string): SectionKey | null {
   if (pathname.startsWith("/tickets")) return "tickets";
   if (pathname.startsWith("/documents")) return "documents";
+  if (pathname.startsWith("/search/advanced") && search.includes("entity=tickets")) return "tickets";
+  if (pathname.startsWith("/search/advanced") && search.includes("entity=documents")) return "documents";
   if (
     pathname.startsWith("/assets") ||
+    pathname.startsWith("/map") ||
+    (pathname.startsWith("/search/advanced") && search.includes("entity=assets")) ||
     pathname.startsWith("/labels") ||
     pathname.startsWith("/global-values") ||
     // The tools that work on assets only live in the Assets section.
@@ -215,6 +240,81 @@ function NewMenu() {
   );
 }
 
+/** A menu in the header: a button and the links it opens. */
+function HeaderMenu({
+  label,
+  title,
+  items,
+  align = "right",
+}: {
+  label: React.ReactNode;
+  title: string;
+  items: ({ to: string; label: string; hint?: string } | { action: () => void; label: string; hint?: string })[];
+  align?: "left" | "right";
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [open]);
+  if (items.length === 0) return null;
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        title={title}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+      >
+        {label}
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className={`absolute z-40 mt-1 w-60 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg ${
+            align === "right" ? "right-0" : "left-0"
+          }`}
+        >
+          {items.map((i) =>
+            "to" in i ? (
+              <Link
+                key={i.label}
+                to={i.to}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="block px-3 py-1.5 hover:bg-slate-50"
+              >
+                <span className="block text-sm text-slate-800">{i.label}</span>
+                {i.hint && <span className="block text-xs text-slate-500">{i.hint}</span>}
+              </Link>
+            ) : (
+              <button
+                key={i.label}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  i.action();
+                }}
+                className="block w-full px-3 py-1.5 text-left text-sm text-slate-800 hover:bg-slate-50"
+              >
+                {i.label}
+              </button>
+            ),
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AppShell() {
   const me = useQuery({ queryKey: ["me"], queryFn: workspacesApi.me });
   const navigate = useNavigate();
@@ -248,6 +348,9 @@ export function AppShell() {
   const openPalette = useCallback(() => setPaletteOpen(true), []);
   useCommandPaletteShortcut(openPalette);
 
+  const [moreOpen, setMoreOpen] = useState(() => readFlag(MORE_KEY, false));
+  const [treeOpen, setTreeOpen] = useState(() => readFlag(TREE_KEY, true));
+
   // What this workspace's packages provide: a workspace of records only (technology transfer, contracts)
   // has no equipment pages and no map; only an accelerator has the beam model.
   const features = useCapabilities();
@@ -255,25 +358,49 @@ export function AppShell() {
     ...SECTIONS,
     assets: has(features, "equipment")
       ? SECTIONS.assets
-      : { ...SECTIONS.assets, label: "Records", hint: "Agreements, parties, cases and the like",
-          links: SECTIONS.assets.links.filter((l) => !l.needs || has(features, l.needs)), treeLabel: "Record types" },
+      : { ...SECTIONS.assets, label: "Records", hint: "Agreements, parties, cases and the like", treeLabel: "Record types" },
   };
   sections.assets = { ...sections.assets, links: sections.assets.links.filter((l) => !l.needs || has(features, l.needs)) };
   const config = sections[activeSection];
-  const accessLink = currentWorkspaceId ? `/workspaces/${currentWorkspaceId}/access` : null;
-  const scopedMembersLink = membersLink ? `${membersLink}?section=${activeSection}` : null;
   const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+  // A browse page shows the tree itself, beside the results; the sidebar's would be a second copy.
+  const treeOnPage =
+    (config.appliesTo === "objects" && location.pathname === "/assets/search") ||
+    (config.appliesTo === "tickets" && location.pathname === "/tickets/search") ||
+    (config.appliesTo === "documents" && location.pathname === "/documents/search");
+
+  const settingsItems = currentWorkspaceId
+    ? [
+        { to: `/workspaces/${currentWorkspaceId}/access`, label: "Access", hint: "Who may see and change what" },
+        { to: `/workspaces/${currentWorkspaceId}/members?section=${activeSection}`, label: "Members" },
+        { to: `/workspaces/${currentWorkspaceId}/packages`, label: "Packages", hint: "Types, kinds and workflows" },
+        { to: `/workspaces/${currentWorkspaceId}/keys`, label: "Keys", hint: "How records are numbered" },
+        ...(adminLink ? [{ to: adminLink, label: "Administration", hint: "Imports, integrations, AI, tokens" }] : []),
+      ]
+    : adminLink
+      ? [{ to: adminLink, label: "Administration" }]
+      : [];
+  const accountItems = [
+    { to: "/account", label: "My account" },
+    { to: "/about", label: "About ARGUS" },
+    { action: () => void signOut(), label: "Sign out" },
+  ];
 
   return (
     <div className="flex h-screen bg-slate-50">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
-        <Link to="/" className="block border-b border-slate-200 px-4 py-3" title="Operations cockpit">
-          <span className="block text-sm font-bold tracking-wide text-slate-900">ARGUS</span>
-          <span className="block text-[11px] text-slate-500">Assets · Service · Knowledge</span>
+      <aside className="flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white">
+        <Link to="/" className="flex items-baseline gap-2 border-b border-slate-200 px-4 py-2.5" title="Operations cockpit">
+          <span className="text-sm font-bold tracking-wide text-slate-900">ARGUS</span>
+          <span className="truncate text-[11px] text-slate-500">Assets · Service · Knowledge</span>
         </Link>
         <WorkspaceSwitcher />
 
-        <nav className="border-t border-slate-200 px-2 py-2" aria-label="Main">
+        <nav
+          className={`shrink-0 overflow-y-auto border-t border-slate-200 px-2 py-2 ${
+            treeOpen && !treeOnPage ? "max-h-[55%]" : "flex-1"
+          }`}
+          aria-label="Main"
+        >
           <NavItem to="/" end>
             <span className="w-4 text-center text-slate-400">⌂</span> Cockpit
           </NavItem>
@@ -289,6 +416,9 @@ export function AppShell() {
           {ORDER.map((key) => {
             const s = sections[key];
             const selected = key === activeSection;
+            const main = s.links.filter((l) => !l.more);
+            const more = s.links.filter((l) => l.more);
+            const moreActive = more.some((l) => location.pathname === l.to.split("?")[0]);
             return (
               <div key={key} className="mt-0.5">
                 <button
@@ -307,11 +437,35 @@ export function AppShell() {
                 </button>
                 {selected && (
                   <div className="ml-4 mt-0.5 space-y-0.5 border-l border-slate-100 pl-2">
-                    {s.links.map((l) => (
+                    {main.map((l) => (
                       <NavItem key={l.to} to={l.to} end={l.end} small>
                         {l.label}
                       </NavItem>
                     ))}
+                    {more.length > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMoreOpen((v) => {
+                              writeFlag(MORE_KEY, !v);
+                              return !v;
+                            });
+                          }}
+                          className="flex w-full items-center gap-1 rounded-md px-3 py-1 text-left text-[13px] text-slate-500 hover:bg-slate-100"
+                          aria-expanded={moreOpen || moreActive}
+                        >
+                          <span className="w-3 text-slate-400">{moreOpen || moreActive ? "▾" : "▸"}</span>
+                          More tools
+                        </button>
+                        {(moreOpen || moreActive) &&
+                          more.map((l) => (
+                            <NavItem key={l.to} to={l.to} end={l.end} small>
+                              <span className="pl-3">{l.label}</span>
+                            </NavItem>
+                          ))}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -332,83 +486,42 @@ export function AppShell() {
             <NavItem to="/ask">
               <span className="w-4 text-center text-slate-400">?</span> Ask ARGUS
             </NavItem>
-            <NavItem to="/help">
-              <span className="w-4 text-center text-slate-400">ⓘ</span> Help
-            </NavItem>
-            <NavItem to="/migration" end>
-              <span className="w-4 text-center text-slate-400">⇄</span> Migration to ARGUS
-            </NavItem>
           </div>
         </nav>
 
-        {!(
-          (config.appliesTo === "objects" && location.pathname === "/assets/search") ||
-          (config.appliesTo === "tickets" && location.pathname === "/tickets/search") ||
-          (config.appliesTo === "documents" && location.pathname === "/documents/search")
-        ) && (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-slate-200 px-2 pb-2">
-          <div className="flex items-center justify-between px-1.5 pb-1 pt-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{config.treeLabel}</p>
-            <Link
-              to={config.newTypeTo}
-              title={config.newTypeTitle}
-              className="rounded px-1.5 text-sm font-medium text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            >
-              +
-            </Link>
-          </div>
-          <SchemaTree appliesTo={config.appliesTo} />
-        </div>
-        )}
-
-        <div className="flex flex-wrap items-center gap-1 border-t border-slate-200 px-2 py-1.5 text-xs">
-          {accessLink && (
-            <NavLink to={accessLink} className="rounded px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700">
-              Access
-            </NavLink>
-          )}
-          {currentWorkspaceId && (
-            <NavLink
-              to={`/workspaces/${currentWorkspaceId}/keys`}
-              className="rounded px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-            >
-              Keys
-            </NavLink>
-          )}
-          {currentWorkspaceId && (
-            <NavLink
-              to={`/workspaces/${currentWorkspaceId}/packages`}
-              className="rounded px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-            >
-              Packages
-            </NavLink>
-          )}
-          {scopedMembersLink && (
-            <NavLink
-              to={scopedMembersLink}
-              className="rounded px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-            >
-              Members
-            </NavLink>
-          )}
-          {adminLink && (
-            <NavLink to={adminLink} className="rounded px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700">
-              Administration
-            </NavLink>
-          )}
-          <NavLink to="/about" className="rounded px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700">
-            About
-          </NavLink>
-          <NavLink to="/account" className="rounded px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700">
-            My account
-          </NavLink>
-          <button
-            onClick={() => void signOut()}
-            className="ml-auto rounded px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+        {!treeOnPage && (
+          <div
+            className={`flex flex-col overflow-hidden border-t border-slate-200 px-2 ${
+              treeOpen ? "min-h-[12rem] flex-1 pb-2" : "shrink-0"
+            }`}
           >
-            Sign out
-          </button>
-        </div>
+            <div className="flex items-center justify-between px-1 py-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  setTreeOpen((v) => {
+                    writeFlag(TREE_KEY, !v);
+                    return !v;
+                  })
+                }
+                className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-800"
+                aria-expanded={treeOpen}
+                title={treeOpen ? "Hide the type tree" : "Show the type tree"}
+              >
+                <span className="w-3 text-slate-400">{treeOpen ? "▾" : "▸"}</span>
+                {config.treeLabel}
+              </button>
+              <Link
+                to={config.newTypeTo}
+                title={config.newTypeTitle}
+                className="rounded px-1.5 text-sm font-medium text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                +
+              </Link>
+            </div>
+            {treeOpen && <SchemaTree appliesTo={config.appliesTo} />}
+          </div>
+        )}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -425,15 +538,35 @@ export function AppShell() {
               {isMac ? "⌘" : "Ctrl"} K
             </kbd>
           </button>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-1">
             <ShowKeysToggle />
             <NotificationBell />
+            <Link
+              to="/help"
+              title="Help"
+              className="rounded-md px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            >
+              ⓘ <span className="hidden lg:inline">Help</span>
+            </Link>
+            <HeaderMenu
+              label={
+                <>
+                  ⚙ <span className="hidden lg:inline">Workspace</span>
+                </>
+              }
+              title="This workspace's settings and administration"
+              items={settingsItems}
+            />
             <NewMenu />
-            {me.data && (
-              <span className="hidden text-xs text-slate-500 md:inline" title={me.data.email ?? undefined}>
-                {me.data.name || me.data.email}
-              </span>
-            )}
+            <HeaderMenu
+              label={
+                <span className="max-w-[10rem] truncate text-xs" title={me.data?.email ?? undefined}>
+                  {me.data ? me.data.name || me.data.email : "Account"} ▾
+                </span>
+              }
+              title="Your account"
+              items={accountItems}
+            />
           </div>
         </header>
         <main className="flex-1 overflow-auto p-6">

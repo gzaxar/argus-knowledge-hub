@@ -44,7 +44,7 @@ You need to be an administrator.
 
 1. The person **signs in once**, so ARGUS knows them. (An administrator can also add someone before their
    first sign-in, by email: `argus_admin.py user add <email>`; their first sign-in claims that account.)
-2. Open the workspace, then **Access** (bottom of the side bar). **Granted roles** lists who holds what.
+2. Open the workspace, then **Access** (**⚙ Workspace** menu, top right). **Granted roles** lists who holds what.
 3. **Grant a role**: choose *Person* or *Group*, pick who, pick the **Role**, and grant it. Grant more roles the
    same way: they add up.
 4. To take a role away, remove that line from *Granted roles*.

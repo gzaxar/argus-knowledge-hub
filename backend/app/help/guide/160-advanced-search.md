@@ -1,16 +1,16 @@
 ---
-title: Advanced search (JQL)
-summary: Searching tickets, equipment and documents with the Jira Query Language — fields, operators, dates, functions, ordering, and searching several workspaces.
-keywords: [jql, jira query language, advanced search, query, filter, search, status, assignee, currentuser, created, updated, order by, project, statuscategory, text, label, serial, former key, startofday, startofmonth]
+title: Advanced query
+summary: Selecting tickets, equipment and documents with a query — fields, operators, dates, functions, ordering, and searching several workspaces.
+keywords: [advanced query, advanced search, query language, query, filter, search, status, assignee, currentuser, created, updated, order by, project, statuscategory, text, label, serial, former key, startofday, startofmonth]
 order: 160
 ---
 
-**Advanced search** selects tickets, equipment or documents with a query in the **Jira Query Language**:
-what a Jira user writes works here.
+**Advanced query** selects tickets, equipment or documents with a query: fields, operators and functions, in
+the same form Jira's searches are written, so a query copied from Jira works here.
 
-- On the web: **Tickets**, **Assets** or **Documents** in the side bar → **Advanced search (JQL)**. The query
+- On the web: **Tickets**, **Assets** or **Documents** in the side bar → **Advanced query**. The query
   is in the page's address, so a search can be bookmarked or sent to a colleague.
-- On the phone: the search icon in Home's search box, or the menu → **Advanced search (JQL)**.
+- On the phone: the search icon in Home's search box, or the menu → **Advanced query**.
 
 ## Write a query
 
