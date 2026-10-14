@@ -339,3 +339,28 @@ export interface ProvenanceView {
   events: { seq: number; kind: string; from: string | null; to: string | null; actor: string; at: string;
             detail: Record<string, unknown> | null }[];
 }
+
+/** A published Git export repeated at an interval (backend app/portability/schedules.py). */
+export interface PortabilitySchedule {
+  id: string;
+  source_export_id: string;
+  chain: "incremental" | "complete";
+  every_minutes: number;
+  skip_unchanged: boolean;
+  enabled: boolean;
+  mode: string;
+  workspaces: string[];
+  repository: string | null;
+  next_run_at: string | null;
+  running: boolean;
+  last_run_at: string | null;
+  last_outcome: "published" | "unchanged" | "waiting" | "failed" | null;
+  last_message: string | null;
+  last_export_id: string | null;
+  last_published_export_id: string | null;
+  failures: number;
+  runs: number;
+  created_by: string;
+  updated_by: string | null;
+  created_at: string | null;
+}

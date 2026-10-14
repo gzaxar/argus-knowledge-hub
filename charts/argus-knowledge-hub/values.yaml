@@ -76,6 +76,11 @@ portabilityJobs:
   cleanup:
     enabled: true
     schedule: "30 2 * * *"
+  # Every 15 minutes: runs the periodic Git exports whose time has come (set on a published export, in
+  # Administration → Portability). Nothing happens while no schedule is due.
+  scheduled:
+    enabled: true
+    schedule: "*/15 * * * *"
   # Twice a year: restores the newest full export into a scratch database and records the result. Suspended
   # until the signing key, trusted keys, repository and one full export exist.
   restoreDrill:

@@ -32,10 +32,13 @@ export function MigrationPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Migration to ARGUS</h1>
-        <p className="mt-0.5 text-sm text-slate-500">
-          One domain at a time. Until a domain's exit is signed, its source stays authoritative and ARGUS holds it
-          read-only; after it, ARGUS is the system of record and there is no way back to Jira.
+        <h1 className="text-2xl font-semibold text-slate-900">Migration from Jira</h1>
+        <p className="mt-0.5 max-w-3xl text-sm text-slate-500">
+          For teams leaving Jira and Insight for ARGUS. A <i>domain</i> is a part of what Jira holds (a project, an
+          object schema) that moves as one: it is imported, compared with Jira while both run, frozen in Jira, and
+          finally signed over, after which ARGUS is where it is kept and changed. Until a domain's exit is signed,
+          Jira stays authoritative and ARGUS holds it read-only; after it, there is no way back to Jira. A workspace
+          that never used Jira has nothing to do here.
         </p>
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[18rem_1fr]">

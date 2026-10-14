@@ -70,17 +70,19 @@ The side bar holds the main areas:
 |---|---|
 | **Cockpit** | what needs attention now: open tickets, items waiting for review, recent changes |
 | **Review queue** | facts that wait for a person: inferred values, proposals, conflicts, installations |
-| **Assets** | the equipment: browse and search, types, labels and QR codes, bulk changes, imports' mapping |
+| **Assets** | the equipment: browse and search, the map, advanced query, types, importing a spreadsheet; under **More tools**: labels and QR codes, global values, bulk changes, equipment classes, imports' mapping |
 | **Service desk** | tickets: list, board, search, workflows |
 | **Knowledge base** | documents: list, search, type suggestions |
 | **Knowledge graph** | how records are connected; what depends on what; what is about the same thing |
 | **Beam model** | the machine's beam-transport model, linked to its equipment |
 | **Ask ARGUS** | ask questions in your own words; it can also propose changes for you to apply |
-| **Help** | this guide |
+Below them, the **type tree** of the area you are in (object, ticket or document types) takes the rest of the side
+bar; its title folds it away when you need the room.
 
-At the bottom of the side bar, for the workspace: **Access** (who has which role), **Members**, **Imports**,
-**Icon library**, **Transfer**, **AI endpoint** and **Keys** (how record keys are made); and
-**Administration** (workspaces, users, settings, portability) for administrators.
+At the top right: **Help** (this guide); **⚙ Workspace**, for the workspace: **Access** (who has which role),
+**Members**, **Packages**, **Keys** (how record keys are made) and **Administration** (imports, GLPI, icon
+library, transfer, migration from Jira, AI endpoint, robot tokens; and workspaces, users, settings and
+portability for administrators); your name, for **My account**, **About ARGUS** and **Sign out**.
 
 **+ New** (top right) creates a ticket, an asset, a document or a beam model.
 

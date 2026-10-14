@@ -3,7 +3,7 @@
 Each query is a question a domain asks of its records, with the records it is asked of (a fixture file in
 the package) and the answer expected. They are the package's executable documentation: the tests load every
 shipped package's fixtures into a fresh workspace with that package installed, run each query as a person
-would (JQL through app/services/jql, graph walks over the projected relations, visibility applied), and
+would (advanced queries through app/services/jql, graph walks over the projected relations, visibility applied), and
 compare the keys. A fixture's keys are local to it; in the workspace they are prefixed with its id.
 
 Fixture format (YAML):

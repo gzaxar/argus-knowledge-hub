@@ -247,6 +247,7 @@ def main(argv=None) -> int:
     cy.add_argument("--repository", required=True)
     cy.add_argument("--store", required=True)
     cy.add_argument("--by", required=True)
+    sub.add_parser("scheduled", help="run the periodic Git exports whose time has come (a CronJob, every 15 min)")
     cl = sub.add_parser("cleanup", help="retention: delete expired archive files unless held")
     cl.add_argument("--dry-run", action="store_true")
     lh = sub.add_parser("legal-hold")
@@ -289,6 +290,11 @@ def main(argv=None) -> int:
     if a.cmd == "drill-signoff":
         _print(signoff_drill(a.drill_id, a.by, a.note))
         return 0
+    if a.cmd == "scheduled":
+        from app.portability import schedules
+        out = schedules.run_due(engine, cfg)
+        _print({"runs": out})
+        return 1 if any(r["outcome"] == "failed" for r in out) else 0
     if a.cmd == "cycle":
         report = cycle(cfg, a.repository, a.store, a.by)
         _print(report)

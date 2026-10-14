@@ -85,7 +85,7 @@ class SearchApi {
 
   /// Search Jql
   ///
-  /// Tickets, equipment or documents selected by a JQL query. Without `project = …` the query searches the current workspace (and what is shared with every workspace); `project in (a, b)` searches those the person may read. A query that cannot be read answers 422 with where it went wrong.
+  /// Tickets, equipment or documents selected by an advanced query. Without `project = …` the query searches the current workspace (and what is shared with every workspace); `project in (a, b)` searches those the person may read. A query that cannot be read answers 422 with where it went wrong.
   ///
   /// Note: This method returns the HTTP [Response].
   ///
@@ -148,7 +148,7 @@ class SearchApi {
 
   /// Search Jql
   ///
-  /// Tickets, equipment or documents selected by a JQL query. Without `project = …` the query searches the current workspace (and what is shared with every workspace); `project in (a, b)` searches those the person may read. A query that cannot be read answers 422 with where it went wrong.
+  /// Tickets, equipment or documents selected by an advanced query. Without `project = …` the query searches the current workspace (and what is shared with every workspace); `project in (a, b)` searches those the person may read. A query that cannot be read answers 422 with where it went wrong.
   ///
   /// Parameters:
   ///

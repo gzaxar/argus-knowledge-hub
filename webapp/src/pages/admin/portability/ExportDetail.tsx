@@ -5,6 +5,7 @@ import { portabilityApi, problemText, workspacesApi } from "../../../api/client"
 import type { Dependency, ExportView } from "../../../api/portabilityTypes";
 import { ActionButton, bytes, Empty, ErrorBox, EXPORT_STEPS, JobsPanel, KV, Labels, LegalHold, Mono, PolicySummary, Section,
   StateBadge, Steps, UninspectedList, useJob, when } from "./shared";
+import { SchedulePanel } from "./Schedules";
 
 const OUTCOME_HELP: Record<string, string> = {
   include_workspace: "add that workspace to the export",
@@ -174,6 +175,8 @@ export function ExportDetailPage() {
           )}
         </div>
       </Section>
+
+      <SchedulePanel e={e} isAdmin={!!cfg.data?.is_admin} highRiskNeedsConfirm={needsConfirm} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Section title="Request">

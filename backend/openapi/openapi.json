@@ -1745,6 +1745,48 @@
         "title": "BindingIn",
         "type": "object"
       },
+      "Body_analyse_v1_spreadsheet_imports_analyse_post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          },
+          "sheet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "JSON: {mode: existing, schema_uid} or {mode: new, name, parent_uid}",
+            "title": "Target"
+          },
+          "use_ai": {
+            "default": true,
+            "title": "Use Ai",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_analyse_v1_spreadsheet_imports_analyse_post",
+        "type": "object"
+      },
       "Body_assist_asset_photo_v1_intake_assist_asset_photo_post": {
         "properties": {
           "draft": {
@@ -1851,6 +1893,36 @@
         "title": "Body_import_markdown_documents_v1_documents_import_post",
         "type": "object"
       },
+      "Body_preview_v1_spreadsheet_imports_preview_post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          },
+          "plan": {
+            "title": "Plan",
+            "type": "string"
+          },
+          "sheet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet"
+          }
+        },
+        "required": [
+          "file",
+          "plan"
+        ],
+        "title": "Body_preview_v1_spreadsheet_imports_preview_post",
+        "type": "object"
+      },
       "Body_propose_for_asset_v1_intake_propose_asset__uid__post": {
         "properties": {
           "file": {
@@ -1902,6 +1974,47 @@
           "attachment_id"
         ],
         "title": "Body_receive_attachment_v1_logbook_olog_entries__facility___entry_id__attachments_post",
+        "type": "object"
+      },
+      "Body_run_v1_spreadsheet_imports_run_post": {
+        "properties": {
+          "expect_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expect Digest"
+          },
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          },
+          "plan": {
+            "title": "Plan",
+            "type": "string"
+          },
+          "sheet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet"
+          }
+        },
+        "required": [
+          "file",
+          "plan"
+        ],
+        "title": "Body_run_v1_spreadsheet_imports_run_post",
         "type": "object"
       },
       "Body_transcribe_recording_v1_ai_transcribe_post": {
@@ -9463,6 +9576,91 @@
           "rules"
         ],
         "title": "RulesetIn",
+        "type": "object"
+      },
+      "ScheduleChangeIn": {
+        "properties": {
+          "chain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "every_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Every Minutes"
+          },
+          "skip_unchanged": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skip Unchanged"
+          }
+        },
+        "title": "ScheduleChangeIn",
+        "type": "object"
+      },
+      "ScheduleIn": {
+        "properties": {
+          "chain": {
+            "default": "incremental",
+            "description": "incremental: an increment on the last publication; complete: a complete export each time",
+            "title": "Chain",
+            "type": "string"
+          },
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "every_minutes": {
+            "default": 1440,
+            "description": "at least 60, at most 31 days",
+            "title": "Every Minutes",
+            "type": "integer"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "skip_unchanged": {
+            "default": true,
+            "title": "Skip Unchanged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "export_id"
+        ],
+        "title": "ScheduleIn",
         "type": "object"
       },
       "SchemaCreate": {
@@ -47202,6 +47400,389 @@
         ]
       }
     },
+    "/v1/portability/schedules": {
+      "get": {
+        "description": "Exports repeated at an interval (app/portability/schedules.py). Administrators.",
+        "operationId": "list_schedules_v1_portability_schedules_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Schedules",
+        "tags": [
+          "portability"
+        ]
+      },
+      "post": {
+        "description": "Repeat a published Git export every `every_minutes`. Setting it is the standing approval of its runs: an\nadministrator; for a high-risk export, a recent sign-in and (with separation of duties) not its requester.",
+        "operationId": "create_schedule_v1_portability_schedules_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Schedule",
+        "tags": [
+          "portability"
+        ]
+      }
+    },
+    "/v1/portability/schedules/{schedule_id}": {
+      "delete": {
+        "description": "Stop repeating the export. What it published stays published.",
+        "operationId": "delete_schedule_v1_portability_schedules__schedule_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "title": "Schedule Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Schedule",
+        "tags": [
+          "portability"
+        ]
+      },
+      "put": {
+        "description": "Switch a schedule off or on, or change how often and how it runs.",
+        "operationId": "change_schedule_v1_portability_schedules__schedule_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "title": "Schedule Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleChangeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Change Schedule",
+        "tags": [
+          "portability"
+        ]
+      }
+    },
+    "/v1/portability/schedules/{schedule_id}/run": {
+      "post": {
+        "description": "Run it now, in the background, as its next run would.",
+        "operationId": "run_schedule_v1_portability_schedules__schedule_id__run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "title": "Schedule Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Run Schedule",
+        "tags": [
+          "portability"
+        ]
+      }
+    },
     "/v1/portability/setup": {
       "get": {
         "description": "The set-up administrators manage here: repositories, trusted keys, signing keys (no secrets), next to\nwhat the deployment configures (names only), and whether this is switched on.",
@@ -49625,7 +50206,7 @@
     },
     "/v1/search/jql": {
       "get": {
-        "description": "Tickets, equipment or documents selected by a JQL query. Without `project = …` the query searches the\ncurrent workspace (and what is shared with every workspace); `project in (a, b)` searches those the person\nmay read. A query that cannot be read answers 422 with where it went wrong.",
+        "description": "Tickets, equipment or documents selected by an advanced query. Without `project = …` the query searches the\ncurrent workspace (and what is shared with every workspace); `project in (a, b)` searches those the person\nmay read. A query that cannot be read answers 422 with where it went wrong.",
         "operationId": "search_jql_v1_search_jql_get",
         "parameters": [
           {
@@ -49804,6 +50385,243 @@
         "summary": "Jql Fields",
         "tags": [
           "search"
+        ]
+      }
+    },
+    "/v1/spreadsheet-imports/analyse": {
+      "post": {
+        "description": "The sheet's columns, the existing types that fit them best, and a plan: which type the rows become\n(an existing one, or a new one under a type of the workspace) and where each column goes. Rules first,\nthe AI for the rest when the workspace has one and `use_ai`. Given a `target`, only the columns are\nproposed.",
+        "operationId": "analyse_v1_spreadsheet_imports_analyse_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_analyse_v1_spreadsheet_imports_analyse_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Analyse",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/v1/spreadsheet-imports/preview": {
+      "post": {
+        "description": "What the import would do, row by row — created, updated, unchanged, or why not — checked as a record\nis on save. The first rows, and every row with a problem. Nothing is written.",
+        "operationId": "preview_v1_spreadsheet_imports_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_preview_v1_spreadsheet_imports_preview_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/v1/spreadsheet-imports/run": {
+      "post": {
+        "description": "The import: the new type or properties now, the rows in the background (an import job, read at\n`GET /v1/imports/{uid}`). `expect_digest` is the file's digest from the preview: another file is refused.",
+        "operationId": "run_v1_spreadsheet_imports_run_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_run_v1_spreadsheet_imports_run_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Run",
+        "tags": [
+          "imports"
         ]
       }
     },

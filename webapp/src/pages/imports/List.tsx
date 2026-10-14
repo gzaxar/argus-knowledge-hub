@@ -138,9 +138,11 @@ export function ImportList() {
           <Link
             key={s.source}
             to={
-              "upload" in s && s.upload
-                ? importPaths.markdown(workspaceId)
-                : importPaths.create(workspaceId, s.source)
+              "href" in s
+                ? s.href
+                : "upload" in s && s.upload
+                  ? importPaths.markdown(workspaceId)
+                  : importPaths.create(workspaceId, s.source)
             }
             className="rounded-lg border border-slate-200 bg-white p-3 hover:border-slate-400"
           >

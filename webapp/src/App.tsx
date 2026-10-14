@@ -41,6 +41,7 @@ import { IssueSearch } from "./pages/issues/Search";
 import { LabelList } from "./pages/labels/List";
 import { ReviewQueuePage } from "./pages/review/Queue";
 import { MigrationPage } from "./pages/migration/Domains";
+import { SpreadsheetImportPage } from "./pages/assets/SpreadsheetImport";
 import { CatalogueMappingPage } from "./pages/migration/CatalogueMapping";
 import { ControlBindingsPage } from "./pages/review/ControlBindings";
 import { TypeCataloguePage } from "./pages/catalogue/TypeCatalogue";
@@ -103,6 +104,7 @@ export function App() {
           <Route path="/search/advanced" element={<AdvancedSearch />} />
           <Route path="/map" element={<MapPage />} />
           <Route path="/assets/new" element={<AssetForm />} />
+          <Route path="/assets/import" element={<SpreadsheetImportPage />} />
           <Route path="/assets/:uid" element={<AssetDetail />} />
           <Route path="/assets/:uid/edit" element={<AssetForm />} />
 
@@ -126,7 +128,8 @@ export function App() {
           <Route path="/beam-model/edit/:modelId" element={<BeamModelEditorPage />} />
           <Route path="/beam-model/:modelId/assets" element={<BeamAssetSyncPage />} />
           <Route path="/review" element={<ReviewQueuePage />} />
-          <Route path="/migration" element={<MigrationPage />} />
+          {/* Moved under Administration; an old link still lands there. */}
+          <Route path="/migration" element={<Navigate to="/admin/migration" replace />} />
           <Route path="/migration/catalogue" element={<CatalogueMappingPage />} />
           <Route path="/control-bindings" element={<ControlBindingsPage />} />
           <Route path="/catalogue/types" element={<TypeCataloguePage />} />
@@ -180,6 +183,7 @@ export function App() {
           <Route path="/admin/ai" element={<InstallationAI />} />
           <Route path="/admin/tokens" element={<AdminTokensPage />} />
           <Route path="/admin/portability" element={<PortabilityPage />} />
+          <Route path="/admin/migration" element={<MigrationPage />} />
           <Route path="/admin/portability/exports/:id" element={<ExportDetailPage />} />
           <Route path="/admin/portability/imports/:id" element={<ImportDetailPage />} />
         </Route>

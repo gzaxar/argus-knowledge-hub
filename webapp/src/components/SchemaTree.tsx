@@ -211,7 +211,10 @@ export function SchemaTree({
     [sharedGroups, query],
   );
   const nameOf = useWorkspaceNames();
-  const [sharedOpen, setSharedOpen] = useState(false);
+  // Shared types folded away while the workspace has a tree of its own; open when it has next to none, or
+  // the tree would show two rows of a workspace whose records are almost all of shared types.
+  const [sharedChoice, setSharedOpen] = useState<boolean | null>(null);
+  const sharedOpen = sharedChoice ?? scopedSchemas.length < 6;
   const tree = useMemo(() => buildTree(scopedSchemas), [scopedSchemas]);
   const visibleTree = useMemo(() => filterTree(tree, query), [tree, query]);
   const counts = useMemo(() => {
@@ -266,7 +269,7 @@ export function SchemaTree({
           <div className="mt-2 border-t border-slate-200 pt-2">
             <button
               type="button"
-              onClick={() => setSharedOpen((v) => !v)}
+              onClick={() => setSharedOpen(!sharedOpen)}
               className="flex w-full items-center gap-1 rounded px-1.5 py-1 text-left text-xs font-medium text-sky-700 hover:bg-slate-100"
               title="Types other workspaces have shared with this one. Their objects appear here too, and can be edited only where they live."
             >

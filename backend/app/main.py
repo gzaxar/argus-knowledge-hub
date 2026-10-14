@@ -33,6 +33,7 @@ from app.routers import (
     import_configs,
     imports,
     issues,
+    spreadsheet_import,
     labels,
     legacy_migration,
     retirement,
@@ -153,6 +154,7 @@ app.include_router(assets.router)
 app.include_router(assets.relations_router)
 app.include_router(issues.router)
 app.include_router(glpi.router)
+app.include_router(spreadsheet_import.router)
 app.include_router(documents.router)
 app.include_router(asset_subresources.router)
 app.include_router(attachments.router)

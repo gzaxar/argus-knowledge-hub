@@ -23,7 +23,7 @@ class JiraIssueImportRequest(BaseModel):
     source: Literal["jira-issues"]
     base_url: str
     pat: str
-    # Any JQL the account can run; a project filter is the usual case.
+    # Any Jira search query the account can run; a project filter is the usual case.
     jql: str
     # Optional ticket type, giving the imported tickets configurable
     # attributes the same way object types do.

@@ -18,7 +18,7 @@ itself.
 
 ## Connect an endpoint
 
-1. **AI endpoint** (bottom of the side bar).
+1. **⚙ Workspace → Administration → AI endpoint**.
 2. **Endpoint URL** (for example `https://ai-gateway.example.infn.it/v1`) and the API key, if it needs one. The key
    is stored encrypted and never shown again.
 3. **Model** for questions and forms. Optionally:
