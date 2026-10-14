@@ -1,0 +1,52 @@
+ticket_types:
+  kinds:
+    - name: "Leak Test"
+      description: "A helium (or other tracer) leak test, and the leak rate found."
+      icon: tabler/test-pipe
+      attributes:
+        - {key: tracer_gas, name: Tracer gas, type: enumeration, options: [{id: he, value: Helium}, {id: h2, value: Hydrogen (forming gas)}]}
+        - {key: leak_rate_mbar_l_s, name: Leak rate (mbar·l/s), type: float, unit: mbar·l/s}
+        - {key: acceptance_mbar_l_s, name: Acceptance (mbar·l/s), type: float, unit: mbar·l/s}
+        - {key: leak_test_result, name: Result, type: enumeration, options: [{id: pass, value: Pass}, {id: fail, value: Fail}]}
+    - name: "Bake-out"
+      description: "Heating a vacuum system to drive out water: temperatures, duration, the pressure reached."
+      icon: tabler/temperature-minus
+      attributes:
+        - {key: max_temperature_c, name: Highest temperature (°C), type: float, unit: °C}
+        - {key: plateau_h, name: Plateau (h), type: float, unit: h}
+        - {key: final_pressure_mbar, name: Final pressure (mbar), type: float, unit: mbar}
+    - name: "Cryogen Delivery"
+      description: "A delivery or fill of a cryogen, and the volume."
+      icon: tabler/snowflake
+      attributes:
+        - {key: cryogen, name: Cryogen, type: enumeration, option_set: cryogens}
+        - {key: volume_l, name: Volume (l), type: float, unit: l}
+
+workflows:
+  - id: bake-out
+    name: "Bake-out"
+    description: "Planned, heating, at plateau, cooling down, done — or aborted."
+    applies_to: ["Bake-out"]
+    initial: planned
+    states:
+      - {key: planned, name: Planned, category: open}
+      - {key: heating, name: Heating, category: active}
+      - {key: plateau, name: At plateau, category: active}
+      - {key: cooling, name: Cooling down, category: active}
+      - {key: done, name: Done, category: done}
+      - {key: aborted, name: Aborted, category: done}
+    transitions:
+      - {from: planned, to: heating, name: Start heating, requires: [assignee]}
+      - {from: heating, to: plateau, name: Plateau reached}
+      - {from: plateau, to: cooling, name: Start cooling}
+      - {from: cooling, to: done, name: Done, requires: [comment]}
+      - {from: "*", to: aborted, name: Abort, requires: [comment]}
+
+document_types:
+  kinds:
+    - name: "Pressure Equipment Certificate"
+      description: "The declaration or inspection certificate of a pressure vessel or assembly."
+      icon: tabler/file-certificate
+      attributes:
+        - {key: pressure_category, name: Category, type: enumeration, options: [{id: art4_3, value: Sound engineering practice}, {id: i, value: I}, {id: ii, value: II}, {id: iii, value: III}, {id: iv, value: IV}]}
+        - {key: next_periodic_inspection, name: Next periodic inspection, type: date}

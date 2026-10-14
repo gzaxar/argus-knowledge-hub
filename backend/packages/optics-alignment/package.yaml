@@ -1,0 +1,16 @@
+id: optics-alignment
+version: 1.0.0
+name: Optical systems, lasers and high-precision alignment
+description: >-
+  Lasers (oscillators, amplifiers, pump lasers) and the optics they drive — mirrors, lenses, windows,
+  gratings, waveplates, optical tables — and what keeps them in place: survey reference points, laser
+  trackers, total stations and autocollimators. Laser controlled areas, alignment surveys and laser work
+  authorisations with their approval workflow. Laser System and Optical Assembly moved here unchanged from
+  the accelerator catalogue. Laser-safety definitions are to be approved by the site's laser safety
+  officer; the package establishes no compliance by itself.
+owner: INFN ARGUS — to be adopted by the site's laser and survey groups
+license: EUPL-1.2
+depends:
+  core-objects: ">=2.0,<3"
+provides: [optics-catalogue]
+contents: [object_types.yaml, tickets.yaml, access.yaml, queries.yaml]

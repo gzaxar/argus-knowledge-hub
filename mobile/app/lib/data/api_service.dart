@@ -199,6 +199,7 @@ class ApiService {
   api.NotificationsApi notifications(api.ApiClient c) => api.NotificationsApi(c);
   api.SearchApi search(api.ApiClient c) => api.SearchApi(c);
   api.LocationsApi locations(api.ApiClient c) => api.LocationsApi(c);
+  api.PackagesApi packages(api.ApiClient c) => api.PackagesApi(c);
   api.GlobalValuesApi globalValues(api.ApiClient c) => api.GlobalValuesApi(c);
   api.SchemasApi schemas(api.ApiClient c) => api.SchemasApi(c);
   api.AiApi ai(api.ApiClient c) => api.AiApi(c);

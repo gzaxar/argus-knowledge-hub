@@ -1,0 +1,102 @@
+# Monitoring networks on the core backbone. An Environmental Sensor is a monitoring instrument; the HVAC
+# package's HVAC Sensor is a control input of an air-handling system — different jobs, different types.
+# Never rename a type, an attribute key or an option id: stored records use them.
+
+option_sets:
+  quantities:
+    - {id: air_temperature, value: Air temperature}
+    - {id: relative_humidity, value: Relative humidity}
+    - {id: air_pressure, value: Atmospheric pressure}
+    - {id: wind_speed, value: Wind speed}
+    - {id: wind_direction, value: Wind direction}
+    - {id: rainfall, value: Rainfall}
+    - {id: pm10, value: PM10}
+    - {id: pm2_5, value: PM2.5}
+    - {id: no2, value: NO2}
+    - {id: o3, value: Ozone}
+    - {id: gamma_dose_rate, value: Ambient gamma dose rate}
+    - {id: radon, value: Radon}
+    - {id: water_ph, value: Water pH}
+    - {id: conductivity, value: Conductivity}
+    - {id: turbidity, value: Turbidity}
+    - {id: water_level, value: Water level}
+    - {id: noise_level, value: Noise level}
+    - {id: vibration, value: Ground vibration}
+  matrices:
+    - {id: air, value: Air}
+    - {id: surface_water, value: Surface water}
+    - {id: groundwater, value: Groundwater}
+    - {id: waste_water, value: Waste water}
+    - {id: soil, value: Soil}
+    - {id: sediment, value: Sediment}
+
+map_layers:
+  - {id: monitoring, name: Monitoring network, description: "Stations, sensors, loggers and sampling points."}
+
+object_types:
+  types:
+    - name: "Monitoring Network"
+      parent: "Item"
+      description: "A network of stations run together: who operates it and where its data are published."
+      icon: tabler/sitemap
+      attributes:
+        - {key: network_purpose, name: Purpose, type: enumeration, options: [{id: air_quality, value: Air quality}, {id: meteorology, value: Meteorology}, {id: radiological, value: Radiological}, {id: water, value: Water}, {id: noise_vibration, value: Noise and vibration}, {id: mixed, value: Mixed}]}
+        - {key: data_portal_url, name: Data portal}
+    - name: "Monitoring Station"
+      parent: "Asset"
+      description: "A station of a network: an enclosure or mast with sensors, power and communication."
+      icon: tabler/antenna
+      locatable: true
+      map_layer: monitoring
+      attributes:
+        - {key: station_code, name: Station code, indexed: true, unique: true}
+        - {key: network, name: Network, type: reference, reference: Monitoring Network}
+        - {key: station_power, name: Power, type: enumeration, options: [{id: mains, value: Mains}, {id: solar, value: Solar}, {id: battery, value: Battery}]}
+    - name: "Environmental Sensor"
+      parent: "Instrument"
+      description: "Measures one environmental quantity: its range, sampling interval, thresholds and calibration."
+      icon: tabler/activity
+      locatable: true
+      map_layer: monitoring
+      attributes:
+        - {key: measured_quantity, name: Measures, type: enumeration, option_set: quantities, indexed: true}
+        - {key: measurement_unit, name: Unit, description: "The unit it reports in, e.g. µg/m³, nSv/h, °C."}
+        - {key: range_min, name: Range from, type: float}
+        - {key: range_max, name: Range to, type: float}
+        - {key: sampling_interval_s, name: Sampling interval (s), type: integer, unit: s}
+        - {key: alert_threshold, name: Alert threshold, type: float}
+        - {key: alarm_threshold, name: Alarm threshold, type: float}
+        - {key: calibration_due, name: Calibration due, type: date, indexed: true}
+        - {key: at_station, name: Station, type: reference, reference: Monitoring Station}
+        - {key: logged_by, name: Logger, type: reference, reference: Data Logger}
+    - name: "Data Logger"
+      parent: "Asset"
+      description: "Collects the sensors' readings and sends them on."
+      icon: tabler/database
+      locatable: true
+      map_layer: monitoring
+      attributes:
+        - {key: n_channels, name: Channels, type: integer}
+        - {key: transmission, name: Transmission, type: enumeration, options: [{id: ethernet, value: Ethernet}, {id: gsm, value: Cellular}, {id: lora, value: LoRaWAN}, {id: satellite, value: Satellite}, {id: manual, value: Manual download}]}
+        - {key: at_station, name: Station, type: reference, reference: Monitoring Station}
+    - name: "Sampling Point"
+      parent: "Location"
+      description: "Where samples are taken by hand: what is sampled and how often."
+      icon: tabler/map-pin
+      locatable: true
+      map_layer: monitoring
+      attributes:
+        - {key: sampling_matrix, name: Matrix, type: enumeration, option_set: matrices}
+        - {key: sampling_frequency, name: Frequency, type: enumeration, options: [{id: weekly, value: Weekly}, {id: monthly, value: Monthly}, {id: quarterly, value: Quarterly}, {id: yearly, value: Yearly}, {id: on_demand, value: On demand}]}
+        - {key: network, name: Network, type: reference, reference: Monitoring Network}
+
+reference_relations:
+  network: "in network"
+  at_station: "at station"
+  logged_by: "logged by"
+
+relation_types:
+  - {id: in-network, verb: "in network", from: [Monitoring Station, Sampling Point], to: Monitoring Network, layer: monitoring, flows: none, description: "a station or sampling point and its network"}
+  - {id: at-station, verb: "at station", from: [Environmental Sensor, Data Logger], to: Monitoring Station, layer: monitoring, flows: reverse, carries: function, description: "a sensor or logger and the station that powers and houses it"}
+  - {id: logged-by, verb: "logged by", from: Environmental Sensor, to: Data Logger, layer: monitoring, flows: reverse, carries: function, description: "a sensor and the logger its readings go through: a failed logger loses them"}
+  - {id: watches, verb: "watches", from: [Environmental Sensor, Monitoring Station], to: "*", layer: monitoring, flows: none, description: "a sensor or station and what it monitors: an emission point, a building, an area"}

@@ -1,0 +1,68 @@
+ticket_types:
+  kinds:
+    - name: "Disclosure Evaluation"
+      description: "The evaluation of an invention disclosure and the decision on it."
+      icon: tabler/bookmark
+      attributes:
+        - {key: disclosure, name: Disclosure, type: reference, reference: Invention Disclosure}
+        - {key: prior_art_summary, name: Prior art, type: text, restricted: unpublished_invention}
+        - {key: recommendation, name: Recommendation, type: enumeration, options: [{id: file, value: File a patent}, {id: secret, value: Keep as know-how}, {id: publish, value: Publish}, {id: release, value: Release to the inventors}]}
+    - name: "Annuity Decision"
+      description: "An annuity coming due: pay it and keep the patent, or let it lapse."
+      icon: tabler/clock
+      attributes:
+        - {key: patent, name: Patent, type: reference, reference: Patent}
+        - {key: annuity_due, name: Due, type: date}
+        - {key: annuity_eur, name: Amount (EUR), type: float, unit: EUR, restricted: costs}
+        - {key: annuity_choice, name: Decision, type: enumeration, options: [{id: pay, value: Pay}, {id: lapse, value: Let it lapse}]}
+    - name: "Licensing Opportunity"
+      description: "A company interested in a technology, and how far the talks have got."
+      icon: tabler/briefcase
+      attributes:
+        - {key: prospect, name: Prospect, type: reference, reference: Organization}
+        - {key: opportunity_stage, name: Stage, type: enumeration, options: [{id: contact, value: First contact}, {id: nda, value: Under NDA}, {id: evaluation, value: Evaluation}, {id: negotiation, value: Negotiation}, {id: signed, value: Signed}, {id: lost, value: Lost}]}
+
+workflows:
+  - id: disclosure-evaluation
+    name: "Disclosure evaluation"
+    description: "Received, assessed, decided by someone who may approve, closed."
+    applies_to: ["Disclosure Evaluation"]
+    initial: received
+    states:
+      - {key: received, name: Received, category: open}
+      - {key: assessing, name: Assessing, category: active}
+      - {key: awaiting_decision, name: Awaiting decision, category: waiting}
+      - {key: decided, name: Decided, category: done}
+    transitions:
+      - {from: received, to: assessing, name: Assess, requires: [assignee]}
+      - {from: assessing, to: awaiting_decision, name: Recommend, requires: [comment]}
+      - {from: awaiting_decision, to: decided, name: Decide, requires: [approver, resolution]}
+      - {from: awaiting_decision, to: assessing, name: Ask for more, requires: [comment]}
+  - id: annuity-decision
+    name: "Annuity decision"
+    description: "Due, decided by someone who may approve, then paid or lapsed."
+    applies_to: ["Annuity Decision"]
+    initial: due
+    states:
+      - {key: due, name: Due, category: open}
+      - {key: to_pay, name: To pay, category: active}
+      - {key: paid, name: Paid, category: done}
+      - {key: lapsed, name: Lapsed, category: done}
+    transitions:
+      - {from: due, to: to_pay, name: Decide to pay, requires: [approver]}
+      - {from: due, to: lapsed, name: Let it lapse, requires: [approver, comment]}
+      - {from: to_pay, to: paid, name: Paid, requires: [comment]}
+
+document_types:
+  kinds:
+    - name: "Invention Disclosure Form"
+      description: "The form the inventors filled in."
+      icon: tabler/file-description
+    - name: "Patent Application Text"
+      description: "Description, claims and drawings as filed."
+      icon: tabler/file-text
+      attributes:
+        - {key: application_number, name: Application number, validator: tt.patent_number}
+    - name: "Valuation Report"
+      description: "What a technology could be worth, to whom, and why."
+      icon: tabler/file-analytics

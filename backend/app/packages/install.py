@@ -118,7 +118,115 @@ def _apply_package(db: Session, workspace_id: str, p: Package, options: dict) ->
         kinds = [k["name"] for k in (p.section(area) or {}).get("kinds") or []]
         if kinds:
             out[f"{area}_added"] = _add_kinds(db, workspace_id, area, kinds)
+            fields = _kind_fields(db, workspace_id, p, area)
+            if fields:
+                out[f"{area}_fields_added"] = fields
+    if p.section("extends"):
+        out["extended"] = sorted(set(out.get("extended") or []) | set(apply_extensions(db, workspace_id, p, scope)))
+    if p.section("workflows"):
+        out["workflows_added"] = add_workflows(db, workspace_id, p)
     db.flush()
+    return out
+
+
+def kind_uid(workspace_id: str, area: str, name: str) -> str:
+    """A ticket or document kind's uid in a workspace (`base` for the base type)."""
+    from app.services import document_types, ticket_types
+    if area == "ticket_types":
+        base = f"{workspace_id}:{ticket_types.BASE_UID_SUFFIX}"
+        return base if name == "base" else f"{base}:{name.lower().replace(' ', '-')}"
+    return f"{workspace_id}:{document_types.BASE_UID_SUFFIX}" if name == "base" else \
+        document_types.type_uid(workspace_id, name)
+
+
+def _merge_attributes(schema: Schema, attrs: list[dict], options: Optional[dict] = None,
+                      usable: Optional[dict] = None) -> list[str]:
+    """Add to a type what it lacks — attributes by key, options of its enumerations by id — never changing what
+    it has (the workspace's own edits included). Returns what was added."""
+    from sqlalchemy.orm.attributes import flag_modified
+    have = [dict(a) for a in schema.attributes or []]
+    keys = {a.get("key") for a in have}
+    added = []
+    for a in attrs:
+        if a["key"] in keys:
+            continue
+        a = dict(a)
+        if a.get("type") == "reference" and usable and a.get("referenceType") in usable:
+            a["referenceSchemaUid"] = usable[a["referenceType"]]
+        have.append(a)
+        added.append(a["key"])
+    for key, extra in (options or {}).items():
+        for a in have:
+            if a.get("key") != key:
+                continue
+            present = {o.get("id") for o in a.get("options") or []}
+            new = [dict(o) for o in extra if o["id"] not in present]
+            if new:
+                a["options"] = [*(a.get("options") or []), *new]
+                added += [f"{key}:{o['id']}" for o in new]
+    if added:
+        schema.attributes = have
+        flag_modified(schema, "attributes")
+    return added
+
+
+def _kind_fields(db: Session, workspace_id: str, p: Package, area: str) -> list[str]:
+    """The fields a package gives its own ticket or document kinds."""
+    from app.packages import compile as c
+    kinds = c.kind_set(p, area, {**defaults.option_sets(), **(p.section("option_sets") or {})})
+    out = []
+    for name, attrs in (kinds.kind_attributes if kinds else {}).items():
+        schema = db.get(Schema, kind_uid(workspace_id, area, name))
+        if schema is not None:
+            out += [f"{name}.{k}" for k in _merge_attributes(schema, attrs)]
+    return out
+
+
+def apply_extensions(db: Session, workspace_id: str, p: Package, scope: Optional[str] = None) -> list[str]:
+    """What the package adds to types other packages define, on the types this workspace holds itself (a
+    beamline's shared types are the catalogue's, extended when the catalogue gets the package)."""
+    from app.packages import compile as c
+    from app.services import asset_types
+    sets = {**defaults.option_sets(), **(p.section("option_sets") or {})}
+    usable = None
+    out = []
+    for e in c.extensions(p, sets):
+        if e.area == "object_types":
+            schema = db.get(Schema, asset_types.type_uid(workspace_id, e.type))
+            if usable is None:
+                usable = asset_types.resolve_type_uids(db, workspace_id)
+        else:
+            schema = db.get(Schema, kind_uid(workspace_id, e.area, e.type))
+        if schema is None or schema.workspace_id != workspace_id:
+            continue
+        out += [f"{e.type}.{k}" for k in _merge_attributes(schema, e.attributes, e.options, usable)]
+    return out
+
+
+def workflow_uid(workspace_id: str, package_id: str, workflow_id: str) -> str:
+    return f"{workspace_id}:workflow:{package_id}:{workflow_id}"
+
+
+def add_workflows(db: Session, workspace_id: str, p: Package) -> list[str]:
+    """A package's workflows, each given to the ticket kinds it names that have none yet. One the workspace
+    already has (edited or not) is left as it is."""
+    from app.models.workflow import Workflow
+    from app.services import workflows
+    out = []
+    for w in p.section("workflows") or []:
+        uid = workflow_uid(workspace_id, p.id, w["id"])
+        if db.get(Workflow, uid) is None:
+            workflows.save(db, workspace_id, {
+                "name": w["name"], "initial": w["initial"], "states": [dict(s) for s in w["states"]],
+                "transitions": [{"from": t["from"], "to": t["to"], "name": t["name"],
+                                 **({"requires": list(t["requires"])} if t.get("requires") else {})}
+                                for t in w.get("transitions") or []],
+                "source": {"package": p.id, "id": w["id"], "version": p.version}}, uid=uid)
+            out.append(w["id"])
+        for kind in w.get("applies_to") or []:
+            schema = db.get(Schema, kind_uid(workspace_id, "ticket_types", kind))
+            if schema is not None and not (schema.metadata_json or {}).get("workflow_uid"):
+                workflows.bind(db, workspace_id, schema.uid, uid)
     return out
 
 
@@ -300,6 +408,53 @@ def install(db: Session, workspace_id: str, package_ids: list[str], *, actor: Op
         raise PackageProblem(str(e)) from None
 
 
+def plan_new(db: Session, package_ids: list[str], *, catalogue_workspace_id: Optional[str] = None,
+             scope: Optional[str] = None) -> Plan:
+    """What a new workspace made from these packages would get (core-facility always), worked out in a
+    workspace made and rolled back: nothing is kept."""
+    import uuid as _uuid
+    savepoint = db.begin_nested()
+    try:
+        scratch = f"preview-{_uuid.uuid4().hex[:12]}"
+        db.add(Workspace(id=scratch, name="preview"))
+        db.flush()
+        out = plan(db, scratch, list(dict.fromkeys(["core-facility", *package_ids])),
+                   catalogue_workspace_id=catalogue_workspace_id, scope=scope)
+        out.workspace_id = None
+        return out
+    finally:
+        savepoint.rollback()
+
+
+def capabilities(db: Session, workspace_id: str) -> dict:
+    """What a workspace can do, from the packages it has: for the web and the app to show only what is there
+    (equipment pages and the type catalogue with an object catalogue, the map with a locatable type, the beam
+    model with the accelerator's, administrative records with core-records)."""
+    from app.packages import compile as c
+    shipped = available()
+    have = {pid: shipped[pid] for pid in installed(db, workspace_id) if pid in shipped}
+    provides = sorted({cap for p in have.values() for cap in p.provides})
+    sets = defaults.option_sets()
+    types = [t for p in have.values() for t in c.object_types(p, sets)]
+    layers = [m for p in have.values() for m in p.section("map_layers") or []]
+    kinds = {area: sorted(k["name"] for p in have.values() for k in (p.section(area) or {}).get("kinds") or [])
+             for area in ("ticket_types", "document_types")}
+    return {
+        "workspace_id": workspace_id, "packages": sorted(have), "provides": provides,
+        "features": {
+            "tickets": "tickets" in provides, "documents": "documents" in provides,
+            "equipment": "object-catalogue" in provides,
+            "records": "records" in provides or "object-catalogue" in provides,
+            "map": any(t.locatable for t in types),
+            "beam_model": "accelerator-catalogue" in provides,
+            "control_system": "accelerator-catalogue" in provides,
+            "type_catalogue": bool(types),
+        },
+        "map_layers": layers, "ticket_kinds": kinds["ticket_types"], "document_kinds": kinds["document_types"],
+        "importers": sorted({i["importer"] for p in have.values() for i in p.section("imports") or []}),
+    }
+
+
 def _record(db: Session, workspace_id: str, p: Package, action: str, from_version: Optional[str], options: dict,
             result: Optional[dict], actor: Optional[str]) -> None:
     row = db.scalar(select(WorkspacePackage).where(WorkspacePackage.workspace_id == workspace_id,
@@ -317,8 +472,8 @@ def _record(db: Session, workspace_id: str, p: Package, action: str, from_versio
 
 def detect_workspace(db: Session, ws: str) -> int:
     """Record the packages one workspace evidently has but no record names, as `detected`, at the version this
-    release ships: core facility when it has the base ticket type; a package of object types when one of its
-    types is here (or in the catalogue the workspace hangs from). Installs nothing. Returns how many."""
+    release ships: core facility when it has the base ticket type; a package of object types when all of its
+    types are here (or in the catalogue the workspace hangs from). Installs nothing. Returns how many."""
     from app.services import asset_types
     from app.services.ticket_types import BASE_UID_SUFFIX
     have = installed(db, ws)
@@ -337,7 +492,16 @@ def detect_workspace(db: Session, ws: str) -> int:
             hangs_from = asset_types.catalogue_of(db, ws)
             usable = asset_types.resolve_type_uids(db, ws, hangs_from)
         own = next((r for r in (db.get(Schema, asset_types.type_uid(ws, n)) for n in names) if r is not None), None)
-        if own is None and not (hangs_from and any(n in usable for n in names)):
+        # Every one of its types, not just one: a workspace that has some (because they were in another
+        # package before, as Radiation Monitor was in the accelerator's) does not have the package — its
+        # installation, through whatever depends on it, adds the rest.
+        here = {n for n in names if db.get(Schema, asset_types.type_uid(ws, n)) is not None}
+        if hangs_from:
+            here |= {n for n in names if n in usable}
+        wanted = set(names)
+        if own is not None and own.is_global and not hangs_from:      # the shared catalogue: its shared types
+            wanted = {n for n in names if asset_types.scope_of(n) == asset_types.SCOPE_GLOBAL}
+        if not wanted or wanted - here:
             continue
         if own is not None and own.is_global:
             options = {"scope": asset_types.SCOPE_GLOBAL}

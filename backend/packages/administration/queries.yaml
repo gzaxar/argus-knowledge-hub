@@ -1,0 +1,21 @@
+queries:
+  - id: invoices-overdue
+    title: Invoices approved for payment and past due on 1 June 2026
+    entity: assets
+    jql: 'type = Invoice AND payment_status = "Approved for payment" AND due_on < "2026-06-01" ORDER BY key'
+    fixture: fixtures/procurement.yaml
+    expect: [INV-1]
+  - id: orders-under-a-contract
+    title: The orders placed under a framework contract
+    entity: graph
+    from: K-FRAME
+    relation: "governed by"
+    direction: in
+    fixture: fixtures/procurement.yaml
+    expect: [PO-1, PO-2]
+  - id: requests-awaiting-approval
+    title: Procurement requests waiting for approval
+    entity: tickets
+    jql: 'type = "Procurement Request" AND status = budget_checked ORDER BY key'
+    fixture: fixtures/procurement.yaml
+    expect: [PR-2]

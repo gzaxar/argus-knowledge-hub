@@ -1,0 +1,16 @@
+roles:
+  - id: laser-safety-officer
+    name: Laser safety officer
+    description: "Laser controlled areas and lasers; approves laser work authorisations."
+    objects: [read, create, modify]
+    tickets: [read, create, modify, approve]
+    documents: [read, create, modify, approve]
+  - id: alignment-surveyor
+    name: Alignment surveyor
+    description: "The reference network, alignment instruments and surveys."
+    objects: [read, create, modify]
+    tickets: [read, create, modify]
+    documents: [read, create, modify]
+
+imports:
+  - {importer: locations, description: "Where lasers, tables and reference points are, from a survey file."}

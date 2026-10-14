@@ -214,6 +214,8 @@ class ApiClient {
           return AssistIn.fromJson(value);
         case 'AttachmentOut':
           return AttachmentOut.fromJson(value);
+        case 'CapabilitiesOut':
+          return CapabilitiesOut.fromJson(value);
         case 'ChatIn':
           return ChatIn.fromJson(value);
         case 'CloseReviewIn':
@@ -246,6 +248,8 @@ class ApiClient {
           return DraftDocumentIn.fromJson(value);
         case 'DraftDocumentOut':
           return DraftDocumentOut.fromJson(value);
+        case 'FeaturesOut':
+          return FeaturesOut.fromJson(value);
         case 'GlobalValueOut':
           return GlobalValueOut.fromJson(value);
         case 'GraphEdgeOut':
@@ -268,6 +272,8 @@ class ApiClient {
           return IssueOut.fromJson(value);
         case 'IssueUpdate':
           return IssueUpdate.fromJson(value);
+        case 'MapLayerOut':
+          return MapLayerOut.fromJson(value);
         case 'MeOut':
           return MeOut.fromJson(value);
         case 'MentionedObject':

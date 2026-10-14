@@ -139,13 +139,13 @@ def test_an_invented_severity_is_not_trusted(monkeypatch):
 def test_ticket_fields_are_read_from_the_report(monkeypatch):
     monkeypatch.setattr(
         "app.services.ai_authoring.complete",
-        lambda *a, **k: '{"category": "fault", "impact": "beam_down", '
+        lambda *a, **k: '{"category": "fault", "impact": "service_down", '
                         '"detected_by": "alarm", "system": "Vacuum", '
                         '"root_cause": "A failed gauge.", "corrective_action": null}',
     )
     fields = draft_ticket_fields(Endpoint("https://x/v1", "m"), "Beam lost", "The alarm fired.")
     assert fields["category"] == "fault"
-    assert fields["impact"] == "beam_down"
+    assert fields["impact"] == "service_down"
     assert fields["root_cause"] == "A failed gauge."
     assert fields["corrective_action"] is None
 
@@ -155,11 +155,26 @@ def test_a_value_outside_the_vocabulary_is_dropped(monkeypatch):
     "catastrophic" must not put it there."""
     monkeypatch.setattr(
         "app.services.ai_authoring.complete",
-        lambda *a, **k: '{"category": "disaster", "impact": "beam_down"}',
+        lambda *a, **k: '{"category": "disaster", "impact": "service_down"}',
     )
     fields = draft_ticket_fields(Endpoint("https://x/v1", "m"), "T", "D")
     assert fields["category"] is None
-    assert fields["impact"] == "beam_down"
+    assert fields["impact"] == "service_down"
+
+
+def test_the_workspaces_own_vocabulary_is_the_one_offered(monkeypatch):
+    """The core's impact is neutral; an accelerator workspace's base type has the beam options its package
+    extends it with, and those are what the model is offered and what is kept."""
+    seen = {}
+
+    def answer(_endpoint, _system, user, **_):
+        seen["user"] = user
+        return '{"impact": "beam_down"}'
+    monkeypatch.setattr("app.services.ai_authoring.complete", answer)
+    beam = [{"id": "beam_down", "value": "Beam down"}, {"id": "service_down", "value": "Service down"}]
+    fields = draft_ticket_fields(Endpoint("https://x/v1", "m"), "T", "D", {"impact": beam})
+    assert fields["impact"] == "beam_down" and "beam_down" in seen["user"]
+    assert draft_ticket_fields(Endpoint("https://x/v1", "m"), "T", "D")["impact"] is None
 
 
 def test_an_unreadable_reply_yields_empty_fields_not_an_error(monkeypatch):

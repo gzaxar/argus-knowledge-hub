@@ -29,7 +29,7 @@ A role gives **actions** on **resources**:
 | `tickets` | read, create, modify, delete, approve |
 | `documents` | read, create, modify, delete, approve |
 | `workspace` | manage_members (grant and revoke roles here) |
-| `restricted` | the restricted classes it may see: `costs`, `personnel`, `security_incident`, `safety_investigation`, `sensitive_design` |
+| `restricted` | the restricted classes it may see: ARGUS's `costs`, `personnel`, `security_incident`, `safety_investigation`, `sensitive_design`, and those the template packages declare (`commercial_terms`, `unpublished_invention`, `source_security`, `physical_security`, `license_keys`) |
 
 A record or field of a restricted class is invisible to anyone without that class, even with `read`:
 it is left out of lists, search, the graph (or shown only as an anonymous node) and Ask ARGUS's answers.
@@ -64,6 +64,11 @@ installed, with ids `argus-<name>`: install them on the *Access reviews* page (f
 | `argus-safety-investigator` | safety and security investigations | read | read, create, modify | read | `safety_investigation`, `security_incident` |
 | `argus-procurement-officer` | costs and procurement records | read, modify | read | read | `costs` |
 | `argus-auditor` | reads everything, changes nothing; verifies the audit log | read | read | read | |
+
+The template packages recommend roles of their own (a fire safety officer, a radiation protection expert, a
+contract manager, a technology transfer officer, a change manager…). A workspace is offered those of the
+packages it has, beside the ones above, with the package each comes from; installing them grants nothing.
+docs/domain-packages.md lists them, and the decisions their domain owners must take about them.
 
 ## How access is worked out
 

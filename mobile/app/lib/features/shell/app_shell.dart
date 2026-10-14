@@ -69,6 +69,8 @@ class AppDrawer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider).value;
     final config = ref.watch(configProvider);
+    final features = ref.watch(workspaceFeaturesProvider).value;
+    final hasMap = features == null || features.contains('map');
     final theme = Theme.of(context);
     void open(String path) {
       Navigator.pop(context);
@@ -107,9 +109,11 @@ class AppDrawer extends ConsumerWidget {
         const Divider(indent: 28, endIndent: 28),
         const _Section('App'),
         _Item('drawer-query', Icons.manage_search, 'Advanced search (JQL)', () => open('/query')),
-        _Item('drawer-nearby', Icons.near_me_outlined, 'Near me', () => open('/nearby')),
-        _Item('drawer-location-reviews', Icons.edit_location_alt_outlined, 'Locations to review',
-            () => open('/location-reviews')),
+        if (hasMap) ...[
+          _Item('drawer-nearby', Icons.near_me_outlined, 'Near me', () => open('/nearby')),
+          _Item('drawer-location-reviews', Icons.edit_location_alt_outlined, 'Locations to review',
+              () => open('/location-reviews')),
+        ],
         _Item('drawer-settings', Icons.settings_outlined, 'Settings', () => open('/settings')),
         _Item('drawer-help', Icons.help_outline, 'Help', () {
           Navigator.pop(context);

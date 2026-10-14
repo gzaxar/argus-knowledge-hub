@@ -1,0 +1,16 @@
+roles:
+  - id: vacuum-specialist
+    name: Vacuum specialist
+    description: "Vacuum equipment, leak tests and bake-outs."
+    objects: [read, create, modify]
+    tickets: [read, create, modify]
+    documents: [read, create, modify]
+  - id: cryogenics-operator
+    name: Cryogenics operator
+    description: "Cryogenic plant, dewars and deliveries; gas cylinders and relief devices."
+    objects: [read, create, modify]
+    tickets: [read, create, modify]
+    documents: [read]
+
+imports:
+  - {importer: locations, description: "Where cylinders, dewars and relief devices are, from a survey file."}

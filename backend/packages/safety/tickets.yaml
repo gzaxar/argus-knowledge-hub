@@ -1,0 +1,87 @@
+# The safety kinds of ticket, with their own fields, and the workflows that govern them. The approval steps
+# (`requires: [approver]`) can only be taken by someone who may approve tickets in the workspace.
+ticket_types:
+  kinds:
+    - name: "Safety Inspection"
+      description: "A periodic inspection of safety equipment, and its result."
+      icon: tabler/clipboard-check
+      attributes:
+        - {key: inspection_result, name: Result, type: enumeration, option_set: inspection_result}
+        - {key: inspected_on, name: Inspected on, type: date}
+        - {key: next_due, name: Next due, type: date}
+    - name: "Safety Finding"
+      description: "Something found wrong at an inspection or audit, to be put right."
+      icon: tabler/alert-triangle
+      attributes:
+        - {key: finding_severity, name: Severity, type: enumeration, options: [{id: observation, value: Observation}, {id: minor, value: Minor}, {id: major, value: Major}, {id: critical, value: Critical}]}
+        - {key: found_during, name: Found during, type: enumeration, options: [{id: inspection, value: Inspection}, {id: audit, value: Audit}, {id: incident, value: Incident}, {id: walkdown, value: Walkdown}]}
+        - {key: containment, name: Immediate containment, type: text}
+    - name: "Safety Incident"
+      description: "An event that harmed or could have harmed people. Investigations are usually restricted."
+      icon: tabler/hand-stop
+      attributes:
+        - {key: incident_outcome, name: Outcome, type: enumeration, options: [{id: near_miss, value: Near miss}, {id: no_injury, value: No injury}, {id: first_aid, value: First aid}, {id: medical, value: Medical treatment}, {id: lost_time, value: Lost time}]}
+        - {key: occurred_at, name: Occurred at, type: datetime}
+        - {key: persons_involved, name: Persons involved, type: text, restricted: personnel}
+    - name: "Radiation Survey"
+      description: "Dose-rate or contamination measurements in an area, with the highest value found."
+      icon: tabler/radioactive
+      attributes:
+        - {key: max_dose_rate_usv_h, name: Highest dose rate (µSv/h), type: float, unit: µSv/h}
+        - {key: contamination_found, name: Contamination found, type: boolean}
+        - {key: survey_instrument, name: Instrument, type: reference, reference: Radiation Monitor}
+    - name: "Permit to Work"
+      description: "Permission to do hazardous work (hot work, confined space, isolation), approved before it starts."
+      icon: tabler/file-certificate
+      attributes:
+        - {key: work_hazards, name: Hazards, type: enumeration, multi: true, options: [{id: hot_work, value: Hot work}, {id: confined_space, value: Confined space}, {id: electrical_isolation, value: Electrical isolation}, {id: work_at_height, value: Work at height}, {id: radiation, value: Radiation}, {id: cryogenic, value: Cryogenic}, {id: pressure, value: Pressure}]}
+        - {key: valid_from, name: Valid from, type: datetime}
+        - {key: valid_until, name: Valid until, type: datetime}
+        - {key: precautions, name: Precautions, type: text}
+    - name: "Radiation Work Permit"
+      description: "Permission to work in a controlled area: expected dose and the protection required."
+      icon: tabler/radioactive
+      attributes:
+        - {key: expected_dose_usv, name: Expected dose (µSv), type: float, unit: µSv}
+        - {key: dose_constraint_usv, name: Dose constraint (µSv), type: float, unit: µSv}
+        - {key: valid_from, name: Valid from, type: datetime}
+        - {key: valid_until, name: Valid until, type: datetime}
+
+workflows:
+  - id: permit-to-work
+    name: "Permit to work"
+    description: "Requested, reviewed, approved by someone who may approve, in force, and closed."
+    applies_to: ["Permit to Work", "Radiation Work Permit"]
+    initial: requested
+    states:
+      - {key: requested, name: Requested, category: open}
+      - {key: under_review, name: Under review, category: active}
+      - {key: approved, name: Approved, category: active}
+      - {key: in_force, name: In force, category: active}
+      - {key: suspended, name: Suspended, category: waiting}
+      - {key: closed, name: Closed, category: done}
+      - {key: rejected, name: Rejected, category: done}
+    transitions:
+      - {from: requested, to: under_review, name: Submit for review}
+      - {from: under_review, to: approved, name: Approve, requires: [approver]}
+      - {from: under_review, to: rejected, name: Reject, requires: [approver, comment]}
+      - {from: under_review, to: requested, name: Return for changes, requires: [comment]}
+      - {from: approved, to: in_force, name: Start work}
+      - {from: in_force, to: suspended, name: Suspend, requires: [comment]}
+      - {from: suspended, to: in_force, name: Resume, requires: [approver]}
+      - {from: in_force, to: closed, name: Close, requires: [comment]}
+  - id: safety-incident
+    name: "Safety incident"
+    description: "Reported, investigated, actions taken, closed by someone who may approve."
+    applies_to: ["Safety Incident"]
+    initial: reported
+    states:
+      - {key: reported, name: Reported, category: open}
+      - {key: investigating, name: Investigating, category: active}
+      - {key: actions, name: Corrective actions, category: active}
+      - {key: closed, name: Closed, category: done}
+    transitions:
+      - {from: reported, to: investigating, name: Investigate, requires: [assignee]}
+      - {from: investigating, to: actions, name: Agree actions, requires: [comment]}
+      - {from: actions, to: closed, name: Close, requires: [approver, resolution]}
+      - {from: actions, to: investigating, name: Reopen investigation}

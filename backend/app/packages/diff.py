@@ -81,14 +81,23 @@ def definitions(sections: dict, package_id: str, extra_sets: Optional[dict] = No
         k = c.kind_set(p, area, sets)
         if k:
             kinds[area] = {"base": {a["key"]: a for a in k.base_attributes},
-                           "kinds": {name: {"description": d, "icon": i} for name, d, i in k.kinds}}
+                           "kinds": {name: {"description": d, "icon": i} for name, d, i in k.kinds},
+                           "fields": {name: {a["key"]: a for a in attrs} for name, attrs in k.kind_attributes.items()}}
     enums = {}
     for e in c.enumerations(p, sets):
         enums[f"{e['applies_to']}.{e['key']}"] = {"name": e["name"], "default": e["default"],
                                                   "options": {o["id"]: o for o in e["options"]}}
     classes = set((sections.get("equipment_classes") or {}).get("classes") or [])
     former = dict((sections.get("object_types") or {}).get("former_names") or {})
-    return {"types": types, "kinds": kinds, "enumerations": enums, "classes": classes, "former_names": former}
+    extensions = {}
+    for e in c.extensions(p, sets):
+        extensions[(e.area, e.type)] = {"attributes": {a["key"]: a for a in e.attributes},
+                                        "options": {k: {o["id"]: o for o in v} for k, v in e.options.items()}}
+    flows = {w["id"]: {"name": w.get("name"), "initial": w.get("initial"), "states": w.get("states"),
+                       "transitions": w.get("transitions"), "applies_to": list(w.get("applies_to") or [])}
+             for w in sections.get("workflows") or [] if package_id != "core-facility"}
+    return {"types": types, "kinds": kinds, "enumerations": enums, "classes": classes, "former_names": former,
+            "extensions": extensions, "workflows": flows}
 
 
 # --------------------------------------------------------------------------- comparing attributes
@@ -216,6 +225,10 @@ def compare(old: dict, new: dict) -> list[Change]:
             elif ok["kinds"][name] != n:
                 out.append(Change(f"{area}/{name}/changed", DEFINITION, area, name, None, "changed",
                                   f"kind {name!r}: new description or icon", ok["kinds"][name], n))
+        for name in nk["kinds"]:
+            if name in ok["kinds"] or (nk.get("fields") or {}).get(name):
+                out.extend(_attribute_changes(area, name, (ok.get("fields") or {}).get(name, {}),
+                                              (nk.get("fields") or {}).get(name, {}), {}))
         for name in ok["kinds"]:
             if name not in nk["kinds"]:
                 out.append(Change(f"{area}/{name}/removed", BREAKING, area, name, None, "removed",
@@ -250,12 +263,54 @@ def compare(old: dict, new: dict) -> list[Change]:
                               f"enumeration {key} is no longer defined", {"name": o["name"]}, None,
                               actions=["apply", "keep"]))
 
+    for (area, subject), n in new.get("extensions", {}).items():
+        o = old.get("extensions", {}).get((area, subject), {"attributes": {}, "options": {}})
+        out.extend(_extension_changes(area, subject, o, n))
+    for (area, subject), o in old.get("extensions", {}).items():
+        if (area, subject) not in new.get("extensions", {}):
+            out.extend(_extension_changes(area, subject, o, {"attributes": {}, "options": {}}))
+
+    ow, nw = old.get("workflows", {}), new.get("workflows", {})
+    for wid, n in nw.items():
+        if wid not in ow:
+            out.append(Change(f"workflows/{wid}/added", ADDITIVE, "workflows", wid, None, "added",
+                              f"new workflow {n['name']!r}" + (f" for {', '.join(n['applies_to'])}" if n["applies_to"] else ""),
+                              None, n))
+        elif ow[wid] != n:
+            out.append(Change(f"workflows/{wid}/changed", DEFINITION, "workflows", wid, None, "changed",
+                              f"workflow {n['name']!r}: new states, transitions or kinds", ow[wid], n))
+    for wid, o in ow.items():
+        if wid not in nw:
+            out.append(Change(f"workflows/{wid}/removed", BREAKING, "workflows", wid, None, "removed",
+                              f"workflow {o['name']!r} is no longer in the package; the workspace keeps its copy",
+                              o, None, actions=["keep"]))
+
     for cls in sorted(new["classes"] - old["classes"]):
         out.append(Change(f"equipment_classes/{cls}/added", ADDITIVE, "equipment_classes", cls, None, "added",
                           f"new equipment class {cls!r}"))
     for cls in sorted(old["classes"] - new["classes"]):
         out.append(Change(f"equipment_classes/{cls}/removed", BREAKING, "equipment_classes", cls, None, "removed",
                           f"equipment class {cls!r} is no longer offered", actions=["apply", "keep"]))
+    return out
+
+
+def _extension_changes(area: str, subject: str, old: dict, new: dict) -> list[Change]:
+    """What a package adds to another package's type, between two versions: attributes, and options."""
+    out = _attribute_changes(area, subject, old["attributes"], new["attributes"], {})
+    for key in sorted(set(old["options"]) | set(new["options"])):
+        oo, no = old["options"].get(key, {}), new["options"].get(key, {})
+        base = f"{area}/{subject}/attributes/{key}/options"
+        for oid, opt in no.items():
+            if oid not in oo:
+                out.append(Change(f"{base}/{oid}/added", ADDITIVE, area, subject, f"{key}:{oid}", "added",
+                                  f"{key!r} gains the option {opt['value']!r}", None, opt))
+            elif oo[oid].get("value") != opt.get("value"):
+                out.append(Change(f"{base}/{oid}/relabelled", DEFINITION, area, subject, f"{key}:{oid}",
+                                  "relabelled", f"option {oid!r} reads {opt['value']!r}", oo[oid], opt))
+        for oid, opt in oo.items():
+            if oid not in no:
+                out.append(Change(f"{base}/{oid}/removed", BREAKING, area, subject, f"{key}:{oid}", "removed",
+                                  f"{key!r} loses the option {opt['value']!r}", opt, None))
     return out
 
 
@@ -335,8 +390,12 @@ def assess(db: Session, workspace_id: str, changes: list[Change], old: dict, sco
         if subject_schema is not None and ch.element and ch.what != "added" and ":" not in ch.element:
             here = {a.get("key"): a for a in subject_schema.attributes or []}
             source_key = (ch.before or {}).get("key", ch.element)
-            given = (old["types"].get(ch.subject, {}).get("attributes", {}) if ch.area == "object_types"
-                     else old["kinds"].get(ch.area, {}).get("base", {}))
+            if ch.area == "object_types":
+                given = old["types"].get(ch.subject, {}).get("attributes", {})
+            elif ch.subject == "base":
+                given = old["kinds"].get(ch.area, {}).get("base", {})
+            else:
+                given = (old["kinds"].get(ch.area, {}).get("fields") or {}).get(ch.subject, {})
             mine = here.get(source_key)
             if mine is None and source_key in given:
                 ch.conflict = "the workspace removed this attribute itself"
@@ -357,8 +416,8 @@ def assess(db: Session, workspace_id: str, changes: list[Change], old: dict, sco
         elif subject_schema is not None and ch.what in ("removed", "moved", "tightened", "renamed") and not ch.element:
             model, _col, where = _records(db, ch.area, [subject_schema.uid])
             ch.records = db.scalar(select(func.count()).select_from(model).where(where)) or 0
-        elif subject_schema is None and ch.what not in ("added",) and ch.area != "enumerations" and \
-                ch.area != "equipment_classes":
+        elif subject_schema is None and ch.what not in ("added",) and ch.area not in (
+                "enumerations", "equipment_classes", "workflows"):
             ch.conflict = "the workspace no longer has this"
         out.append(ch)
     return out

@@ -1,0 +1,28 @@
+# Who the package expects, as role templates a workspace may install and grant (never granted by itself),
+# and the restricted class it adds.
+restricted_classes:
+  - {id: source_security, description: "Where high-activity sources are kept and how they are secured."}
+
+roles:
+  - id: fire-safety-officer
+    name: Fire safety officer
+    description: "Keeps the fire protection equipment and its inspections; approves permits to work."
+    objects: [read, create, modify]
+    tickets: [read, create, modify, approve]
+    documents: [read, create, modify, approve]
+  - id: radiation-protection-expert
+    name: Radiation protection expert
+    description: "Radiation areas, monitors, sources and surveys; approves radiation work permits; sees source security."
+    objects: [read, create, modify]
+    tickets: [read, create, modify, approve]
+    documents: [read, create, modify, approve]
+    restricted: [source_security, safety_investigation]
+  - id: safety-inspector
+    name: Safety inspector
+    description: "Carries out inspections and records findings; approves nothing."
+    objects: [read, modify]
+    tickets: [read, create, modify]
+    documents: [read]
+
+imports:
+  - {importer: locations, description: "Positions of detectors, extinguishers and monitors, from a CSV or GeoJSON survey."}

@@ -1,0 +1,16 @@
+id: safety
+version: 1.0.0
+name: Safety, fire protection and radiation protection
+description: >-
+  What protects people and plant, and the records around it: fire detection, alarm and suppression,
+  extinguishers and emergency lighting, gas and oxygen-deficiency detection, radiation monitors,
+  shielding, radioactive sources and dosimeters; fire zones and radiation areas; inspections, findings,
+  incidents and near misses, and permits to work with their approval workflow. A structure to start
+  from: it does not establish compliance with any regulation, and its definitions and workflows are to be
+  approved by the site's safety and radiation protection officers (docs/domain-packages.md).
+owner: INFN ARGUS — to be adopted by the site's safety service
+license: EUPL-1.2
+depends:
+  core-objects: ">=2.0,<3"
+provides: [safety-catalogue]
+contents: [object_types.yaml, tickets.yaml, documents.yaml, access.yaml, queries.yaml]

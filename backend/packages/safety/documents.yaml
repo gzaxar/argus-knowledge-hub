@@ -1,0 +1,18 @@
+document_types:
+  kinds:
+    - name: "Risk Assessment"
+      description: "Hazards of an activity or area, their risk, and the measures that control it."
+      icon: tabler/alert-triangle
+      attributes:
+        - {key: assessed_on, name: Assessed on, type: date}
+        - {key: review_due, name: Review due, type: date}
+        - {key: residual_risk, name: Residual risk, type: enumeration, options: [{id: low, value: Low}, {id: medium, value: Medium}, {id: high, value: High}]}
+    - name: "Emergency Plan"
+      description: "What to do in a fire, a release or an evacuation, and who does it."
+      icon: tabler/route
+    - name: "Inspection Certificate"
+      description: "A certificate issued for a test or inspection of safety equipment."
+      icon: tabler/file-certificate
+      attributes:
+        - {key: certified_on, name: Certified on, type: date}
+        - {key: certificate_expires, name: Expires, type: date}

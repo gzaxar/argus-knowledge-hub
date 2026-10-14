@@ -1,12 +1,17 @@
 id: it
-version: 1.0.0
+version: 1.1.0
 name: IT
 description: >-
   Network and computing equipment — switches, routers, firewalls, wireless access points, converters,
-  servers, workstations, storage, patch panels — and what the network registry knows (segments, addresses).
+  servers, workstations, storage, patch panels, peripherals — what the network registry knows (segments,
+  addresses), software and its licences, and the IT service desk's incidents, requests, problems and
+  changes. Since 1.1 it hosts GLPI data: a computer or network device GLPI does not classify further is a
+  Computing Node or Network Device, every record keeps its GLPI link and the GLPI fields ARGUS does not map,
+  and GLPI's own custom asset types and fields come in through a reviewed schema proposal (docs/glpi.md).
 owner: INFN ARGUS
 license: EUPL-1.2
 depends:
-  core-objects: ">=1.0,<2"
+  core-objects: ">=2.0,<3"
+  core-records: ">=1.0,<2"
 provides: [it-catalogue]
-contents: [object_types.yaml]
+contents: [object_types.yaml, glpi.yaml, service_desk.yaml, queries.yaml]

@@ -513,3 +513,16 @@ class LocationRepository {
         : _api.locations(c).rejectObservationWithHttpInfo(id, api.DecisionIn()));
   }
 }
+
+/// What the current workspace's packages let it do: a workspace of records only (contracts, technology
+/// transfer) has no map, so the app does not offer one.
+class CapabilitiesRepository {
+  CapabilitiesRepository(this._api);
+  final ApiService _api;
+
+  Future<Set<String>> features(String workspaceId) async {
+    final r = _map(await _api.json((c) => _api.packages(c).workspaceCapabilitiesWithHttpInfo(workspaceId)));
+    final f = _map(r['features']);
+    return {for (final e in f.entries) if (e.value == true) e.key};
+  }
+}

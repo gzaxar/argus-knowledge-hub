@@ -84,6 +84,7 @@ FIELD_OPERATIONS = [
     ("get", "/v1/assets/{uid}/location"),
     ("post", "/v1/assets/{uid}/location/observations"),
     ("get", "/v1/map/nearby"),
+    ("get", "/v1/workspaces/{workspace_id}/capabilities"),
     ("get", "/v1/location-reviews"),
     ("post", "/v1/location-reviews/{obs_id}/accept"),
     ("post", "/v1/location-reviews/{obs_id}/reject"),

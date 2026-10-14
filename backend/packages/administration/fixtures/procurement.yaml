@@ -1,0 +1,12 @@
+records:
+  - {key: SUP-1, type: Organization, name: Supplier One S.p.A., attributes: {org_kind: Company, country: IT}}
+  - {key: BL-1, type: Budget Line, name: Vacuum consumables 2026, attributes: {budget_code: "VAC-2026", fiscal_year: 2026}}
+  - {key: K-FRAME, type: Contract, name: Framework for consumables, attributes: {contract_number: "2025/031", contract_status: Active, cig: "A0B1C2D3E4", procurement_procedure: Framework call-off, counterparty: ["@SUP-1"]}}
+  - {key: PO-1, type: Purchase Order, name: Gaskets, attributes: {po_number: "PO-26-001", ordered_from: "@SUP-1", under_contract: "@K-FRAME", budget_line: "@BL-1", order_status: Delivered}}
+  - {key: PO-2, type: Purchase Order, name: Bolts, attributes: {po_number: "PO-26-002", ordered_from: "@SUP-1", under_contract: "@K-FRAME", order_status: Issued}}
+  - {key: PO-3, type: Purchase Order, name: Direct order, attributes: {po_number: "PO-26-003", ordered_from: "@SUP-1", order_status: Issued}}
+  - {key: INV-1, type: Invoice, name: Invoice 112, attributes: {invoice_number: "112/2026", issued_by: "@SUP-1", bills_order: "@PO-1", due_on: "2026-05-15", payment_status: Approved for payment}}
+  - {key: INV-2, type: Invoice, name: Invoice 140, attributes: {invoice_number: "140/2026", issued_by: "@SUP-1", due_on: "2026-07-15", payment_status: Approved for payment}}
+tickets:
+  - {key: PR-1, kind: Procurement Request, title: New gauges, state: submitted}
+  - {key: PR-2, kind: Procurement Request, title: Spare turbo pump, state: budget_checked}

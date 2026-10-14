@@ -9,7 +9,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.auth import get_current_user_id, require_permission
+from app.auth import get_current_user_id, get_identity, require_permission
 from app.db import get_db
 from app.ledger.cutover import assert_writable
 from app.ledger.engine import LedgerError
@@ -679,9 +679,20 @@ class TransitionIn(BaseModel):
     assignee: Optional[str] = None
 
 
+def _may_approve_tickets(db: Session, identity, workspace_id: str) -> bool:
+    from app.auth import PatIdentity
+    from app.services.permissions import resolve_permission
+    if isinstance(identity, PatIdentity):
+        return identity.may("approve", "tickets")
+    if identity.token is not None and not identity.token.may("approve", "tickets"):
+        return False
+    return resolve_permission(db, identity.user, workspace_id, "approve", "tickets")
+
+
 @router.post("/{uid}/transition", response_model=IssueOut)
 def transition_issue(uid: str, body: TransitionIn,
                      workspace_id: str = Depends(require_permission("modify", resource="tickets")),
+                     identity=Depends(get_identity),
                      current_user_id: Optional[str] = Depends(get_current_user_id), db: Session = Depends(get_db),
                      if_match: Optional[str] = Header(None, alias="If-Match",
                                                       description="The ticket version read"),
@@ -709,7 +720,8 @@ def transition_issue(uid: str, body: TransitionIn,
     previous_assignee = issue.assignee
     try:
         moved = workflows.transition(db, issue, body.to, current_user_id, comment=body.comment,
-                                     resolution=body.resolution, assignee=body.assignee)
+                                     resolution=body.resolution, assignee=body.assignee,
+                                     may_approve=_may_approve_tickets(db, identity, workspace_id))
     except workflows.WorkflowError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail={"error": str(exc), "invariant": "workflow"})

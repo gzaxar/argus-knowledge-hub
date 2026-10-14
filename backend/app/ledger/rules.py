@@ -121,6 +121,19 @@ RULES: dict[str, dict] = {
         "signature": {"outputs": ["exists", "attr:*", "rel:*"]},
         "impl": ["1"],
     },
+    "glpi.record/1": {
+        "family": "glpi.record",
+        "meaning": "a GLPI item, by its GLPI identity, is an ARGUS record with the fields the GLPI mapping gives it",
+        "signature": {"outputs": ["exists", "name", "attr:*", "rel:*"]},
+        "impl": ["1"],
+    },
+    "glpi.reference/1": {
+        "family": "glpi.reference",
+        "meaning": "a GLPI item's link to another (location, product, supplier) is a reference field naming the "
+                   "ARGUS record that other item became",
+        "signature": {"outputs": ["attr:*"], "methods": ["stated"]},
+        "impl": ["1"],
+    },
     "bind.control.tag/1": {
         "family": "bind.control.tag",
         "meaning": "a control channel acts on the one physical unit whose tag has the same zone, function code "

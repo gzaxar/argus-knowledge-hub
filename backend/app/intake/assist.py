@@ -370,14 +370,14 @@ def assist_ticket(db: Session, workspace_id: str, actor: str, endpoint: Endpoint
                   file_refs: Optional[list] = None, trace: Optional[list] = None) -> dict:
     from app.ledger import temporal
     from app.services.llm import complete_structured
-    from app.services.ticket_types import base_attributes
+    from app.services.ticket_types import workspace_base_attributes
     started = time.monotonic()
     draft = dict(draft or {})
     clean, redactions = _clean(text)
     types = _visible_types(db, workspace_id, "tickets")
     by_name = {s.name: s for s in types}
     chosen = db.get(Schema, draft.get("schema_uid")) if draft.get("schema_uid") else None
-    base = base_attributes()
+    base = workspace_base_attributes(db, workspace_id)
     menu = {k: a for k, a in _attribute_menu(db, chosen, base).items()
             if k not in ("argus_root_cause", "argus_corrective_action", "occurred_from", "occurred_until")}
     user = ("Ticket types:\n" + (", ".join(by_name) or "(none)") + "\n\nAttributes:\n" + _describe_menu(menu)

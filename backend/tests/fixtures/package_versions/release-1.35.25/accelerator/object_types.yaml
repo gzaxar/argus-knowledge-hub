@@ -1,0 +1,995 @@
+# The object types of an accelerator facility, on the shared backbone of core-objects and it (docs/asset-schema-design.md is the reasoning).
+# One abstract root and six branches: Functional (what the machine is), Physical (the serialised boxes),
+# Catalogue (products and vendors), Control (EPIK8s), Engineering records, Location; plus IT records and
+# ports. Types under the beamline roots belong to one machine; everything else is shared by every
+# workspace (the catalogue workspace flags them global).
+#
+# Never rename a type, an attribute key or an option id here: stored records use them. A type's uid in a
+# workspace is <workspace>:argus-object:<name as a slug>.
+
+option_sets:
+  band:
+    - {id: s_band, value: S-band}
+    - {id: c_band, value: C-band}
+    - {id: x_band, value: X-band}
+  pickup_kind:
+    - {id: button, value: Button}
+    - {id: stripline, value: Stripline}
+    - {id: cavity, value: Cavity}
+    - {id: inductive, value: Inductive}
+
+object_types:
+  beamline_roots: [Functional Element, Control Item, Engineering Record]
+  types:
+    - name: "Functional Element"
+      parent: "Engineered Item"
+      description: "What the machine is made of, and where along the beam."
+      abstract: true
+      icon: tabler/hierarchy-2
+      behaviors: [functional]
+      attributes:
+        - {key: argus_beamline, name: Beamline, indexed: true}
+        - {key: zone, name: Zones, indexed: true, multi: true}
+    - name: "Facility"
+      parent: "Functional Element"
+      description: "A beamline or accelerator facility."
+      icon: tabler/building-factory-2
+      attributes:
+        - {key: beamline, name: Beamline (as configured), indexed: true}
+        - {key: namespace, name: Kubernetes namespace, indexed: true}
+        - {key: cluster, name: Cluster, indexed: true}
+        - {key: git_url, name: Repository, indexed: true}
+        - {key: git_revision, name: Revision}
+    - name: "Section"
+      parent: "Functional Element"
+      description: "Injector, linac, bunch compressor, undulator hall."
+      icon: tabler/section
+    - name: "Machine System"
+      parent: "Functional Element"
+      description: "A named system: Vacuum, RF, Magnets, Diagnostics."
+      icon: tabler/sitemap
+      attributes:
+        - {key: system_code, name: System code, indexed: true}
+        - {key: responsible_group, name: Responsible group}
+    - name: "Machine Module"
+      parent: "Functional Element"
+      description: "An assembled module, as the PBS names them."
+      icon: tabler/puzzle
+      attributes:
+        - {key: module_code, name: Module, indexed: true, unique: true}
+        - {key: module_kind, name: Module kind, type: enumeration, options: [{id: accelerating, value: Accelerating}, {id: magnetic, value: Magnetic}, {id: diagnostic, value: Diagnostic}, {id: plasma, value: Plasma}, {id: other, value: Other}]}
+        - {key: assembly_state, name: Assembly state, type: enumeration, options: [{id: designed, value: Designed}, {id: in_assembly, value: In assembly}, {id: assembled, value: Assembled}, {id: installed, value: Installed}]}
+    - name: "RF Station"
+      parent: "Functional Element"
+      description: "Modulator, amplifier, compressor, waveguide and structures that make one RF source."
+      icon: tabler/antenna-bars-5
+      attributes:
+        - {key: band, name: Band, type: enumeration, option_set: band}
+        - {key: station_number, name: Station number, type: integer}
+        - {key: frequency, name: Frequency (MHz), type: float}
+        - {key: peak_power, name: Peak power (MW), type: float}
+        - {key: pulse_length, name: Pulse length (µs), type: float}
+        - {key: repetition_rate, name: Repetition rate (Hz), type: float}
+    - name: "Beam Element"
+      parent: "Functional Element"
+      description: "Something the beam passes through or is acted on by."
+      abstract: true
+      icon: tabler/arrow-narrow-right
+      attributes:
+        - {key: lattice_name, name: Lattice name, indexed: true, unique: true, regex: '^[A-Z][A-Z0-9_]{2,15}$'}
+        - {key: s_position, name: s position (m), type: float}
+        - {key: length, name: Magnetic/effective length (m), type: float}
+        - {key: family, name: Family, indexed: true}
+        - {key: design_value, name: Design strength, type: float}
+        - {key: design_unit, name: Design strength unit, indexed: true}
+        - {key: polarity, name: Polarity, type: enumeration, options: [{id: positive, value: Positive}, {id: negative, value: Negative}, {id: bipolar, value: Bipolar}]}
+        - {key: model_name, name: Model name, indexed: true}
+        - {key: element_kind, name: Element kind, indexed: true}
+        - {key: capabilities, name: Capabilities, indexed: true, multi: true}
+        - {key: native_type, name: Native type, indexed: true}
+        - {key: native_source, name: Native source, indexed: true}
+        - {key: component_family, name: Component family, indexed: true}
+        - {key: definition, name: Definition, indexed: true}
+        - {key: aliases, name: Aliases, indexed: true, multi: true}
+        - {key: virtual, name: Virtual (no physical object), type: boolean}
+    - name: "Dipole"
+      parent: "Beam Element"
+      description: "A bending magnet."
+      icon: argus/dipole-magnet
+      attributes:
+        - {key: bend_angle, name: Bend angle (rad), type: float}
+        - {key: bend_radius, name: Bend radius (m), type: float}
+        - {key: field, name: Field (T), type: float}
+    - name: "Quadrupole"
+      parent: "Beam Element"
+      description: "A focusing magnet."
+      icon: argus/quadrupole
+      attributes:
+        - {key: gradient, name: Gradient (T/m), type: float}
+        - {key: k1, name: k1 (1/m²), type: float}
+        - {key: aperture_radius, name: Aperture radius (mm), type: float}
+    - name: "Sextupole"
+      parent: "Beam Element"
+      description: "A chromaticity-correcting magnet."
+      icon: tabler/hexagon
+      attributes:
+        - {key: k2, name: k2 (1/m³), type: float}
+    - name: "Corrector"
+      parent: "Beam Element"
+      description: "A steering magnet."
+      icon: argus/dipole-magnet
+      attributes:
+        - {key: plane, name: Plane, type: enumeration, options: [{id: h, value: H}, {id: v, value: V}, {id: combined, value: Combined}]}
+        - {key: max_kick, name: Maximum kick (mrad), type: float}
+    - name: "Solenoid"
+      parent: "Beam Element"
+      description: "A solenoid magnet."
+      icon: tabler/spiral
+      attributes:
+        - {key: field_on_axis, name: Field on axis (T), type: float}
+    - name: "Accelerating Structure"
+      parent: "Beam Element"
+      description: "A travelling- or standing-wave structure."
+      icon: tabler/wave-sine
+      attributes:
+        - {key: frequency, name: Frequency (MHz), type: float}
+        - {key: n_cells, name: Number of cells, type: integer}
+        - {key: gradient, name: Gradient (MV/m), type: float}
+        - {key: r_over_q, name: R/Q (Ω), type: float}
+        - {key: q0, name: Unloaded Q, type: float}
+    - name: "RF Gun"
+      parent: "Beam Element"
+      description: "The electron source."
+      icon: tabler/atom
+      attributes:
+        - {key: frequency, name: Frequency (MHz), type: float}
+        - {key: cathode_material, name: Cathode material, indexed: true}
+        - {key: peak_field, name: Peak field (MV/m), type: float}
+    - name: "RF Deflector"
+      parent: "Beam Element"
+      description: "A transverse deflecting cavity."
+      icon: tabler/arrow-bear-right
+    - name: "Undulator"
+      parent: "Beam Element"
+      description: "A periodic magnet array producing radiation."
+      icon: tabler/wave-square
+      attributes:
+        - {key: period, name: Period (mm), type: float}
+        - {key: n_periods, name: Number of periods, type: integer}
+        - {key: k_value, name: K value, type: float}
+        - {key: gap_min, name: Minimum gap (mm), type: float}
+        - {key: gap_max, name: Maximum gap (mm), type: float}
+    - name: "Plasma Module"
+      parent: "Beam Element"
+      description: "A plasma-accelerator stage."
+      icon: tabler/atom-2
+      attributes:
+        - {key: capillary_length, name: Capillary length (mm), type: float}
+        - {key: capillary_diameter, name: Capillary diameter (mm), type: float}
+        - {key: gas, name: Gas, indexed: true}
+        - {key: discharge_voltage, name: Discharge voltage (kV), type: float}
+        - {key: plasma_density, name: Plasma density (cm⁻³), type: float}
+    - name: "Collimator"
+      parent: "Beam Element"
+      description: "An aperture limiting the beam."
+      icon: tabler/focus-centered
+      attributes:
+        - {key: aperture_min, name: Aperture minimum (mm), type: float}
+        - {key: aperture_max, name: Aperture maximum (mm), type: float}
+        - {key: material, name: Material, indexed: true}
+    - name: "Beam Stopper"
+      parent: "Beam Element"
+      description: "Blocks the beam."
+      icon: tabler/hand-stop
+      attributes:
+        - {key: aperture_min, name: Aperture minimum (mm), type: float}
+        - {key: aperture_max, name: Aperture maximum (mm), type: float}
+        - {key: material, name: Material, indexed: true}
+    - name: "Mirror"
+      parent: "Beam Element"
+      description: "A mirror steering a laser beam, on a mount that motors tilt."
+      icon: tabler/flip-horizontal
+      attributes:
+        - {key: mirror_kind, name: Mirror kind, type: enumeration, options: [{id: flat, value: Flat}, {id: parabolic, value: Parabolic}, {id: other, value: Other}]}
+        - {key: beam, name: Laser line, indexed: true}
+        - {key: coating, name: Coating, indexed: true}
+        - {key: diameter_mm, name: Diameter (mm), type: float}
+        - {key: substrate, name: Substrate, indexed: true}
+    - name: "Vacuum Sector"
+      parent: "Beam Element"
+      description: "What a valve isolates."
+      icon: tabler/brackets-contain
+      attributes:
+        - {key: nominal_pressure, name: Nominal pressure (mbar), type: float}
+        - {key: length, name: Length (m), type: float}
+        - {key: isolated_by, name: Isolated by, type: reference, multi: true, reference: Vacuum Valve}
+    - name: "Diagnostic Element"
+      parent: "Beam Element"
+      description: "Measures the beam."
+      abstract: true
+      icon: tabler/chart-line
+      attributes:
+        - {key: measures, name: Measures, type: enumeration, options: [{id: position, value: Position}, {id: charge, value: Charge}, {id: profile, value: Profile}, {id: emittance, value: Emittance}, {id: energy, value: Energy}, {id: arrival_time, value: Arrival time}, {id: bunch_length, value: Bunch length}, {id: loss, value: Loss}]}
+        - {key: is_invasive, name: Stops the beam, type: boolean}
+        - {key: resolution, name: Resolution, type: float}
+        - {key: resolution_unit, name: Resolution unit, indexed: true}
+        - {key: acquisition_rate, name: Acquisition rate (Hz), type: float}
+        - {key: calibration_due, name: Calibration due, type: date}
+    - name: "Screen Station"
+      parent: "Diagnostic Element"
+      description: "A screen, camera, actuator and optics composed into one profile monitor."
+      icon: tabler/aperture
+      attributes:
+        - {key: screen_type, name: Screen type, type: enumeration, options: [{id: yag_ce, value: 'YAG:Ce'}, {id: lyso, value: LYSO}, {id: otr, value: OTR}, {id: chromox, value: Chromox}, {id: scintillating_fibre, value: Scintillating fibre}]}
+        - {key: calibration_um_per_px, name: Calibration (µm/px), type: float}
+        - {key: insertion_positions, name: Insertion positions, indexed: true, multi: true}
+        - {key: viewing_angle_deg, name: Viewing angle (°), type: float}
+        - {key: field_of_view_mm, name: Field of view (mm), type: float}
+    - name: "Beam Position Monitor"
+      parent: "Diagnostic Element"
+      description: "Measures the beam's transverse position."
+      icon: tabler/crosshair
+      attributes:
+        - {key: pickup_kind, name: Pickup, type: enumeration, option_set: pickup_kind}
+        - {key: n_electrodes, name: Number of electrodes, type: integer}
+        - {key: bandwidth, name: Bandwidth (MHz), type: float}
+    - name: "Beam Charge Monitor"
+      parent: "Diagnostic Element"
+      description: "Measures the bunch charge."
+      icon: tabler/chart-donut
+      attributes:
+        - {key: monitor_kind, name: Monitor kind, type: enumeration, options: [{id: integrating_current_transformer, value: Integrating current transformer}, {id: wall_current, value: Wall current}, {id: faraday_cup, value: Faraday cup}]}
+        - {key: charge_range_pc, name: Charge range (pC), type: float}
+    - name: "Faraday Cup"
+      parent: "Diagnostic Element"
+      description: "Stops the beam and reads its charge."
+      icon: tabler/cup
+      attributes:
+        - {key: material, name: Material, indexed: true}
+        - {key: is_retractable, name: Retractable, type: boolean}
+    - name: "Wire Scanner"
+      parent: "Diagnostic Element"
+      description: "Profiles the beam with a moving wire."
+      icon: tabler/scan
+      attributes:
+        - {key: wire_material, name: Wire material, indexed: true}
+        - {key: wire_diameter, name: Wire diameter (µm), type: float}
+        - {key: n_planes, name: Number of planes, type: integer}
+    - name: "Emittance Meter"
+      parent: "Diagnostic Element"
+      description: "Measures emittance; composed of screens and actuators."
+      icon: tabler/chart-scatter
+      attributes:
+        - {key: method, name: Method, type: enumeration, options: [{id: pepper_pot, value: Pepper-pot}, {id: quadrupole_scan, value: Quadrupole scan}, {id: multi_screen, value: Multi-screen}, {id: slit_scan, value: Slit-scan}]}
+        - {key: mask_pitch, name: Mask pitch (µm), type: float}
+    - name: "Spectrometer Station"
+      parent: "Diagnostic Element"
+      description: "Measures the beam's energy spectrum."
+      icon: tabler/prism
+      attributes:
+        - {key: dispersion, name: Dispersion (m), type: float}
+        - {key: energy_range_min, name: Energy range minimum (MeV), type: float}
+        - {key: energy_range_max, name: Energy range maximum (MeV), type: float}
+    - name: "Beam Loss Monitor"
+      parent: "Diagnostic Element"
+      description: "Detects lost particles."
+      icon: tabler/alert-triangle
+      attributes:
+        - {key: detector_kind, name: Detector, type: enumeration, options: [{id: ion_chamber, value: Ion chamber}, {id: scintillator, value: Scintillator}, {id: cherenkov, value: Cherenkov}, {id: pin_diode, value: PIN diode}]}
+        - {key: alarm_threshold, name: Alarm threshold, type: float}
+    - name: "Beam Arrival Monitor"
+      parent: "Diagnostic Element"
+      description: "Measures arrival time."
+      icon: tabler/clock
+      attributes:
+        - {key: time_resolution_fs, name: Time resolution (fs), type: float}
+        - {key: pickup_kind, name: Pickup, type: enumeration, option_set: pickup_kind}
+    - name: "Bunch Length Monitor"
+      parent: "Diagnostic Element"
+      description: "Measures the bunch length."
+      icon: tabler/ruler-measure
+      attributes:
+        - {key: method, name: Method, type: enumeration, options: [{id: electro_optic_sampling, value: Electro-optic sampling}, {id: streak_camera, value: Streak camera}, {id: ctr, value: CTR}, {id: cdr, value: CDR}, {id: rf_deflector, value: RF deflector}]}
+        - {key: time_range_ps, name: Time range (ps), type: float}
+    - name: "Generic Monitor"
+      parent: "Diagnostic Element"
+      description: "A diagnostic location a model names without saying what kind: a particle monitor, a photodiode, a camera on a laser line."
+      icon: tabler/device-analytics
+    - name: "Drift"
+      parent: "Beam Element"
+      description: "A field-free length between elements."
+      icon: tabler/line-dashed
+    - name: "Kicker"
+      parent: "Beam Element"
+      description: "A fast pulsed magnet for injection or extraction."
+      icon: tabler/arrow-bear-right
+      attributes:
+        - {key: plane, name: Plane, type: enumeration, options: [{id: h, value: H}, {id: v, value: V}]}
+        - {key: max_kick, name: Maximum kick (mrad), type: float}
+    - name: "Septum"
+      parent: "Beam Element"
+      description: "Separates two beam paths: where a line branches off or joins."
+      icon: tabler/arrows-join
+      attributes:
+        - {key: septum_kind, name: Septum kind, type: enumeration, options: [{id: magnetic, value: Magnetic}, {id: electrostatic, value: Electrostatic}, {id: lambertson, value: Lambertson}]}
+    - name: "RF Cavity"
+      parent: "Beam Element"
+      description: "A cavity giving the beam energy or bunching it, in a ring or a linac."
+      icon: tabler/wave-sine
+      attributes:
+        - {key: frequency, name: Frequency (MHz), type: float}
+        - {key: harmonic, name: Harmonic number, type: integer}
+    - name: "Beam Source"
+      parent: "Beam Element"
+      description: "Where a beam starts: an electron gun, an ion source, a laser oscillator."
+      icon: tabler/flare
+    - name: "Beam Dump"
+      parent: "Beam Element"
+      description: "Where a beam ends: absorbed for good."
+      icon: tabler/cylinder
+      attributes:
+        - {key: material, name: Material, indexed: true}
+    - name: "Lens"
+      parent: "Beam Element"
+      description: "Focuses a photon beam."
+      icon: tabler/focus-centered
+      attributes:
+        - {key: focal_length, name: Focal length (m), type: float}
+    - name: "Beam Splitter"
+      parent: "Beam Element"
+      description: "Divides a photon beam between two paths."
+      icon: tabler/prism
+      attributes:
+        - {key: split_ratio, name: Split ratio, type: float}
+    - name: "Generic Beam Element"
+      parent: "Beam Element"
+      description: "An element a model has and this catalogue has no kind for; its native type says what it is."
+      icon: tabler/box
+    - name: "Vacuum Element"
+      parent: "Beam Element"
+      description: "A vacuum component in the beam path: beam pipe, chamber, bellows, flange, transition, valve, window, pumping or gauge port. Its kind is the element kind."
+    - name: "Material Element"
+      parent: "Beam Element"
+      description: "Material the beam meets: a foil, window, wire, target, converter, gas target or crystal."
+      attributes:
+        - {key: material, name: Material, indexed: true}
+        - {key: thickness, name: Thickness (m), type: float}
+    - name: "Optical Element"
+      parent: "Beam Element"
+      description: "An optical component of a photon line other than a mirror, lens or beam splitter: polariser, waveplate, grating, prism, iris, filter, amplifier."
+    - name: "Support Element"
+      parent: "Beam Element"
+      description: "A girder, support, mover, stage, fiducial or alignment reference: it carries or locates beamline components, without necessarily being in the beam."
+    - name: "Beam System"
+      parent: "Functional Element"
+      description: "A system that produces or transports a beam: a storage ring, an accumulator, a linac, a transfer line, a laser transport, an FEL line."
+      aliases: [beam system, accelerator, beamline system]
+      icon: tabler/atom
+      attributes:
+        - {key: system_kind, name: System kind, type: enumeration, options: [{id: storage_ring, value: Storage ring}, {id: synchrotron, value: Synchrotron}, {id: accumulator, value: Accumulator}, {id: linac, value: Linac}, {id: transfer_line, value: Transfer line}, {id: laser_transport, value: Laser transport}, {id: fel_line, value: FEL line}, {id: other, value: Other}]}
+        - {key: model_id, name: Model id, indexed: true}
+        - {key: model_name, name: Model name}
+        - {key: model_source, name: Model source, indexed: true}
+        - {key: model_version, name: Model version}
+        - {key: model_git_commit, name: Model git commit}
+        - {key: model_simulator, name: Model simulator, indexed: true}
+    - name: "Beam"
+      parent: "Functional Element"
+      description: "What a beam system carries: the reference beam, separately from the topology it travels."
+      abstract: true
+      icon: tabler/atom-2
+      attributes:
+        - {key: model_id, name: Model id, indexed: true}
+    - name: "Particle Beam"
+      parent: "Beam"
+      description: "A beam of charged (or neutral) particles."
+      attributes:
+        - {key: species, name: Species, indexed: true}
+        - {key: charge, name: Charge (e), type: float}
+        - {key: reference_energy, name: Reference energy (GeV), type: float}
+        - {key: reference_momentum, name: Reference momentum (GeV/c), type: float}
+        - {key: rest_mass, name: Rest mass (MeV/c²), type: float}
+    - name: "Photon Beam"
+      parent: "Beam"
+      description: "A photon beam: a laser, or radiation transported to an experiment."
+      icon: tabler/sun
+      attributes:
+        - {key: wavelength, name: Wavelength (nm), type: float}
+        - {key: frequency, name: Frequency (THz), type: float}
+        - {key: pulse_duration, name: Pulse duration (fs), type: float}
+        - {key: repetition_rate, name: Repetition rate (Hz), type: float}
+        - {key: polarization, name: Polarization, indexed: true}
+    - name: "Beam Path"
+      parent: "Functional Element"
+      description: "The route a beam takes: open (a linac, a transfer line, a laser line) or closed (a ring). Its elements are joined by `upstream of`, its branches by `branches to`, and a closed path's last element by `closes to` its first; `s` is a coordinate along it, not its topology."
+      icon: tabler/route
+      attributes:
+        - {key: topology, name: Topology, type: enumeration, options: [{id: open, value: open}, {id: closed, value: closed}]}
+        - {key: length, name: Length or circumference (m), type: float}
+        - {key: direction, name: Direction, type: enumeration, options: [{id: forward, value: forward}, {id: backward, value: backward}]}
+        - {key: model_id, name: Model id, indexed: true}
+        - {key: sequence, name: Placement order, multi: true}
+    - name: "Power Supply"
+      parent: "Asset"
+      description: "Powers a magnet or another load."
+      icon: tabler/bolt
+      attributes:
+        - {key: n_channels, name: Number of channels, type: integer}
+        - {key: current_max, name: Maximum current (A), type: float}
+        - {key: voltage_max, name: Maximum voltage (V), type: float}
+        - {key: bipolar, name: Bipolar, type: boolean}
+        - {key: interface, name: Interface, type: enumeration, options: [{id: modbus_tcp, value: Modbus TCP}, {id: serial, value: Serial}, {id: ethernet, value: Ethernet}, {id: gpib, value: GPIB}, {id: can, value: CAN}]}
+        - {key: ramp_rate, name: Ramp rate (A/s), type: float}
+    - name: "Magnet Assembly"
+      parent: "Asset"
+      description: "The magnet itself, as a physical unit."
+      icon: argus/dipole-magnet
+      attributes:
+        - {key: coil_resistance, name: Coil resistance (Ω), type: float}
+        - {key: cooling, name: Cooling, type: enumeration, options: [{id: air, value: Air}, {id: water, value: Water}, {id: cryogenic, value: Cryogenic}]}
+        - {key: weight, name: Weight (kg), type: float}
+    - name: "RF Amplifier"
+      parent: "Asset"
+      description: "Klystron or solid-state amplifier."
+      icon: tabler/antenna
+    - name: "Klystron"
+      parent: "RF Amplifier"
+      description: "A klystron: the vacuum-tube amplifier itself, beam in, RF out."
+      attributes:
+        - {key: frequency_mhz, name: Frequency (MHz), type: float}
+        - {key: peak_power_mw, name: Peak power (MW), type: float}
+        - {key: beam_voltage_kv, name: Beam voltage (kV), type: float}
+        - {key: n_cavities, name: Number of cavities, type: integer}
+    - name: "Collector"
+      parent: "Asset"
+      description: "A klystron's collector: the sub-component housed inside it that absorbs the spent electron beam once it has given up its energy to the RF cavities."
+      aliases: [beam collector, electron collector]
+      attributes:
+        - {key: cooling, name: Cooling, type: enumeration, options: [{id: air, value: Air}, {id: water, value: Water}]}
+        - {key: dissipation_max_kw, name: Maximum dissipation (kW), type: float}
+        - {key: is_depressed, name: Depressed (multi-stage), type: boolean}
+    - name: "Modulator"
+      parent: "Asset"
+      description: "Pulsed power for a klystron."
+      icon: tabler/wave-saw-tool
+    - name: "Low-Level RF Unit"
+      parent: "Asset"
+      description: "Regulates RF phase and amplitude."
+      icon: tabler/cpu
+    - name: "Waveguide Component"
+      parent: "Asset"
+      description: "A part of the RF waveguide network."
+      abstract: true
+      icon: tabler/arrows-right-left
+      attributes:
+        - {key: band, name: Band, type: enumeration, option_set: band}
+        - {key: waveguide_size, name: Waveguide size, indexed: true}
+        - {key: flange_type, name: Flange type}
+        - {key: peak_power_rating, name: Peak power rating (MW), type: float}
+        - {key: average_power_rating, name: Average power rating (kW), type: float}
+        - {key: is_pressurised, name: Pressurised, type: boolean}
+        - {key: gas, name: Gas, indexed: true}
+    - name: "Waveguide Section"
+      parent: "Waveguide Component"
+      description: "A straight or bent length of waveguide."
+      attributes:
+        - {key: length_mm, name: Length (mm), type: float}
+        - {key: bend_angle_deg, name: Bend angle (°), type: float}
+        - {key: is_flexible, name: Flexible, type: boolean}
+    - name: "RF Load"
+      parent: "Waveguide Component"
+      description: "Absorbs RF power."
+      attributes:
+        - {key: load_kind, name: Load kind, type: enumeration, options: [{id: water, value: Water}, {id: dry, value: Dry}, {id: ceramic, value: Ceramic}]}
+        - {key: vswr_max, name: Maximum VSWR, type: float}
+    - name: "RF Window"
+      parent: "Waveguide Component"
+      description: "A vacuum-tight RF window."
+      attributes:
+        - {key: window_material, name: Window material, type: enumeration, options: [{id: ceramic, value: Ceramic}, {id: sapphire, value: Sapphire}]}
+        - {key: is_vacuum_barrier, name: Vacuum barrier, type: boolean}
+    - name: "Directional Coupler"
+      parent: "Waveguide Component"
+      description: "Samples forward and reflected power."
+      attributes:
+        - {key: coupling_db, name: Coupling (dB), type: float}
+        - {key: directivity_db, name: Directivity (dB), type: float}
+        - {key: is_bidirectional, name: Bidirectional, type: boolean}
+    - name: "RF Isolator"
+      parent: "Waveguide Component"
+      description: "Protects the source from reflections."
+      attributes:
+        - {key: isolation_db, name: Isolation (dB), type: float}
+        - {key: insertion_loss_db, name: Insertion loss (dB), type: float}
+    - name: "Circulator"
+      parent: "Waveguide Component"
+      description: "A ferrite device that routes RF power from one port to the next in turn, rather than back where it came from."
+      attributes:
+        - {key: n_ports, name: Number of ports, type: integer}
+        - {key: isolation_db, name: Isolation (dB), type: float}
+        - {key: insertion_loss_db, name: Insertion loss (dB), type: float}
+    - name: "RF Hybrid"
+      parent: "Waveguide Component"
+      description: "Splits or combines RF power."
+      attributes:
+        - {key: hybrid_kind, name: Hybrid kind, type: enumeration, options: [{id: 3_db, value: 3 dB}, {id: magic_t, value: Magic-T}]}
+        - {key: phase_balance_deg, name: Phase balance (°), type: float}
+    - name: "RF Pulse Compressor"
+      parent: "Waveguide Component"
+      description: "Trades pulse length for peak power."
+      attributes:
+        - {key: compressor_kind, name: Compressor kind, type: enumeration, options: [{id: sled, value: SLED}, {id: boc, value: BOC}, {id: barrel, value: Barrel}]}
+        - {key: gain_factor, name: Gain factor, type: float}
+        - {key: q0, name: Unloaded Q, type: float}
+    - name: "RF Attenuator"
+      parent: "Waveguide Component"
+      description: "Reduces RF power."
+      attributes:
+        - {key: attenuation_db, name: Attenuation (dB), type: float}
+        - {key: is_variable, name: Variable, type: boolean}
+    - name: "RF Phase Shifter"
+      parent: "Waveguide Component"
+      description: "Adjusts RF phase."
+      attributes:
+        - {key: phase_range_deg, name: Phase range (°), type: float}
+        - {key: is_motorised, name: Motorised, type: boolean}
+    - name: "RF Mode Converter"
+      parent: "Waveguide Component"
+      description: "Converts between waveguide modes."
+      attributes:
+        - {key: mode_in, name: Mode in}
+        - {key: mode_out, name: Mode out}
+    - name: "Vacuum Pump"
+      parent: "Asset"
+      description: "Any vacuum pump."
+      abstract: true
+      icon: tabler/propeller
+    - name: "Ion Pump"
+      parent: "Vacuum Pump"
+      description: "A sputter-ion pump: the thing that trips when the pressure rises."
+      attributes:
+        - {key: pumping_speed, name: Pumping speed (l/s), type: float}
+        - {key: nominal_voltage, name: Nominal voltage (V), type: integer}
+        - {key: element_count, name: Number of elements, type: integer}
+    - name: "Turbo Pump"
+      parent: "Vacuum Pump"
+      description: "A turbomolecular pump."
+      attributes:
+        - {key: pumping_speed, name: Pumping speed (l/s), type: float}
+        - {key: rotation_speed, name: Rotation speed (Hz), type: float}
+        - {key: backing_pump, name: Backed by, type: reference, reference: Primary Pump}
+    - name: "Primary Pump"
+      parent: "Vacuum Pump"
+      description: "A roughing or backing pump."
+    - name: "NEG Cartridge"
+      parent: "Vacuum Pump"
+      description: "A non-evaporable getter pump."
+    - name: "Vacuum Gauge"
+      parent: "Asset"
+      description: "Measures pressure."
+      icon: tabler/gauge
+      attributes:
+        - {key: gauge_kind, name: Gauge kind, type: enumeration, options: [{id: pirani, value: Pirani}, {id: penning, value: Penning}, {id: cold_cathode, value: Cold cathode}, {id: capacitive, value: Capacitive}]}
+        - {key: range_min, name: Range minimum (mbar), type: float}
+        - {key: range_max, name: Range maximum (mbar), type: float}
+    - name: "Vacuum Valve"
+      parent: "Asset"
+      description: "Isolates a vacuum sector."
+      icon: argus/vacuum-valve
+      attributes:
+        - {key: valve_kind, name: Valve kind, type: enumeration, options: [{id: gate, value: Gate}, {id: angle, value: Angle}, {id: all_metal, value: All-metal}]}
+        - {key: actuation, name: Actuation, type: enumeration, options: [{id: manual, value: Manual}, {id: pneumatic, value: Pneumatic}, {id: electric, value: Electric}]}
+        - {key: interlocked, name: Interlocked, type: boolean}
+    - name: "Vacuum Chamber"
+      parent: "Asset"
+      description: "What you unbolt."
+      icon: tabler/cylinder
+    - name: "Vacuum Controller"
+      parent: "Asset"
+      description: "The box between a control line and the vacuum equipment it runs: an ion pump controller, a turbo controller, a gauge controller. It powers and reads what is connected to it, so when it stops, all of that does."
+      aliases: [ion pump controller, turbo pump controller, ipcmini]
+      icon: tabler/settings-automation
+      attributes:
+        - {key: n_channels, name: Channels, type: integer}
+        - {key: firmware_version, name: Firmware}
+    - name: "Vacuum Component"
+      parent: "Asset"
+      description: "A passive part of the vacuum line: a length of pipe, a bellows, a cross or a tee. Gauges, pumps and valves are mounted on it; a Vacuum Sector says which ones a valve isolates."
+      aliases: [pipe, vacuum pipe, beam pipe, vacuum tube, bellows, cross, tee, elbow, nipple, spool, vacuum line]
+      icon: argus/vacuum-cross
+      attributes:
+        - {key: component_kind, name: Kind, type: enumeration, options: [{id: pipe, value: Pipe}, {id: bellows, value: Bellows}, {id: cross, value: Cross}, {id: tee, value: Tee}, {id: elbow, value: Elbow}, {id: nipple, value: Nipple}, {id: reducer, value: Reducer}, {id: adapter, value: Adapter}, {id: viewport, value: Viewport}, {id: feedthrough, value: Feedthrough}, {id: other, value: Other}]}
+        - {key: length_mm, name: Length (mm), type: float}
+        - {key: inner_diameter_mm, name: Inner diameter (mm), type: float}
+        - {key: flange_type, name: Flange type, type: enumeration, options: [{id: cf, value: CF}, {id: kf, value: KF}, {id: iso_k, value: ISO-K}, {id: iso_f, value: ISO-F}, {id: vcr, value: VCR}, {id: other, value: Other}]}
+        - {key: flange_size, name: Flange size}
+        - {key: material, name: Material}
+        - {key: bakeable, name: Bakeable, type: boolean}
+        - {key: bake_temperature_c, name: Bake-out temperature (°C), type: float}
+    - name: "Motion Controller"
+      parent: "Asset"
+      description: "Drives one or more motor axes."
+      icon: tabler/adjustments-horizontal
+      attributes:
+        - {key: n_axes, name: Number of axes, type: integer}
+        - {key: protocol, name: Protocol}
+        - {key: firmware_version, name: Firmware version}
+    - name: "Motor Axis"
+      parent: "Asset"
+      description: "One motorised axis."
+      icon: tabler/engine
+      attributes:
+        - {key: axis_id, name: Axis id}
+        - {key: travel_min, name: Travel minimum (mm), type: float}
+        - {key: travel_max, name: Travel maximum (mm), type: float}
+        - {key: resolution, name: Resolution (mm/step), type: float}
+        - {key: velocity_max, name: Maximum velocity (mm/s), type: float}
+        - {key: has_home_switch, name: Home switch, type: boolean}
+    - name: "Actuator"
+      parent: "Asset"
+      description: "Puts something in and out of the beam."
+      icon: tabler/arrows-move-horizontal
+      attributes:
+        - {key: actuator_kind, name: Actuator kind, type: enumeration, options: [{id: pneumatic, value: Pneumatic}, {id: solenoid, value: Solenoid}, {id: stepper, value: Stepper}, {id: piezo, value: Piezo}, {id: manual, value: Manual}]}
+        - {key: n_positions, name: Number of positions, type: integer}
+        - {key: position_labels, name: Position labels, indexed: true, multi: true}
+        - {key: stroke_mm, name: Stroke (mm), type: float}
+        - {key: has_position_switch, name: Position switch, type: boolean}
+        - {key: fail_safe_position, name: Fail-safe position, indexed: true}
+    - name: "Camera"
+      parent: "Asset"
+      description: "A camera."
+      icon: tabler/camera
+      attributes:
+        - {key: sensor, name: Sensor}
+        - {key: resolution_x, name: Resolution X (px), type: integer}
+        - {key: resolution_y, name: Resolution Y (px), type: integer}
+        - {key: pixel_size, name: Pixel size (µm), type: float}
+        - {key: interface, name: Interface, type: enumeration, options: [{id: gige, value: GigE}, {id: usb3, value: USB3}, {id: cameralink, value: CameraLink}, {id: coaxpress, value: CoaXPress}]}
+        - {key: lens, name: Lens}
+        - {key: px_calibration, name: Calibration (µm/px), type: float}
+    - name: "Optical Assembly"
+      parent: "Asset"
+      description: "The optics between a screen and its camera."
+      icon: tabler/eye
+      attributes:
+        - {key: focal_length_mm, name: Focal length (mm), type: float}
+        - {key: magnification, name: Magnification, type: float}
+        - {key: aperture_f, name: Aperture (f-number), type: float}
+        - {key: filters, name: Filters, indexed: true, multi: true}
+        - {key: mirror_count, name: Number of mirrors, type: integer}
+        - {key: working_distance_mm, name: Working distance (mm), type: float}
+    - name: "Scintillator Screen"
+      parent: "Asset"
+      description: "The screen the beam strikes."
+      icon: tabler/sun
+      attributes:
+        - {key: screen_material, name: Screen material, type: enumeration, options: [{id: yag_ce, value: 'YAG:Ce'}, {id: lyso, value: LYSO}, {id: otr_foil, value: OTR foil}, {id: chromox, value: Chromox}, {id: alumina, value: Alumina}]}
+        - {key: thickness_um, name: Thickness (µm), type: float}
+        - {key: diameter_mm, name: Diameter (mm), type: float}
+        - {key: mount_angle_deg, name: Mount angle (°), type: float}
+        - {key: has_calibration_target, name: Calibration target, type: boolean}
+        - {key: radiation_dose_budget, name: Radiation dose budget, type: float}
+    - name: "Digitizer"
+      parent: "Asset"
+      description: "Samples an analogue signal."
+      icon: tabler/device-analytics
+    - name: "I/O Module"
+      parent: "Asset"
+      description: "Analogue or digital input and output."
+      icon: tabler/plug
+    - name: "PLC"
+      parent: "Asset"
+      description: "A programmable logic controller."
+      icon: tabler/cpu-2
+    - name: "Timing Module"
+      parent: "Asset"
+      description: "Event generator, receiver or delay generator."
+      icon: tabler/clock
+    - name: "Electronics Crate"
+      parent: "Asset"
+      description: "A crate holding electronics boards."
+      icon: tabler/server-2
+    - name: "Electronics Board"
+      parent: "Asset"
+      description: "A board in a crate."
+      icon: tabler/cpu
+    - name: "Cryogenic Device"
+      parent: "Asset"
+      description: "A cryostat, cold head or transfer line."
+      icon: tabler/temperature-minus
+    - name: "Interlock Unit"
+      parent: "Asset"
+      description: "A safety or machine-protection interlock."
+      icon: tabler/lock
+      attributes:
+        - {key: interlock_kind, name: Interlock kind, type: enumeration, options: [{id: pss, value: PSS}, {id: mps, value: MPS}, {id: vacuum, value: Vacuum}, {id: thermal, value: Thermal}]}
+        - {key: sil_level, name: SIL level}
+        - {key: test_interval_months, name: Test interval (months), type: integer}
+    - name: "Radiation Monitor"
+      parent: "Asset"
+      description: "Measures radiation."
+      icon: tabler/radioactive
+      attributes:
+        - {key: detector_kind, name: Detector kind}
+        - {key: alarm_threshold, name: Alarm threshold, type: float}
+        - {key: calibration_due, name: Calibration due, type: date}
+    - name: "Laser System"
+      parent: "Asset"
+      description: "A laser and its delivery."
+      icon: tabler/flare
+    - name: "Observable"
+      parent: "Catalog Item"
+      description: "A physical quantity a model predicts and a diagnostic measures: beam.position.x, beam.intensity, optical.power. The meaning, not a value: live values stay in the control system."
+      icon: tabler/eye
+      attributes:
+        - {key: quantity, name: Quantity, indexed: true, unique: true, regex: '^[a-z]+(\.[a-z_]+)+$'}
+        - {key: unit, name: Unit, indexed: true}
+        - {key: domain, name: Domain, type: enumeration, options: [{id: particle, value: particle}, {id: optical, value: optical}, {id: any, value: any}]}
+        - {key: plane, name: Plane, type: enumeration, options: [{id: x, value: x}, {id: y, value: y}, {id: z, value: z}, {id: none, value: none}]}
+    - name: "Control Item"
+      parent: "Item"
+      description: "The control configuration, as objects."
+      abstract: true
+      icon: tabler/adjustments
+      behaviors: [control]
+      attributes:
+        - {key: beamline, name: Beamline, indexed: true}
+        - {key: inventory_url, name: Inventory link}
+    - name: "Control Configuration"
+      parent: "Control Item"
+      description: "One values.yaml at one git revision."
+      icon: tabler/file-settings
+      attributes:
+        - {key: git_url, name: Repository, indexed: true}
+        - {key: git_revision, name: Revision}
+        - {key: config_path, name: Path in repository}
+        - {key: namespace, name: Kubernetes namespace, indexed: true}
+        - {key: cluster, name: Cluster, indexed: true}
+        - {key: argocd_project, name: ArgoCD project}
+        - {key: epics_address_list, name: EPICS address list}
+        - {key: max_array_bytes, name: Max array bytes, type: integer}
+        - {key: base_ip, name: Address range}
+        - {key: ingress_class, name: Ingress class}
+        - {key: imported_at, name: Read at, type: datetime, readonly: true}
+    - name: "IOC Template"
+      parent: "Control Item"
+      description: "An iocDefaults entry: the recipe an IOC is deployed from."
+      icon: tabler/template
+      attributes:
+        - {key: template_name, name: Template, indexed: true, unique: true}
+        - {key: chart_url, name: Chart}
+        - {key: image, name: Image}
+        - {key: devgroup, name: Device group, indexed: true}
+        - {key: devtype, name: Device type, indexed: true}
+        - {key: devfunc, name: Device function, indexed: true}
+        - {key: opi, name: OPI}
+        - {key: autosync, name: Auto-sync, type: boolean}
+        - {key: pva, name: PVAccess, type: boolean}
+        - {key: product_model, name: Instance of, type: reference, reference: Product Model}
+    - name: "IOC"
+      parent: "Control Item"
+      description: "An EPICS IOC: the deployable unit of control software."
+      icon: tabler/terminal-2
+      attributes:
+        - {key: iocprefix, name: IOC prefix, indexed: true}
+        - {key: iocroot, name: IOC root}
+        - {key: pv_prefix, name: PV prefix, indexed: true}
+        - {key: template, name: Template, indexed: true}
+        - {key: devtype, name: Device type, indexed: true}
+        - {key: system, name: System (devgroup), indexed: true}
+        - {key: zones, name: Zones, indexed: true, multi: true}
+        - {key: address, name: Address, indexed: true}
+        - {key: port, name: Port}
+        - {key: chart_url, name: Chart}
+        - {key: image, name: Image}
+        - {key: host, name: Host, indexed: true}
+        - {key: opi, name: OPI}
+        - {key: autosync, name: Auto-sync, type: boolean}
+        - {key: pva, name: PVAccess, type: boolean}
+        - {key: networks, name: Networks, indexed: true, multi: true}
+        - {key: ioc_init, name: IOC init, type: text}
+        - {key: ssh_nodeport, name: SSH node port}
+        - {key: permit_conditions, name: Permit conditions, multi: true}
+    - name: "Control Device"
+      parent: "Control Item"
+      description: "A channel, axis, gauge or supply an IOC drives — what fails."
+      icon: tabler/toggle-left
+      attributes:
+        - {key: pv, name: PV, indexed: true}
+        - {key: pv_prefix, name: PV prefix, indexed: true}
+        - {key: ioc, name: IOC, indexed: true}
+        - {key: system, name: System (devgroup), indexed: true}
+        - {key: function, name: Function (devfunc), indexed: true}
+        - {key: devtype, name: Device type, indexed: true}
+        - {key: device_class, name: Device class, indexed: true}
+        - {key: element, name: Element it serves, indexed: true}
+        - {key: vendor, name: Vendor (as found), indexed: true}
+        - {key: model_code, name: Model (as found), indexed: true}
+        - {key: zones, name: Zones, indexed: true, multi: true}
+        - {key: channel, name: Channel, type: integer}
+        - {key: axis, name: Axis, type: integer}
+        - {key: address, name: Address, indexed: true}
+        - {key: port, name: Port}
+        - {key: interlock, name: Interlocked, type: boolean}
+        - {key: geo, name: Geographic index, type: integer}
+        - {key: enable_pv, name: Enable PV}
+        - {key: settings, name: Settings and limits, type: text}
+    - name: "Access Point"
+      parent: "Control Item"
+      description: "What control software reaches hardware through: a terminal server, a converter, or the hardware's own network socket."
+      icon: tabler/access-point
+      attributes:
+        - {key: address, name: Address, indexed: true}
+        - {key: ip, name: IP address, indexed: true}
+        - {key: hostname, name: Hostname, indexed: true}
+        - {key: fqdn, name: FQDN}
+        - {key: argus_provenance, name: Provenance, type: text, readonly: true}
+        - {key: port_count, name: Number of ports, type: integer}
+        - {key: network, name: Network, indexed: true}
+        - {key: endpoint_kind, name: Endpoint kind, type: enumeration, options: [{id: serial_converter, value: Serial converter}, {id: host, value: Host}, {id: instrument, value: Instrument}, {id: camera, value: Camera}, {id: unknown, value: Unknown}]}
+        - {key: endpoint_kind_source, name: How the kind was read}
+    - name: "Serial Line"
+      parent: "Control Item"
+      description: "One serial port of a converter and the devices on it: the cable whose failure takes those devices and no others."
+      icon: tabler/line-dashed
+      attributes:
+        - {key: tcp_port, name: TCP port, type: integer, indexed: true}
+        - {key: serial_port, name: Serial port, type: integer}
+        - {key: line_kind, name: Line kind, type: enumeration, options: [{id: single_device, value: Single device}, {id: multi_channel_controller, value: Multi-channel controller}, {id: multi_axis_controller, value: Multi-axis controller}, {id: multi_drop_bus, value: Multi-drop bus}]}
+        - {key: serial_mode, name: Serial mode}
+        - {key: baud, name: Baud rate, type: integer}
+        - {key: framing, name: Framing}
+    - name: "Communication Path"
+      parent: "Control Item"
+      description: "From one IOC to one endpoint: the protocol and transport the control software speaks."
+      icon: tabler/route
+      attributes:
+        - {key: protocol, name: Protocol, indexed: true}
+        - {key: transport, name: Transport}
+        - {key: tcp_port, name: TCP port, type: integer}
+    - name: "Bus Segment"
+      parent: "Control Item"
+      description: "The medium behind an endpoint: a serial line, a bus or a cable, with its line parameters. It is attached to a port of the unit installed at the position."
+      icon: tabler/arrows-join
+      behaviors: [bus_segment]
+      attributes:
+        - {key: medium, name: Medium, indexed: true}
+        - {key: baud, name: Baud rate, type: integer}
+        - {key: framing, name: Framing}
+        - {key: serial_mode, name: Serial mode}
+        - {key: safety_class, name: Safety class, type: enumeration, options: [{id: none, value: none}, {id: personnel_safety, value: personnel_safety}, {id: machine_protection, value: machine_protection}, {id: interlock, value: interlock}, {id: critical_rf_permit, value: critical_rf_permit}, {id: critical_actuator, value: critical_actuator}, {id: damage_risk, value: damage_risk}]}
+    - name: "Control Service"
+      parent: "Control Item"
+      description: "A shared control service: archiver, gateway, alarm server, logbook."
+      icon: tabler/cloud-computing
+      attributes:
+        - {key: service, name: Service, indexed: true}
+        - {key: chart_url, name: Chart}
+        - {key: chart_revision, name: Chart revision}
+        - {key: image, name: Image}
+        - {key: loadbalancer_ip, name: Load balancer IP}
+        - {key: ingress, name: Ingress, type: boolean}
+        - {key: url, name: URL}
+        - {key: replicas, name: Replicas, type: integer}
+    - name: "Control Network"
+      parent: "Control Item"
+      description: "A named network and its address range."
+      icon: tabler/network
+      attributes:
+        - {key: network_name, name: Network, indexed: true}
+        - {key: cidr, name: CIDR}
+        - {key: annotation, name: Annotation}
+        - {key: vlan, name: VLAN, type: integer}
+        - {key: address_list, name: Address list}
+    - name: "Storage Mount"
+      parent: "Control Item"
+      description: "An NFS mount or backup target."
+      icon: tabler/database
+      attributes:
+        - {key: mount_kind, name: Mount kind, type: enumeration, options: [{id: nfs, value: NFS}, {id: local, value: Local}, {id: s3, value: S3}]}
+        - {key: server, name: Server, indexed: true}
+        - {key: export_path, name: Export path}
+        - {key: mount_path, name: Mount path}
+        - {key: size_gb, name: Size (GB), type: float}
+        - {key: is_backup, name: Backup, type: boolean}
+    - name: "Control Signal"
+      parent: "Control Item"
+      description: "One signal's identity in the control system: the PV or channel that carries a setpoint, a readback, a status or a measurement. Its value is read there, never stored here."
+      icon: tabler/wave-square
+      attributes:
+        - {key: signal_system, name: Control system, type: enumeration, options: [{id: epics, value: EPICS}, {id: chaos, value: '!CHAOS'}, {id: tango, value: Tango}, {id: opc_ua, value: OPC UA}, {id: other, value: Other}]}
+        - {key: address, name: 'Address (PV, channel)', indexed: true}
+        - {key: role, name: Role, type: enumeration, options: [{id: setpoint, value: setpoint}, {id: readback, value: readback}, {id: status, value: status}, {id: measurement, value: measurement}, {id: command, value: command}]}
+        - {key: quantity, name: Quantity, indexed: true}
+        - {key: unit, name: Unit}
+    - name: "Engineering Record"
+      parent: "Item"
+      description: "What the design says a component needs and costs."
+      abstract: true
+      icon: tabler/file-description
+    - name: "Utility Requirement"
+      parent: "Engineering Record"
+      description: "What the building has to supply."
+      icon: tabler/bolt
+      attributes:
+        - {key: electrical_phases, name: Electrical phases, type: enumeration, options: [{id: 3p_n, value: 3P+N}, {id: 1p_n, value: 1P+N}]}
+        - {key: under_ups, name: Under UPS, type: boolean}
+        - {key: nominal_current_a, name: Nominal current (A), type: float}
+        - {key: max_inrush_current_a, name: Maximum inrush current (A), type: float}
+        - {key: nominal_power_kva, name: Nominal power (kVA), type: float}
+        - {key: active_power_kw, name: Active power in operation (kW), type: float}
+        - {key: cos_phi, name: cos φ, type: float}
+        - {key: rack_units, name: Rack units, type: integer}
+        - {key: connectivity, name: Connectivity, indexed: true, multi: true}
+        - {key: heat_in_air_kw, name: Heat dissipation in air (kW), type: float}
+        - {key: heat_in_water_nominal_kw, name: Nominal heat dissipation in water (kW), type: float}
+        - {key: heat_in_water_min_kw, name: Minimum heat dissipation in water (kW), type: float}
+        - {key: water_temp_in_c, name: 'Water temperature in, nominal (°C)', type: float}
+        - {key: water_temp_setpoint_c, name: Water temperature setpoint (°C), type: float}
+        - {key: water_temp_setpoint_min_c, name: Water temperature setpoint minimum (°C), type: float}
+        - {key: water_temp_setpoint_max_c, name: Water temperature setpoint maximum (°C), type: float}
+        - {key: water_temp_stability_c, name: Water temperature stability (°C), type: float}
+        - {key: water_flow_l_min, name: Water flow rate (l/min), type: float}
+        - {key: water_pressure_in_bar, name: Water nominal pressure in (bar), type: float}
+        - {key: water_pressure_drop_bar, name: Water pressure drop (bar), type: float}
+        - {key: water_pressure_max_bar, name: Water maximum pressure in (bar), type: float}
+        - {key: water_delta_t_c, name: Water ΔT (°C), type: float}
+        - {key: water_max_acceptable_temp_c, name: Maximum acceptable temperature in (°C), type: float}
+        - {key: air_temp_nominal_c, name: 'Air temperature, nominal (°C)', type: float}
+        - {key: air_temp_stability_c, name: Air temperature stability (°C), type: float}
+        - {key: relative_humidity_pct, name: Relative humidity (%), type: float}
+        - {key: rh_stability_pct, name: RH stability (%), type: float}
+        - {key: compressed_air_nominal_bar, name: 'Compressed air pressure, nominal (bar)', type: float}
+        - {key: compressed_air_min_bar, name: 'Compressed air pressure, minimum (bar)', type: float}
+        - {key: compressed_air_max_bar, name: 'Compressed air pressure, maximum (bar)', type: float}
+        - {key: compressed_air_flow_l_min, name: Compressed air flow rate (l/min), type: float}
+        - {key: gas_type, name: 'Other gases, type', indexed: true}
+        - {key: gas_quantity_m3_h, name: 'Other gases, quantity (m³/h)', type: float}
+    - name: "Procurement Record"
+      parent: "Engineering Record"
+      description: "Cost, supplier, delivery and funding."
+      icon: tabler/receipt
+      attributes:
+        - {key: unit_cost_eur, name: Unit cost (€), type: float}
+        - {key: total_cost_eur, name: Total cost (€), type: float}
+        - {key: currency, name: Currency}
+        - {key: target_year, name: Target year, type: integer}
+        - {key: target_semester, name: Target semester, type: enumeration, options: [{id: h1, value: H1}, {id: h2, value: H2}]}
+        - {key: procurement_route, name: Procurement route, indexed: true}
+        - {key: production_time_months, name: Production time (months), type: float}
+        - {key: delivery_time_months, name: Delivery time (months), type: float}
+        - {key: supplier, name: Supplier, indexed: true}
+        - {key: supplier_ref, name: Supplied by, type: reference, reference: Vendor}
+        - {key: rup, name: RUP, type: user}
+        - {key: funding_line, name: Funding line, indexed: true}
+        - {key: cig, name: CIG, indexed: true}
+        - {key: order_reference, name: Order reference}
+        - {key: ordered_on, name: Ordered on, type: date}
+        - {key: delivered_on, name: Delivered on, type: date}
+    - name: "Work Package"
+      parent: "Engineering Record"
+      description: "WP-01 … WP-13."
+      icon: tabler/briefcase
+      attributes:
+        - {key: wbs_code, name: WBS code, indexed: true, unique: true}
+        - {key: leader, name: Leader, type: user}
+        - {key: institute, name: Institute, indexed: true}
+        - {key: budget_eur, name: Budget (€), type: float}
+        - {key: start_date, name: Start date, type: date}
+        - {key: end_date, name: End date, type: date}
+    - name: "Model Dataset"
+      parent: "Engineering Record"
+      description: "One version of a physics model of a beam path: design optics, a year's nominal lattice, measured optics. The values that depend on it (s, strengths, Twiss, geometry) are kept with it, never on the hardware."
+      icon: tabler/database
+      attributes:
+        - {key: dataset_kind, name: Kind, type: enumeration, options: [{id: design, value: design}, {id: nominal, value: nominal}, {id: current_model, value: current model}, {id: measured, value: measured}, {id: commissioning, value: commissioning}, {id: configuration, value: configuration}, {id: other, value: other}]}
+        - {key: model_id, name: Model id, indexed: true}
+        - {key: source, name: Source, indexed: true}
+        - {key: version, name: Version}
+        - {key: git_commit, name: Git commit}
+        - {key: simulator, name: Simulator, indexed: true}
+        - {key: simulator_version, name: Simulator version}
+        - {key: generated_at, name: Generated at}
+        - {key: valid_from, name: Valid from}
+        - {key: valid_until, name: Valid until}

@@ -1,0 +1,17 @@
+# The technical plant as a whole, on electrical, hydraulic and HVAC.
+
+object_types:
+  types:
+    - name: "Plant System"
+      parent: "Engineered Item"
+      description: "A plant system as the site names it: a cooling loop, a substation, a ventilation zone."
+      icon: tabler/sitemap
+      attributes:
+        - {key: system_kind, name: Kind, type: enumeration, options: [{id: electrical, value: Electrical}, {id: hydraulic, value: Hydraulic}, {id: hvac, value: HVAC}, {id: fire, value: Fire safety}, {id: other, value: Other}]}
+        - {key: plant_responsible, name: Responsible, type: user}
+    - name: "Technical Room"
+      parent: "Location"
+      description: "A room that houses plant: a substation, a pump room, a plant room on the roof."
+      icon: tabler/building
+      attributes:
+        - {key: room_code, name: Room, indexed: true}

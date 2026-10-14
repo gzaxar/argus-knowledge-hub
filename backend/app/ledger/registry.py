@@ -100,6 +100,8 @@ RETIRE_EXEMPT_SOURCES = {INSTALLATION}
 def _with_extensions() -> None:
     """Endpoint types and cardinality declared by extensions (§13 S8)."""
     from app import extensions
+    from app.packages import relations
+    ENDPOINTS.update({k: v for k, v in relations.endpoints().items() if k not in ENDPOINTS})
     endpoints, cardinality = extensions.registry_rules()
     ENDPOINTS.update({k: v for k, v in endpoints.items() if k not in ENDPOINTS})
     CARDINALITY.update({k: v for k, v in cardinality.items() if k not in CARDINALITY})

@@ -150,12 +150,18 @@ def review_document(
     return sorted(findings, key=lambda f: order[f["severity"]])[:8]
 
 
-def draft_ticket_fields(endpoint: Endpoint, title: str, description: str) -> dict:
-    """The structured fields a fault report implies, where it says them."""
+def draft_ticket_fields(endpoint: Endpoint, title: str, description: str,
+                        vocabulary: Optional[dict] = None) -> dict:
+    """The structured fields a fault report implies, where it says them. `vocabulary` (category, impact,
+    detected_by -> options) is the workspace's; the core's when not given."""
+    vocabulary = vocabulary or {}
+    categories = vocabulary.get("category") or CATEGORY_OPTIONS
+    impacts = vocabulary.get("impact") or IMPACT_OPTIONS
+    detections = vocabulary.get("detected_by") or DETECTED_BY_OPTIONS
     user = (
-        f"Categories: {_describe(CATEGORY_OPTIONS)}\n"
-        f"Operational impact: {_describe(IMPACT_OPTIONS)}\n"
-        f"Detected by: {_describe(DETECTED_BY_OPTIONS)}\n\n"
+        f"Categories: {_describe(categories)}\n"
+        f"Operational impact: {_describe(impacts)}\n"
+        f"Detected by: {_describe(detections)}\n\n"
         f"Title: {title}\n\nReport:\n{(description or '')[:8000]}"
     )
     data = _json_payload(complete(endpoint, TICKET_SYSTEM, user))
@@ -176,9 +182,9 @@ def draft_ticket_fields(endpoint: Endpoint, title: str, description: str) -> dic
         return value.strip() if isinstance(value, str) and value.strip() else None
 
     return {
-        "category": pick("category", CATEGORY_OPTIONS),
-        "impact": pick("impact", IMPACT_OPTIONS),
-        "detected_by": pick("detected_by", DETECTED_BY_OPTIONS),
+        "category": pick("category", categories),
+        "impact": pick("impact", impacts),
+        "detected_by": pick("detected_by", detections),
         "system": text("system"),
         "subsystem": text("subsystem"),
         "root_cause": text("root_cause"),

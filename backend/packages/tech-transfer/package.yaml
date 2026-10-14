@@ -1,0 +1,16 @@
+id: tech-transfer
+version: 1.0.0
+name: Technology transfer and research valorization
+description: >-
+  Inventions from disclosure to patent, the patent families and their annuities, licence and
+  confidentiality agreements, spin-off companies, valorization projects and research outputs (with DOIs
+  and ORCID iDs checked by code). Disclosure evaluations and annuity decisions go through an approval
+  workflow; unpublished inventions are a restricted class of their own. No equipment, no map. The
+  definitions and workflows are a structure to start from, to be approved by the technology transfer
+  office; they establish no legal or regulatory compliance and are no substitute for patent counsel.
+owner: INFN ARGUS — to be adopted by the technology transfer office
+license: EUPL-1.2
+depends:
+  core-records: ">=1.0,<2"
+provides: [technology-transfer]
+contents: [record_types.yaml, tickets.yaml, access.yaml, queries.yaml]

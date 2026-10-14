@@ -1,0 +1,121 @@
+# Technology transfer on the core records (Record, Organization, Contract are core-records'). Patent
+# numbers, DOIs and ORCID iDs are checked by code (app/packages/validators.py).
+# Never rename a type, an attribute key or an option id: stored records use them.
+
+option_sets:
+  trl:
+    - {id: "1", value: TRL 1}
+    - {id: "2", value: TRL 2}
+    - {id: "3", value: TRL 3}
+    - {id: "4", value: TRL 4}
+    - {id: "5", value: TRL 5}
+    - {id: "6", value: TRL 6}
+    - {id: "7", value: TRL 7}
+    - {id: "8", value: TRL 8}
+    - {id: "9", value: TRL 9}
+
+object_types:
+  types:
+    - name: "Invention Disclosure"
+      parent: "Record"
+      description: "An invention as its inventors report it, before any decision to protect it."
+      icon: tabler/bookmark
+      attributes:
+        - {key: disclosure_number, name: Disclosure number, indexed: true, unique: true}
+        - {key: disclosed_on, name: Disclosed on, type: date, validator: core.not_after_today}
+        - {key: inventors, name: Inventors, type: user, multi: true}
+        - {key: inventor_orcids, name: Inventors' ORCID iDs, multi: true, validator: tt.orcid}
+        - {key: technical_field, name: Technical field}
+        - {key: trl, name: Readiness, type: enumeration, option_set: trl}
+        - {key: ownership, name: Ownership, type: enumeration, options: [{id: sole, value: Sole}, {id: joint, value: Joint}, {id: third_party, value: Third party}]}
+        - {key: co_owners, name: Co-owners, type: reference, reference: Organization, multi: true}
+        - {key: technical_summary, name: Technical summary, type: text, restricted: unpublished_invention}
+        - {key: disclosure_decision, name: Decision, type: enumeration, options: [{id: pending, value: Pending}, {id: file, value: File a patent}, {id: secret, value: Keep as know-how}, {id: publish, value: Publish}, {id: release, value: Release to the inventors}]}
+    - name: "Patent Family"
+      parent: "Record"
+      description: "The applications and patents that claim one priority."
+      icon: tabler/hierarchy-2
+      attributes:
+        - {key: priority_number, name: Priority application, indexed: true, validator: tt.patent_number}
+        - {key: priority_date, name: Priority date, type: date}
+        - {key: from_disclosure, name: From disclosure, type: reference, reference: Invention Disclosure}
+    - name: "Patent"
+      parent: "Record"
+      description: "One application or patent in one office: its numbers, status and annuities."
+      icon: tabler/file-certificate
+      attributes:
+        - {key: application_number, name: Application number, indexed: true, unique: true, validator: tt.patent_number}
+        - {key: publication_number, name: Publication number, indexed: true, validator: tt.patent_number}
+        - {key: patent_office, name: Office, type: enumeration, options: [{id: ep, value: EPO}, {id: it, value: UIBM (IT)}, {id: us, value: USPTO}, {id: pct, value: PCT (WIPO)}, {id: other, value: Other}]}
+        - {key: filed_on, name: Filed on, type: date}
+        - {key: granted_on, name: Granted on, type: date}
+        - {key: patent_status, name: Status, type: enumeration, options: [{id: filed, value: Filed}, {id: published, value: Published}, {id: granted, value: Granted}, {id: opposed, value: Opposed}, {id: lapsed, value: Lapsed}, {id: abandoned, value: Abandoned}]}
+        - {key: in_family, name: Family, type: reference, reference: Patent Family}
+        - {key: next_annuity_due, name: Next annuity due, type: date, indexed: true}
+        - {key: annuity_cost_eur, name: Next annuity (EUR), type: float, unit: EUR, restricted: costs}
+        - {key: attorney, name: Attorney, type: reference, reference: Organization}
+    - name: "License Agreement"
+      parent: "Contract"
+      description: "A licence or option on protected technology: kind, field of use, territory, royalties."
+      icon: tabler/file-certificate
+      attributes:
+        - {key: license_kind, name: Kind, type: enumeration, options: [{id: exclusive, value: Exclusive}, {id: non_exclusive, value: Non-exclusive}, {id: option, value: Option}, {id: evaluation, value: Evaluation}]}
+        - {key: field_of_use, name: Field of use, type: text}
+        - {key: territory, name: Territory}
+        - {key: royalty_rate_pct, name: Royalty rate (%), type: float, unit: "%", restricted: commercial_terms}
+        - {key: licensed_rights, name: Licensed, type: reference, reference: Record, include_children: true, multi: true}
+    - name: "Confidentiality Agreement"
+      parent: "Contract"
+      description: "An NDA: what may be disclosed, to whom, and how long it stays confidential."
+      icon: tabler/lock
+      attributes:
+        - {key: nda_direction, name: Direction, type: enumeration, options: [{id: mutual, value: Mutual}, {id: incoming, value: We receive}, {id: outgoing, value: We disclose}]}
+        - {key: confidentiality_years, name: Confidential for (years), type: integer, unit: year}
+    - name: "Spin-off Company"
+      parent: "Organization"
+      description: "A company founded on the institution's research: when, the stake, its state."
+      icon: tabler/briefcase
+      attributes:
+        - {key: incorporated_on, name: Incorporated on, type: date}
+        - {key: equity_stake_pct, name: Stake held (%), type: float, unit: "%", restricted: commercial_terms}
+        - {key: spinoff_status, name: Status, type: enumeration, options: [{id: proposed, value: Proposed}, {id: accredited, value: Accredited}, {id: active, value: Active}, {id: exited, value: Exited}, {id: closed, value: Closed}]}
+    - name: "Valorization Project"
+      parent: "Record"
+      description: "A project that takes research towards use: proof of concept, licensing campaign, collaboration."
+      icon: tabler/puzzle
+      attributes:
+        - {key: project_kind, name: Kind, type: enumeration, options: [{id: proof_of_concept, value: Proof of concept}, {id: licensing, value: Licensing campaign}, {id: collaboration, value: Industrial collaboration}, {id: spin_off, value: Spin-off creation}]}
+        - {key: trl_start, name: Readiness at start, type: enumeration, option_set: trl}
+        - {key: trl_target, name: Readiness targeted, type: enumeration, option_set: trl}
+        - {key: valorizes, name: Valorizes, type: reference, reference: Record, include_children: true, multi: true}
+        - {key: project_budget_eur, name: Budget (EUR), type: float, unit: EUR, restricted: costs}
+    - name: "Research Output"
+      parent: "Record"
+      description: "A publication, dataset, software or prototype, with its persistent identifier and licence."
+      icon: tabler/book
+      attributes:
+        - {key: output_kind, name: Kind, type: enumeration, options: [{id: publication, value: Publication}, {id: dataset, value: Dataset}, {id: software, value: Software}, {id: prototype, value: Prototype}]}
+        - {key: doi, name: DOI, indexed: true, validator: tt.doi}
+        - {key: open_access, name: Open access, type: boolean}
+        - {key: output_license, name: Licence, description: "An SPDX identifier where there is one, e.g. CC-BY-4.0, EUPL-1.2."}
+        - {key: author_orcids, name: Authors' ORCID iDs, multi: true, validator: tt.orcid}
+
+reference_relations:
+  in_family: "member of family"
+  from_disclosure: "claims"
+  licensed_rights: "licenses"
+  valorizes: "valorizes"
+  co_owners: "co-owned with"
+  attorney: "represented by"
+
+relation_types:
+  - {id: member-of-family, verb: "member of family", from: Patent, to: Patent Family, layer: administrative, flows: none, description: "an application and its patent family"}
+  - {id: claims, verb: "claims", from: [Patent Family, Patent], to: Invention Disclosure, layer: administrative, flows: none, description: "a family or patent and the invention it protects"}
+  - {id: licenses, verb: "licenses", from: License Agreement, to: Record, layer: administrative, flows: none, description: "a licence and the patents, know-how or software it licenses"}
+  - {id: valorizes, verb: "valorizes", from: Valorization Project, to: Record, layer: administrative, flows: none, description: "a project and the results it takes towards use"}
+  - {id: co-owned-with, verb: "co-owned with", from: Invention Disclosure, to: Organization, layer: administrative, flows: none, description: "an invention and an organisation that owns it jointly"}
+  - {id: represented-by, verb: "represented by", from: Patent, to: Organization, layer: administrative, flows: none, description: "a patent and the attorney firm that prosecutes it"}
+  - {id: derived-from, verb: "derived from", from: Research Output, to: Record, layer: administrative, flows: none, description: "an output and the invention or project it comes from"}
+
+restricted_classes:
+  - {id: unpublished_invention, description: "Inventions not yet filed or published: their technical content, and the evaluation of it."}

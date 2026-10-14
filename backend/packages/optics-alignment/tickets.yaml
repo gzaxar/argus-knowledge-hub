@@ -1,0 +1,49 @@
+ticket_types:
+  kinds:
+    - name: "Alignment Survey"
+      description: "A survey of positions against the reference network, and the largest deviation found."
+      icon: tabler/crosshair
+      attributes:
+        - {key: max_deviation_um, name: Largest deviation (µm), type: float, unit: µm}
+        - {key: tolerance_um, name: Tolerance (µm), type: float, unit: µm}
+        - {key: survey_instrument, name: Instrument, type: reference, reference: Alignment Instrument, include_children: true}
+    - name: "Optics Inspection"
+      description: "An inspection of optics for damage or contamination."
+      icon: tabler/eye
+      attributes:
+        - {key: damage_found, name: Damage found, type: boolean}
+        - {key: cleaned, name: Cleaned, type: boolean}
+    - name: "Laser Work Authorisation"
+      description: "Permission to operate or align a class 3B or 4 laser: who, where, until when."
+      icon: tabler/file-certificate
+      attributes:
+        - {key: laser_class, name: Laser class, type: enumeration, option_set: laser_class}
+        - {key: valid_until, name: Valid until, type: date}
+        - {key: eyewear, name: Required eyewear, description: "Optical density and wavelength range, e.g. OD7+ 750-850 nm."}
+
+workflows:
+  - id: laser-work-authorisation
+    name: "Laser work authorisation"
+    description: "Requested, approved by someone who may approve, active, then expired or revoked."
+    applies_to: ["Laser Work Authorisation"]
+    initial: requested
+    states:
+      - {key: requested, name: Requested, category: open}
+      - {key: approved, name: Approved, category: active}
+      - {key: expired, name: Expired, category: done}
+      - {key: revoked, name: Revoked, category: done}
+      - {key: refused, name: Refused, category: done}
+    transitions:
+      - {from: requested, to: approved, name: Approve, requires: [approver]}
+      - {from: requested, to: refused, name: Refuse, requires: [approver, comment]}
+      - {from: approved, to: expired, name: Expire}
+      - {from: approved, to: revoked, name: Revoke, requires: [approver, comment]}
+
+document_types:
+  kinds:
+    - name: "Alignment Report"
+      description: "The result of an alignment campaign: network, measurements, residuals."
+      icon: tabler/file-analytics
+      attributes:
+        - {key: surveyed_on, name: Surveyed on, type: date}
+        - {key: coordinate_frame, name: Frame}

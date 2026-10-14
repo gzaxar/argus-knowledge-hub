@@ -1,0 +1,19 @@
+# What an accelerator adds to the neutral core: the beam's own impacts and criticalities. The option ids are
+# those core-facility 1.x and core-objects 1.x had, so records written before keep their values.
+extends:
+  - area: ticket_types
+    type: base
+    options:
+      argus_impact:
+        - {id: beam_down, value: Beam down}
+        - {id: beam_degraded, value: Beam degraded}
+        - {id: no_beam_impact, value: No beam impact}
+  - type: Item
+    options:
+      argus_criticality:
+        - {id: beam_critical, value: Beam-critical}
+        - {id: degrades, value: Degrades beam}
+
+imports:
+  - {importer: epik8s, description: "The control configuration of an EPIK8s beamline: IOCs, devices, hosts and networks."}
+  - {importer: pbs, description: "A product-breakdown workbook: what will be built, by whom, at what cost."}

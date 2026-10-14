@@ -59,6 +59,7 @@ import { WorkspaceMembers } from "./pages/workspace/Members";
 import { WorkspaceIntegrity } from "./pages/workspace/Integrity";
 import { WorkspaceKeys } from "./pages/workspace/Keys";
 import { WorkspacePackages } from "./pages/workspace/Packages";
+import { GlpiPage } from "./pages/workspace/Glpi";
 import { AccessReviews } from "./pages/workspace/AccessReviews";
 import { EquipmentClassesPage } from "./pages/catalogue/EquipmentClasses";
 import { WorkspaceTransfer } from "./pages/workspace/Transfer";
@@ -167,6 +168,7 @@ export function App() {
           <Route path="/workspaces/:workspaceId/integrity" element={<WorkspaceIntegrity />} />
           <Route path="/workspaces/:workspaceId/keys" element={<WorkspaceKeys />} />
           <Route path="/workspaces/:workspaceId/packages" element={<WorkspacePackages />} />
+          <Route path="/workspaces/:workspaceId/glpi" element={<GlpiPage />} />
           <Route path="/workspaces/:workspaceId/icons" element={<IconLibrary />} />
           <Route path="/workspaces/:workspaceId/transfer" element={<WorkspaceTransfer />} />
           <Route path="/workspaces/:workspaceId/transfers" element={<TransferList />} />

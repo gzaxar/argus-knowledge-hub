@@ -1,15 +1,15 @@
 id: core-objects
-version: 1.1.0
+version: 2.0.0
 name: Core objects
 description: >-
   The backbone every object catalogue stands on: the root type and its branches, physical equipment and what
   is generic about it (ports, cables, supports, spares, instruments, cooling plant), products and vendors,
   and places (buildings, areas, racks, stores); the vocabulary of Other Equipment. Since 1.1, equipment and
-  places may have a location on the map. Domain packages add their
-  types under it.
+  places may have a location on the map; since 2.0 its vocabulary is domain neutral (the beam-specific
+  criticalities are the accelerator package's). Domain packages add their types under it.
 owner: INFN ARGUS
 license: EUPL-1.2
 depends:
-  core-facility: ">=1.0,<2"
+  core-facility: ">=2.0,<3"
 provides: [object-catalogue]
 contents: [object_types.yaml, vocabulary.yaml]

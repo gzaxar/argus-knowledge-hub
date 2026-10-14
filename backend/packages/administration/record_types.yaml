@@ -1,0 +1,73 @@
+# Administrative records on the core ones (Record, Organization, Contract are core-records'). Italian
+# public-procurement identifiers (CIG, CUP) are checked by code (app/packages/validators.py), not patterns.
+# Never rename a type, an attribute key or an option id: stored records use them.
+
+extends:
+  - type: Contract
+    attributes:
+      - {key: cig, name: CIG, indexed: true, validator: admin.cig, description: "The tender identifier (Codice Identificativo Gara)."}
+      - {key: cup, name: CUP, indexed: true, validator: admin.cup, description: "The public project code (Codice Unico di Progetto)."}
+      - {key: procurement_procedure, name: Procedure, type: enumeration, options: [{id: open, value: Open}, {id: restricted, value: Restricted}, {id: negotiated, value: Negotiated}, {id: direct_award, value: Direct award}, {id: framework_call_off, value: Framework call-off}, {id: marketplace, value: Public marketplace}]}
+      - {key: contract_responsible, name: Responsible for the procedure, type: user}
+      - {key: budget_line, name: Budget line, type: reference, reference: Budget Line}
+      - {key: guarantee_eur, name: Guarantee (EUR), type: float, unit: EUR, restricted: costs}
+      - {key: special_terms, name: Special terms, type: text, restricted: commercial_terms}
+
+object_types:
+  types:
+    - name: "Budget Line"
+      parent: "Record"
+      description: "A line of budget that commitments are charged to."
+      icon: tabler/chart-donut
+      attributes:
+        - {key: budget_code, name: Code, indexed: true, unique: true}
+        - {key: fiscal_year, name: Year, type: integer, unit: year}
+        - {key: allocated_eur, name: Allocated (EUR), type: float, unit: EUR, restricted: costs}
+        - {key: funded_by, name: Funded by, type: reference, reference: Grant Agreement}
+    - name: "Grant Agreement"
+      parent: "Contract"
+      description: "Funding received for a project: programme, grant number, contribution."
+      icon: tabler/file-certificate
+      attributes:
+        - {key: funding_programme, name: Programme, type: enumeration, options: [{id: horizon_europe, value: Horizon Europe}, {id: pnrr, value: PNRR}, {id: prin, value: PRIN}, {id: internal, value: Internal}, {id: regional, value: Regional}, {id: industry, value: Industry}, {id: other, value: Other}]}
+        - {key: grant_number, name: Grant number, indexed: true}
+        - {key: contribution_eur, name: Contribution (EUR), type: float, unit: EUR, restricted: costs}
+    - name: "Purchase Order"
+      parent: "Record"
+      description: "An order to a supplier, under a contract or alone."
+      icon: tabler/receipt
+      attributes:
+        - {key: po_number, name: Order number, indexed: true, unique: true}
+        - {key: ordered_from, name: Supplier, type: reference, reference: Organization}
+        - {key: under_contract, name: Contract, type: reference, reference: Contract, include_children: true}
+        - {key: budget_line, name: Budget line, type: reference, reference: Budget Line}
+        - {key: ordered_on, name: Ordered on, type: date}
+        - {key: amount_eur, name: Amount (EUR), type: float, unit: EUR, restricted: costs}
+        - {key: order_status, name: Status, type: enumeration, options: [{id: draft, value: Draft}, {id: issued, value: Issued}, {id: partially_delivered, value: Partially delivered}, {id: delivered, value: Delivered}, {id: invoiced, value: Invoiced}, {id: closed, value: Closed}, {id: cancelled, value: Cancelled}]}
+    - name: "Invoice"
+      parent: "Record"
+      description: "A supplier's invoice, the order it bills, and whether it is paid."
+      icon: tabler/receipt
+      attributes:
+        - {key: invoice_number, name: Invoice number, indexed: true}
+        - {key: issued_by, name: Supplier, type: reference, reference: Organization}
+        - {key: bills_order, name: Order, type: reference, reference: Purchase Order}
+        - {key: issued_on, name: Issued on, type: date}
+        - {key: due_on, name: Due on, type: date}
+        - {key: amount_eur, name: Amount (EUR), type: float, unit: EUR, restricted: costs}
+        - {key: payment_status, name: Payment, type: enumeration, options: [{id: received, value: Received}, {id: approved, value: Approved for payment}, {id: paid, value: Paid}, {id: disputed, value: Disputed}]}
+
+reference_relations:
+  budget_line: "charged to"
+  funded_by: "funded by"
+  ordered_from: "ordered from"
+  under_contract: "governed by"
+  issued_by: "issued by"
+  bills_order: "bills"
+
+relation_types:
+  - {id: charged-to, verb: "charged to", from: "*", to: Budget Line, layer: administrative, flows: none, description: "a commitment and the budget line it is charged to"}
+  - {id: funded-by, verb: "funded by", from: "*", to: Grant Agreement, layer: administrative, flows: none, description: "a budget line or project and the grant that funds it"}
+  - {id: ordered-from, verb: "ordered from", from: Purchase Order, to: Organization, layer: administrative, flows: none, description: "an order and its supplier"}
+  - {id: issued-by, verb: "issued by", from: Invoice, to: Organization, layer: administrative, flows: none, description: "an invoice and the supplier that issued it"}
+  - {id: bills, verb: "bills", from: Invoice, to: Purchase Order, layer: administrative, flows: none, description: "an invoice and the order it bills"}

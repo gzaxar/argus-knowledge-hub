@@ -420,6 +420,11 @@ def _number(col, op: str, vals: list[Value], ctx: Ctx) -> Any:
     """An attribute holding a number, compared as one when it reads as one; text otherwise."""
     if op in ("IS", "IS NOT", "~", "!~", "=", "!=", "IN", "NOT IN"):
         return _text(col, op, vals, ctx)
+    v = vals[0]
+    if v.function in DATE_FUNCTIONS or (not v.function and _REL.match(v.text)):
+        # A date attribute (stored as an ISO date or date-time) against now(), startOfMonth(), -30d…
+        at = to_datetime(v, ctx.now)
+        return _compare(col, op, at.date().isoformat() if (at.hour, at.minute) == (0, 0) else at.isoformat())
     try:
         n = float(vals[0].text)
     except ValueError:

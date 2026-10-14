@@ -1,0 +1,12 @@
+records:
+  - {key: NET-AIR, type: Monitoring Network, name: Air quality network, attributes: {network_purpose: Air quality}}
+  - {key: ST-NORTH, type: Monitoring Station, name: North gate station, attributes: {station_code: AQ-N, network: "@NET-AIR"}}
+  - {key: ST-SOUTH, type: Monitoring Station, name: South fence station, attributes: {station_code: AQ-S, network: "@NET-AIR"}}
+  - {key: LOG-1, type: Data Logger, name: North logger, attributes: {transmission: Cellular, at_station: "@ST-NORTH"}}
+  - {key: S-PM10, type: Environmental Sensor, name: PM10 north, attributes: {measured_quantity: PM10, measurement_unit: "µg/m³", calibration_due: "2026-12-01", at_station: "@ST-NORTH", logged_by: "@LOG-1"}}
+  - {key: S-GAMMA, type: Environmental Sensor, name: Gamma north, attributes: {measured_quantity: Ambient gamma dose rate, measurement_unit: nSv/h, calibration_due: "2027-06-01", at_station: "@ST-NORTH", logged_by: "@LOG-1"}}
+  - {key: S-RAIN, type: Environmental Sensor, name: Rain gauge south, attributes: {measured_quantity: Rainfall, measurement_unit: mm, calibration_due: "2026-04-15", at_station: "@ST-SOUTH"}}
+tickets:
+  - {key: EX-1, kind: Threshold Exceedance, title: PM10 above the daily limit, state: verified, attributes: {measured_value: 61, limit_value: 50, notification_required: true}}
+  - {key: EX-2, kind: Threshold Exceedance, title: Gamma spike, state: verified, attributes: {notification_required: false}}
+  - {key: EX-3, kind: Threshold Exceedance, title: Ozone peak, state: detected, attributes: {notification_required: true}}

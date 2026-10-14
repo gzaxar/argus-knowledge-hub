@@ -1,0 +1,16 @@
+roles:
+  - id: environmental-officer
+    name: Environmental officer
+    description: "The monitoring networks, their thresholds and reports; verifies and notifies exceedances."
+    objects: [read, create, modify]
+    tickets: [read, create, modify, approve]
+    documents: [read, create, modify, approve]
+  - id: monitoring-technician
+    name: Monitoring technician
+    description: "Installs, calibrates and maintains stations and sensors; takes samples."
+    objects: [read, create, modify]
+    tickets: [read, create, modify]
+    documents: [read, create]
+
+imports:
+  - {importer: locations, description: "Where stations, sensors and sampling points are, from a CSV or GeoJSON file."}

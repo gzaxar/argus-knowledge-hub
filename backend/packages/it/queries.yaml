@@ -1,0 +1,21 @@
+queries:
+  - id: computers-with-a-version
+    title: The computers that have a software version installed
+    entity: graph
+    from: SW-FF-128
+    relation: "has installed"
+    direction: in
+    fixture: fixtures/inventory.yaml
+    expect: [PC-001, SRV-01]
+  - id: licences-ending-in-2026
+    title: Software licences that end in 2026
+    entity: assets
+    jql: 'type = "Software License" AND end_date >= "2026-01-01" AND end_date <= "2026-12-31" ORDER BY key'
+    fixture: fixtures/inventory.yaml
+    expect: [LIC-OFFICE]
+  - id: open-incidents
+    title: Incidents not yet closed
+    entity: tickets
+    jql: 'type = Incident AND statusCategory != Done ORDER BY key'
+    fixture: fixtures/inventory.yaml
+    expect: [INC-1]

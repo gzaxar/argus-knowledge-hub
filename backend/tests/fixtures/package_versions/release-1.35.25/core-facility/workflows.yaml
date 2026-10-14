@@ -1,0 +1,14 @@
+# The workflow a ticket follows when its type has none of its own.
+workflows:
+  - id: argus-default
+    name: "ARGUS default"
+    initial: new
+    default: true
+    states:
+      - {key: new, name: New, category: open}
+      - {key: in_progress, name: In Progress, category: active}
+      - {key: pending, name: Pending, category: waiting}
+      - {key: resolved, name: Resolved, category: done}
+      - {key: closed, name: Closed, category: done}
+    transitions:
+      - {from: '*', to: '*', name: Move}

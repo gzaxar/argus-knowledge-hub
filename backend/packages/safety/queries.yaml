@@ -1,0 +1,29 @@
+queries:
+  - id: extinguishers-due-before-july-2026
+    title: Fire extinguishers due for inspection before 1 July 2026
+    entity: assets
+    jql: 'type = "Fire Extinguisher" AND next_inspection < "2026-07-01" ORDER BY key'
+    fixture: fixtures/fire.yaml
+    expect: [EXT-01, EXT-03]
+  - id: what-protects-the-klystron-hall
+    title: What protects the klystron hall
+    entity: graph
+    from: ZONE-KH
+    relation: [protects, "in fire zone"]
+    direction: in
+    fixture: fixtures/fire.yaml
+    expect: [DET-01, EXT-01, SPR-01]
+  - id: detectors-on-a-panel
+    title: What a fire alarm panel's failure would silence
+    entity: graph
+    from: PANEL-1
+    relation: "reports to"
+    direction: in
+    fixture: fixtures/fire.yaml
+    expect: [DET-01, DET-02, SPR-01]
+  - id: controlled-areas
+    title: Controlled radiation areas
+    entity: assets
+    jql: 'type = "Radiation Area" AND radiation_classification = Controlled ORDER BY key'
+    fixture: fixtures/fire.yaml
+    expect: [RA-1]

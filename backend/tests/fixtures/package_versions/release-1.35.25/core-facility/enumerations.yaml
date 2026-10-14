@@ -1,0 +1,33 @@
+# A workspace's shared enumerations (global values). A type opts in to one through an attribute; none is
+# forced. A Jira import may replace an enumeration's options with the source system's (same key).
+enumerations:
+  - key: status
+    name: Status
+    applies_to: objects
+    default: uninstalled
+    options:
+      - {id: active, value: Active}
+      - {id: action_needed, value: Action Needed}
+      - {id: broken, value: Broken}
+      - {id: not_active, value: Not Active}
+      - {id: ok, value: Ok}
+      - {id: uninstalled, value: Uninstalled}
+  - key: priority
+    name: Priority
+    applies_to: tickets
+    options:
+      - {id: low, value: Low}
+      - {id: medium, value: Medium}
+      - {id: high, value: High}
+      - {id: blocker, value: Blocker}
+      - {id: critical, value: Critical}
+  - key: status
+    name: Status
+    applies_to: tickets
+    default: new
+    options:
+      - {id: new, value: New, responsible: Help Desk (Queue), meaning: Created and waiting to be picked up.}
+      - {id: in_progress, value: In Progress, responsible: Assigned Technician, meaning: Actively being analyzed or fixed.}
+      - {id: pending, value: Pending, responsible: External Party (User/Vendor), meaning: "Paused, waiting for an external action."}
+      - {id: resolved, value: Resolved, responsible: User (for verification), meaning: The solution has been applied.}
+      - {id: closed, value: Closed, responsible: None (Archived), meaning: Successfully resolved and locked.}

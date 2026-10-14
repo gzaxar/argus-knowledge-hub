@@ -1,0 +1,11 @@
+records:
+  - {key: DISC-1, type: Invention Disclosure, name: Compact plasma lens, attributes: {disclosure_number: "ID-2024-07", disclosed_on: "2024-03-12", trl: TRL 3, disclosure_decision: File a patent}}
+  - {key: FAM-1, type: Patent Family, name: Plasma lens family, attributes: {priority_number: "IT 102024000012345", priority_date: "2024-06-01", from_disclosure: "@DISC-1"}}
+  - {key: PAT-IT, type: Patent, name: Plasma lens IT, attributes: {application_number: "IT 102024000012345", patent_office: UIBM (IT), patent_status: Granted, in_family: "@FAM-1", next_annuity_due: "2027-06-30"}}
+  - {key: PAT-EP, type: Patent, name: Plasma lens EP, attributes: {application_number: "EP 25123456.7", patent_office: EPO, patent_status: Published, in_family: "@FAM-1", next_annuity_due: "2026-06-30"}}
+  - {key: PAT-US, type: Patent, name: Plasma lens US, attributes: {application_number: "US 19/123,456", patent_office: USPTO, patent_status: Filed, in_family: "@FAM-1", next_annuity_due: "2026-11-30"}}
+  - {key: CO-1, type: Organization, name: Lens Industries, attributes: {org_kind: Company}}
+  - {key: LIC-1, type: License Agreement, name: Lens licence, attributes: {license_kind: Exclusive, contract_status: Active, counterparty: ["@CO-1"], licensed_rights: ["@PAT-EP", "@PAT-US"]}}
+tickets:
+  - {key: EVAL-1, kind: Disclosure Evaluation, title: Evaluate ID-2025-02, state: awaiting_decision}
+  - {key: EVAL-2, kind: Disclosure Evaluation, title: Evaluate ID-2025-03, state: assessing}

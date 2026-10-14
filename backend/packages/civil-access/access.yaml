@@ -1,0 +1,17 @@
+roles:
+  - id: facility-manager
+    name: Facility manager
+    description: "Buildings, rooms and building systems; approves civil works."
+    objects: [read, create, modify, delete]
+    tickets: [read, create, modify, approve]
+    documents: [read, create, modify, approve]
+  - id: access-control-administrator
+    name: Access control administrator
+    description: "Zones, doors and readers; approves and grants access requests; sees who asked and the security notes."
+    objects: [read, create, modify]
+    tickets: [read, create, modify, approve]
+    documents: [read]
+    restricted: [personnel, physical_security]
+
+imports:
+  - {importer: locations, description: "Where doors, readers and building systems are, from a survey or BIM export."}

@@ -31,7 +31,7 @@ from app.models.ledger import (Conflict, ConflictEvent, Decision, IdentityBindin
                                TicketLink)
 from app.ledger.writer import ledger_writer
 
-IMMUTABLE_ID_KINDS = {"insight", "jira"}
+IMMUTABLE_ID_KINDS = {"insight", "jira", "glpi"}
 INACTIVE = ("Merged", "Retired")
 CANDIDATE = "identity_candidate"
 

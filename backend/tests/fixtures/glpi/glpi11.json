@@ -1,0 +1,494 @@
+{
+ "api": {
+  "high_level": "v2",
+  "legacy": true,
+  "notes": []
+ },
+ "config": {
+  "version": "11.0.1"
+ },
+ "custom": {
+  "asset_definitions": [
+   {
+    "id": 1,
+    "is_active": 1,
+    "label": "Rack",
+    "system_name": "Rack"
+   },
+   {
+    "id": 2,
+    "is_active": 1,
+    "label": "Lab instrument",
+    "system_name": "LabInstrument"
+   }
+  ],
+  "custom_fields": [
+   {
+    "assetdefinitions_id": 2,
+    "id": 1,
+    "label": "Calibration due",
+    "system_name": "calibration_due",
+    "type": "Glpi\\Asset\\CustomFieldType\\DateType"
+   },
+   {
+    "assetdefinitions_id": 2,
+    "id": 2,
+    "label": "Accuracy",
+    "system_name": "accuracy",
+    "type": "Glpi\\Asset\\CustomFieldType\\NumberType"
+   },
+   {
+    "assetdefinitions_id": 2,
+    "id": 3,
+    "itemtype": "Glpi\\CustomDropdown\\LabDropdown",
+    "label": "Laboratory",
+    "system_name": "lab",
+    "type": "Glpi\\Asset\\CustomFieldType\\DropdownType"
+   },
+   {
+    "assetdefinitions_id": 2,
+    "id": 4,
+    "label": "Signature",
+    "system_name": "signature",
+    "type": "Glpi\\Asset\\CustomFieldType\\SignatureType"
+   }
+  ]
+ },
+ "dropdowns": {
+  "ComputerModel": {
+   "1": "PowerEdge R650"
+  },
+  "ComputerType": {
+   "1": "Server",
+   "2": "Desktop",
+   "3": "Laptop"
+  },
+  "Glpi\\CustomDropdown\\LabDropdown": {
+   "1": "Optics lab",
+   "2": "RF lab"
+  },
+  "Group": {
+   "3": "IT Services"
+  },
+  "Manufacturer": {
+   "1": "Dell",
+   "2": "Mozilla",
+   "3": "Microsoft"
+  },
+  "NetworkEquipmentType": {
+   "1": "Switch",
+   "2": "Wireless Access Point"
+  },
+  "State": {
+   "1": "In use"
+  },
+  "User": {
+   "5": "jdoe",
+   "6": "nobody-here"
+  }
+ },
+ "entities": [
+  {
+   "completename": "Root entity",
+   "entities_id": null,
+   "id": 0,
+   "name": "Root entity"
+  },
+  {
+   "completename": "Root entity > LNF",
+   "entities_id": 0,
+   "id": 1,
+   "name": "LNF"
+  },
+  {
+   "completename": "Root entity > LNF > Lab IT",
+   "entities_id": 1,
+   "id": 2,
+   "name": "Lab IT"
+  },
+  {
+   "completename": "Root entity > Other site",
+   "entities_id": 0,
+   "id": 3,
+   "name": "Other site"
+  }
+ ],
+ "files": {
+  "1": "JVBERi0xLjQgd2FycmFudHk="
+ },
+ "instance": "https://glpi.example.org",
+ "items": {
+  "Change": [
+   {
+    "entities_id": 2,
+    "id": 1,
+    "name": "Upgrade the database",
+    "priority": 3,
+    "status": 10,
+    "urgency": 3
+   }
+  ],
+  "Change_Item": [
+   {
+    "changes_id": 1,
+    "id": 1,
+    "items_id": 1,
+    "itemtype": "Computer"
+   }
+  ],
+  "Computer": [
+   {
+    "comment": "<p>Main database</p>",
+    "computermodels_id": 1,
+    "computertypes_id": 1,
+    "date_mod": "2026-09-20 10:00:00",
+    "entities_id": 2,
+    "groups_id": 3,
+    "id": 1,
+    "is_deleted": 0,
+    "is_template": 0,
+    "locations_id": 10,
+    "manufacturers_id": 1,
+    "name": "srv-db01",
+    "otherserial": "INV-1001",
+    "serial": "SN-1001",
+    "states_id": 1,
+    "users_id": 5,
+    "uuid": "4c4c-4544"
+   },
+   {
+    "computertypes_id": 2,
+    "date_mod": "2026-09-01 09:00:00",
+    "entities_id": 2,
+    "id": 2,
+    "is_deleted": 0,
+    "is_template": 0,
+    "locations_id": 11,
+    "name": "pc-042",
+    "users_id": 6
+   },
+   {
+    "computertypes_id": 3,
+    "entities_id": 3,
+    "id": 3,
+    "is_deleted": 0,
+    "is_template": 0,
+    "name": "lap-7"
+   },
+   {
+    "computertypes_id": 2,
+    "entities_id": 2,
+    "id": 4,
+    "is_deleted": 1,
+    "is_template": 0,
+    "name": "old-pc"
+   },
+   {
+    "entities_id": 2,
+    "id": 5,
+    "is_template": 1,
+    "name": "",
+    "template_name": "Standard desktop"
+   }
+  ],
+  "Contract": [
+   {
+    "begin_date": "2025-01-01",
+    "duration": 24,
+    "entities_id": 2,
+    "id": 1,
+    "name": "Server maintenance",
+    "notice": 3,
+    "num": "C-2025-7",
+    "renewal": 1
+   }
+  ],
+  "Contract_Item": [
+   {
+    "contracts_id": 1,
+    "id": 1,
+    "items_id": 1,
+    "itemtype": "Computer"
+   }
+  ],
+  "Contract_Supplier": [
+   {
+    "contracts_id": 1,
+    "id": 1,
+    "suppliers_id": 1
+   }
+  ],
+  "Document": [
+   {
+    "filename": "warranty.pdf",
+    "id": 1,
+    "mime": "application/pdf",
+    "name": "Warranty",
+    "sha1sum": "x"
+   }
+  ],
+  "Document_Item": [
+   {
+    "documents_id": 1,
+    "id": 1,
+    "items_id": 1,
+    "itemtype": "Computer"
+   },
+   {
+    "documents_id": 1,
+    "id": 2,
+    "items_id": 1,
+    "itemtype": "Ticket"
+   }
+  ],
+  "Glpi\\CustomAsset\\LabInstrumentAsset": [
+   {
+    "custom_accuracy": 0.5,
+    "custom_calibration_due": "2026-11-01",
+    "custom_lab": 2,
+    "custom_signature": "data:image/png;base64,AAAA",
+    "entities_id": 2,
+    "id": 1,
+    "is_deleted": 0,
+    "is_template": 0,
+    "name": "osc-1",
+    "serial": "OS-1"
+   }
+  ],
+  "Glpi\\CustomAsset\\RackAsset": [
+   {
+    "entities_id": 2,
+    "id": 1,
+    "is_deleted": 0,
+    "is_template": 0,
+    "name": "R-01"
+   }
+  ],
+  "IPAddress": [
+   {
+    "id": 1,
+    "mainitems_id": 1,
+    "mainitemtype": "Computer",
+    "name": "192.168.10.5",
+    "version": 4
+   },
+   {
+    "id": 2,
+    "mainitems_id": 1,
+    "mainitemtype": "Computer",
+    "name": "fe80::1",
+    "version": 6
+   }
+  ],
+  "Item_Problem": [
+   {
+    "id": 1,
+    "items_id": 1,
+    "itemtype": "Computer",
+    "problems_id": 1
+   }
+  ],
+  "Item_SoftwareVersion": [
+   {
+    "id": 1,
+    "items_id": 1,
+    "itemtype": "Computer",
+    "softwareversions_id": 1
+   },
+   {
+    "id": 2,
+    "items_id": 2,
+    "itemtype": "Computer",
+    "softwareversions_id": 1
+   }
+  ],
+  "Item_Ticket": [
+   {
+    "id": 1,
+    "items_id": 1,
+    "itemtype": "Computer",
+    "tickets_id": 1
+   }
+  ],
+  "Location": [
+   {
+    "completename": "Building 1",
+    "entities_id": 0,
+    "id": 9,
+    "is_recursive": 1,
+    "locations_id": 0,
+    "name": "Building 1"
+   },
+   {
+    "building": "B1",
+    "completename": "Building 1 > Server room",
+    "entities_id": 0,
+    "id": 10,
+    "is_recursive": 1,
+    "latitude": "41.8226",
+    "locations_id": 9,
+    "longitude": "12.6713",
+    "name": "Server room"
+   },
+   {
+    "completename": "Building 1 > Office 12",
+    "entities_id": 0,
+    "id": 11,
+    "is_recursive": 1,
+    "locations_id": 9,
+    "name": "Office 12"
+   }
+  ],
+  "Monitor": [
+   {
+    "entities_id": 2,
+    "id": 1,
+    "is_deleted": 0,
+    "is_template": 0,
+    "name": "MON-1"
+   }
+  ],
+  "NetworkEquipment": [
+   {
+    "entities_id": 2,
+    "id": 1,
+    "is_deleted": 0,
+    "is_template": 0,
+    "locations_id": 10,
+    "name": "sw-core-1",
+    "networkequipmenttypes_id": 1,
+    "serial": "SW-77"
+   },
+   {
+    "entities_id": 2,
+    "id": 2,
+    "is_deleted": 0,
+    "is_template": 0,
+    "name": "ap-floor1",
+    "networkequipmenttypes_id": 2
+   }
+  ],
+  "NetworkPort": [
+   {
+    "entities_id": 2,
+    "id": 1,
+    "instantiation_type": "NetworkPortEthernet",
+    "items_id": 1,
+    "itemtype": "Computer",
+    "logical_number": 1,
+    "mac": "AA:BB:CC:00:11:22",
+    "name": "eth0"
+   },
+   {
+    "entities_id": 2,
+    "id": 2,
+    "instantiation_type": "NetworkPortEthernet",
+    "items_id": 1,
+    "itemtype": "NetworkEquipment",
+    "logical_number": 1,
+    "mac": "AA:BB:CC:00:99:01",
+    "name": "Gi1/0/1"
+   }
+  ],
+  "Problem": [
+   {
+    "entities_id": 2,
+    "id": 1,
+    "impact": 4,
+    "name": "Recurring DB locks",
+    "priority": 4,
+    "status": 1
+   }
+  ],
+  "Software": [
+   {
+    "entities_id": 0,
+    "id": 1,
+    "manufacturers_id": 2,
+    "name": "Firefox"
+   },
+   {
+    "entities_id": 0,
+    "id": 2,
+    "manufacturers_id": 3,
+    "name": "Office"
+   }
+  ],
+  "SoftwareLicense": [
+   {
+    "entities_id": 0,
+    "expire": "2026-09-30",
+    "id": 1,
+    "name": "Office 50 seats",
+    "number": 50,
+    "serial": "XXXX-YYYY-ZZZZ",
+    "softwares_id": 2
+   }
+  ],
+  "SoftwareVersion": [
+   {
+    "entities_id": 0,
+    "id": 1,
+    "name": "128.3",
+    "softwares_id": 1
+   }
+  ],
+  "Supplier": [
+   {
+    "entities_id": 0,
+    "id": 1,
+    "name": "Acme IT",
+    "phonenumber": "+39 06 000",
+    "website": "https://acme.example"
+   }
+  ],
+  "Ticket": [
+   {
+    "content": "&lt;p&gt;Users report slow queries.&lt;/p&gt;",
+    "date": "2026-09-25 08:00:00",
+    "date_mod": "2026-09-25 09:00:00",
+    "entities_id": 2,
+    "id": 1,
+    "impact": 3,
+    "itilcategories_id": 0,
+    "name": "Database slow",
+    "priority": 4,
+    "status": 2,
+    "type": 1,
+    "urgency": 4
+   },
+   {
+    "closedate": "2026-09-11 10:00:00",
+    "content": "Please create an account.",
+    "date": "2026-09-10 08:00:00",
+    "entities_id": 2,
+    "id": 2,
+    "name": "New account",
+    "priority": 3,
+    "status": 6,
+    "type": 2,
+    "urgency": 3
+   },
+   {
+    "entities_id": 3,
+    "id": 3,
+    "name": "Other site printer",
+    "status": 1,
+    "type": 1
+   }
+  ]
+ },
+ "plugins": [],
+ "read_at": "2026-10-01T08:00:00+00:00",
+ "unavailable": {
+  "Phone": "403 ERROR_RIGHT_MISSING"
+ },
+ "users": {
+  "5": {
+   "login": "jdoe"
+  },
+  "6": {
+   "login": "nobody-here"
+  }
+ }
+}

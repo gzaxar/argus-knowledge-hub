@@ -54,6 +54,11 @@ class Package:
             "workflows": len(self.section("workflows") or []),
             "equipment_classes": len(classes.get("classes") or []),
             "map_layers": len(self.section("map_layers") or []),
+            "extensions": len(self.section("extends") or []),
+            "relation_types": len(self.section("relation_types") or []),
+            "roles": len(self.section("roles") or []),
+            "restricted_classes": len(self.section("restricted_classes") or []),
+            "queries": len(self.section("queries") or []),
         }
 
     def describe(self) -> dict:

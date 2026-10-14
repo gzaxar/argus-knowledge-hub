@@ -1,0 +1,14 @@
+records:
+  - {key: ZONE-CR, type: Access Zone, name: Clean room, attributes: {security_level: Restricted}}
+  - {key: ZONE-LAB, type: Access Zone, name: Laser lab, attributes: {security_level: High security}}
+  - {key: DOOR-1, type: Door, name: Clean room airlock, attributes: {door_kind: Security door, access_controlled: true, leads_to: "@ZONE-CR"}}
+  - {key: DOOR-2, type: Door, name: Clean room emergency exit, attributes: {door_kind: Fire door, fire_rating_min: 60, leads_to: "@ZONE-CR"}}
+  - {key: DOOR-3, type: Door, name: Laser lab door, attributes: {door_kind: Security door, leads_to: "@ZONE-LAB"}}
+  - {key: CTRL-1, type: Access Controller, name: Controller A, attributes: {n_doors: 2}}
+  - {key: READER-1, type: Badge Reader, name: Airlock reader, attributes: {reads_for: "@DOOR-1", access_controller: "@CTRL-1"}}
+  - {key: READER-2, type: Badge Reader, name: Laser lab reader, attributes: {reads_for: "@DOOR-3", access_controller: "@CTRL-1"}}
+  - {key: CRANE-1, type: Overhead Crane, name: Hall crane 10 t, attributes: {swl_t: 10, statutory_inspection_due: "2026-10-31"}}
+  - {key: LIFT-1, type: Elevator, name: Goods lift, attributes: {rated_load_kg: 2000, statutory_inspection_due: "2027-04-30"}}
+tickets:
+  - {key: AR-1, kind: Access Request, title: Access to the clean room for a visiting engineer, state: requested}
+  - {key: AR-2, kind: Access Request, title: Laser lab access, state: granted}

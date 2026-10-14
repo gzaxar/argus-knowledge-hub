@@ -5,19 +5,25 @@ from **template packages**: versioned YAML in `backend/packages/<id>/`, read by 
 
 | Package | Holds | Depends on |
 |---|---|---|
-| `core-facility` | the base ticket and document types and their kinds, the status and priority enumerations, the default ticket workflow | — |
-| `core-objects` | the object backbone: the root and its branches, equipment (Asset) and what is generic about it — ports, cables, supports, spares, instruments, chillers and cooling-circuit components — products and vendors, places; the Other Equipment classes | `core-facility` |
-| `it` | network and computing equipment (switches, routers, firewalls, Wi-Fi access points, converters, servers, workstations, storage, patch panels) and network records | `core-objects` |
-| `electrical` | switchboards, distribution panels, breakers, transformers, UPS, generators, meters, circuits; `fed from` is a power edge | `core-objects` |
-| `hydraulic` | water pumps, valves, pipe segments, tanks, flow and pressure transmitters, heat exchangers; `cooled by` is a cooling edge | `core-objects` |
-| `hvac` | air handling units, fan coils, dampers, cooling towers, heat pumps, ducts, sensors | `core-objects` |
-| `plant` | electrical, hydraulic and HVAC together, with plant systems and technical rooms | `electrical`, `hydraulic`, `hvac` |
-| `accelerator` | the accelerator facility: the machine as functions, its equipment (magnets, RF, vacuum, diagnostics, motion, timing), control and engineering records | `core-objects`, `it` |
+| `core-facility` 2.0 | the base ticket and document types and their kinds, the status and priority enumerations, the default ticket workflow — domain neutral | — |
+| `core-objects` 2.0 | the object backbone: equipment (Asset) and what is generic about it, products and vendors, places; the Other Equipment classes — domain neutral | `core-facility` |
+| `core-records` | records that are not equipment: Record, Organization, Contract | `core-facility` |
+| `it` | network and computing equipment, peripherals, network records, software and licences, the IT service desk's kinds; GLPI (docs/glpi.md) | `core-objects`, `core-records` |
+| `safety` | fire protection, gas and radiation monitoring, shielding, sources; fire zones and radiation areas; inspections, findings, incidents, permits to work | `core-objects` |
+| `vacuum-cryo` | vacuum, cryogenics and gas handling; leak tests, bake-outs, cryogen deliveries | `core-objects` |
+| `civil-access` | rooms, access zones, doors, readers, controllers, elevators, cranes; defects, civil works, access requests | `core-objects` |
+| `optics-alignment` | lasers, optics, optical tables, survey points and instruments, laser controlled areas | `core-objects` |
+| `environmental` | monitoring networks, stations, sensors, loggers, sampling points; calibrations, exceedances | `core-objects` |
+| `administration` | budget lines, grants, purchase orders, invoices; procurement requests | `core-records` |
+| `tech-transfer` | inventions, patents, licences, NDAs, spin-offs, valorization projects, research outputs | `core-records` |
+| `electrical`, `hydraulic`, `hvac`, `plant` | the technical plant; `fed from`, `cooled by` | `core-objects` |
+| `accelerator` 2.1 | the accelerator facility: functions, magnets, RF, diagnostics, motion, timing, control, engineering records; the beam's own impacts and criticalities (an extension) | `core-objects`, `it`, `safety`, `vacuum-cryo`, `optics-alignment` |
 
 Every workspace has `core-facility`; the others are chosen when the workspace is made, or installed later, alone
-or together: no two packages define the same type, so any combination shares one core. Accelerator 2.0 is the
-1.x catalogue split in three — core-objects, it, accelerator — with the same types and uids: a workspace on 1.x
-upgrades with every moved type reported as *moved* (no decision, nothing changed) and gains the four new IT types.
+or together: no two packages define the same type, kind, relation verb, role or restricted class, so any
+combination shares one core. docs/domain-packages.md has the design of the domain packages, the types that
+moved between packages (unchanged), compatibility, and the decisions their domain owners must take; none of
+them establishes regulatory compliance.
 
 ## Format
 
@@ -35,9 +41,10 @@ provides: [object-catalogue, accelerator-catalogue]   # capabilities importers w
 contents: [object_types.yaml, vocabulary.yaml]
 ```
 
-Each content file holds one or more sections: `option_sets`, `enumerations`, `object_types`
-(`types`, `beamline_roots`, `former_names`), `ticket_types` and `document_types` (`base`, `kinds`),
-`workflows`, `equipment_classes`, `reference_relations`, `map_layers`. An object type:
+Each content file holds one or more sections (a section lives in one file): `option_sets`, `enumerations`,
+`object_types` (`types`, `beamline_roots`, `former_names`), `ticket_types` and `document_types` (`base`,
+`kinds` — a kind may have `attributes` of its own), `workflows`, `equipment_classes`, `reference_relations`,
+`map_layers`, `extends`, `relation_types`, `roles`, `restricted_classes`, `imports`, `queries`. An object type:
 
 ```yaml
 - name: Vacuum Pump
@@ -52,6 +59,32 @@ Each content file holds one or more sections: `option_sets`, `enumerations`, `ob
     - {key: pump_kind, name: Pump kind, type: enumeration, option_set: pump_kinds}
     - {key: vendor_ref, name: Vendor, type: reference, reference: Vendor}
     - {key: rated_power_kva, name: Rated power (kVA), type: float, unit: kVA}   # a number's unit
+```
+
+An attribute may also say `validator: <id>` (a check ARGUS implements: `GET` the ids from
+`app/packages/validators.py`), `restricted: <class>` (hidden from anyone not given that class), and
+`description`. The other sections:
+
+```yaml
+extends:                        # add to a type a dependency defines; never change what is there
+  - {area: ticket_types, type: base, options: {argus_impact: [{id: beam_down, value: Beam down}]}}
+  - {type: Contract, attributes: [{key: cig, name: CIG, validator: admin.cig}]}
+relation_types:                 # verbs with a meaning; refused between the wrong types
+  - {id: reports-to, verb: "reports to", from: [Fire Detector], to: Fire Alarm Panel,
+     layer: safety, flows: reverse, carries: function}
+workflows:                      # a package's workflow names its kinds; an approval step needs `approve`
+  - id: permit-to-work
+    applies_to: ["Permit to Work"]
+    initial: requested
+    states: [{key: requested, name: Requested, category: open}, …]
+    transitions: [{from: under_review, to: approved, name: Approve, requires: [approver]}, …]
+roles:                          # role templates, offered to workspaces with the package; never granted
+  - {id: fire-safety-officer, name: …, description: …, objects: [read, create, modify], tickets: [read, approve]}
+restricted_classes: [{id: source_security, description: …}]
+imports: [{importer: locations, description: …}]       # importer ids from app/packages/importers.py
+queries:                        # representative questions, run by the tests against the fixture
+  - {id: extinguishers-due, title: …, entity: assets, jql: 'type = "Fire Extinguisher" AND …',
+     fixture: fixtures/fire.yaml, expect: [EXT-01, EXT-03]}
 ```
 
 A package holds **definitions only**: no site data (coordinates, records) and no code. It is read with a safe
@@ -128,12 +161,18 @@ checks them before anything is written. A workspace that lacks one is told what 
 imported. Imports never install or rewrite definitions: a workspace's definitions change only through the
 installer, previewed and recorded.
 
+Every importer's prerequisites are listed in `app/packages/importers.py` (and a package's `imports:` may
+only name importers listed there):
+
 | Import | Needs | May still create |
 |---|---|---|
 | EPIK8s configuration (web and `scripts/import_epik8s.py`) | `accelerator-catalogue` | its own `epik8s-…` types when the catalogue has none of that name |
 | PBS workbook (`scripts/import_pbs.py`) | `accelerator-catalogue` | — |
+| GLPI | `it-catalogue`, `records`, `tickets`, `documents` | workspace types and fields for GLPI's own schema, only once approved |
+| Locations (CSV, GeoJSON) | `object-catalogue` | — |
 | Jira issues | `tickets` | a ticket kind for each issue type the data names that the workspace lacks |
 | Confluence, Markdown, Olog | `documents` | a missing core document kind it classifies into |
+| Jira Insight, Git | — | the types the source's own schema defines (the data's, not a package's) |
 
 The base ticket and document types' fields are no longer rewritten by an import (they were reset to the
 release's on every import, losing local edits). A workspace given its definitions before the record began is
@@ -149,4 +188,6 @@ the whole catalogue in the workspace) is gone.
 The two packages were generated from the Python definitions they replace, and
 `backend/tests/fixtures/package_parity/seeding.json` records what seeding wrote before them, in the four ways
 a workspace is seeded (core, self-contained catalogue, shared catalogue, beamline). `tests/test_packages.py`
-installs the packages the same four ways and requires the identical result.
+installs the packages the same four ways and requires the identical result, but for what is listed as added
+since (the split, the new IT types, map placement, and 1.35.26's neutral core, GLPI provenance fields and the
+types of the packages the accelerator now stands on).

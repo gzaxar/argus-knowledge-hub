@@ -1,0 +1,78 @@
+# Hydraulic networks, on the core backbone. Chillers and cooling-circuit components are core types: shared
+# with HVAC and the accelerator's cooling.
+
+option_sets:
+  fluids:
+    - {id: water, value: Water}
+    - {id: demineralised, value: Demineralised water}
+    - {id: glycol, value: Glycol mix}
+    - {id: compressed_air, value: Compressed air}
+    - {id: other, value: Other}
+
+map_layers:
+  - {id: hydraulic, name: Hydraulic, description: "Pumps, valves, tanks and pipes."}
+
+object_types:
+  types:
+    - name: "Hydraulic Equipment"
+      parent: "Asset"
+      description: "Equipment of a water or fluid network."
+      abstract: true
+      icon: tabler/droplet
+      locatable: true
+      map_layer: hydraulic
+      attributes:
+        - {key: fluid, name: Fluid, type: enumeration, option_set: fluids}
+        - {key: nominal_pressure_bar, name: Nominal pressure (bar), type: float, unit: bar}
+        - {key: dn, name: Nominal diameter (DN), type: integer}
+        - {key: circuit, name: Circuit, indexed: true}
+        - {key: cooled_by, name: Cooled by, type: reference, reference: Asset, include_children: true}
+    - name: "Water Pump"
+      parent: "Hydraulic Equipment"
+      description: "Circulates water or another fluid in a circuit."
+      icon: tabler/propeller
+      attributes:
+        - {key: flow_m3h, name: Rated flow (m³/h), type: float, unit: m3/h}
+        - {key: head_m, name: Head (m), type: float, unit: m}
+        - {key: motor_power_kw, name: Motor power (kW), type: float, unit: kW}
+    - name: "Hydraulic Valve"
+      parent: "Hydraulic Equipment"
+      description: "Isolates, regulates or prevents back-flow in a circuit."
+      icon: tabler/adjustments
+      attributes:
+        - {key: valve_kind, name: Kind, type: enumeration, options: [{id: isolation, value: Isolation}, {id: control, value: Control}, {id: check, value: Check (non-return)}, {id: relief, value: Pressure relief}]}
+        - {key: actuated, name: Actuated, type: boolean}
+    - name: "Pipe Segment"
+      parent: "Hydraulic Equipment"
+      description: "A run of pipe between two points of a circuit."
+      icon: tabler/line-dashed
+      attributes:
+        - {key: length_m, name: Length (m), type: float, unit: m}
+        - {key: material, name: Material, indexed: true}
+    - name: "Tank"
+      parent: "Hydraulic Equipment"
+      description: "Stores fluid: a buffer, an expansion vessel, a reservoir."
+      icon: tabler/cylinder
+      attributes:
+        - {key: volume_m3, name: Volume (m³), type: float, unit: m3}
+    - name: "Flow Transmitter"
+      parent: "Hydraulic Equipment"
+      description: "Measures the flow in a pipe."
+      icon: tabler/gauge
+      attributes:
+        - {key: range_m3h, name: Range (m³/h), type: float, unit: m3/h}
+    - name: "Pressure Transmitter"
+      parent: "Hydraulic Equipment"
+      description: "Measures the pressure at a point of a circuit."
+      icon: tabler/gauge
+      attributes:
+        - {key: range_bar, name: Range (bar), type: float, unit: bar}
+    - name: "Heat Exchanger"
+      parent: "Hydraulic Equipment"
+      description: "Transfers heat between two circuits."
+      icon: tabler/arrows-right-left
+      attributes:
+        - {key: duty_kw, name: Duty (kW), type: float, unit: kW}
+
+reference_relations:
+  cooled_by: "cooled by"

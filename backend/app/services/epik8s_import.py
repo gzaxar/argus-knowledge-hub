@@ -68,12 +68,13 @@ from app.services.element_inference import (
     ASSET_TYPES, CAMERA, CONTROLLER_TYPES, ELEMENT_TYPES, LATTICE_NAME, SCREEN_NAME, SYSTEM_BY_GROUP,
     infer_controller, infer_device, infer_ioc,
 )
+from app.packages.importers import requires
 from app.services import dns_convention
 from app.services.network_resolve import IPV4, NetworkIndex, short_host
 from app.services.relations import rebuild_asset_relations
 
 # The packages a workspace must have before an EPIK8s import (their `provides`).
-REQUIRES = ("accelerator-catalogue",)
+REQUIRES = requires("epik8s")
 SOURCE = "epik8s"
 
 # The object types this import owns. Created on first run if they are not

@@ -1,0 +1,8 @@
+records:
+  - {key: OSC-1, type: Laser Oscillator, name: Ti:Sa oscillator, attributes: {laser_class: "4", wavelength_nm: 800}}
+  - {key: PUMP-1, type: Pump Laser, name: Pump laser, attributes: {laser_class: 3B, wavelength_nm: 532}}
+  - {key: AMP-1, type: Laser Amplifier, name: Regenerative amplifier, attributes: {laser_class: "4", seeded_by: "@OSC-1", pumped_by: "@PUMP-1"}}
+  - {key: AMP-2, type: Laser Amplifier, name: Multipass amplifier, attributes: {seeded_by: "@AMP-1"}}
+tickets:
+  - {key: SURV-1, kind: Alignment Survey, title: Girder survey 1, attributes: {max_deviation_um: 42, tolerance_um: 100}}
+  - {key: SURV-2, kind: Alignment Survey, title: Girder survey 2, attributes: {max_deviation_um: 180, tolerance_um: 100}}

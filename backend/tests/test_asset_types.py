@@ -71,9 +71,12 @@ def effective_keys(db, ws, name):
 
 def test_the_catalogue_is_the_size_the_design_says():
     # 153 in the 1.x catalogue, and the four IT types (firewall, Wi-Fi access point, storage, patch panel)
-    # the it package added when the catalogue was split into core-objects, it and accelerator.
-    assert len(at.CATALOGUE) == 157
-    assert sum(t.abstract for t in at.CATALOGUE) == 18
+    # the it package added when the catalogue was split into core-objects, it and accelerator: 157. Since
+    # 1.35.26 the accelerator package stands on core-records, safety, vacuum-cryo and optics-alignment too, so
+    # its catalogue gains their new types (3 + 12 + 11 + 17) and it 1.1.0's four (peripheral, software product,
+    # version, licence); the types moved into those packages are counted once, as before.
+    assert len(at.CATALOGUE) == 204
+    assert sum(t.abstract for t in at.CATALOGUE) == 22
     assert max(at.depth(t.name) for t in at.CATALOGUE) == 6
 
 
@@ -400,7 +403,8 @@ def test_a_screen_station_is_composed_of_its_parts(seeded):
 def test_the_two_sets_partition_the_catalogue():
     assert set(at.GLOBAL_TYPES) | set(at.BEAMLINE_TYPES) == {t.name for t in at.CATALOGUE}
     assert not set(at.GLOBAL_TYPES) & set(at.BEAMLINE_TYPES)
-    assert (len(at.GLOBAL_TYPES), len(at.BEAMLINE_TYPES)) == (88, 69)  # the it package's four new types are shared equipment
+    # the it package's four new types are shared equipment, and so are the 47 the domain packages add (1.35.26)
+    assert (len(at.GLOBAL_TYPES), len(at.BEAMLINE_TYPES)) == (135, 69)
 
 
 def test_a_machines_structure_and_control_are_its_own_and_the_rest_is_shared():
@@ -747,7 +751,9 @@ def test_the_it_types_form_a_tree_under_asset_and_the_registry_records_sit_apart
     assert parent("Server") == parent("Workstation") == "Computing Node"
     assert parent("Network Segment") == parent("Address Record") == "IT Record"
     assert parent("IT Record") == "Item"
-    assert all(at.BY_NAME[n].abstract for n in ("IT Equipment", "Network Device", "Computing Node", "IT Record"))
+    assert all(at.BY_NAME[n].abstract for n in ("IT Equipment", "IT Record"))
+    # concrete since it 1.1.0: what GLPI does not classify further is a plain network device or computing node
+    assert not any(at.BY_NAME[n].abstract for n in ("Network Device", "Computing Node"))
 
 
 def test_it_equipment_and_records_are_shared_and_a_serial_line_is_a_beamlines_own():
@@ -778,12 +784,12 @@ def test_seeding_again_moves_a_type_whose_place_in_the_tree_changed(db, workspac
     db.commit()
     device = db.get(Schema, at.type_uid(workspace, "Network Device"))
     device.parent_schema_uid = at.type_uid(workspace, "Asset")      # the old shape
-    device.is_concrete = True
+    device.is_concrete = False                                        # abstract before it 1.1.0
     db.commit()
     result = at.ensure_asset_types(db, workspace, scope="all")
     db.commit()
     db.refresh(device)
-    assert device.parent_schema_uid == at.type_uid(workspace, "IT Equipment") and not device.is_concrete
+    assert device.parent_schema_uid == at.type_uid(workspace, "IT Equipment") and device.is_concrete
     assert "Network Device" in result.extended
 
 

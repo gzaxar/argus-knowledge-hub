@@ -1,0 +1,52 @@
+# The base ticket type (its fields are kept current in every workspace) and the kinds of work a
+# ticket can be. A type's uid is <workspace>:argus-ticket[:<kind>].
+ticket_types:
+  base:
+    name: "Ticket"
+    description: "Fields every ticket carries, whatever created it."
+    icon: tabler/ticket
+    attributes:
+      - {key: argus_category, name: Category, type: enumeration, options: [{id: fault, value: Fault}, {id: maintenance, value: Maintenance}, {id: upgrade, value: Upgrade}, {id: request, value: Request}, {id: investigation, value: Investigation}, {id: other, value: Other}]}
+      - {key: argus_impact, name: Operational impact, type: enumeration, options: [{id: beam_down, value: Beam down}, {id: beam_degraded, value: Beam degraded}, {id: no_beam_impact, value: No beam impact}, {id: safety, value: Safety}, {id: unknown, value: Unknown}]}
+      - {key: argus_detected_by, name: Detected by, type: enumeration, options: [{id: operator, value: Operator}, {id: alarm, value: Alarm}, {id: monitoring, value: Monitoring}, {id: inspection, value: Inspection}, {id: user_report, value: User report}]}
+      - {key: argus_system, name: System, indexed: true}
+      - {key: argus_subsystem, name: Subsystem, indexed: true}
+      - {key: argus_root_cause, name: Root cause, type: text}
+      - {key: argus_corrective_action, name: Corrective action, type: text}
+      - {key: argus_resolution, name: Resolution, indexed: true}
+      - {key: argus_downtime_start, name: Downtime start, type: datetime}
+      - {key: argus_downtime_end, name: Downtime end, type: datetime}
+      - {key: argus_downtime_minutes, name: Downtime (minutes), type: integer}
+      - {key: argus_epic, name: Epic}
+      - {key: argus_epic_name, name: Epic name}
+      - {key: argus_sprint, name: Sprint, indexed: true, multi: true}
+      - {key: argus_story_points, name: Story points, type: float}
+      - {key: argus_components, name: Components, indexed: true, multi: true}
+      - {key: argus_fix_versions, name: Fix version/s, indexed: true, multi: true}
+      - {key: argus_affects_versions, name: Affects version/s, indexed: true, multi: true}
+      - {key: argus_environment, name: Environment, type: text}
+      - {key: argus_parent, name: Parent ticket}
+      - {key: argus_time_spent, name: Time spent (s), type: integer}
+      - {key: argus_time_estimate, name: Original estimate (s), type: integer}
+      - {key: argus_reporter, name: Reporter, indexed: true}
+      - {key: argus_votes, name: Votes, type: integer}
+      - {key: argus_watchers, name: Watchers, type: integer}
+      - {key: argus_source, name: Source, type: enumeration, readonly: true, options: [{id: manual, value: Created here}, {id: jira, value: Jira}]}
+      - {key: argus_project, name: Project at source, readonly: true}
+      - {key: argus_source_key, name: Source key, readonly: true}
+      - {key: argus_source_url, name: Source link, readonly: true}
+      - {key: argus_source_status, name: Status at source, readonly: true}
+      - {key: argus_source_type, name: Type at source, readonly: true}
+      - {key: argus_source_created, name: Created at source, type: datetime, readonly: true}
+      - {key: argus_source_updated, name: Updated at source, type: datetime, readonly: true}
+  kinds:
+    - name: "Epic"
+      icon: tabler/bolt
+    - name: "Story"
+      icon: tabler/bookmark
+    - name: "Task"
+      icon: tabler/checkbox
+    - name: "Bug"
+      icon: tabler/bug
+    - name: "Sub-task"
+      icon: tabler/subtask

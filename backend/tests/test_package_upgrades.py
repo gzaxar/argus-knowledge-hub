@@ -44,14 +44,14 @@ def _newer(tmp_path):
     # additive: a new type, a new attribute, a new option
     data["object_types"]["types"].append({"name": "Turbo Pump Controller", "parent": "Vacuum Controller",
                                           "description": "Drives a turbomolecular pump."})
-    types["Vacuum Gauge"].setdefault("attributes", []).append({"key": "gauge_range", "name": "Range", "type": "string"})
+    types["Camera"].setdefault("attributes", []).append({"key": "frame_rate", "name": "Frame rate", "type": "string"})
     data["option_sets"]["band"].append({"id": "w_band", "value": "W-band"})
     # definition: a label and a description
     mount = types["Storage Mount"]
     for a in mount["attributes"]:
         if a["key"] == "export_path":
             a["name"] = "Export path (on the server)"
-    types["Vacuum Gauge"]["description"] = "Measures pressure in a vacuum sector."
+    types["Camera"]["description"] = "Takes images of a screen or a beam."
     # breaking: a rename, a removal, tighter validation, a type removed
     for a in mount["attributes"]:
         if a["key"] == "size_gb":
@@ -107,9 +107,9 @@ def test_a_preview_says_what_changes_what_needs_a_decision_and_what_it_touches(w
     r = step.result
     by_id = {c["id"]: c for c in r["changes"]}
     assert by_id["object_types/Turbo Pump Controller/added"]["category"] == "additive"
-    assert by_id["object_types/Vacuum Gauge/attributes/gauge_range/added"]["category"] == "additive"
+    assert by_id["object_types/Camera/attributes/frame_rate/added"]["category"] == "additive"
     assert by_id["object_types/RF Station/attributes/band/options/w_band/added"]["category"] == "additive"
-    assert by_id["object_types/Vacuum Gauge/description"]["category"] == "definition"
+    assert by_id["object_types/Camera/description"]["category"] == "definition"
     assert set(r["needs_decision"]) >= {"object_types/Storage Mount/attributes/capacity_gb/renamed",
                                         "object_types/Storage Mount/attributes/server/removed",
                                         "object_types/Storage Mount/attributes/mount_path/tightened",
@@ -164,9 +164,9 @@ def test_an_upgrade_with_its_plan_applies_it_keeps_local_edits_and_records_every
     assert "server" in keys                                                      # kept, as decided
     assert "regex" not in keys["mount_path"]                                     # kept: no pattern imposed
     assert "export_path" not in keys, "a field the workspace removed is not added back"
-    gauge = db.get(Schema, asset_types.type_uid(ws, "Vacuum Gauge"))
-    assert "gauge_range" in {a["key"] for a in gauge.attributes}
-    assert gauge.description == "Measures pressure in a vacuum sector."
+    camera = db.get(Schema, asset_types.type_uid(ws, "Camera"))
+    assert "frame_rate" in {a["key"] for a in camera.attributes}
+    assert camera.description == "Takes images of a screen or a beam."
     band = next(a for a in db.get(Schema, asset_types.type_uid(ws, "RF Station")).attributes if a["key"] == "band")
     assert "w_band" in {o["id"] for o in band["options"]}
     new_type = db.get(Schema, asset_types.type_uid(ws, "Turbo Pump Controller"))

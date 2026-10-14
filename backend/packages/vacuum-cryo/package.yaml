@@ -1,0 +1,15 @@
+id: vacuum-cryo
+version: 1.0.0
+name: Vacuum, cryogenics and gas handling
+description: >-
+  Vacuum pumps, gauges, valves, chambers and controllers; cryostats, cryocoolers, dewars, transfer lines
+  and cold boxes; gas cylinders, manifolds, regulators, lines and relief devices. Leak tests, bake-outs and
+  cryogen deliveries as tickets, pressure-equipment certificates as documents. The vacuum types moved here
+  unchanged from the accelerator catalogue. Its relief-device and pressure-equipment definitions are to be
+  checked and approved by the site's pressure-equipment responsible; it establishes no compliance by itself.
+owner: INFN ARGUS — to be adopted by the site's vacuum and cryogenics groups
+license: EUPL-1.2
+depends:
+  core-objects: ">=2.0,<3"
+provides: [vacuum-catalogue]
+contents: [object_types.yaml, tickets.yaml, access.yaml, queries.yaml]

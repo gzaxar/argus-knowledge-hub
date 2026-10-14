@@ -2083,6 +2083,71 @@
         "title": "BulkIn",
         "type": "object"
       },
+      "CapabilitiesOut": {
+        "properties": {
+          "document_kinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Document Kinds",
+            "type": "array"
+          },
+          "features": {
+            "$ref": "#/components/schemas/FeaturesOut"
+          },
+          "importers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Importers",
+            "type": "array"
+          },
+          "map_layers": {
+            "items": {
+              "$ref": "#/components/schemas/MapLayerOut"
+            },
+            "title": "Map Layers",
+            "type": "array"
+          },
+          "packages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Packages",
+            "type": "array"
+          },
+          "provides": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Provides",
+            "type": "array"
+          },
+          "ticket_kinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ticket Kinds",
+            "type": "array"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "packages",
+          "provides",
+          "features",
+          "map_layers",
+          "ticket_kinds",
+          "document_kinds",
+          "importers"
+        ],
+        "title": "CapabilitiesOut",
+        "type": "object"
+      },
       "ChatIn": {
         "properties": {
           "conversation_id": {
@@ -4110,6 +4175,54 @@
         "title": "ExportIn",
         "type": "object"
       },
+      "FeaturesOut": {
+        "properties": {
+          "beam_model": {
+            "title": "Beam Model",
+            "type": "boolean"
+          },
+          "control_system": {
+            "title": "Control System",
+            "type": "boolean"
+          },
+          "documents": {
+            "title": "Documents",
+            "type": "boolean"
+          },
+          "equipment": {
+            "title": "Equipment",
+            "type": "boolean"
+          },
+          "map": {
+            "title": "Map",
+            "type": "boolean"
+          },
+          "records": {
+            "title": "Records",
+            "type": "boolean"
+          },
+          "tickets": {
+            "title": "Tickets",
+            "type": "boolean"
+          },
+          "type_catalogue": {
+            "title": "Type Catalogue",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tickets",
+          "documents",
+          "equipment",
+          "records",
+          "map",
+          "beam_model",
+          "control_system",
+          "type_catalogue"
+        ],
+        "title": "FeaturesOut",
+        "type": "object"
+      },
       "FinalizeIn": {
         "properties": {
           "golden_waiver": {
@@ -4858,6 +4971,128 @@
           }
         },
         "title": "GlobalValueUpdate",
+        "type": "object"
+      },
+      "GlpiAuthorityIn": {
+        "properties": {
+          "records": {
+            "default": "argus",
+            "title": "Records",
+            "type": "string"
+          },
+          "tickets": {
+            "default": "argus",
+            "title": "Tickets",
+            "type": "string"
+          }
+        },
+        "title": "GlpiAuthorityIn",
+        "type": "object"
+      },
+      "GlpiConnectionIn": {
+        "properties": {
+          "app_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Token"
+          },
+          "base_url": {
+            "title": "Base Url",
+            "type": "string"
+          },
+          "documents": {
+            "default": true,
+            "title": "Documents",
+            "type": "boolean"
+          },
+          "key_prefix": {
+            "default": "GLPI",
+            "title": "Key Prefix",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "tickets": {
+            "default": true,
+            "title": "Tickets",
+            "type": "boolean"
+          },
+          "user_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Token"
+          },
+          "verify_tls": {
+            "default": true,
+            "title": "Verify Tls",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "base_url"
+        ],
+        "title": "GlpiConnectionIn",
+        "type": "object"
+      },
+      "GlpiEntityMapIn": {
+        "properties": {
+          "entity_map": {
+            "items": {
+              "type": "object"
+            },
+            "title": "Entity Map",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entity_map"
+        ],
+        "title": "GlpiEntityMapIn",
+        "type": "object"
+      },
+      "GlpiRunIn": {
+        "properties": {
+          "expect_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expect Digest"
+          }
+        },
+        "title": "GlpiRunIn",
+        "type": "object"
+      },
+      "GlpiSchemaApproveIn": {
+        "properties": {
+          "digest": {
+            "title": "Digest",
+            "type": "string"
+          }
+        },
+        "required": [
+          "digest"
+        ],
+        "title": "GlpiSchemaApproveIn",
         "type": "object"
       },
       "GoldenIn": {
@@ -7038,6 +7273,35 @@
         "title": "ManifestIn",
         "type": "object"
       },
+      "MapLayerOut": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "MapLayerOut",
+        "type": "object"
+      },
       "MappingBulkIn": {
         "properties": {
           "item_ids": {
@@ -8697,6 +8961,35 @@
           "reason"
         ],
         "title": "RetireAction",
+        "type": "object"
+      },
+      "RetirementDecisionIn": {
+        "properties": {
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "decision"
+        ],
+        "title": "RetirementDecisionIn",
         "type": "object"
       },
       "RetypeRequest": {
@@ -28025,6 +28318,1056 @@
         ]
       }
     },
+    "/v1/glpi/connections": {
+      "get": {
+        "operationId": "list_connections_v1_glpi_connections_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Connections",
+        "tags": [
+          "glpi"
+        ]
+      },
+      "post": {
+        "description": "A GLPI connection, its tokens encrypted (never returned). Give it a GLPI API client and a user whose\nprofile can only read what is imported, in the entities imported (docs/glpi.md).",
+        "operationId": "create_connection_v1_glpi_connections_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlpiConnectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Connection",
+        "tags": [
+          "glpi"
+        ]
+      }
+    },
+    "/v1/glpi/connections/{uid}": {
+      "delete": {
+        "description": "Forget the connection and its credentials. The records it imported stay (their GLPI identities too).",
+        "operationId": "delete_connection_v1_glpi_connections__uid__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Connection",
+        "tags": [
+          "glpi"
+        ]
+      },
+      "get": {
+        "operationId": "get_connection_v1_glpi_connections__uid__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Connection",
+        "tags": [
+          "glpi"
+        ]
+      },
+      "put": {
+        "operationId": "update_connection_v1_glpi_connections__uid__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlpiConnectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Connection",
+        "tags": [
+          "glpi"
+        ]
+      }
+    },
+    "/v1/glpi/connections/{uid}/authority": {
+      "put": {
+        "description": "Who wins when a field was edited here and GLPI changes it: argus (the local value stays, the\ndifference is reported) or glpi (GLPI's applies; a field edited here goes to review in the ledger).",
+        "operationId": "set_authority_v1_glpi_connections__uid__authority_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlpiAuthorityIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Authority",
+        "tags": [
+          "glpi"
+        ]
+      }
+    },
+    "/v1/glpi/connections/{uid}/discover": {
+      "post": {
+        "description": "Read GLPI now and record what it is: version, APIs, entities, item types, custom assets and fields,\nplugins. Proposes an entity mapping (if there is none) and GLPI's schema as ARGUS types and fields.",
+        "operationId": "discover_v1_glpi_connections__uid__discover_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Discover",
+        "tags": [
+          "glpi"
+        ]
+      }
+    },
+    "/v1/glpi/connections/{uid}/entity-map": {
+      "put": {
+        "description": "Which GLPI entities go to which workspaces (each entry: entity_id, workspace_id, recursive). The\nperson setting it must be able to create records and tickets in every workspace it names.",
+        "operationId": "set_entity_map_v1_glpi_connections__uid__entity_map_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlpiEntityMapIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Entity Map",
+        "tags": [
+          "glpi"
+        ]
+      }
+    },
+    "/v1/glpi/connections/{uid}/preview": {
+      "post": {
+        "description": "What importing now would do in each workspace: records created, updated (which fields), unchanged;\nconflicts with local edits and how the authority policy settles them; records GLPI no longer lists\n(retirement candidates); tickets; documents; custom types awaiting schema review; entities outside the map.",
+        "operationId": "preview_v1_glpi_connections__uid__preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview",
+        "tags": [
+          "glpi"
+        ]
+      }
+    },
+    "/v1/glpi/connections/{uid}/retirement-candidates": {
+      "get": {
+        "description": "Records GLPI no longer lists (or has in its trash) that nobody has decided on yet.",
+        "operationId": "retirement_candidates_v1_glpi_connections__uid__retirement_candidates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retirement Candidates",
+        "tags": [
+          "glpi"
+        ]
+      },
+      "post": {
+        "description": "Retire a record GLPI no longer lists, or keep it as an ARGUS record. The import stops stating it.",
+        "operationId": "decide_v1_glpi_connections__uid__retirement_candidates_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetirementDecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Decide",
+        "tags": [
+          "glpi"
+        ]
+      }
+    },
+    "/v1/glpi/connections/{uid}/run": {
+      "post": {
+        "description": "Import now. With `expect_digest` (from the preview), only if GLPI still holds what was previewed.",
+        "operationId": "run_v1_glpi_connections__uid__run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlpiRunIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Run",
+        "tags": [
+          "glpi"
+        ]
+      }
+    },
+    "/v1/glpi/connections/{uid}/schema/approve": {
+      "post": {
+        "description": "Approve the proposal that was reviewed (named by its digest): create the workspace types and fields it\nproposes. A proposal made since — GLPI's schema changed — is not approved by an older digest.",
+        "operationId": "approve_schema_v1_glpi_connections__uid__schema_approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlpiSchemaApproveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Approve Schema",
+        "tags": [
+          "glpi"
+        ]
+      }
+    },
     "/v1/graph": {
       "get": {
         "description": "Everything within `depth` hops of one node, across objects, tickets,\ndocuments and people.\n\nDepth is capped at 4 deliberately: in a real inventory a hub object\nreaches most of the graph by the third hop, and an answer that large\nhelps nobody.",
@@ -42678,6 +44021,85 @@
         ]
       }
     },
+    "/v1/packages/preview": {
+      "post": {
+        "description": "What a new workspace made from these packages would get — each package (dependencies first) with its\nexact version and checksum, and the types, kinds and workflows it would create — worked out in a workspace\nmade and rolled back. For the form that creates workspaces (administrators).",
+        "operationId": "preview_new_workspace_v1_packages_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PackagesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview New Workspace",
+        "tags": [
+          "packages"
+        ]
+      }
+    },
     "/v1/packages/resolve": {
       "post": {
         "description": "What a new workspace starting from these packages would get: each package (dependencies first) and\nwhat it holds. For the form that creates a workspace, before there is one to preview in.",
@@ -50629,6 +52051,86 @@
         "summary": "Delete Binding",
         "tags": [
           "roles"
+        ]
+      }
+    },
+    "/v1/workspaces/{workspace_id}/capabilities": {
+      "get": {
+        "description": "What this workspace's packages let it do: which pages to show (equipment, map, beam model, records), its\nmap layers, ticket and document kinds, and the importers its packages support.",
+        "operationId": "workspace_capabilities_v1_workspaces__workspace_id__capabilities_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilitiesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Workspace Capabilities",
+        "tags": [
+          "packages"
         ]
       }
     },

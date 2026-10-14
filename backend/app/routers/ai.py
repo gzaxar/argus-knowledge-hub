@@ -462,6 +462,13 @@ def review_a_document(
     )
 
 
+def _ticket_vocabulary(db: Session, workspace_id: str) -> dict:
+    from app.services.ticket_types import options_in, workspace_base_attributes
+    attrs = workspace_base_attributes(db, workspace_id)
+    return {"category": options_in(attrs, "argus_category"), "impact": options_in(attrs, "argus_impact"),
+            "detected_by": options_in(attrs, "argus_detected_by")}
+
+
 @router.post("/draft-ticket", response_model=DraftTicketOut)
 def draft_a_ticket(
     body: DraftTicketIn,
@@ -474,7 +481,8 @@ def draft_a_ticket(
     if not body.title.strip() and not body.description.strip():
         raise HTTPException(status_code=422, detail="Write the report first.")
     try:
-        fields = draft_ticket_fields(endpoint_for(config), body.title, body.description)
+        fields = draft_ticket_fields(endpoint_for(config), body.title, body.description,
+                                     _ticket_vocabulary(db, workspace_id))
     except LLMError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
     return DraftTicketOut(

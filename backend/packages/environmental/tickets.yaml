@@ -1,0 +1,60 @@
+ticket_types:
+  kinds:
+    - name: "Sensor Calibration"
+      description: "A calibration: the error as found and as left, and the certificate."
+      icon: tabler/adjustments
+      attributes:
+        - {key: calibrated_on, name: Calibrated on, type: date}
+        - {key: as_found_error, name: Error as found, type: float}
+        - {key: as_left_error, name: Error as left, type: float}
+        - {key: certificate_number, name: Certificate}
+    - name: "Threshold Exceedance"
+      description: "A measurement above a threshold: verified, and notified where that is required."
+      icon: tabler/alert-triangle
+      attributes:
+        - {key: measured_quantity, name: Quantity, type: enumeration, option_set: quantities}
+        - {key: measured_value, name: Measured, type: float}
+        - {key: limit_value, name: Limit, type: float}
+        - {key: exceeded_at, name: When, type: datetime}
+        - {key: notification_required, name: Notification required, type: boolean}
+    - name: "Field Sampling"
+      description: "Samples taken at a sampling point, and the laboratory's reference."
+      icon: tabler/test-pipe
+      attributes:
+        - {key: sample_ids, name: Sample ids, multi: true}
+        - {key: sampled_at, name: Sampled at, type: datetime}
+        - {key: laboratory_reference, name: Laboratory reference}
+
+workflows:
+  - id: threshold-exceedance
+    name: "Threshold exceedance"
+    description: "Detected, verified (or dismissed as a false reading), notified by someone who may approve, closed."
+    applies_to: ["Threshold Exceedance"]
+    initial: detected
+    states:
+      - {key: detected, name: Detected, category: open}
+      - {key: verified, name: Verified, category: active}
+      - {key: notified, name: Notified, category: active}
+      - {key: closed, name: Closed, category: done}
+      - {key: false_reading, name: False reading, category: done}
+    transitions:
+      - {from: detected, to: verified, name: Verify, requires: [assignee, comment]}
+      - {from: detected, to: false_reading, name: Dismiss as a false reading, requires: [comment]}
+      - {from: verified, to: notified, name: Notify, requires: [approver, comment]}
+      - {from: verified, to: closed, name: Close (no notification needed), requires: [approver, resolution]}
+      - {from: notified, to: closed, name: Close, requires: [resolution]}
+
+document_types:
+  kinds:
+    - name: "Monitoring Report"
+      description: "What a network measured over a period, against its limits."
+      icon: tabler/chart-line
+      attributes:
+        - {key: period_start, name: From, type: date}
+        - {key: period_end, name: To, type: date}
+    - name: "Calibration Certificate"
+      description: "The certificate of a calibration, with its traceability."
+      icon: tabler/file-certificate
+      attributes:
+        - {key: calibrated_on, name: Calibrated on, type: date}
+        - {key: certificate_number, name: Certificate}

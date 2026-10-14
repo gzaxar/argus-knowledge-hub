@@ -28,10 +28,11 @@ object_types:
         - {key: argus_subsystem, name: Subsystem, indexed: true}
         - {key: argus_keywords, name: Keywords, indexed: true, multi: true}
         - {key: argus_lifecycle, name: Lifecycle, type: enumeration, options: [{id: planned, value: Planned}, {id: in_service, value: In service}, {id: standby, value: Standby}, {id: maintenance, value: Under maintenance}, {id: faulty, value: Faulty}, {id: decommissioned, value: Decommissioned}, {id: scrapped, value: Scrapped}]}
-        - {key: argus_criticality, name: Criticality, type: enumeration, options: [{id: safety, value: Safety-critical}, {id: beam_critical, value: Beam-critical}, {id: degrades, value: Degrades beam}, {id: non_critical, value: Non-critical}]}
+        # Domain neutral since 2.0: the accelerator package adds Beam-critical and Degrades beam.
+        - {key: argus_criticality, name: Criticality, type: enumeration, options: [{id: safety, value: Safety-critical}, {id: mission_critical, value: Mission-critical}, {id: degrades_service, value: Degrades service}, {id: non_critical, value: Non-critical}]}
         - {key: argus_owner, name: Owning service, type: group, indexed: true}
         - {key: argus_responsible, name: Responsible, type: user}
-        - {key: argus_source, name: Source, type: enumeration, readonly: true, options: [{id: manual, value: Created here}, {id: epik8s, value: EPIK8s}, {id: epik8s-devices, value: epik8s-devices}, {id: jira, value: Jira}, {id: git, value: Git}, {id: pbs, value: PBS workbook}]}
+        - {key: argus_source, name: Source, type: enumeration, readonly: true, options: [{id: manual, value: Created here}, {id: epik8s, value: EPIK8s}, {id: epik8s-devices, value: epik8s-devices}, {id: jira, value: Jira}, {id: git, value: Git}, {id: pbs, value: PBS workbook}, {id: glpi, value: GLPI}]}
         - {key: argus_source_ref, name: Source revision, readonly: true}
     - name: "Engineered Item"
       parent: "Item"

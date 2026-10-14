@@ -12,6 +12,7 @@ export function AdminShell() {
     items.push({ to: `/workspaces/${currentWorkspaceId}/access`, label: "Access" });
     items.push({ to: `/workspaces/${currentWorkspaceId}/members`, label: "Members" });
     items.push({ to: `/workspaces/${currentWorkspaceId}/imports`, label: "Imports" });
+    items.push({ to: `/workspaces/${currentWorkspaceId}/glpi`, label: "GLPI" });
     items.push({ to: `/workspaces/${currentWorkspaceId}/icons`, label: "Icon library" });
     items.push({ to: `/workspaces/${currentWorkspaceId}/transfer`, label: "Transfer" });
     items.push({ to: `/workspaces/${currentWorkspaceId}/ai`, label: "AI endpoint" });

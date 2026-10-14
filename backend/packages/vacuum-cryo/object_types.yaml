@@ -1,0 +1,209 @@
+# Vacuum, cryogenics and gas handling, on the core backbone. Vacuum Pump (and its kinds), Vacuum Gauge,
+# Valve, Chamber, Controller and Component and Cryogenic Device moved here unchanged from the accelerator
+# catalogue. Never rename a type, an attribute key or an option id: stored records use them.
+
+option_sets:
+  gases:
+    - {id: he, value: Helium}
+    - {id: n2, value: Nitrogen}
+    - {id: ar, value: Argon}
+    - {id: h2, value: Hydrogen}
+    - {id: o2, value: Oxygen}
+    - {id: co2, value: Carbon dioxide}
+    - {id: sf6, value: SF6}
+    - {id: dry_air, value: Dry air}
+    - {id: mixture, value: Mixture}
+  cryogens:
+    - {id: lhe, value: Liquid helium}
+    - {id: ln2, value: Liquid nitrogen}
+    - {id: lar, value: Liquid argon}
+
+map_layers:
+  - {id: cryogenics, name: Cryogenics, description: "Cryostats, cold boxes, dewars and transfer lines."}
+  - {id: gas-handling, name: Gas handling, description: "Cylinders, manifolds, regulators and relief devices."}
+
+object_types:
+  types:
+    - name: "Vacuum Pump"
+      parent: "Asset"
+      description: "Any vacuum pump."
+      abstract: true
+      icon: tabler/propeller
+    - name: "Ion Pump"
+      parent: "Vacuum Pump"
+      description: "A sputter-ion pump: the thing that trips when the pressure rises."
+      attributes:
+        - {key: pumping_speed, name: Pumping speed (l/s), type: float}
+        - {key: nominal_voltage, name: Nominal voltage (V), type: integer}
+        - {key: element_count, name: Number of elements, type: integer}
+    - name: "Turbo Pump"
+      parent: "Vacuum Pump"
+      description: "A turbomolecular pump."
+      attributes:
+        - {key: pumping_speed, name: Pumping speed (l/s), type: float}
+        - {key: rotation_speed, name: Rotation speed (Hz), type: float}
+        - {key: backing_pump, name: Backed by, type: reference, reference: Primary Pump}
+    - name: "Primary Pump"
+      parent: "Vacuum Pump"
+      description: "A roughing or backing pump."
+    - name: "NEG Cartridge"
+      parent: "Vacuum Pump"
+      description: "A non-evaporable getter pump."
+    - name: "Vacuum Gauge"
+      parent: "Asset"
+      description: "Measures pressure."
+      icon: tabler/gauge
+      attributes:
+        - {key: gauge_kind, name: Gauge kind, type: enumeration, options: [{id: pirani, value: Pirani}, {id: penning, value: Penning}, {id: cold_cathode, value: Cold cathode}, {id: capacitive, value: Capacitive}]}
+        - {key: range_min, name: Range minimum (mbar), type: float}
+        - {key: range_max, name: Range maximum (mbar), type: float}
+    - name: "Vacuum Valve"
+      parent: "Asset"
+      description: "Isolates a vacuum sector."
+      icon: argus/vacuum-valve
+      attributes:
+        - {key: valve_kind, name: Valve kind, type: enumeration, options: [{id: gate, value: Gate}, {id: angle, value: Angle}, {id: all_metal, value: All-metal}]}
+        - {key: actuation, name: Actuation, type: enumeration, options: [{id: manual, value: Manual}, {id: pneumatic, value: Pneumatic}, {id: electric, value: Electric}]}
+        - {key: interlocked, name: Interlocked, type: boolean}
+    - name: "Vacuum Chamber"
+      parent: "Asset"
+      description: "What you unbolt."
+      icon: tabler/cylinder
+    - name: "Vacuum Controller"
+      parent: "Asset"
+      description: "The box between a control line and the vacuum equipment it runs: an ion pump controller, a turbo controller, a gauge controller. It powers and reads what is connected to it, so when it stops, all of that does."
+      aliases: [ion pump controller, turbo pump controller, ipcmini]
+      icon: tabler/settings-automation
+      attributes:
+        - {key: n_channels, name: Channels, type: integer}
+        - {key: firmware_version, name: Firmware}
+    - name: "Vacuum Component"
+      parent: "Asset"
+      description: "A passive part of the vacuum line: a length of pipe, a bellows, a cross or a tee. Gauges, pumps and valves are mounted on it; a Vacuum Sector says which ones a valve isolates."
+      aliases: [pipe, vacuum pipe, beam pipe, vacuum tube, bellows, cross, tee, elbow, nipple, spool, vacuum line]
+      icon: argus/vacuum-cross
+      attributes:
+        - {key: component_kind, name: Kind, type: enumeration, options: [{id: pipe, value: Pipe}, {id: bellows, value: Bellows}, {id: cross, value: Cross}, {id: tee, value: Tee}, {id: elbow, value: Elbow}, {id: nipple, value: Nipple}, {id: reducer, value: Reducer}, {id: adapter, value: Adapter}, {id: viewport, value: Viewport}, {id: feedthrough, value: Feedthrough}, {id: other, value: Other}]}
+        - {key: length_mm, name: Length (mm), type: float}
+        - {key: inner_diameter_mm, name: Inner diameter (mm), type: float}
+        - {key: flange_type, name: Flange type, type: enumeration, options: [{id: cf, value: CF}, {id: kf, value: KF}, {id: iso_k, value: ISO-K}, {id: iso_f, value: ISO-F}, {id: vcr, value: VCR}, {id: other, value: Other}]}
+        - {key: flange_size, name: Flange size}
+        - {key: material, name: Material}
+        - {key: bakeable, name: Bakeable, type: boolean}
+        - {key: bake_temperature_c, name: Bake-out temperature (°C), type: float}
+    - name: "Cryogenic Device"
+      parent: "Asset"
+      description: "A cryostat, cold head or transfer line."
+      icon: tabler/temperature-minus
+    - name: "Cryostat"
+      parent: "Cryogenic Device"
+      description: "A vessel that keeps what it holds at cryogenic temperature."
+      icon: tabler/snowflake
+      locatable: true
+      map_layer: cryogenics
+      attributes:
+        - {key: operating_temperature_k, name: Operating temperature (K), type: float, unit: K}
+        - {key: cryogen, name: Cryogen, type: enumeration, option_set: cryogens}
+        - {key: design_pressure_bar, name: Design pressure (bar), type: float, unit: bar}
+        - {key: cooled_by, name: Cooled by, type: reference, reference: Cryogenic Device, include_children: true}
+    - name: "Cryocooler"
+      parent: "Cryogenic Device"
+      description: "A closed-cycle cooler: Gifford-McMahon, pulse tube, Stirling."
+      icon: tabler/snowflake
+      locatable: true
+      map_layer: cryogenics
+      attributes:
+        - {key: cooler_kind, name: Kind, type: enumeration, options: [{id: gm, value: Gifford-McMahon}, {id: pulse_tube, value: Pulse tube}, {id: stirling, value: Stirling}]}
+        - {key: cooling_power_w, name: Cooling power (W), type: float, unit: W}
+        - {key: at_temperature_k, name: At (K), type: float, unit: K}
+        - {key: service_interval_h, name: Service interval (h), type: integer, unit: h}
+    - name: "Cold Box"
+      parent: "Cryogenic Device"
+      description: "A refrigerator or liquefier: the plant that makes the cold."
+      icon: tabler/building-factory-2
+      locatable: true
+      map_layer: cryogenics
+      attributes:
+        - {key: refrigeration_power_w, name: Refrigeration power (W), type: float, unit: W}
+        - {key: at_temperature_k, name: At (K), type: float, unit: K}
+        - {key: liquefaction_rate_l_h, name: Liquefaction (l/h), type: float, unit: l/h}
+    - name: "Dewar"
+      parent: "Cryogenic Device"
+      description: "A storage or transport vessel for a cryogen."
+      icon: tabler/cylinder
+      locatable: true
+      map_layer: cryogenics
+      attributes:
+        - {key: cryogen, name: Cryogen, type: enumeration, option_set: cryogens}
+        - {key: capacity_l, name: Capacity (l), type: float, unit: l}
+        - {key: mobile, name: Mobile, type: boolean}
+    - name: "Cryogenic Transfer Line"
+      parent: "Cryogenic Device"
+      description: "A vacuum-insulated line between cold equipment."
+      icon: tabler/line-dashed
+      locatable: true
+      map_layer: cryogenics
+      attributes:
+        - {key: length_m, name: Length (m), type: float, unit: m}
+        - {key: cryogen, name: Cryogen, type: enumeration, option_set: cryogens}
+    - name: "Gas Handling Equipment"
+      parent: "Asset"
+      description: "Equipment that stores, distributes or relieves process gas."
+      abstract: true
+      icon: tabler/cylinder
+      locatable: true
+      map_layer: gas-handling
+      attributes:
+        - {key: gas, name: Gas, type: enumeration, option_set: gases}
+        - {key: max_pressure_bar, name: Maximum pressure (bar), type: float, unit: bar}
+    - name: "Gas Cylinder"
+      parent: "Gas Handling Equipment"
+      description: "A cylinder or bundle: its gas, size, fill pressure and the next test."
+      icon: tabler/cylinder
+      attributes:
+        - {key: water_volume_l, name: Water volume (l), type: float, unit: l}
+        - {key: fill_pressure_bar, name: Fill pressure (bar), type: float, unit: bar}
+        - {key: purity, name: Purity, regex: '^[0-9](\.[0-9])?$', description: "Grade, e.g. 5.0 for 99.999 %."}
+        - {key: cylinder_test_due, name: Test due, type: date}
+    - name: "Gas Manifold"
+      parent: "Gas Handling Equipment"
+      description: "Joins cylinders to a distribution line, with change-over."
+      icon: tabler/arrows-join
+      attributes:
+        - {key: n_inlets, name: Inlets, type: integer}
+    - name: "Pressure Regulator"
+      parent: "Gas Handling Equipment"
+      description: "Reduces a supply to the pressure the users need."
+      icon: tabler/gauge
+      attributes:
+        - {key: outlet_min_bar, name: Outlet from (bar), type: float, unit: bar}
+        - {key: outlet_max_bar, name: Outlet to (bar), type: float, unit: bar}
+    - name: "Gas Line"
+      parent: "Gas Handling Equipment"
+      description: "A run of pipe that carries a gas between equipment."
+      icon: tabler/line-dashed
+      attributes:
+        - {key: line_material, name: Material, type: enumeration, options: [{id: stainless, value: Stainless steel}, {id: copper, value: Copper}, {id: ptfe, value: PTFE}, {id: other, value: Other}]}
+        - {key: outer_diameter_mm, name: Outer diameter (mm), type: float, unit: mm}
+        - {key: supplied_from, name: Supplied from, type: reference, reference: Gas Handling Equipment, include_children: true}
+    - name: "Pressure Relief Device"
+      parent: "Gas Handling Equipment"
+      description: "A relief valve or burst disc that protects a vessel or line from overpressure."
+      icon: tabler/alert-triangle
+      attributes:
+        - {key: relief_kind, name: Kind, type: enumeration, options: [{id: valve, value: Relief valve}, {id: burst_disc, value: Burst disc}]}
+        - {key: set_pressure_bar, name: Set pressure (bar), type: float, unit: bar}
+        - {key: relief_test_due, name: Test due, type: date}
+        - {key: protects_vessel, name: Protects, type: reference, reference: Asset, include_children: true}
+
+reference_relations:
+  backing_pump: "backed by"
+  cooled_by: "cooled by"
+  supplied_from: "gas from"
+  protects_vessel: "relieves"
+
+relation_types:
+  - {id: backed-by, verb: "backed by", from: Vacuum Pump, to: Vacuum Pump, layer: vacuum, flows: reverse, carries: function, description: "a high-vacuum pump and the pump that backs it: if the backing stops, so does it"}
+  - {id: pumps, verb: "pumps", from: Vacuum Pump, to: "*", layer: vacuum, flows: forward, carries: function, description: "a pump and the chamber or sector it pumps"}
+  - {id: gas-from, verb: "gas from", from: "*", to: Gas Handling Equipment, layer: gas, flows: reverse, carries: function, description: "a user or line and the gas equipment it is supplied from"}
+  - {id: relieves, verb: "relieves", from: Pressure Relief Device, to: "*", layer: safety, flows: forward, carries: degradation, description: "a relief device and the vessel or line it protects from overpressure"}

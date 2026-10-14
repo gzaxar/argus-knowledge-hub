@@ -32,7 +32,8 @@ from app.models.schema import Schema
 from app.models.workflow import Workflow
 
 CATEGORIES = ("open", "active", "waiting", "done")
-REQUIREMENTS = ("assignee", "resolution", "comment")
+# What a transition may require; `approver`: whoever takes it may approve tickets in the workspace.
+REQUIREMENTS = ("assignee", "resolution", "comment", "approver")
 JIRA_CATEGORY = {"new": "open", "indeterminate": "active", "done": "done"}
 
 
@@ -195,9 +196,11 @@ def apply_state(issue: Issue, wf: dict, target: str) -> None:
 
 
 def transition(db: Session, issue: Issue, target: str, actor: Optional[str], *, comment: Optional[str] = None,
-               resolution: Optional[str] = None, assignee: Optional[str] = None) -> dict:
+               resolution: Optional[str] = None, assignee: Optional[str] = None, may_approve: bool = False) -> dict:
     wf = workflow_for(db, issue.workspace_id, issue.schema_uid)
     step = check_move(wf, issue.state, target)
+    if "approver" in step["requires"] and not may_approve:
+        raise WorkflowError(f"{step['name']} is an approval: it needs someone who may approve tickets here")
     if assignee:
         issue.assignee = assignee
     if resolution:

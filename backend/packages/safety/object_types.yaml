@@ -1,0 +1,153 @@
+# Safety, fire protection and radiation protection, on the core backbone. Radiation Monitor and Interlock
+# Unit moved here unchanged from the accelerator catalogue (same names, uids, attribute keys and option ids).
+# Never rename a type, an attribute key or an option id: stored records use them.
+
+option_sets:
+  inspection_result:
+    - {id: pass, value: Pass}
+    - {id: pass_with_remarks, value: Pass with remarks}
+    - {id: fail, value: Fail}
+    - {id: not_accessible, value: Not accessible}
+
+map_layers:
+  - {id: safety, name: Safety equipment, description: "Detectors, extinguishers, suppression, monitors and shielding."}
+  - {id: safety-zones, name: Fire zones and radiation areas, description: "Areas with a fire or radiation classification."}
+
+object_types:
+  types:
+    - name: "Radiation Monitor"
+      parent: "Asset"
+      description: "Measures radiation."
+      icon: tabler/radioactive
+      attributes:
+        - {key: detector_kind, name: Detector kind}
+        - {key: alarm_threshold, name: Alarm threshold, type: float}
+        - {key: calibration_due, name: Calibration due, type: date}
+    - name: "Interlock Unit"
+      parent: "Asset"
+      description: "A safety or machine-protection interlock."
+      icon: tabler/lock
+      attributes:
+        - {key: interlock_kind, name: Interlock kind, type: enumeration, options: [{id: pss, value: PSS}, {id: mps, value: MPS}, {id: vacuum, value: Vacuum}, {id: thermal, value: Thermal}]}
+        - {key: sil_level, name: SIL level}
+        - {key: test_interval_months, name: Test interval (months), type: integer}
+    - name: "Safety Equipment"
+      parent: "Asset"
+      description: "Equipment that detects, alarms, suppresses or shields: inspected on a fixed interval."
+      abstract: true
+      icon: tabler/shield-check
+      locatable: true
+      map_layer: safety
+      attributes:
+        - {key: inspection_interval_months, name: Inspection interval (months), type: integer, unit: month}
+        - {key: last_inspection, name: Last inspection, type: date, validator: core.not_after_today}
+        - {key: next_inspection, name: Next inspection due, type: date, indexed: true}
+        - {key: last_inspection_result, name: Last result, type: enumeration, option_set: inspection_result}
+        - {key: fire_zone, name: Fire zone, type: reference, reference: Fire Zone}
+    - name: "Fire Detector"
+      parent: "Safety Equipment"
+      description: "Detects fire: smoke, heat or flame, on a loop of a fire alarm panel."
+      icon: tabler/alert-triangle
+      attributes:
+        - {key: detector_type, name: Detector type, type: enumeration, options: [{id: smoke_optical, value: Optical smoke}, {id: heat, value: Heat}, {id: flame, value: Flame}, {id: multi_sensor, value: Multi-sensor}, {id: aspirating, value: Aspirating}, {id: manual_call_point, value: Manual call point}]}
+        - {key: loop_address, name: Loop address, description: "Loop and address on the panel, e.g. 2/045."}
+        - {key: alarm_panel, name: Alarm panel, type: reference, reference: Fire Alarm Panel}
+    - name: "Fire Alarm Panel"
+      parent: "Safety Equipment"
+      description: "The control panel detectors report to; raises the alarm and drives suppression."
+      icon: tabler/device-analytics
+      attributes:
+        - {key: n_loops, name: Loops, type: integer}
+        - {key: n_zones, name: Zones, type: integer}
+    - name: "Fire Extinguisher"
+      parent: "Safety Equipment"
+      description: "A portable or wheeled extinguisher: agent, capacity and the classes of fire it is for."
+      icon: tabler/flare
+      attributes:
+        - {key: agent, name: Agent, type: enumeration, options: [{id: co2, value: CO2}, {id: powder_abc, value: ABC powder}, {id: foam, value: Foam}, {id: water, value: Water}, {id: wet_chemical, value: Wet chemical}, {id: clean_agent, value: Clean agent}]}
+        - {key: capacity_kg, name: Capacity (kg), type: float, unit: kg}
+        - {key: fire_classes, name: Fire classes, type: enumeration, multi: true, options: [{id: a, value: A}, {id: b, value: B}, {id: c, value: C}, {id: d, value: D}, {id: f, value: F}]}
+        - {key: pressure_test_due, name: Pressure test due, type: date}
+    - name: "Fire Suppression System"
+      parent: "Safety Equipment"
+      description: "A fixed system that puts out or controls fire in a volume: sprinklers, mist, gas."
+      icon: tabler/droplet
+      attributes:
+        - {key: suppression_agent, name: Agent, type: enumeration, options: [{id: water_sprinkler, value: Water sprinkler}, {id: water_mist, value: Water mist}, {id: inert_gas, value: Inert gas}, {id: clean_agent, value: Clean agent}, {id: foam, value: Foam}]}
+        - {key: protected_volume_m3, name: Protected volume (m³), type: float, unit: m³}
+        - {key: alarm_panel, name: Alarm panel, type: reference, reference: Fire Alarm Panel}
+    - name: "Emergency Lighting Unit"
+      parent: "Safety Equipment"
+      description: "Lights an escape route when the supply fails."
+      icon: tabler/sun
+      attributes:
+        - {key: autonomy_min, name: Autonomy (min), type: integer, unit: min}
+        - {key: maintained, name: Maintained, type: boolean}
+    - name: "Gas Detector"
+      parent: "Safety Equipment"
+      description: "Detects a gas, or the lack of oxygen, and alarms above or below a threshold."
+      icon: tabler/gauge
+      attributes:
+        - {key: gas, name: Gas, type: enumeration, options: [{id: o2, value: Oxygen (deficiency)}, {id: h2, value: Hydrogen}, {id: co, value: Carbon monoxide}, {id: co2, value: Carbon dioxide}, {id: ch4, value: Methane}, {id: sf6, value: SF6}, {id: other, value: Other}]}
+        - {key: alarm_low, name: Low alarm, type: float, description: "In the unit the detector reads: % vol for oxygen, ppm or % LEL otherwise."}
+        - {key: alarm_high, name: High alarm, type: float}
+        - {key: reading_unit, name: Reads in, type: enumeration, options: [{id: pct_vol, value: "% vol"}, {id: ppm, value: ppm}, {id: pct_lel, value: "% LEL"}]}
+        - {key: calibration_due, name: Calibration due, type: date}
+    - name: "Shielding Element"
+      parent: "Safety Equipment"
+      description: "A block, wall or door that attenuates radiation."
+      icon: tabler/box-multiple
+      attributes:
+        - {key: shielding_material, name: Material, type: enumeration, options: [{id: concrete, value: Concrete}, {id: heavy_concrete, value: Heavy concrete}, {id: lead, value: Lead}, {id: steel, value: Steel}, {id: polyethylene, value: Polyethylene}, {id: borated_pe, value: Borated polyethylene}]}
+        - {key: thickness_mm, name: Thickness (mm), type: float, unit: mm}
+        - {key: removable, name: Removable, type: boolean}
+    - name: "Dosimeter"
+      parent: "Safety Equipment"
+      description: "A personal or area dosimeter. Who wears it is personnel data; the doses are not kept here."
+      icon: tabler/activity
+      attributes:
+        - {key: dosimeter_kind, name: Kind, type: enumeration, options: [{id: passive, value: "Passive (TLD, OSL)"}, {id: electronic, value: Electronic}, {id: area, value: Area}]}
+        - {key: worn_by, name: Worn by, type: user, restricted: personnel}
+        - {key: exchange_due, name: Exchange due, type: date}
+    - name: "Radioactive Source"
+      parent: "Asset"
+      description: "A sealed or unsealed source: nuclide, activity at a reference date, where it is kept."
+      icon: tabler/radioactive
+      locatable: true
+      map_layer: safety
+      attributes:
+        - {key: nuclide, name: Nuclide, regex: '^[A-Z][a-z]?-[0-9]{1,3}m?$', description: "e.g. Cs-137, Am-241, Tc-99m."}
+        - {key: activity_bq, name: Activity (Bq), type: float, unit: Bq}
+        - {key: activity_reference_date, name: Activity at, type: date}
+        - {key: source_form, name: Form, type: enumeration, options: [{id: sealed, value: Sealed}, {id: unsealed, value: Unsealed}]}
+        - {key: authorisation_ref, name: Authorisation, description: "The licence or authorisation that covers it."}
+        - {key: storage_details, name: Storage and security, type: text, restricted: source_security}
+    - name: "Fire Zone"
+      parent: "Area"
+      description: "A fire compartment: an area its detectors, alarms and suppression cover together."
+      icon: tabler/flare
+      locatable: true
+      map_layer: safety-zones
+      attributes:
+        - {key: fire_resistance_min, name: Fire resistance (min), type: integer, unit: min}
+        - {key: fire_load_mj_m2, name: Fire load (MJ/m²), type: float, unit: MJ/m²}
+    - name: "Radiation Area"
+      parent: "Area"
+      description: "An area classified for radiation protection (its classification and access rule are the Area's)."
+      icon: tabler/radioactive
+      locatable: true
+      map_layer: safety-zones
+      attributes:
+        - {key: dose_rate_limit_usv_h, name: Dose-rate limit (µSv/h), type: float, unit: µSv/h}
+        - {key: rp_supervisor, name: Radiation protection supervisor, type: user}
+
+reference_relations:
+  fire_zone: "in fire zone"
+  alarm_panel: "reports to"
+
+relation_types:
+  - {id: protects, verb: "protects", from: [Safety Equipment, Interlock Unit, Radiation Monitor], to: "*", layer: safety, flows: forward, carries: degradation, description: "safety equipment and what it protects: if it fails, the protection is lost"}
+  - {id: shields, verb: "shields", from: Shielding Element, to: "*", layer: safety, flows: forward, carries: degradation, description: "shielding and the area or equipment it shields"}
+  - {id: in-fire-zone, verb: "in fire zone", from: "*", to: Fire Zone, layer: safety, flows: none, description: "equipment and the fire compartment it is in"}
+  - {id: reports-to, verb: "reports to", from: [Fire Detector, Fire Suppression System], to: Fire Alarm Panel, layer: safety, flows: reverse, carries: function, description: "a detector or suppression system and its panel: a failed panel stops them"}
+  - {id: monitors-area, verb: "monitors area", from: [Radiation Monitor, Gas Detector], to: Location, layer: safety, flows: forward, carries: degradation, description: "a monitor and the area it watches"}

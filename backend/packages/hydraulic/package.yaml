@@ -1,5 +1,5 @@
 id: hydraulic
-version: 1.0.0
+version: 1.1.0
 name: Hydraulic networks
 description: >-
   Water and fluid networks: pumps, valves, pipe segments, tanks, flow and pressure transmitters, heat
@@ -7,6 +7,6 @@ description: >-
 owner: INFN ARGUS
 license: EUPL-1.2
 depends:
-  core-objects: ">=1.0,<2"
+  core-objects: ">=2.0,<3"
 provides: [hydraulic-catalogue]
 contents: [object_types.yaml]

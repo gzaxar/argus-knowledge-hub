@@ -147,6 +147,7 @@ Class | Method | HTTP request | Description
 *NotificationsApi* | [**mySubscriptions**](doc//NotificationsApi.md#mysubscriptions) | **GET** /v1/notifications/subscriptions | My Subscriptions
 *NotificationsApi* | [**setSubscription**](doc//NotificationsApi.md#setsubscription) | **PUT** /v1/notifications/subscriptions/{workspace_id} | Set Subscription
 *NotificationsApi* | [**unfollowRecord**](doc//NotificationsApi.md#unfollowrecord) | **DELETE** /v1/notifications/following/{subject}/{uid} | Unfollow Record
+*PackagesApi* | [**workspaceCapabilities**](doc//PackagesApi.md#workspacecapabilities) | **GET** /v1/workspaces/{workspace_id}/capabilities | Workspace Capabilities
 *SchemasApi* | [**getSchema**](doc//SchemasApi.md#getschema) | **GET** /v1/schemas/{uid} | Get Schema
 *SchemasApi* | [**listSchemas**](doc//SchemasApi.md#listschemas) | **GET** /v1/schemas | List Schemas
 *SearchApi* | [**jqlFields**](doc//SearchApi.md#jqlfields) | **GET** /v1/search/jql/fields | Jql Fields
@@ -180,6 +181,7 @@ Class | Method | HTTP request | Description
  - [AssetUpdate](doc//AssetUpdate.md)
  - [AssistIn](doc//AssistIn.md)
  - [AttachmentOut](doc//AttachmentOut.md)
+ - [CapabilitiesOut](doc//CapabilitiesOut.md)
  - [ChatIn](doc//ChatIn.md)
  - [CloseReviewIn](doc//CloseReviewIn.md)
  - [DecideIn](doc//DecideIn.md)
@@ -196,6 +198,7 @@ Class | Method | HTTP request | Description
  - [DocumentUpdate](doc//DocumentUpdate.md)
  - [DraftDocumentIn](doc//DraftDocumentIn.md)
  - [DraftDocumentOut](doc//DraftDocumentOut.md)
+ - [FeaturesOut](doc//FeaturesOut.md)
  - [GlobalValueOut](doc//GlobalValueOut.md)
  - [GraphEdgeOut](doc//GraphEdgeOut.md)
  - [GraphNodeOut](doc//GraphNodeOut.md)
@@ -207,6 +210,7 @@ Class | Method | HTTP request | Description
  - [IssueCreate](doc//IssueCreate.md)
  - [IssueOut](doc//IssueOut.md)
  - [IssueUpdate](doc//IssueUpdate.md)
+ - [MapLayerOut](doc//MapLayerOut.md)
  - [MeOut](doc//MeOut.md)
  - [MentionedObject](doc//MentionedObject.md)
  - [MyWorkspaceOut](doc//MyWorkspaceOut.md)

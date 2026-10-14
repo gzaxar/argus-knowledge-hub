@@ -795,7 +795,7 @@ def test_A18_A19_A20_restricted_records_and_secrets_never_reach_git_or_the_archi
         pump = ledger.ensure_type(db, s.inv, "Ion Pump")
         db.add(Asset(uid=secret_uid, workspace_id=s.inv, key=f"{s.fac}-COST", name=secret_name, type="Ion Pump",
                      schema_uid=pump.uid, attributes={"classification": "restricted:costs", "cost": 12345}))
-        db.add(Relation(workspace_id=s.inv, from_asset_uid=s.unit, to_asset_uid=secret_uid, relation_type="funded by"))
+        db.add(Relation(workspace_id=s.inv, from_asset_uid=s.unit, to_asset_uid=secret_uid, relation_type="privately sponsored by"))
         db.add(ApiToken(workspace_id=s.inv, token_hash=hash_token(raw_token)))
         db.commit()
     cfg = env.cfg("src")
@@ -839,7 +839,7 @@ def test_A18_A19_A20_restricted_records_and_secrets_never_reach_git_or_the_archi
     def leaks(needle: bytes) -> list[str]:
         return [name for name, data in files.items() if needle in data]
     assert leaks(secret_uid.encode()) == [] and leaks(secret_name.encode()) == []           # A18
-    assert leaks(b"funded by") == [] and leaks(b"12345") == []
+    assert leaks(b"privately sponsored by") == [] and leaks(b"12345") == []
     assert leaks(raw_token.encode()) == [] and leaks(b"token_hash") == []                    # A19
     assert leaks(b"PRIVATE KEY") == [] and leaks(env.signer.key_path.read_bytes()) == []
     manifest = json.loads((clone / gitrepo.CHECKPOINTS / view["id"] / "manifest.json").read_text())
