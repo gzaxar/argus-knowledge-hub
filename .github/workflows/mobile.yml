@@ -63,9 +63,15 @@ jobs:
           else
             name="$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)"
           fi
-          # Always above the 1 a local build uses, so a phone accepts it as an update.
+          # A tag's code comes from its version (1.35.25 -> 1035025), so every release is above the one before
+          # and above anything uploaded to Google Play by hand; other builds stay above the 1 a local build uses.
           echo "name=$name" >> "$GITHUB_OUTPUT"
-          echo "code=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            IFS=. read -r major minor patch <<< "${name%%-*}"
+            echo "code=$((10#$major * 1000000 + 10#$minor * 1000 + 10#${patch:-0}))" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_OUTPUT"
+          fi
       - name: Upload key
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
