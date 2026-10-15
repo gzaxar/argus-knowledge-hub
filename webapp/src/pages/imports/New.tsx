@@ -41,6 +41,8 @@ export function ImportConfigForm() {
   const [jql, setJql] = useState("");
   const [spaceKey, setSpaceKey] = useState("");
   const [cql, setCql] = useState("");
+  const [pageUrl, setPageUrl] = useState("");
+  const [includeChildren, setIncludeChildren] = useState(true);
   const [linkAssets, setLinkAssets] = useState(true);
 
   const [provider, setProvider] = useState<"github" | "gitlab">("github");
@@ -83,6 +85,8 @@ export function ImportConfigForm() {
       setBaseUrl(param("base_url"));
       setSpaceKey(param("space_key"));
       setCql(param("cql"));
+      setPageUrl(param("page_url"));
+      setIncludeChildren(existing.data.params.include_children !== false);
       setLinkAssets(existing.data.params.link_assets !== false);
     } else if (existing.data.source === "jira-issues") {
       setBaseUrl(param("base_url"));
@@ -115,9 +119,10 @@ export function ImportConfigForm() {
           : source === "confluence"
           ? {
               source: "confluence" as const,
-              base_url: baseUrl.replace(/\/+$/, ""),
-              space_key: spaceKey || undefined,
-              cql: cql || undefined,
+              base_url: baseUrl.replace(/\/+$/, "") || undefined,
+              ...(pageUrl.trim()
+                ? { page_url: pageUrl.trim(), include_children: includeChildren }
+                : { space_key: spaceKey || undefined, cql: cql || undefined }),
               link_assets: linkAssets,
               ...(jiraPat ? { pat: jiraPat } : {}),
             }
@@ -246,12 +251,12 @@ export function ImportConfigForm() {
                       ? "https://issues.example.org/jira"
                       : "https://servicedesk.example.org"
                 }
-                required
+                required={!(source === "confluence" && pageUrl.trim())}
                 className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
               />
               <p className="mt-1 text-xs text-slate-500">
                 {source === "confluence"
-                  ? "Include the context path if the server has one — Confluence is often published under /confluence or /wiki rather than at the site root. The import checks both."
+                  ? "Include the context path if the server has one — Confluence is often published under /confluence or /wiki rather than at the site root. The import checks both. Leave it empty when you give a page link below."
                   : "Include the context path if the server has one — many Jira installations live under /jira rather than at the site root. The import checks both."}
               </p>
             </div>
@@ -270,7 +275,32 @@ export function ImportConfigForm() {
             {source === "confluence" ? (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700">Space key</label>
+                  <label className="block text-sm font-medium text-slate-700">A page link</label>
+                  <input
+                    value={pageUrl}
+                    onChange={(e) => setPageUrl(e.target.value)}
+                    placeholder="https://wiki.example.org/x/YwX6AQ"
+                    className="mt-1 w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">
+                    The short link from the page's Share button, or the page's address. The token's
+                    account must be able to open the page.
+                  </p>
+                  {pageUrl.trim() && (
+                    <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={includeChildren}
+                        onChange={(e) => setIncludeChildren(e.target.checked)}
+                      />
+                      And every page under it
+                    </label>
+                  )}
+                </div>
+                {!pageUrl.trim() && (
+                <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Or a space key</label>
                   <input
                     value={spaceKey}
                     onChange={(e) => setSpaceKey(e.target.value)}
@@ -293,6 +323,8 @@ export function ImportConfigForm() {
                     Markdown; re-importing a page whose version hasn't changed adds no revision.
                   </p>
                 </div>
+                </>
+                )}
                 <label className="flex items-start gap-2 text-sm text-slate-700">
                   <input
                     type="checkbox"

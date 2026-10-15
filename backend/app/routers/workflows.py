@@ -1,5 +1,6 @@
 """Ticket workflows and notifications (asset-model-revision §19 item 3)."""
-from typing import Any, Optional
+import os
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -205,6 +206,62 @@ def set_subscription(workspace_id: str, body: SubscriptionIn, identity=Depends(g
     sub.updated_at = notify.now()
     db.commit()
     return {"workspace_id": workspace_id, **body.model_dump()}
+
+
+# --------------------------------------------------------------------------- e-mail
+
+class EmailPreferenceIn(BaseModel):
+    email: Literal["instant", "digest", "off"] = "instant"
+    muted: list[str] = []
+
+
+def _person(identity) -> "OidcIdentity":
+    if not isinstance(identity, OidcIdentity):
+        raise HTTPException(status_code=422, detail="E-mail preferences belong to a person, not an API token.")
+    return identity
+
+
+def _preference_view(db: Session, user) -> dict:
+    pref = notify.preference(db, user)
+    return {"email": pref.email if pref else "instant", "muted": list(pref.muted or []) if pref else [],
+            "address": user.email, "email_configured": notify.email_configured(),
+            "digest_hour": int(os.environ.get("NOTIFY_DIGEST_HOUR", "7")),
+            "categories": [{"key": k, "label": label} for k, (label, _) in notify.EMAIL_CATEGORIES.items()]}
+
+
+@notifications_router.get("/preferences")
+def my_email_preferences(identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """How this person gets their notifications by e-mail: each as it happens (`instant`, the default), once a
+    day (`digest`) or never (`off`), and the categories they never want by e-mail. Whether this installation
+    sends e-mail at all, and to which address."""
+    return _preference_view(db, _person(identity).user)
+
+
+@notifications_router.put("/preferences")
+def set_email_preferences(body: EmailPreferenceIn, identity=Depends(get_identity), db: Session = Depends(get_db)):
+    from app.models.workflow import NotificationPreference
+    user = _person(identity).user
+    unknown = sorted(set(body.muted) - set(notify.EMAIL_CATEGORIES))
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"Unknown categories: {', '.join(unknown)}")
+    pref = db.get(NotificationPreference, user.id)
+    if pref is None:
+        pref = NotificationPreference(user_id=user.id)
+        db.add(pref)
+    if body.email == "digest" and pref.email != "digest":
+        pref.last_digest_at = notify.now()        # the first digest gathers from now, not from long ago
+    pref.email, pref.muted, pref.updated_at = body.email, sorted(set(body.muted)), notify.now()
+    db.commit()
+    return _preference_view(db, user)
+
+
+@notifications_router.post("/preferences/test")
+def send_test_email(identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """A test message to this person's address now: checks the mail server and the address."""
+    try:
+        return {"sent_to": notify.send_test(_person(identity).user)}
+    except notify.MailError as exc:
+        raise HTTPException(status_code=409 if not notify.email_configured() else 502, detail=str(exc))
 
 
 @notifications_router.get("/everywhere")

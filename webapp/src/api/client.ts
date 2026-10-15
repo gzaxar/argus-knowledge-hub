@@ -123,6 +123,8 @@ import type {
   AccessPointView,
   AddressUse,
   NotificationView,
+  EmailPreferences,
+  WorkspaceSubscription,
   AccessReviewView,
   AttachmentCheck,
   RetentionClass,
@@ -1284,6 +1286,14 @@ export const workflowApi = {
   follow: (subject: "asset" | "document", uid: string, on: boolean) =>
     request<FollowState>(`/v1/notifications/following/${subject}/${encodeURIComponent(uid)}`,
                          { method: on ? "PUT" : "DELETE" }),
+  emailPreferences: () => request<EmailPreferences>("/v1/notifications/preferences"),
+  setEmailPreferences: (body: Pick<EmailPreferences, "email" | "muted">) =>
+    request<EmailPreferences>("/v1/notifications/preferences", { method: "PUT", body: json(body) }),
+  testEmail: () => request<{ sent_to: string }>("/v1/notifications/preferences/test", { method: "POST" }),
+  subscriptions: () => request<WorkspaceSubscription[]>("/v1/notifications/subscriptions"),
+  subscribe: (s: WorkspaceSubscription) =>
+    request<WorkspaceSubscription>(`/v1/notifications/subscriptions/${encodeURIComponent(s.workspace_id)}`, {
+      method: "PUT", body: json({ tickets: s.tickets, documents: s.documents, assets: s.assets }) }),
 };
 
 export const accessReviewsApi = {

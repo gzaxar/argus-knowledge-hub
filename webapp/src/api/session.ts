@@ -178,3 +178,19 @@ export function openInWorkspace(workspaceId: string | null | undefined, path: st
   window.location.assign(path);
   return true;
 }
+
+/** A link from an e-mail names its workspace (`?ws=…`): a signed-in profile moves there before the page loads,
+ * and the parameter leaves the address. */
+export function adoptWorkspaceFromUrl(): void {
+  try {
+    const url = new URL(window.location.href);
+    const ws = url.searchParams.get("ws");
+    const profile = getActiveProfile();
+    if (!ws || profile?.authType !== "oidc") return;
+    if (profile.activeWorkspaceId !== ws) updateProfile(profile.id, { activeWorkspaceId: ws });
+    url.searchParams.delete("ws");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  } catch {
+    // Storage unavailable: the page opens in the workspace already chosen.
+  }
+}

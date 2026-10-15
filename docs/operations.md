@@ -8,15 +8,37 @@ system of record (asset-model-revision §19).
 | When | Command | Why |
 |---|---|---|
 | continuously (or every minute) | `python -m app.ledger derive-worker` | runs the derived links a user edit queued, when `LEDGER_USER_EDIT_DERIVE=manual` (the default `background` runs them in the API process) |
-| every 5–15 minutes | `python -m app.ledger escalate` | escalates tickets that outstayed their state's SLA; sends pending notifications by e-mail when `SMTP_HOST` is set; removes expired idempotency keys and unfinished uploads (`docs/api-policy.md`) |
+| every 5–15 minutes | `python -m app.ledger escalate` | escalates tickets that outstayed their state's SLA and overdue review items; e-mails pending notifications (as each person chose) when `SMTP_HOST` is set; removes expired idempotency keys and unfinished uploads (`docs/api-policy.md`) |
 | daily, after midnight UTC | `python -m app.ledger audit-digest` | seals yesterday's audit events into the digest chain. **Copy the printed digest outside ARGUS** (a ticket in another system, a signed e-mail, write-once storage) |
 | weekly | `python -m app.ledger verify-audit` | recomputes the chain; a non-zero exit names the first altered day |
 | daily | `python -m app.ledger backup --out /backups` | base backup: `pg_dump`, the attachments, and a manifest with checksums and row counts |
 | quarterly (at least) | `python -m app.ledger rehearse-restore /backups/argus-….manifest.json` | restores into a scratch database, checks counts and the audit chain, drops it. Keep the JSON report as evidence |
 | monthly (proposed), and after every upgrade | `python -m app.portability drill --repository escrow` | imports the newest signed full checkpoint into a scratch database through staging and promotion, reconciles, drops it. Keep the JSON report as evidence (see "Restore drills" below) |
 
-E-mail: `SMTP_HOST`, `SMTP_PORT` (25), `SMTP_FROM`, and `ARGUS_URL` for links.
-Notifications are always stored in-app; e-mail is a delivery channel.
+E-mail (the chart's `email:` values; the Helm chart runs `escalate` as the CronJob `argus-ledger-escalate`,
+every 10 minutes):
+
+| Variable | Meaning |
+|---|---|
+| `SMTP_HOST` | the relay; e-mail is off while it is empty |
+| `SMTP_PORT` | 587 for `starttls`, 465 for `ssl`, 25 for `none` by default |
+| `SMTP_SECURITY` | `starttls` (default), `ssl` or `none` |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | the relay's account, when it asks for one (Secret `argus-smtp`, keys `username` and `password`) |
+| `SMTP_FROM` | the sender; by default the account's address (`username@` the relay's domain) |
+| `ARGUS_WEB_URL` | the web app, for links (`ARGUS_URL` is still read); the chart sets it from `hosts.web` |
+| `NOTIFY_DIGEST_HOUR`, `NOTIFY_TIMEZONE` | when daily digests go out (7, Europe/Rome) |
+| `NOTIFY_EMAIL_MAX_AGE_HOURS` | older notifications are not e-mailed late (48): turning e-mail on does not send the backlog |
+
+Notifications are always stored in-app; e-mail is a delivery channel. Each person chooses on **My account →
+Notifications**: each one as it happens (default), a daily digest, or none, and which kinds never by e-mail.
+A refused recipient is logged and skipped; an unreachable relay leaves everything for the next run.
+
+The LNF relay (`smtp.lnf.infn.it`) relays from the INFN cloud only for an authenticated LNF account:
+
+    kubectl -n argus create secret generic argus-smtp \
+      --from-literal=username=<account> --from-literal=password=<password>
+
+then restart the API (`kubectl -n argus rollout restart deploy/argus-api`) and use **Send me a test message**.
 
 ## Point-in-time recovery (RPO ≤ 15 min, RTO ≤ 4 h)
 

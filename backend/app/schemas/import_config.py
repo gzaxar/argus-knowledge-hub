@@ -3,7 +3,7 @@ from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.import_job import MergeStrategy
+from app.schemas.import_job import ConfluencePageLink, MergeStrategy
 from app.services.import_merge import MERGE_STRATEGIES
 
 
@@ -23,9 +23,8 @@ class JiraIssueImportConfigParams(BaseModel):
     pat: Optional[str] = None  # omit on update to keep the stored secret
 
 
-class ConfluenceImportConfigParams(BaseModel):
+class ConfluenceImportConfigParams(ConfluencePageLink):
     source: Literal["confluence"]
-    base_url: str
     space_key: Optional[str] = None
     cql: Optional[str] = None
     link_assets: bool = True

@@ -622,3 +622,23 @@ export type LedgerReviewProposal = {
     profile_id: string | null;
   };
 };
+
+/** How a person gets their notifications by e-mail (GET /v1/notifications/preferences). */
+export interface EmailPreferences {
+  email: "instant" | "digest" | "off";
+  /** Categories never sent by e-mail; the app still has them. */
+  muted: string[];
+  address: string | null;
+  email_configured: boolean;
+  digest_hour: number;
+  categories: { key: string; label: string }[];
+}
+
+/** What a person hears about in one workspace beyond what they watch or follow. */
+export interface WorkspaceSubscription {
+  workspace_id: string;
+  workspace_name: string;
+  tickets: boolean;
+  documents: boolean;
+  assets: boolean;
+}

@@ -105,7 +105,7 @@ def create_import(
         background_tasks.add_task(
             run_confluence_import,
             job.uid, workspace_id, body.base_url, body.pat, body.space_key, body.cql,
-            body.merge_strategy, body.link_assets,
+            body.merge_strategy, body.link_assets, body.page_url, body.include_children,
         )
     elif isinstance(body, Epik8sImportRequest):
         background_tasks.add_task(

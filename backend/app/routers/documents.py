@@ -497,7 +497,7 @@ def submit_revision(
         raise HTTPException(status_code=409, detail="Only a draft revision can be submitted")
     revision.state = "in_review"
     revision.submitted_at = datetime.now(timezone.utc)
-    notify.document_changed(db, doc, f"revision {revision.revision_number} sent for review", _actor_user_id(identity))
+    notify.review_requested(db, doc, revision, _actor_user_id(identity))
     db.commit()
     db.refresh(revision)
     return revision

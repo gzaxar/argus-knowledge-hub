@@ -5,6 +5,7 @@ its own XHTML dialect, and anything the converter drops silently is
 content nobody will notice is missing until they need it.
 """
 import json
+import re
 import secrets
 import threading
 import uuid
@@ -24,7 +25,9 @@ from app.models.import_job import ImportJob
 from app.models.schema import Schema
 from app.models.workspace import Workspace
 from app.services.confluence_import import (
+    PageLinkError,
     choose_document_type,
+    parse_page_link,
     run_confluence_import,
     storage_to_markdown,
 )
@@ -212,6 +215,8 @@ FILES: dict[str, bytes] = {}
 # Page ids whose attachment listing should fail, so the unhappy path gets
 # exercised — a wiki will always have a file the importer cannot fetch.
 BROKEN_LISTINGS: set = set()
+# Short links the stub's /x/ answers with a redirect, as Confluence does.
+SHORT_LINKS: dict[str, str] = {}
 
 PNG = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
@@ -255,6 +260,8 @@ class _ConfluenceStub(BaseHTTPRequestHandler):
             # advertised by a `next` link. A stub that invents a `totalSize`
             # hides the pagination bug this endpoint is prone to.
             rows = self.blogposts if query.get("type") == ["blogpost"] else self.pages
+            if query.get("title"):
+                rows = [p for p in rows if p["title"] == query["title"][0]]
             window = rows[start:start + 50]
             body = {"results": window, "size": len(window), "start": start, "limit": 50,
                     "_links": {"base": f"http://127.0.0.1:{self.server.server_port}"}}
@@ -262,9 +269,26 @@ class _ConfluenceStub(BaseHTTPRequestHandler):
                 body["_links"]["next"] = f"/rest/api/content?start={start + len(window)}"
             self._json(body)
         elif parsed.path == "/rest/api/content/search":
-            window = self.pages[start:start + 50]
+            rows = self.pages
+            one = re.fullmatch(r"id = (\d+)( or ancestor = \1)?", query.get("cql", [""])[0])
+            if one:
+                root, under = one.group(1), bool(one.group(2))
+                rows = [p for p in rows if p["id"] == root or (
+                    under and root in [a["id"] for a in p.get("ancestors") or []])]
+            window = rows[start:start + 50]
             self._json({"results": window, "size": len(window),
-                        "totalSize": len(self.pages)})
+                        "totalSize": len(rows)})
+        elif re.fullmatch(r"/rest/api/content/\d+", parsed.path):
+            found = [p for p in self.pages if p["id"] == parsed.path.rsplit("/", 1)[1]]
+            if not found:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self._json(found[0])
+        elif parsed.path.startswith("/x/") and parsed.path[3:] in SHORT_LINKS:
+            self.send_response(302)
+            self.send_header("Location", f"/pages/viewpage.action?pageId={SHORT_LINKS[parsed.path[3:]]}")
+            self.end_headers()
         elif parsed.path.endswith("/child/attachment"):
             page_id = parsed.path.split("/")[-3]
             if page_id in BROKEN_LISTINGS:
@@ -297,6 +321,7 @@ def confluence_stub():
     ATTACHMENTS.clear()
     FILES.clear()
     BROKEN_LISTINGS.clear()
+    SHORT_LINKS.clear()
 
 
 def _document(db, workspace_id: str, page_id: str) -> Document:
@@ -696,3 +721,93 @@ def test_a_file_that_will_not_download_leaves_the_rest_of_the_page(confluence_st
     assert "image: gone.png" in revision.body_markdown
     assert "![gone.png]" not in revision.body_markdown
     db.close()
+
+
+def test_a_page_link_names_the_server_and_the_page():
+    """What the Share button gives, and the addresses a browser shows."""
+    assert parse_page_link("https://confluence.infn.it/x/YwX6AQ") == {
+        "base_url": "https://confluence.infn.it", "page_id": "33162595", "short": "YwX6AQ"}
+    assert parse_page_link("https://wiki.example.org/confluence/pages/viewpage.action?pageId=4242") == {
+        "base_url": "https://wiki.example.org/confluence", "page_id": "4242"}
+    assert parse_page_link("https://site.atlassian.net/wiki/spaces/LNF/pages/98765/Vacuum+system")["page_id"] == "98765"
+    assert parse_page_link("https://wiki.example.org/display/LNF/Vacuum+recovery") == {
+        "base_url": "https://wiki.example.org", "space": "LNF", "title": "Vacuum recovery"}
+    for wrong in ("confluence.infn.it/x/YwX6AQ", "https://confluence.infn.it/", "https://wiki.example.org/x/!!"):
+        with pytest.raises(PageLinkError):
+            parse_page_link(wrong)
+
+
+def _tree():
+    _ConfluenceStub.pages = [
+        _page("33162595", "Vacuum system"),
+        _page("33162596", "Vacuum recovery", parent="33162595"),
+        {**_page("33162597", "Gauge calibration"), "ancestors": [{"id": "33162595"}, {"id": "33162596"}]},
+        _page("777", "Elsewhere"),
+    ]
+
+
+def _run_link(ws, link, **kwargs):
+    db = SessionLocal()
+    job = ImportJob(uid=str(uuid.uuid4()), workspace_id=ws, source="confluence")
+    db.add(job)
+    db.commit()
+    uid = job.uid
+    db.close()
+    run_confluence_import(uid, ws, "", "pat", page_url=link, **kwargs)
+    db = SessionLocal()
+    job = db.get(ImportJob, uid)
+    result = (job.status, job.error, dict(job.counts or {}))
+    db.close()
+    return result
+
+
+def test_a_short_link_imports_its_page_and_the_pages_under_it(confluence_stub):
+    _tree()
+    ws = _workspace()
+    status, error, counts = _run_link(ws, f"{confluence_stub}/x/YwX6AQ")
+    assert status == "succeeded", error
+    db = SessionLocal()
+    assert all(_document(db, ws, i) is not None for i in ("33162595", "33162596", "33162597"))
+    assert _document(db, ws, "777") is None                       # not under the page
+    db.close()
+
+
+def test_a_page_link_without_the_pages_under_it(confluence_stub):
+    _tree()
+    ws = _workspace()
+    status, error, _ = _run_link(ws, f"{confluence_stub}/display/LNF/Vacuum+recovery", include_children=False)
+    assert status == "succeeded", error
+    db = SessionLocal()
+    assert _document(db, ws, "33162596") is not None
+    assert _document(db, ws, "33162597") is None and _document(db, ws, "33162595") is None
+    db.close()
+
+
+def test_a_short_link_the_server_redirects_is_followed(confluence_stub):
+    """Should the id written in a short link ever not be the page's, the server's
+    own redirect says which page it is."""
+    _tree()
+    SHORT_LINKS["AQ"] = "777"                                     # "AQ" decodes to page 1
+    ws = _workspace()
+    status, error, _ = _run_link(ws, f"{confluence_stub}/x/AQ", include_children=False)
+    assert status == "succeeded", error
+    db = SessionLocal()
+    assert _document(db, ws, "777") is not None
+    db.close()
+
+
+def test_a_link_to_a_page_that_is_not_there_says_so(confluence_stub):
+    _tree()
+    status, error, _ = _run_link(_workspace(), f"{confluence_stub}/pages/viewpage.action?pageId=5")
+    assert status == "failed" and "not found" in error
+
+
+def test_a_request_needs_a_server_or_a_page_link():
+    from pydantic import ValidationError
+
+    from app.schemas.import_config import ConfluenceImportConfigParams
+    assert ConfluenceImportConfigParams(source="confluence", page_url="https://confluence.infn.it/x/YwX6AQ")
+    with pytest.raises(ValidationError, match="server URL, or a link"):
+        ConfluenceImportConfigParams(source="confluence", space_key="LNF")
+    with pytest.raises(ValidationError, match="not a link to a Confluence page"):
+        ConfluenceImportConfigParams(source="confluence", page_url="https://confluence.infn.it/")

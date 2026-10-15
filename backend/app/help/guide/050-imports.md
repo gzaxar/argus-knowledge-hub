@@ -1,7 +1,7 @@
 ---
 title: Importing data
 summary: Bringing equipment, tickets and documents in from EPIK8s, Jira, Confluence, Git and Markdown; re-running imports; mapping imported records.
-keywords: [prerequisite, missing package, install the catalogue, import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
+keywords: [confluence page link, share link, short link, prerequisite, missing package, install the catalogue, import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
 order: 50
 ---
 
@@ -19,7 +19,7 @@ runs. **New** starts one. Choose the source:
 | **EPIK8s control** | a beamline's control configuration (`values.yaml`): IOCs, devices, services, and optionally the equipment they drive |
 | **Jira objects** | Jira Insight / Assets objects |
 | **Jira tickets** | Jira issues, as tickets |
-| **Confluence** | a Confluence space's pages, as documents |
+| **Confluence** | a Confluence space's pages, a query's, or one page and the pages under it, as documents |
 | **Git** | files from a Git repository |
 | **Markdown** | Markdown files, as documents |
 
@@ -65,6 +65,21 @@ Notes:
 - A file that is an **overlay** (such as `values-linac.yaml`, with no `beamline:` of its own) takes the
   beamline and its templates' defaults from the `values.yaml` beside it. Import the main file and the
   overlay as two configurations.
+
+## Import Confluence pages
+
+**Imports → New → Confluence**. Name the configuration, give a **personal access token** (made on
+Confluence under your profile, **Personal Access Tokens**): the import reads only what that account may
+open. Then say which pages:
+
+- **A page link**: the short link from the page's **Share** button (`https://confluence.infn.it/x/YwX6AQ`)
+  or the page's address. It imports that page and, with **And every page under it**, its whole subtree.
+  The server is taken from the link, so the server URL may stay empty.
+- **A space key** (`LNF`): every page and blog post of the space.
+- **A CQL query**: whatever it selects.
+
+Pages become documents typed from their labels; the page tree becomes *child of* links. Running the
+configuration again adds a revision only to pages whose version changed.
 
 ## After an import
 

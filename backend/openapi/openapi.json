@@ -2357,8 +2357,15 @@
       "ConfluenceImportConfigParams": {
         "properties": {
           "base_url": {
-            "title": "Base Url",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
           },
           "cql": {
             "anyOf": [
@@ -2371,10 +2378,26 @@
             ],
             "title": "Cql"
           },
+          "include_children": {
+            "default": true,
+            "title": "Include Children",
+            "type": "boolean"
+          },
           "link_assets": {
             "default": true,
             "title": "Link Assets",
             "type": "boolean"
+          },
+          "page_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Url"
           },
           "pat": {
             "anyOf": [
@@ -2408,8 +2431,7 @@
           }
         },
         "required": [
-          "source",
-          "base_url"
+          "source"
         ],
         "title": "ConfluenceImportConfigParams",
         "type": "object"
@@ -2417,8 +2439,15 @@
       "ConfluenceImportRequest": {
         "properties": {
           "base_url": {
-            "title": "Base Url",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
           },
           "cql": {
             "anyOf": [
@@ -2430,6 +2459,11 @@
               }
             ],
             "title": "Cql"
+          },
+          "include_children": {
+            "default": true,
+            "title": "Include Children",
+            "type": "boolean"
           },
           "link_assets": {
             "default": true,
@@ -2445,6 +2479,17 @@
             ],
             "title": "Merge Strategy",
             "type": "string"
+          },
+          "page_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Url"
           },
           "pat": {
             "title": "Pat",
@@ -2472,7 +2517,6 @@
         },
         "required": [
           "source",
-          "base_url",
           "pat"
         ],
         "title": "ConfluenceImportRequest",
@@ -3975,6 +4019,30 @@
           "workspace"
         ],
         "title": "EffectivePermissionsOut",
+        "type": "object"
+      },
+      "EmailPreferenceIn": {
+        "properties": {
+          "email": {
+            "default": "instant",
+            "enum": [
+              "instant",
+              "digest",
+              "off"
+            ],
+            "title": "Email",
+            "type": "string"
+          },
+          "muted": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Muted",
+            "type": "array"
+          }
+        },
+        "title": "EmailPreferenceIn",
         "type": "object"
       },
       "Epik8sImportConfigParams": {
@@ -43597,6 +43665,220 @@
           }
         ],
         "summary": "Follow Record",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/v1/notifications/preferences": {
+      "get": {
+        "description": "How this person gets their notifications by e-mail: each as it happens (`instant`, the default), once a\nday (`digest`) or never (`off`), and the categories they never want by e-mail. Whether this installation\nsends e-mail at all, and to which address.",
+        "operationId": "my_email_preferences_v1_notifications_preferences_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "My Email Preferences",
+        "tags": [
+          "notifications"
+        ]
+      },
+      "put": {
+        "operationId": "set_email_preferences_v1_notifications_preferences_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailPreferenceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Email Preferences",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/v1/notifications/preferences/test": {
+      "post": {
+        "description": "A test message to this person's address now: checks the mail server and the address.",
+        "operationId": "send_test_email_v1_notifications_preferences_test_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Send Test Email",
         "tags": [
           "notifications"
         ]

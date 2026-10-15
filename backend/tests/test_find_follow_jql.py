@@ -197,7 +197,9 @@ def test_following_equipment_and_documents_in_any_workspace(people):
 
     titles = [n["title"] for n in inbox(w, "bob")]
     assert any(t.startswith("Ion pump 7") and "Added qrcode label" in t for t in titles)
-    assert any(t.endswith("revision 1 sent for review") for t in titles)
+    # bob may approve documents here: asked to review, not told twice
+    assert any(t.startswith("Review requested:") and t.endswith("revision 1") for t in titles)
+    assert not any(t.endswith("revision 1 sent for review") for t in titles)
     assert not any("sent for review" in n["title"] for n in inbox(w, "ann")), "not what you did yourself"
 
     as_(w["bob"])

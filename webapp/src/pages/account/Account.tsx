@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { tokensApi, workspacesApi } from "../../api/client";
 import { PERSONAL_PRESETS, TokenForm, TokenTable } from "../../components/ApiTokens";
+import { NotificationSettings } from "./Notifications";
 
-/** Who you are to ARGUS: the account, this sign-in, groups, what each workspace lets you do, and your personal
- * access tokens. */
+/** Who you are to ARGUS: the account, this sign-in, groups, what each workspace lets you do, your notifications
+ * and your personal access tokens. */
 export function AccountPage() {
   const queryClient = useQueryClient();
   const profile = useQuery({ queryKey: ["my-profile"], queryFn: tokensApi.profile });
@@ -102,6 +103,8 @@ export function AccountPage() {
           </div>
         </section>
       )}
+
+      {p?.auth_type === "oidc" && <NotificationSettings />}
 
       <section className="space-y-3">
         <div>
