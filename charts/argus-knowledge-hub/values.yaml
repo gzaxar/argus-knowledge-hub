@@ -89,6 +89,26 @@ portabilityJobs:
     schedule: "0 3 1 1,7 *"
     repository: escrow
 
+# The ledger's periodic work (docs/operations.md): ticket and review-queue escalation, e-mailing notifications,
+# removing expired idempotency keys and unfinished uploads. On the API's node (its attachments volume).
+ledgerJobs:
+  escalate:
+    enabled: true
+    schedule: "*/10 * * * *"
+
+# Notifications by e-mail. Off while host is empty: notifications stay in the app (the bell, the phone).
+# The relay's account, when it needs one, is in the Secret named here (keys username and password), made by
+# hand: kubectl -n argus create secret generic argus-smtp --from-literal=username=… --from-literal=password=…
+email:
+  host: ""
+  port: 587
+  security: starttls          # starttls, ssl (port 465) or none
+  # The sender; empty: the account's address (username@ the server's domain, e.g. lnf.infn.it).
+  from: ""
+  secret: argus-smtp
+  # Daily digests go out at this hour, Europe/Rome, to those who chose one.
+  digestHour: 7
+
 # Removing container images no container uses, on each node: every release pulls new ones, and the node
 # disks are small. Kubernetes only collects images past ~85% full, too late for local-path volumes on the
 # same disk. One CronJob per node (a pod runs on one node), with the node's root mounted to reach containerd.

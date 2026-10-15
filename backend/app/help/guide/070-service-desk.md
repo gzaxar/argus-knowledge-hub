@@ -1,7 +1,7 @@
 ---
 title: Service desk (tickets)
 summary: Reporting a fault or a request, working tickets through their workflow, the board, watchers, notifications and subscriptions.
-keywords: [ticket, tickets, issue, fault, incident, request, task, service desk, workflow, status, assignee, priority, board, watcher, notification, notifications, subscribe, subscription, sla, resolution, description]
+keywords: [email, e-mail, digest, review requested, ticket, tickets, issue, fault, incident, request, task, service desk, workflow, status, assignee, priority, board, watcher, notification, notifications, subscribe, subscription, sla, resolution, description]
 order: 70
 ---
 
@@ -74,12 +74,30 @@ may not read, nor about what you did yourself.
 be told of each change to it: an edit, a label, a file, a comment; for a document, a new revision, a review,
 an approval, a publication, a retirement. The author of a document follows it from the start.
 
+A revision **sent for review** asks the people who can approve it — the document's owner and whoever may
+approve documents in the workspace, never its author — with **Review requested**.
+
 Your notifications come from **every workspace** you can open, whichever workspace you are in: each says
 which workspace it is from, and opens there.
 
-You can also ask to hear about **everything new** in a workspace. In the mobile app, **Settings →
-Notifications**: for each workspace you can open, switch on **New tickets**, **New and published documents**
-or **New equipment**. They are off until you choose them.
+You can also ask to hear about **everything new** in a workspace: on the web, **My account → Notifications**
+(account menu, top right); in the mobile app, **Settings → Notifications**. For each workspace you can open,
+switch on **New tickets**, **New and published documents** or **New equipment**. They are off until you choose
+them.
+
+## By e-mail
+
+When the installation has a mail server, your notifications also reach you by e-mail — **each one as it
+happens**, unless you choose otherwise in **My account → Notifications**:
+
+- **Once a day, in a digest**: everything since the last one, in one message, in the morning (7:00).
+- **Never**: only in the app.
+- **What to e-mail**: leave out whole kinds — changes to tickets you watch, overdue items, changes to what you
+  follow, what is new in the workspaces you subscribed to. Assignments, mentions and review requests are a kind
+  of their own.
+
+Each message links to its page, opened in its workspace. **Send me a test message** checks that mail reaches
+you. The app keeps every notification whatever you choose for e-mail.
 
 - On the web, the **bell** at the top lists your notifications.
 - On the phone, the bell on **Home** lists them, and **Show news on this phone** (same Settings page, or

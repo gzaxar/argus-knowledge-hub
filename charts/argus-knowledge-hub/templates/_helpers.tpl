@@ -32,6 +32,24 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 - name: OIDC_EXTRA_PROVIDERS
   value: {{ toJson . | quote }}
 {{- end }}
+# Links in e-mails and notifications lead to the web app.
+- {name: ARGUS_WEB_URL, value: {{ printf "https://%s" .Values.hosts.web | quote }}}
+{{- with .Values.email }}
+{{- if .host }}
+- {name: SMTP_HOST, value: {{ .host | quote }}}
+- {name: SMTP_PORT, value: {{ .port | quote }}}
+- {name: SMTP_SECURITY, value: {{ .security | quote }}}
+{{- with .from }}
+- {name: SMTP_FROM, value: {{ . | quote }}}
+{{- end }}
+- {name: NOTIFY_DIGEST_HOUR, value: {{ .digestHour | quote }}}
+# The account the server relays for, when it asks for one: keys username and password of this Secret.
+- name: SMTP_USERNAME
+  valueFrom: {secretKeyRef: {name: {{ .secret }}, key: username, optional: true}}
+- name: SMTP_PASSWORD
+  valueFrom: {secretKeyRef: {name: {{ .secret }}, key: password, optional: true}}
+{{- end }}
+{{- end }}
 {{- range $k, $v := .Values.api.env }}
 - {name: {{ $k }}, value: {{ $v | quote }}}
 {{- end }}

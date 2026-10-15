@@ -105,3 +105,16 @@ class NotificationSubscription(Base):
     documents: Mapped[bool] = mapped_column(Boolean, default=False)
     assets: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class NotificationPreference(Base):
+    """How a person wants their notifications by e-mail: each one as it happens (`instant`), once a day
+    (`digest`), or never (`off`) — and which kinds (services/notify.EMAIL_CATEGORIES) never by e-mail. Without
+    a row: each one as it happens. The app (the bell, the phone) always has them all."""
+    __tablename__ = "notification_preferences"
+
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    email: Mapped[str] = mapped_column(String, default="instant")
+    muted: Mapped[list] = mapped_column(JSONB, default=list)
+    last_digest_at: Mapped[Optional[object]] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)

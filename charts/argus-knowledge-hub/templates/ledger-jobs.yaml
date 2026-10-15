@@ -1,0 +1,45 @@
+{{- if .Values.ledgerJobs.escalate.enabled }}
+# Every few minutes: escalates tickets past their state's time limit and overdue review items, e-mails the
+# notifications waiting to be sent (immediately, or in each person's daily digest), and removes expired
+# idempotency keys and unfinished uploads (docs/operations.md).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: argus-ledger-escalate
+  labels: {{- include "argus.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.ledgerJobs.escalate.schedule | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels: {app: argus-ledger-escalate}
+        spec:
+          restartPolicy: Never
+          # Unfinished uploads are on the API's attachments volume, ReadWriteOnce on that node's disk.
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector: {matchLabels: {app: argus-api}}
+                  topologyKey: kubernetes.io/hostname
+          containers:
+            - name: job
+              image: "{{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}"
+              command: ["python", "-m", "app.ledger", "escalate"]
+              env:
+                {{- include "argus.apiEnv" . | nindent 16 }}
+              resources:
+                requests: {cpu: 20m, memory: 192Mi}
+                limits: {memory: 1Gi}
+              volumeMounts:
+                - {name: attachments, mountPath: /data/attachments}
+          volumes:
+            - name: attachments
+              persistentVolumeClaim: {claimName: argus-attachments}
+{{- end }}

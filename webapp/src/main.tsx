@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 import { ApiError } from "./api/client";
+import { adoptWorkspaceFromUrl } from "./api/session";
 import { ToastHost, showToast } from "./components/Toast";
 import "./index.css";
 
@@ -20,6 +21,8 @@ const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError: handleError }),
   mutationCache: new MutationCache({ onError: handleError }),
 });
+
+adoptWorkspaceFromUrl();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -47,6 +47,12 @@ api:
 web:
   nodeSelector:
     kubernetes.io/hostname: vnode-1
+# The LNF relay: from the cloud it relays only for an LNF account (Secret argus-smtp).
+email:
+  host: smtp.lnf.infn.it
+  port: 587
+  security: starttls
+  from: argus-noreply@lnf.infn.it
 keycloak:
   # "Sign in with Google" on the Keycloak page (Google Cloud project seraphic-camera-479521-s5).
   google:
