@@ -440,9 +440,13 @@ export interface GitImportConfigParams {
 
 export interface ConfluenceImportConfigParams {
   source: "confluence";
-  base_url: string;
+  /** Left out when `page_url` names the server. */
+  base_url?: string;
   space_key?: string | null;
   cql?: string | null;
+  /** One page (the Share button's short link, or its address) instead of a space or a query. */
+  page_url?: string | null;
+  include_children?: boolean;
   link_assets?: boolean;
   pat?: string;
 }

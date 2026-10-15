@@ -158,12 +158,14 @@ def run_config(
             run_confluence_import,
             job.uid,
             workspace_id,
-            config.params["base_url"],
+            config.params.get("base_url"),
             pat,
             config.params.get("space_key"),
             config.params.get("cql"),
             config.merge_strategy,
             config.params.get("link_assets", True),
+            config.params.get("page_url"),
+            config.params.get("include_children", True),
         )
     elif config.source == "epik8s":
         background_tasks.add_task(

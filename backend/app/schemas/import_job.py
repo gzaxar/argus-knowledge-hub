@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 # "remove_all_before" is retired (services/import_merge.RETIRED_STRATEGIES): a new
 # import may not ask for it; a stored configuration that names it runs as override.
@@ -33,9 +33,29 @@ class JiraIssueImportRequest(BaseModel):
     merge_strategy: MergeStrategy = "override"
 
 
-class ConfluenceImportRequest(BaseModel):
+class ConfluencePageLink(BaseModel):
+    """A link to one page (the short link its Share button gives, or the page's
+    address) imports that page and, unless `include_children` is false, the pages
+    under it. The server comes from the link when `base_url` is left out."""
+    base_url: Optional[str] = None
+    page_url: Optional[str] = None
+    include_children: bool = True
+
+    @model_validator(mode="after")
+    def _a_server_or_a_page(self):
+        from app.services.confluence_import import PageLinkError, parse_page_link
+        if self.page_url:
+            try:
+                parse_page_link(self.page_url)
+            except PageLinkError as exc:
+                raise ValueError(str(exc))
+        elif not self.base_url:
+            raise ValueError("The Confluence server URL, or a link to a page, is required.")
+        return self
+
+
+class ConfluenceImportRequest(ConfluencePageLink):
     source: Literal["confluence"]
-    base_url: str
     pat: str
     # One space, or any CQL the account can run. A space is the usual case.
     space_key: Optional[str] = None

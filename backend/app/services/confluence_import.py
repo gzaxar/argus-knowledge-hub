@@ -11,12 +11,15 @@ a page's *version* is the thing that changes: re-importing a page whose
 version hasn't moved must not manufacture a new revision, or a document's
 history fills with identical entries.
 """
+import base64
+import binascii
 import os
 import re
 import uuid
 from datetime import datetime, timezone
 from html import unescape
 from typing import Optional
+from urllib.parse import parse_qs, unquote_plus, urlparse
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -434,6 +437,100 @@ def _import_attachments(db: Session, session, base_url: str, workspace_id: str,
     return files, copied
 
 
+# Where a page link's path starts after the server's own context path.
+_LINK_MARKERS = ("/x/", "/pages/", "/display/", "/spaces/")
+
+
+class PageLinkError(ValueError):
+    pass
+
+
+def tiny_link_page_id(code: str) -> str:
+    """The page id in a short link (/x/YwX6AQ): Confluence writes the id's bytes,
+    least significant first, in base64 with - for / and _ for +, without the
+    trailing zero bytes."""
+    text = code.replace("-", "/").replace("_", "+")
+    text += "A" * (-len(text) % 4)
+    try:
+        raw = base64.b64decode(text, validate=True)
+    except (ValueError, binascii.Error):
+        raise PageLinkError(f"“{code}” is not a Confluence short link.")
+    page_id = int.from_bytes(raw, "little")
+    if page_id <= 0:
+        raise PageLinkError(f"“{code}” is not a Confluence short link.")
+    return str(page_id)
+
+
+def parse_page_link(link: str) -> dict:
+    """A link to one Confluence page, as the browser or the Share button gives it:
+    the short link (…/x/YwX6AQ), …/pages/viewpage.action?pageId=…,
+    …/spaces/KEY/pages/123/Title, or …/display/KEY/Title. Says the server (with
+    its context path) and the page: its id, or its space and title."""
+    parsed = urlparse((link or "").strip())
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise PageLinkError("A page link starts with https:// and names the Confluence server.")
+    path = parsed.path
+    cut = min((i for i in (path.find(m) for m in _LINK_MARKERS) if i >= 0), default=-1)
+    if cut < 0:
+        raise PageLinkError("This is not a link to a Confluence page: copy it from the page, "
+                            "or from its Share button.")
+    base = f"{parsed.scheme}://{parsed.netloc}{path[:cut]}"
+    rest = [p for p in path[cut:].split("/") if p]
+    query = parse_qs(parsed.query)
+    if rest[0] == "x" and len(rest) > 1:
+        return {"base_url": base, "page_id": tiny_link_page_id(rest[1]), "short": rest[1]}
+    if rest[0] == "pages" and query.get("pageId"):
+        page_id = query["pageId"][0]
+    elif rest[0] == "pages" and query.get("spaceKey") and query.get("title"):
+        return {"base_url": base, "space": query["spaceKey"][0], "title": query["title"][0]}
+    elif rest[0] == "spaces" and len(rest) > 3 and rest[2] == "pages":
+        page_id = rest[3]
+    elif rest[0] == "display" and len(rest) > 2:
+        return {"base_url": base, "space": rest[1], "title": unquote_plus(rest[2])}
+    else:
+        raise PageLinkError("This link does not name a page: copy it from the page, or from its "
+                            "Share button.")
+    if not page_id.isdigit():
+        raise PageLinkError(f"“{page_id}” is not a Confluence page id.")
+    return {"base_url": base, "page_id": page_id}
+
+
+def resolve_page(session, base_url: str, link: dict) -> tuple[str, str]:
+    """The id and title of the page a parsed link names, read from the server so a
+    link the account cannot open says so before anything is imported."""
+    def refused(resp) -> RuntimeError:
+        if resp.status_code in (401, 403):
+            return RuntimeError("Confluence refused the token for this page: check the personal access "
+                                "token, and that its account can open the page.")
+        return RuntimeError(f"The linked page was not found ({_describe_error(None, resp)}).")
+
+    if "page_id" in link:
+        resp = session.get(f"{base_url}/rest/api/content/{link['page_id']}")
+        if resp.status_code == 200:
+            page = resp.json()
+            return str(page["id"]), page.get("title") or ""
+        if "short" not in link or resp.status_code in (401, 403):
+            raise refused(resp)
+        # A short link the decoding got wrong: the server knows where it leads.
+        hop = session.get(f"{base_url}/x/{link['short']}", allow_redirects=True)
+        try:
+            target = parse_page_link(hop.url)
+        except PageLinkError:
+            raise refused(resp)
+        if target.get("short") or target == link:
+            raise refused(resp)
+        return resolve_page(session, base_url, target)
+    resp = session.get(f"{base_url}/rest/api/content",
+                       params={"spaceKey": link["space"], "title": link["title"], "type": "page"})
+    if resp.status_code != 200:
+        raise refused(resp)
+    results = resp.json().get("results") or []
+    if not results:
+        raise RuntimeError(f"No page “{link['title']}” in the space {link['space']}, or the token's "
+                           "account cannot see it.")
+    return str(results[0]["id"]), results[0].get("title") or link["title"]
+
+
 def resolve_api_base(session, base_url: str) -> str:
     """Confluence Server is often published under /confluence or /wiki, and
     the site root answers with a normal page either way — so a wrong base
@@ -502,7 +599,12 @@ def run_confluence_import(
     cql: Optional[str] = None,
     merge_strategy: str = "override",
     link_assets: bool = True,
+    page_url: Optional[str] = None,
+    include_children: bool = True,
 ) -> None:
+    """`page_url` imports one page (and, with `include_children`, every page under
+    it) instead of a space or a CQL query; the server comes from the link when
+    `base_url` is empty."""
     db = SessionLocal()
     job = db.get(ImportJob, job_uid)
     job.status = "running"
@@ -510,9 +612,10 @@ def run_confluence_import(
     db.commit()
 
     seen: set = set()
-    base_url = base_url.rstrip("/")
 
     try:
+        link = parse_page_link(page_url) if page_url else None
+        base_url = (base_url or (link or {}).get("base_url") or "").rstrip("/")
         session = _TimeoutSession()
         session.headers.update({"Authorization": f"Bearer {pat}", "Accept": "application/json"})
 
@@ -520,6 +623,13 @@ def run_confluence_import(
         if resolved != base_url:
             _set_progress(db, job, f"Confluence API found at {resolved}")
         base_url = resolved
+
+        if link is not None:
+            root_id, root_title = resolve_page(session, base_url, link)
+            space_key = None
+            cql = f"id = {root_id} or ancestor = {root_id}" if include_children else f"id = {root_id}"
+            _set_progress(db, job, f"The page “{root_title}” ({root_id})"
+                                   + (" and the pages under it" if include_children else ""))
 
         type_uids = ensure_document_kinds(db, workspace_id)
         db.commit()
