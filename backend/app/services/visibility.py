@@ -144,6 +144,43 @@ def restricted_fields(db, schema_uid: Optional[str]) -> dict[str, str]:
     return out
 
 
+def restricted_by_type(db) -> dict[str, dict[str, str]]:
+    """Every type with a restricted field, of its own or from an ancestor: uid -> {attribute key: class},
+    as restricted_fields() gives it for one type. Two queries whatever the number of types: the few types
+    that declare one, then the tree, walked in memory. A scan or a search asks this once, not per type."""
+    from sqlalchemy import String, cast, select
+
+    from app.models.schema import Schema
+    own: dict[str, dict[str, str]] = {}
+    for uid, attributes in db.execute(select(Schema.uid, Schema.attributes)
+                                      .where(cast(Schema.attributes, String).like('%"restricted"%'))):
+        defs = {}
+        for attr in attributes or []:
+            key = attr.get("key") or attr.get("name")
+            if key and attr.get("restricted"):
+                defs.setdefault(key, str(attr["restricted"]))
+        if defs:
+            own[uid] = defs
+    if not own:
+        return {}
+    parent = dict(db.execute(select(Schema.uid, Schema.parent_schema_uid)).all())
+    memo: dict[str, dict[str, str]] = {}
+
+    def of(uid: str) -> dict[str, str]:
+        chain, seen = [], set()
+        while uid and uid not in seen and uid not in memo:
+            seen.add(uid)
+            chain.append(uid)
+            uid = parent.get(uid)
+        inherited = memo.get(uid, {}) if uid else {}
+        for u in reversed(chain):               # from the farthest ancestor down: the nearest type wins
+            inherited = {**inherited, **own.get(u, {})}
+            memo[u] = inherited
+        return memo[chain[0]] if chain else inherited
+
+    return {uid: m for uid in parent if (m := of(uid))}
+
+
 def hidden_fields(db, record, grants: Optional[Grants] = None) -> set[str]:
     grants = grants if grants is not None else current_grants()
     if grants.everything:

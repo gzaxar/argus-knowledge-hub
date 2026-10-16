@@ -19,26 +19,29 @@ from app.models.asset_subresources import AssetLabel
 IDENTIFIER_ATTRS = ("serial", "serial_number", "inventory", "inventory_number", "mac", "asset_tag")
 
 
-def _blocked_schemas(db: Session, grants, attr: str) -> Optional[list[str]]:
-    """The types on which this attribute is restricted from the viewer; None when nothing is restricted."""
+def _blocked_schemas(db: Session, grants, attr: str, restricted: Optional[dict] = None) -> Optional[list[str]]:
+    """The types on which this attribute is restricted from the viewer; None when nothing is restricted.
+    `restricted` is visibility.restricted_by_type(), when the caller already has it."""
     if grants is None or getattr(grants, "everything", False):
         return None
-    from app.models.schema import Schema
-    from app.services.visibility import restricted_fields
-    blocked = []
-    for uid in db.scalars(select(Schema.uid)):
-        cls = restricted_fields(db, uid).get(attr)
-        if cls is not None and not grants.allows(cls):
-            blocked.append(uid)
+    if restricted is None:
+        from app.services.visibility import restricted_by_type
+        restricted = restricted_by_type(db)
+    blocked = [uid for uid, fields in restricted.items()
+               if attr in fields and not grants.allows(fields[attr])]
     return blocked or None
 
 
 def attribute_match(db: Session, grants, match) -> object:
     """Any identifier attribute for which `match(column)` holds, where the viewer may see that attribute."""
+    restricted = None
+    if grants is not None and not getattr(grants, "everything", False):
+        from app.services.visibility import restricted_by_type
+        restricted = restricted_by_type(db)
     clauses = []
     for attr in IDENTIFIER_ATTRS:
         clause = match(Asset.attributes[attr].astext)
-        blocked = _blocked_schemas(db, grants, attr)
+        blocked = _blocked_schemas(db, grants, attr, restricted)
         clauses.append(and_(clause, Asset.schema_uid.notin_(blocked)) if blocked else clause)
     return or_(*clauses)
 
