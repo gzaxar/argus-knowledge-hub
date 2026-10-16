@@ -627,13 +627,12 @@ def _priority_rank(col):
 def _visible_attributes_like(ctx: Ctx, word: str):
     """Any attribute value containing the word — only where the viewer may see every attribute of that type."""
     from app.models.asset import Asset
-    from app.models.schema import Schema
-    from app.services.visibility import restricted_fields
+    from app.services.visibility import restricted_by_type
     like = cast(Asset.attributes, String).ilike(f"%{word}%")
     if ctx.grants is None or getattr(ctx.grants, "everything", False):
         return like
-    blocked = [uid for uid in ctx.db.scalars(select(Schema.uid))
-               if any(not ctx.grants.allows(cls) for cls in restricted_fields(ctx.db, uid).values())]
+    blocked = [uid for uid, fields in restricted_by_type(ctx.db).items()
+               if any(not ctx.grants.allows(cls) for cls in fields.values())]
     return and_(like, Asset.schema_uid.notin_(blocked)) if blocked else like
 
 

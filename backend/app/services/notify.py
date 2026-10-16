@@ -354,12 +354,27 @@ def preference(db: Session, user: Optional[User]):
     return db.get(NotificationPreference, user.id)
 
 
+_REFUSED = (smtplib.SMTPRecipientsRefused, smtplib.SMTPDataError, smtplib.SMTPSenderRefused)
+
+
+class _Deferred(Exception):
+    pass
+
+
+def _temporary(exc: smtplib.SMTPException) -> bool:
+    """A 4xx answer: try again later (a relay refusing until it is signed in to says 454). A 5xx is final."""
+    if isinstance(exc, smtplib.SMTPRecipientsRefused):
+        return all(code < 500 for code, _ in exc.recipients.values())
+    return getattr(exc, "smtp_code", 500) < 500
+
+
 def deliver_pending(db: Session, at: Optional[datetime] = None) -> int:
     """E-mail the notifications not yet sent, when SMTP is configured: each one as it happens, or together in
     a person's daily digest, as they chose (none of what they muted). A recipient with no e-mail address, or
     one who wants none, keeps it in the app only. What is older than NOTIFY_EMAIL_MAX_AGE_HOURS (48) is not
-    e-mailed late — a mail server set up today does not send a year of history. A refused recipient does not
-    stop the others; a mail server that cannot be reached leaves the rest for the next run."""
+    e-mailed late — a mail server set up today does not send a year of history. A recipient refused for good
+    (5xx) does not stop the others; a mail server that cannot be reached, or defers (4xx, as a relay does until
+    it is signed in to), leaves the rest for the next run."""
     import logging
     if not email_configured():
         return 0
@@ -408,7 +423,9 @@ def deliver_pending(db: Session, at: Optional[datetime] = None) -> int:
                 smtp.send_message(_message(address, f"[ARGUS] {n.title}"[:250],
                                            _instant_body(db, n, workspace(n.workspace_id))))
                 sent += 1
-            except (smtplib.SMTPRecipientsRefused, smtplib.SMTPDataError, smtplib.SMTPSenderRefused) as exc:
+            except _REFUSED as exc:
+                if _temporary(exc):
+                    raise _Deferred(exc) from exc
                 log.warning("notification %s to %s not sent: %s", n.id, address, exc)
             n.delivered_at = at
         for pref, address, items in sendable:
@@ -418,11 +435,16 @@ def deliver_pending(db: Session, at: Optional[datetime] = None) -> int:
                 smtp.send_message(_message(address, f"[ARGUS] Your daily digest: {len(items)} notification(s)",
                                            _digest_body(db, items, names)))
                 sent += 1
-            except (smtplib.SMTPRecipientsRefused, smtplib.SMTPDataError, smtplib.SMTPSenderRefused) as exc:
+            except _REFUSED as exc:
+                if _temporary(exc):
+                    raise _Deferred(exc) from exc
                 log.warning("digest to %s not sent: %s", address, exc)
             for n in items:
                 n.delivered_at = at
             pref.last_digest_at = at
+    except _Deferred as exc:
+        log.error("the mail server deferred delivery after %s message(s), the rest wait for the next run "
+                  "(a relay that needs its account, SMTP_USERNAME?): %s", sent, exc.__cause__)
     except (OSError, smtplib.SMTPException) as exc:
         log.error("the mail server stopped answering after %s message(s): %s", sent, exc)
     finally:

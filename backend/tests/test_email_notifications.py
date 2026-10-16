@@ -14,14 +14,15 @@ from tests.test_find_follow_jql import as_, client, people  # noqa: F401 — fix
 
 
 class FakeSMTP:
-    def __init__(self, refuse=()):
+    def __init__(self, refuse=(), code=550):
         self.sent: list[EmailMessage] = []
         self.refuse = set(refuse)
+        self.code = code
 
     def send_message(self, msg):
         import smtplib
-        if msg["To"] in self.refuse:
-            raise smtplib.SMTPRecipientsRefused({msg["To"]: (550, b"no such user")})
+        if msg["To"] in self.refuse or "*" in self.refuse:
+            raise smtplib.SMTPRecipientsRefused({msg["To"]: (self.code, b"refused")})
         self.sent.append(msg)
 
     def quit(self):
@@ -208,3 +209,22 @@ def test_a_revision_sent_for_review_asks_those_who_can_approve_it(people):
     as_(w["cid"])                                       # may approve, may not read documents
     assert not [n for n in client.get("/v1/notifications/everywhere", params={"include_read": True}).json()
                 if n["detail"].get("uid") == doc]
+
+
+def test_a_relay_that_defers_keeps_them_for_the_next_run(people, monkeypatch):
+    """Not signed in, the LNF relay answers each recipient "454 Relay access denied": temporary. Nothing is
+    given up; once the account is set, the next run sends them."""
+    w = people
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.org")
+    smtp = FakeSMTP(refuse={"*"}, code=454)
+    monkeypatch.setattr(notify, "_connect", lambda: smtp)
+    db = SessionLocal()
+    n = _note(db, w["ws"], w["bob"], title="Assigned to you: deferred")
+    assert notify.deliver_pending(db) == 0
+    db.refresh(n)
+    assert n.delivered_at is None
+    smtp.refuse.clear()
+    notify.deliver_pending(db)
+    assert [m["Subject"] for m in smtp.to(w["bob"].email)] == ["[ARGUS] Assigned to you: deferred"]
+    db.rollback()
+    db.close()

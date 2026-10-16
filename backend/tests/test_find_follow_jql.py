@@ -238,3 +238,37 @@ def test_jql_selects_tickets_equipment_and_documents(people):
     assert bad.status_code == 422 and bad.json()["detail"]["position"] == 9
     assert q("tickets", "summary ~ x ORDER updated").status_code == 422
     assert client.get("/v1/search/jql/fields").json()["tickets"]
+
+
+def test_restricted_fields_of_every_type_come_from_two_queries_and_agree_with_one_type_at_a_time(people):
+    """A scan or a search asks which identifier fields are restricted on which type: once for all types,
+    not once per type, field and ancestor — that took a scan to minutes with thousands of types."""
+    from sqlalchemy import event
+
+    from app.db import engine
+    from app.models.schema import Schema
+    from app.services.visibility import restricted_by_type, restricted_fields
+    t = secrets.token_hex(3)
+    db = SessionLocal()
+    root = Schema(uid=f"r-{t}", name="Root", workspace_id=people["ws"], attributes=[{"key": "serial", "restricted": "costs"}])
+    mid = Schema(uid=f"m-{t}", name="Mid", workspace_id=people["ws"], parent_schema_uid=root.uid,
+                 attributes=[{"key": "price", "restricted": "costs"}, {"key": "serial", "restricted": "hr"}])
+    leaf = Schema(uid=f"l-{t}", name="Leaf", workspace_id=people["ws"], parent_schema_uid=mid.uid, attributes=[{"key": "model"}])
+    plain = Schema(uid=f"p-{t}", name="Plain", workspace_id=people["ws"], attributes=[{"key": "serial"}])
+    db.add_all([root, mid, leaf, plain])
+    db.flush()
+    queries = []
+
+    def count(*_):
+        queries.append(1)
+    event.listen(engine, "before_cursor_execute", count)
+    try:
+        got = restricted_by_type(db)
+    finally:
+        event.remove(engine, "before_cursor_execute", count)
+    assert len(queries) == 2
+    for s in (root, mid, leaf, plain):
+        assert got.get(s.uid, {}) == restricted_fields(db, s.uid), s.name
+    assert got[leaf.uid] == {"serial": "hr", "price": "costs"}               # the nearest type wins
+    db.rollback()
+    db.close()
