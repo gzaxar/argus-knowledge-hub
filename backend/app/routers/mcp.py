@@ -35,6 +35,8 @@ INSTRUCTIONS = (
     "Prefer graph_neighbours for anything that spans records — what has gone wrong "
     "with a piece of equipment before, which procedure covers it, what it depends on. "
     "Searching text alone will miss those, because the answer is not in one document.\n"
+    "For EPICS IOCs built with ibek (drivers, ibek-templates, a beamline values.yaml entry) use the ioc_* "
+    "tools: ioc_search first, and ioc_render to check an entry before proposing it.\n"
     "Everything here is read-only."
 )
 

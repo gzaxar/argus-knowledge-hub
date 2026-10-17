@@ -296,6 +296,13 @@ currently valid* revision rather than to an arbitrary PDF.
   recognises can be classified by the AI, as proposals in the review queue only.
 - **Data integrity tools**: relink of unresolved references, and a report of missing
   references, dangling links and orphaned objects, with targeted cleanup actions.
+- **IOC engineer.** Ask ARGUS and any MCP client can help build containerised EPICS IOCs with
+  ibek: find the driver for a device and its git source (from `install.yml`), read an entity
+  model's parameters or a template's devtypes, render a beamline IOC entry exactly as the pod does
+  (jnjrender) and check it as `ibek runtime generate` will (unknown or not-compiled types, missing
+  or mistyped parameters), and draft the files a new driver needs. Answered from a catalogue of
+  `infn-epics-ioc` and its submodules (`python -m app.ioc_engineer build`); the `ioc_*` MCP tools,
+  read-only. [docs/ioc-engineer.md](docs/ioc-engineer.md).
 
 ## Design notes
 
@@ -534,6 +541,7 @@ VITE_API_BASE_URL=http://localhost:8080
 | `OIDC_EXTRA_PROVIDERS` | More trusted OIDC providers, as a JSON list of `{issuer, jwks_uri, audience}` (e.g. Firebase beside INFN's IdP). |
 | (worker) | `python -m app.ledger derive-worker` runs queued derives when `LEDGER_USER_EDIT_DERIVE=manual`; `python -m app.ledger backfill-checksums` records SHA-256 for older attachments. |
 | `LEDGER_USER_EDIT_DERIVE` | How derived links follow a user's edit: `background` (default), `inline`, or `manual` (left for a worker). |
+| `ARGUS_IOC_CATALOG` | An IOC catalogue (`.json` or `.json.gz`) to answer the `ioc_*` tools from instead of the bundled snapshot (docs/ioc-engineer.md). |
 
 ## Deployment
 

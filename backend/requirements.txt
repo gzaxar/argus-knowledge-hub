@@ -7,6 +7,8 @@ pydantic==2.9.2
 python-multipart==0.0.9
 requests==2.32.3
 pyyaml==6.0.2
+# Renders ibek-templates the way the IOC pod does (app/ioc_engineer), sandboxed.
+jinja2==3.1.6
 pyjwt[crypto]==2.9.0
 cryptography==43.0.1
 ldap3==2.9.1

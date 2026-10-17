@@ -802,6 +802,131 @@ TOOLS: list[dict[str, Any]] = [
     },
 ]
 
+# The IOC engineer (app/ioc_engineer): building containerised EPICS IOCs with ibek, from the catalogue of
+# infn-epics-ioc's support modules and templates. Answers the same in every workspace: it is about the image.
+from app.ioc_engineer import tools as ioc  # noqa: E402
+
+TOOLS += [
+    {
+        "name": "ioc_search",
+        "description": "Search the EPICS IOC catalogue (infn-epics-ioc: ibek-support-infn drivers, upstream "
+                       "ibek-support, ibek-templates and their example entries) by vendor, device, driver, "
+                       "devtype or entity type. Start here for any question about building, configuring or "
+                       "deploying a containerised IOC with ibek.",
+        "handler": ioc.ioc_search,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "e.g. 'pfeiffer gauge', 'ocem', 'modbus', 'technosoft'"},
+                "kind": {"type": "string", "enum": ["module", "entity_model", "template", "example"]},
+                "limit": {"type": "integer"},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "ioc_get_module",
+        "description": "One support module: its driver's git repository and version (from install.yml), libs "
+                       "and dbds, whether the infn-epics-ioc image compiles it (and in which Dockerfile), its "
+                       "entity models with their required parameters, the templates that use it, and — when "
+                       "indexed — the driver source's db templates with their macros and protocol files.",
+        "handler": ioc.ioc_get_module,
+        "inputSchema": {
+            "type": "object",
+            "properties": {"name": {"type": "string",
+                                    "description": "Folder (ocemPS), repository (OCEMPowerSupply) or ibek module (ocem)"}},
+            "required": ["name"],
+        },
+    },
+    {
+        "name": "ioc_get_entity_model",
+        "description": "One ibek entity model whole, by type (ocem.modbusps, asyn.AsynIP, epics.DbAlias): "
+                       "parameters with types, defaults and descriptions, the st.cmd lines it adds, the "
+                       "databases it loads with their macros, and whether the image can instantiate it.",
+        "handler": ioc.ioc_get_entity_model,
+        "inputSchema": {"type": "object", "properties": {"type": {"type": "string"}}, "required": ["type"]},
+    },
+    {
+        "name": "ioc_get_template",
+        "description": "One ibek-template by the value of `template:` (ocem, motor, agilent-vac…): its Jinja2 "
+                       "source, the devtypes it branches on, the variables it reads from the beamline entry, "
+                       "the entity types it emits and whether the image has them, and its examples.",
+        "handler": ioc.ioc_get_template,
+        "inputSchema": {
+            "type": "object",
+            "properties": {"name": {"type": "string"},
+                           "include_source": {"type": "boolean", "description": "Default true"}},
+            "required": ["name"],
+        },
+    },
+    {
+        "name": "ioc_get_example",
+        "description": "A worked beamline IOC entry, by name or by template: an ibek-templates test fixture or a "
+                       "config kept in infn-epics-ioc. The quickest start for a new entry of a known type.",
+        "handler": ioc.ioc_get_example,
+        "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+    },
+    {
+        "name": "ioc_render",
+        "description": "Render a beamline IOC entry (YAML: template, devtype, iocprefix, devices, ps:, motor:…; "
+                       "a pasted epicsConfiguration.iocs block with one IOC works too) exactly as the IOC pod "
+                       "does with jnjrender, then check the resulting ibek IOC YAML as `ibek runtime generate` "
+                       "would: unknown or not-compiled entity types, missing, unknown or mistyped parameters, "
+                       "dangling object references. Pass template_source to try a template being written.",
+        "handler": ioc.ioc_render,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "values": {"type": "string", "description": "The IOC entry as YAML"},
+                "template": {"type": "string", "description": "Override the entry's template:"},
+                "template_source": {"type": "string", "description": "A Jinja2 template to render instead"},
+            },
+            "required": ["values"],
+        },
+    },
+    {
+        "name": "ioc_validate",
+        "description": "Check an ibek IOC instance YAML (ioc_name, entities: [...]) against the entity models "
+                       "and what the image compiles, without rendering a template.",
+        "handler": ioc.ioc_validate,
+        "inputSchema": {"type": "object", "properties": {"ioc_yaml": {"type": "string"}}, "required": ["ioc_yaml"]},
+    },
+    {
+        "name": "ioc_scaffold_driver",
+        "description": "Draft the files a new INFN driver needs, in the house style: <folder>.install.yml and "
+                       "<folder>.ibek.support.yaml for ibek-support-infn, a template and a test fixture for "
+                       "ibek-templates, the Dockerfile line, checked against each other by rendering the "
+                       "fixture. Returns text to review and commit; it writes nothing.",
+        "handler": ioc.ioc_scaffold_driver,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "folder": {"type": "string", "description": "ibek-support-infn folder and ibek module name"},
+                "repository": {"type": "string", "description": "The driver's git repository name"},
+                "organization": {"type": "string", "description": "Default https://github.com/infn-epics/"},
+                "version": {"type": "string", "description": "Tag or branch; default main"},
+                "protocol": {"type": "string", "enum": ["stream", "modbus", "asyn"]},
+                "group": {"type": "string", "enum": ioc.GROUPS},
+                "devtype": {"type": "string"},
+                "db_template": {"type": "string", "description": "The driver's db template file"},
+                "proto_file": {"type": "string", "description": "StreamDevice protocol, relative to the repo"},
+                "description": {"type": "string"},
+                "default_port": {"type": "integer"},
+            },
+            "required": ["folder", "repository"],
+        },
+    },
+    {
+        "name": "ioc_guide",
+        "description": "How infn-epics-ioc, ibek-support-infn, ibek-templates, epik8s-chart and the beamline "
+                       "repositories fit together (the architecture document, by section), the workflow for "
+                       "a new IOC or driver, and which commit the catalogue was read from.",
+        "handler": ioc.ioc_guide,
+        "inputSchema": {"type": "object", "properties": {
+            "section": {"type": "string", "description": "A section title or a word in it; omit for all"}}},
+    },
+]
+
 BY_NAME: dict[str, dict] = {tool["name"]: tool for tool in TOOLS}
 
 
