@@ -30,6 +30,7 @@ submodules and tagging an image stay with people.
 | `ioc_get_example` | A worked entry: an ibek-templates fixture or a config kept in infn-epics-ioc |
 | `ioc_render` | The entry rendered as the pod renders it, then checked as `ibek runtime generate` will check it |
 | `ioc_validate` | The same check on an ibek IOC YAML written by hand |
+| `ioc_ibekize_repo` | An existing IOC repository (makeBaseApp tree with an example `st.cmd`) read into its `install.yml`, `ibek.support.yaml`, template and fixture, rendered against each other, with a report of where each value came from |
 | `ioc_scaffold_driver` | The `install.yml`, `ibek.support.yaml`, template and fixture for a new driver, with the Dockerfile line, rendered against each other |
 | `ioc_list_beamline` | The beamlines in the catalogue, or one beamline's IOCs: template, devtype, prefix, how the pod starts them |
 | `ioc_get_beamline_ioc` | One IOC as deployed: its entry, the iocDefaults it inherits, the values the pod receives, its render |
@@ -111,6 +112,45 @@ Known limits:
   RTEMS image) is checked against the runtime image, and the result says so.
 - `templates/global/` is not appended.
 - The beamline schema (`ioc.schema.json`) is shipped in the catalogue but is not enforced.
+
+## Ibekizing an existing repository
+
+`ioc_ibekize_repo` takes one of two inputs:
+
+- an https URL on an allowed host (`ARGUS_IOC_SOURCE_HOSTS`, by default `github.com`, `gitlab.com` and
+  `baltig.infn.it`);
+- the name of a module the catalogue knows; then its `install.yml` gives the URL and version.
+
+It clones the repository shallow, without submodules or hooks, and reads it; nothing in it is run.
+
+| From | It writes |
+|---|---|
+| `*App/src/Makefile` (`*_LIBS`, `*_DBD`, `PROD_IOC` / `LIBRARY_IOC`, make variables expanded), else `configure/RELEASE` | `install.yml`: `module`, `organization`, `version`, `libs` and `dbds`, without base or the IOC itself. A support library lists its own library and dbd. |
+| `*.proto` files and `Db/Makefile` | `protocol_files`: `db/<file>` when the Db Makefile installs the file, else its path in the repository |
+| the example `st.cmd`: port set-up (`drvAsynIPPortConfigure`, `drvAsynSerialPortConfigure`, `drvModbusAsynConfigure`, `modbusInterposeConfig`, `asynSetOption`, driver `*Config*` commands) | a `controller` entity. Its port is `name`, and the address becomes `IP`/`TCPPORT` (or `TTY`), with the example's values as defaults. Derived ports become `{{name}}_<port>`. Its `pre_init` lines are the set-up. |
+| `dbLoadRecords` and `dbLoadTemplate` (pattern and key=value substitution files), with `epicsEnvSet` values expanded | one entity per db template, with one typed parameter per macro. The default is the template's `$(M=default)`, or else the value `st.cmd` gives when every load agrees. A macro naming one of the controller's ports becomes the `controller` object. |
+| `dbpf`, `seq` and the other after-`iocInit` lines | the controller's `post_init` |
+
+Boilerplate (`dbLoadDatabase`, `*_registerRecordDeviceDriver`, `cd`, `iocInit`, `dbl`, …) is dropped.
+
+The template maps the beamline vocabulary onto the entities: `P` comes from `iocprefix`, `R` from the device
+name, and each other macro from the device's key, else the IOC's, else the model's default. The fixture is the
+IOC as its `st.cmd` starts it.
+
+The report says what to review:
+
+- `inferred`: each value and where it came from;
+- `required_without_example`: parameters nobody set;
+- `kept_verbatim`: `st.cmd` lines copied as written, such as vendor initialisation;
+- notes: for example a macro naming different ports across loads, which becomes a `<MACRO>_PORT` suffix
+  parameter.
+
+`self_check` renders the fixture against the drafts. Run on the 42 INFN driver repositories the catalogue
+indexes, all 42 drafts pass their self-check.
+
+What it cannot know: whether a macro that looks numeric is an integer or a float (it follows the example), and
+which `st.cmd` values are site-specific rather than defaults. The drafts then go to two pull requests
+(*Opening a pull request*).
 
 ## Opening a pull request
 

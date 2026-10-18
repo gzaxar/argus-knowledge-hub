@@ -1,7 +1,7 @@
 ---
 title: IOC engineer
 summary: Getting help with EPICS IOCs built with ibek: find a driver, write a beamline IOC entry, check it before deploying, start a new driver.
-keywords: [ioc, epics, ibek, beamline check, iocdefaults, pull request, pr, github, ibek-templates, ibek-support, driver, support module, template, devtype, values.yaml, epik8s, beamline, st.cmd, container, image, infn-epics-ioc, render, validate, scaffold]
+keywords: [ioc, epics, ibek, ibekize, existing repository, st.cmd, beamline check, iocdefaults, pull request, pr, github, ibek-templates, ibek-support, driver, support module, template, devtype, values.yaml, epik8s, beamline, st.cmd, container, image, infn-epics-ioc, render, validate, scaffold]
 order: 180
 ---
 
@@ -38,6 +38,20 @@ its entry, its defaults and the values the pod receives.
 
 The beamlines it knows are the ones its catalogue was built with. Ask "which beamlines do you know?" to see
 them.
+
+## Ibekize a driver that already has an IOC
+
+If the driver already has an EPICS repository with an example `st.cmd`, give its address: "ibekize
+https://github.com/infn-epics/my-driver". The assistant reads the repository and writes these drafts:
+
+- `install.yml`, from its Makefiles;
+- the support definition, with a controller made from the `st.cmd` port set-up and one entity per db template
+  with its macros;
+- a template and a fixture.
+
+The drafts are rendered against each other. The answer lists which values came from where, which parameters
+have no example, and which `st.cmd` lines were copied as written. Review those, then ask for the two pull
+requests.
 
 ## Support new hardware
 

@@ -805,6 +805,7 @@ TOOLS: list[dict[str, Any]] = [
 # The IOC engineer (app/ioc_engineer): building containerised EPICS IOCs with ibek, from the catalogue of
 # infn-epics-ioc's support modules and templates. Answers the same in every workspace: it is about the image.
 from app.ioc_engineer import tools as ioc  # noqa: E402
+from app.ioc_engineer.ibekize import ioc_ibekize_repo as ibekize_tool  # noqa: E402
 
 TOOLS += [
     {
@@ -948,6 +949,29 @@ TOOLS += [
         "inputSchema": {"type": "object", "properties": {
             "beamline": {"type": "string"}, "template": {"type": "string", "description": "Only this template"}},
             "required": ["beamline"]},
+    },
+    {
+        "name": "ioc_ibekize_repo",
+        "description": "Read an existing EPICS IOC repository (a makeBaseApp tree: configure/RELEASE, *App/src/"
+                       "Makefile, *App/Db templates and protocols, iocBoot/*/st.cmd) and draft what makes it an "
+                       "ibek support module and an ibek-template: install.yml (git source, libs, dbds, protocol "
+                       "files), ibek.support.yaml (a controller entity from st.cmd's port set-up, one entity per db "
+                       "template it loads, a typed parameter per macro), the template and a fixture, rendered "
+                       "against each other. Reports where each value came from, which parameters have no example "
+                       "and which st.cmd lines were kept verbatim. Reads only: it writes nothing. url is an https "
+                       "git URL on an allowed host, or the name of a module the catalogue already knows.",
+        "handler": ibekize_tool,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "https://host/owner/repo, or a catalogue module name"},
+                "ref": {"type": "string", "description": "Branch or tag; default the repository's default"},
+                "folder": {"type": "string", "description": "ibek-support-infn folder and ibek module name"},
+                "group": {"type": "string", "enum": ioc.GROUPS},
+                "devtype": {"type": "string"},
+            },
+            "required": ["url"],
+        },
     },
     {
         "name": "ioc_guide",
