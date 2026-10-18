@@ -84,6 +84,21 @@ How the pod starts an IOC follows ioc-chart's precedence:
 
 Only `template:` IOCs are rendered and checked; the others are listed as skipped.
 
+### Retired modules and stale examples
+
+A module whose `ansible.sh` line is commented out in a Dockerfile was taken out of the image on purpose. An
+example is the TML motor driver (`technosoft`, `devtype: tml`), which `technosoft-asyn` replaced. Such a
+module is reported as **retired**, and an entity from it fails the check with a pointer to the template's
+other devtypes.
+
+Each example is rendered once against the image:
+
+- One that no longer renders clean, such as `motor-tml-test`, `tml-ch2-config` or `tml-ch3-config`, is listed
+  last by `ioc_search`.
+- `ioc_get_example` gives such an example a warning and a `use_instead` list. The closest working examples
+  come first: `tml-ch1-config`, which uses `technosoft-asyn`.
+- `ioc_get_template` marks each of its examples `renders_clean`.
+
 Known limits:
 
 - ioc-chart's own default values (`iocConfig`, `start`, …) also land in `/tmp/iocconfig.yaml`. They are not

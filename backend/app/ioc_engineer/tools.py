@@ -60,8 +60,12 @@ def _availability(model: dict) -> dict:
     b = module["built"]
     if b["in_image"]:
         return {"in_image": True, "how": f"ansible.sh {module['folder']} in {b['dockerfile']}"}
-    hint = f" (commented out in {', '.join(b['commented_out_in'])})" if b["commented_out_in"] else ""
-    return {"in_image": False, "how": f"{module['path']} exists but no Dockerfile runs ansible.sh {module['folder']}{hint}"}
+    if b["commented_out_in"]:
+        # Taken out of the build on purpose: a module nobody uses any more (motorTML, replaced by
+        # technosoft-asyn), not one somebody forgot to add.
+        return {"in_image": False, "retired": True,
+                "how": f"retired: ansible.sh {module['folder']} is commented out in {', '.join(b['commented_out_in'])}"}
+    return {"in_image": False, "how": f"{module['path']} exists but no Dockerfile runs ansible.sh {module['folder']}"}
 
 
 def _find_module(name: str) -> list:
@@ -137,8 +141,10 @@ def ioc_search(db, workspace_id: str, query: str, kind: Optional[str] = None, li
         for x in load()["examples"]:
             s = _score(words, [(4, x["name"]), (3, x["template"]), (3, x["devtype"]), (1, x["iocprefix"])])
             if s:
-                hits.append((s, {"kind": "example", "name": x["name"], "template": x["template"],
-                                 "devtype": x["devtype"], "origin": x["origin"]}))
+                clean = example_status(x)["renders_clean"]
+                hits.append((s if clean else -1 / s, {"kind": "example", "name": x["name"], "template": x["template"],
+                                                     "devtype": x["devtype"], "origin": x["origin"],
+                                                     "renders_clean": clean}))
     hits.sort(key=lambda h: -h[0])
     limit = max(1, min(int(limit or 15), 50))
     return {"total": len(hits), "results": [h for _s, h in hits[:limit]]}
@@ -190,8 +196,25 @@ def ioc_get_template(db, workspace_id: str, name: str, include_source: bool = Tr
     out["resolution"] = {"kind": resolved["kind"], "renders": [x["path"] for x in resolved["templates"]]}
     out["emits"] = [{"type": e, "known": e in models, **(_availability(models[e]) if e in models else {})}
                     for e in t["entity_types"]]
-    out["examples"] = [x["name"] for x in load()["examples"] if x["template"] == t["name"]]
+    out["examples"] = [{"name": x["name"], "devtype": x["devtype"], **example_status(x)}
+                       for x in load()["examples"] if x["template"] == t["name"]]
     return {"found": True, **out}
+
+
+_status_cache: dict = {}
+
+
+def example_status(x: dict) -> dict:
+    """Whether an example still renders clean against the image: a fixture for a retired branch (devtype tml,
+    for motorTML) is history, not a starting point."""
+    key = (id(load()), x["path"])
+    if key not in _status_cache:
+        r = ioc_render(None, "", x["source"])
+        errors = list(r.get("errors") or [])
+        for o in r.get("outputs") or []:
+            errors += ([o["error"]] if o.get("error") else []) + (o.get("errors") or [])
+        _status_cache[key] = {"renders_clean": bool(r.get("ok")), **({"problem": errors[0]} if errors else {})}
+    return _status_cache[key]
 
 
 def ioc_get_example(db, workspace_id: str, name: str) -> dict:
@@ -202,8 +225,20 @@ def ioc_get_example(db, workspace_id: str, name: str) -> dict:
     if x is None:
         return {"found": False, "examples": [{"name": e["name"], "template": e["template"], "devtype": e["devtype"]}
                                              for e in examples]}
-    return {"found": True, **x, "others_for_template": [e["name"] for e in examples
-                                                        if e["template"] == x["template"] and e is not x]}
+    status = example_status(x)
+    others = [e for e in examples if e["template"] == x["template"] and e is not x]
+    out = {"found": True, **x, **status,
+           "others_for_template": [{"name": e["name"], "devtype": e["devtype"], **example_status(e)} for e in others]}
+    if not status["renders_clean"]:
+        # The closest working ones first: tml-ch2 → tml-ch1 (same hardware, the devtype that replaced it).
+        def words(e: dict) -> set:
+            return set(re.findall(r"[a-z]+", e["name"].lower())) - {"test", "config", "ch", str(x["template"]).lower()}
+
+        clean = [e for e in others if example_status(e)["renders_clean"]]
+        clean.sort(key=lambda e: -len(words(x) & words(e)))
+        out["use_instead"] = [e["name"] for e in clean]
+        out["warning"] = ("This example no longer renders clean against the image; do not start a new entry from it.")
+    return out
 
 
 def ioc_guide(db, workspace_id: str, section: Optional[str] = None) -> dict:
@@ -349,7 +384,10 @@ def validate_instance(document: Any, extra_models: Optional[dict] = None) -> dic
             continue
         if extra_models is None or etype not in extra_models:
             avail = _availability(model)
-            if not avail["in_image"]:
+            if avail.get("retired"):
+                errors.append(f"{where}: {etype} is not compiled into the image, its module is {avail['how']}; "
+                              "use another devtype of the template (see its examples that render clean).")
+            elif not avail["in_image"]:
                 errors.append(f"{where}: {etype} is defined but not compiled into the image: {avail['how']}.")
         params = model["parameters"]
         for key, spec in params.items():

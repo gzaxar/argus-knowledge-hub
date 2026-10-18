@@ -168,7 +168,8 @@ def test_the_template_knows_its_branches_and_what_it_emits(checkout):
     emits = {e["type"]: e["in_image"] for e in t["emits"]}
     assert emits == {"epics.PostStartupCommand": True, "gauge.controller": True, "gauge.sensor": True,
                      "legacy.device": False}
-    assert t["examples"] == ["vac-gauge-test"] and t["resolution"]["kind"] == "file"
+    assert t["examples"] == [{"name": "vac-gauge-test", "devtype": "tpg", "renders_clean": True}]
+    assert t["resolution"]["kind"] == "file"
 
 
 def test_a_good_entry_renders_and_passes(checkout):
@@ -183,7 +184,7 @@ def test_a_good_entry_renders_and_passes(checkout):
 def test_a_branch_the_image_does_not_compile_fails_before_the_pod_does(checkout):
     r = tools.ioc_render(None, "ws", "template: gauge\ndevtype: legacy\niocprefix: T\nserver: h\ndevices: [{name: A}]\n")
     assert not r["ok"]
-    assert any("legacy.device is defined but not compiled into the image" in e for e in r["outputs"][0]["errors"])
+    assert any("legacy.device is not compiled into the image, its module is retired" in e for e in r["outputs"][0]["errors"])
 
 
 def test_a_missing_key_is_named_rather_than_silently_rendered_as_nothing(checkout):
@@ -322,7 +323,7 @@ def test_a_beamline_check_names_what_its_next_sync_would_break(checkout):
     report = tools.ioc_check_beamline(None, "ws", "testline")
     assert report["passed"] == 1
     assert [f["ioc"] for f in report["failed"]] == ["vgauge02"]
-    assert "legacy.device is defined but not compiled" in report["failed"][0]["errors"][0]
+    assert "legacy.device is not compiled into the image, its module is retired" in report["failed"][0]["errors"][0]
     assert {s["ioc"]: s["why"] for s in report["skipped"]} == {"off01": "disabled", "remote01": "host"}
     assert report["ignored_by_merge"][0]["ioc"] == "vgauge01"
 
@@ -362,3 +363,18 @@ def test_a_published_catalogue_is_fetched_and_its_last_copy_kept(checkout, tmp_p
     assert later["loaded_from"].endswith("c.json.gz") and "could not fetch" in later["problems"][0]
     assert tools.ioc_get_module(None, "ws", "gauge")["found"] and calls
     assert gz.decompress((tmp_path / "cache" / "c.json.gz").read_bytes())
+
+
+def test_an_example_for_a_retired_branch_is_not_offered_as_a_start(checkout, monkeypatch):
+    _write(checkout, "ibek-templates/tests/vac-gauge-legacy-test.yaml",
+           "iocname: old\ntemplate: gauge\ndevtype: legacy\niocprefix: T\nserver: h\ndevices: [{name: A}]\n")
+    out = checkout.parent / "catalog2.json.gz"
+    catalog.write(catalog.build(checkout), out)
+    monkeypatch.setenv("ARGUS_IOC_CATALOG", str(out))
+    catalog.load.cache_clear()
+    old = tools.ioc_get_example(None, "ws", "vac-gauge-legacy-test")
+    assert not old["renders_clean"] and "retired" in old["problem"]
+    assert old["use_instead"] == ["vac-gauge-test"] and old["warning"]
+    hits = [h for h in tools.ioc_search(None, "ws", "gauge", "example")["results"]]
+    assert [h["name"] for h in hits] == ["vac-gauge-test", "vac-gauge-legacy-test"]
+    assert tools.ioc_get_entity_model(None, "ws", "legacy.device")["availability"]["retired"]
