@@ -24,7 +24,9 @@ from app.models.asset import Asset, Relation
 from app.models.schema import Schema
 
 # What each kind of change needs, as the forms would.
-PERMISSION = {"create": "create", "update": "modify", "relate": "create", "unrelate": "delete"}
+PERMISSION = {"create": "create", "update": "modify", "relate": "create", "unrelate": "delete",
+              # Leaves ARGUS: a person who may approve in this workspace, signed in, never an API token.
+              "pull_request": "approve"}
 SKIPPED_ATTRIBUTES = ("argus_source", "argus_facility")
 
 SYSTEM = (
@@ -86,10 +88,37 @@ def tool_specs() -> list[dict]:
                 "remove": {"type": "boolean"},
                 "reason": {"type": "string"},
             }, "required": ["from", "relation_type", "to"]}}},
-    ]
+    ] + _pull_request_specs()
 
 
-TOOL_NAMES = {"propose_create_record", "propose_update_record", "propose_relation"}
+def _pull_request_specs() -> list[dict]:
+    """Offered only where an administrator installed the credential (app/ioc_engineer/pull_requests.py)."""
+    from app.ioc_engineer import pull_requests
+    if not pull_requests.enabled():
+        return []
+    return [{"type": "function", "function": {
+        "name": "propose_ioc_pull_request",
+        "description": "Propose a pull request with IOC files (a beamline IOC entry, an ibek-template and its "
+                       "fixture, a driver's install.yml and ibek.support.yaml, a Dockerfile line) on one of: "
+                       + ", ".join(pull_requests.repositories()) + ". Only when the person asks for a pull request. "
+                       "Give each file's whole new content. It is checked now: every template, fixture and IOC "
+                       "config in it must render and pass the ibek check, with the entity models of this and "
+                       "earlier proposed pull requests counted as known; a refusal says what to fix. Nothing "
+                       "leaves ARGUS until the person confirms; then ARGUS opens a draft pull request for review "
+                       "and never merges. One pull request per repository: a new driver is one on "
+                       "ibek-support-infn and one on ibek-templates.",
+        "parameters": {"type": "object", "properties": {
+            "repository": {"type": "string", "description": "owner/name, one of the allowed repositories"},
+            "title": {"type": "string"},
+            "description": {"type": "string", "description": "What it adds and why, for the reviewers"},
+            "base": {"type": "string", "description": "Branch to merge into; default the repository's default"},
+            "files": {"type": "array", "items": {"type": "object", "properties": {
+                "path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}},
+            "reason": {"type": "string"},
+        }, "required": ["repository", "title", "files"]}}}]
+
+
+TOOL_NAMES = {"propose_create_record", "propose_update_record", "propose_relation", "propose_ioc_pull_request"}
 
 
 class Refused(ValueError):
@@ -167,7 +196,7 @@ class Proposer:
 
     def __call__(self, name: str, arguments: dict) -> dict:
         handler = {"propose_create_record": self._create, "propose_update_record": self._update,
-                   "propose_relation": self._relation}[name]
+                   "propose_relation": self._relation, "propose_ioc_pull_request": self._pull_request}[name]
         kind, payload, summary = handler(arguments or {})
         number = (self.db.scalar(select(AskAction.number).where(AskAction.conversation_id == self.conversation_id)
                                  .order_by(AskAction.number.desc()).limit(1)) or 0) + 1
@@ -222,6 +251,30 @@ class Proposer:
             f"{k} → {'(cleared)' if v is None else v}" for k, v in attributes.items()]
         return "update", {"uid": asset.uid, "key": asset.key, "name": name, "attributes": attributes}, \
             f"Update {asset.key}: " + ", ".join(parts)
+
+    def _pull_request(self, a: dict) -> tuple[str, dict, str]:
+        from app.ioc_engineer import pull_requests
+        if not pull_requests.enabled():
+            raise Refused("this installation does not open pull requests (no ARGUS_GITHUB_TOKEN)")
+        title = str(a.get("title") or "").strip()
+        if not title:
+            raise Refused("a pull request needs a title")
+        try:
+            checked = pull_requests.check(a.get("repository"), a.get("files"),
+                                          prior_models(self.db, self.conversation_id))
+        except pull_requests.Refused as e:
+            raise Refused(str(e))
+        try:
+            base = pull_requests.safe_branch(a.get("base"))
+        except pull_requests.Refused as e:
+            raise Refused(str(e))
+        payload = {"repository": checked["repository"], "title": title[:200],
+                   "description": str(a.get("description") or "").strip()[:5000],
+                   "base": base, "files": checked["files"],
+                   "checks": checked["checks"]}
+        n = len(checked["files"])
+        return "pull_request", payload, \
+            f"Open a pull request on {checked['repository']}: “{title}” ({n} file{'s' if n != 1 else ''})"
 
     def _relation(self, a: dict) -> tuple[str, dict, str]:
         from app.ledger import registry
@@ -279,6 +332,17 @@ def context(db: Session, conversation_id: str) -> Optional[str]:
     return ("Changes proposed earlier in this conversation:\n" + "\n".join(lines)) if lines else None
 
 
+def prior_models(db: Session, conversation_id: str, before: Optional[int] = None) -> dict:
+    """Entity models defined by pull requests proposed earlier in the conversation: a new driver's
+    ibek.support.yaml (one repository) makes its types known to the template that uses them (another)."""
+    from app.ioc_engineer import pull_requests
+    models: dict = {}
+    for a in of_conversation(db, conversation_id):
+        if a.kind == "pull_request" and a.status in ("proposed", "applied") and (before is None or a.number < before):
+            models.update(pull_requests._models_in((a.payload or {}).get("files") or {}))
+    return models
+
+
 def _detail(exc: HTTPException) -> str:
     d = exc.detail
     if isinstance(d, dict):
@@ -300,7 +364,8 @@ def _permitted(db: Session, identity, workspace_id: str, kind: str) -> bool:
     from app.auth import OidcIdentity
     from app.services.permissions import resolve_permission
     if not isinstance(identity, OidcIdentity):
-        return True          # a token's scope was checked when it reached the workspace
+        # A token's scope was checked when it reached the workspace; but only a person opens a pull request.
+        return kind != "pull_request"
     return resolve_permission(db, identity.user, workspace_id, PERMISSION[kind], "objects")
 
 
@@ -310,6 +375,13 @@ def _execute(db: Session, identity, workspace_id: str, action: AskAction) -> dic
     from app.schemas.asset import AssetCreate, AssetUpdate, RelationCreate
     p = action.payload
     user_id = get_current_user_id(identity)
+    if action.kind == "pull_request":
+        from app.ioc_engineer import pull_requests
+        actor = getattr(getattr(identity, "user", None), "email", None) or str(user_id)
+        try:
+            return pull_requests.open_pull_request(p, actor, prior_models(db, action.conversation_id, action.number))
+        except pull_requests.Refused as e:
+            raise HTTPException(status_code=422, detail=str(e))
     if action.kind == "create":
         asset = forms.create_asset(
             AssetCreate(uid=str(uuid.uuid4()), schema_uid=p["schema_uid"], key=p.get("key"), name=p["name"],

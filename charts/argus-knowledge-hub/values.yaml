@@ -109,6 +109,17 @@ email:
   # Daily digests go out at this hour, Europe/Rome, to those who chose one.
   digestHour: 7
 
+# The IOC engineer (docs/ioc-engineer.md): the ioc_* tools of Ask ARGUS and the MCP server.
+iocEngineer:
+  # The catalogue to answer from; empty: the snapshot built into the image. infn-epics-ioc attaches one to
+  # every release: https://github.com/infn-epics/infn-epics-ioc/releases/latest/download/ioc-catalog.json.gz
+  catalog: ""
+  # Pull requests Ask ARGUS proposes and a person confirms. Off until the key ioc-github-token is in
+  # existingSecret: a token with contents and pull-requests write on these repositories only.
+  pullRequests:
+    repositories: "infn-epics/ibek-support-infn,infn-epics/ibek-templates,infn-epics/infn-epics-ioc"
+    draft: true
+
 # Removing container images no container uses, on each node: every release pulls new ones, and the node
 # disks are small. Kubernetes only collects images past ~85% full, too late for local-path volumes on the
 # same disk. One CronJob per node (a pod runs on one node), with the node's root mounted to reach containerd.

@@ -303,7 +303,8 @@ currently valid* revision rather than to an arbitrary PDF.
   or mistyped parameters), check every IOC of a beamline as deployed (iocDefaults merged the
   way epik8s-chart merges them), and draft the files a new driver needs. Answered from a catalogue of
   `infn-epics-ioc` and its submodules (`python -m app.ioc_engineer build`); the `ioc_*` MCP tools,
-  read-only. [docs/ioc-engineer.md](docs/ioc-engineer.md).
+  read-only. Ask ARGUS can also open the drafts as a draft pull request once a person with `approve`
+  confirms it; reviewers merge it, never ARGUS. [docs/ioc-engineer.md](docs/ioc-engineer.md).
 
 ## Design notes
 
@@ -542,6 +543,7 @@ VITE_API_BASE_URL=http://localhost:8080
 | `OIDC_EXTRA_PROVIDERS` | More trusted OIDC providers, as a JSON list of `{issuer, jwks_uri, audience}` (e.g. Firebase beside INFN's IdP). |
 | (worker) | `python -m app.ledger derive-worker` runs queued derives when `LEDGER_USER_EDIT_DERIVE=manual`; `python -m app.ledger backfill-checksums` records SHA-256 for older attachments. |
 | `LEDGER_USER_EDIT_DERIVE` | How derived links follow a user's edit: `background` (default), `inline`, or `manual` (left for a worker). |
+| `ARGUS_GITHUB_TOKEN`, `ARGUS_IOC_PR_REPOS`, `ARGUS_IOC_PR_DRAFT` | Let Ask ARGUS open the IOC pull requests a person confirms, on those repositories only, as drafts by default; off without the token (docs/ioc-engineer.md, *Opening a pull request*). |
 | `ARGUS_IOC_CATALOG` | An IOC catalogue (a `.json`/`.json.gz` file, or an http(s) URL such as infn-epics-ioc's `releases/latest/download/ioc-catalog.json.gz`) to answer the `ioc_*` tools from instead of the bundled snapshot; a URL is re-read every `ARGUS_IOC_CATALOG_TTL` seconds (default 21600) and its last copy kept at `ARGUS_IOC_CATALOG_CACHE` (docs/ioc-engineer.md). |
 
 ## Deployment

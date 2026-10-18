@@ -17,8 +17,9 @@ submodules:
 ## The tools
 
 They are MCP tools of the hub's server (`/mcp`), so Ask ARGUS uses them too. Like every MCP tool here they are
-read-only. They find, explain, render and check. The scaffold returns text. Committing it, bumping submodules
-and tagging an image stay with a person.
+read-only. They find, explain, render and check. The scaffold returns text. Ask ARGUS can turn the drafts into
+a pull request once a person confirms it (*Opening a pull request*). Reviewing and merging it, bumping
+submodules and tagging an image stay with people.
 
 | Tool | Answers |
 |---|---|
@@ -110,6 +111,52 @@ Known limits:
   RTEMS image) is checked against the runtime image, and the result says so.
 - `templates/global/` is not appended.
 - The beamline schema (`ioc.schema.json`) is shipped in the catalogue but is not enforced.
+
+## Opening a pull request
+
+The tools above write nothing. A person who wants the drafted files in a repository asks Ask ARGUS for a
+pull request ("open a PR with the template and its fixture"). Two people approve the change before it is
+merged:
+
+1. **The person in Ask ARGUS.** The assistant can only *propose* the pull request, with the new content of each
+   file. The proposal appears under the answer like the record changes it can propose, and nothing leaves
+   ARGUS until the person applies it.
+   - Only a signed-in person can apply it, not an API token.
+   - They need the `approve` permission in the workspace.
+   - The checks run again when they apply it, against the catalogue the hub has at that moment.
+2. **The repository's reviewers.** ARGUS makes one commit on a new branch (`argus/<title>-<suffix>`) and opens
+   a draft pull request. ARGUS never merges.
+   - The pull request lists the checks that ran and names the person who confirmed it.
+   - It also says what the checks cannot see: addresses, ports, channels and axis ids.
+
+**Checks at proposal time.** A proposal that fails one of them is refused, and the reason goes back to the
+model so it can fix the files:
+
+- the repository is in `ARGUS_IOC_PR_REPOS` (by default `infn-epics/ibek-support-infn`,
+  `infn-epics/ibek-templates` and `infn-epics/infn-epics-ioc`);
+- paths stay inside the repository and out of `.github/`, so CI is not the assistant's to change;
+- at most 20 files of 200 kB each;
+- YAML parses;
+- an `*.ibek.support.yaml` declares its `module` and `entity_models`, and an `*.install.yml` its `module`;
+- every ibek-templates fixture (`tests/*.yaml`) and every infn-epics-ioc `*-config.yaml` in the change renders
+  and passes the same check as `ioc_render`.
+
+The fixture is rendered against the template in the same change if there is one, otherwise the image's. Entity
+models in the change, and in pull requests proposed earlier in the same conversation, count as known. So a new
+driver is two pull requests (`ibek-support-infn`, then `ibek-templates`), and the template's fixture already
+checks against the driver proposed just before it. A template without a fixture in the change is noted in the
+pull request.
+
+**Configuration.** The feature is off unless an administrator installs a credential:
+
+| Variable | Meaning |
+|---|---|
+| `ARGUS_GITHUB_TOKEN` | A fine-grained token, or a GitHub App's, with *Contents* and *Pull requests* read and write on the allowed repositories only. When it is absent, the assistant is not offered the tool. In the chart it is the key `ioc-github-token` of `existingSecret` (k8s/README.md). |
+| `ARGUS_IOC_PR_REPOS` | Comma-separated `owner/name` list; the chart's `iocEngineer.pullRequests.repositories`. |
+| `ARGUS_IOC_PR_DRAFT` | `true` (default) opens drafts. |
+| `ARGUS_GITHUB_API` | For GitHub Enterprise; default `https://api.github.com`. |
+
+The external MCP tools stay read-only. Only Ask ARGUS, where a person confirms, can propose a pull request.
 
 ## The catalogue
 
