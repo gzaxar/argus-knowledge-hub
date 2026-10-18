@@ -552,7 +552,8 @@ See [`k8s/README.md`](k8s/README.md). Production is the Helm chart in `charts/ar
 deployed by Argo CD: Postgres with pgvector, the API, the web app and a temporary Keycloak, as
 docker-compose runs them. A version tag is a release: `git tag v1.34.0 && git push origin v1.34.0`
 runs the tests, pushes both images and sets the version in the chart's `values-production.yaml`,
-which Argo CD rolls out (`.github/workflows/release.yml`, `k8s/argocd/application.yaml`). By hand, the
+which Argo CD rolls out (`.github/workflows/release.yml`, `k8s/argocd/application.yaml`). Every pull request
+runs the same tests first (`.github/workflows/tests.yml`). By hand, the
 images are still built with `backend/deploy.sh <version>` and `webapp/deploy.sh <version>`.
 
 ## License
