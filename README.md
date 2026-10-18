@@ -300,7 +300,8 @@ currently valid* revision rather than to an arbitrary PDF.
   ibek: find the driver for a device and its git source (from `install.yml`), read an entity
   model's parameters or a template's devtypes, render a beamline IOC entry exactly as the pod does
   (jnjrender) and check it as `ibek runtime generate` will (unknown or not-compiled types, missing
-  or mistyped parameters), and draft the files a new driver needs. Answered from a catalogue of
+  or mistyped parameters), check every IOC of a beamline as deployed (iocDefaults merged the
+  way epik8s-chart merges them), and draft the files a new driver needs. Answered from a catalogue of
   `infn-epics-ioc` and its submodules (`python -m app.ioc_engineer build`); the `ioc_*` MCP tools,
   read-only. [docs/ioc-engineer.md](docs/ioc-engineer.md).
 
@@ -541,7 +542,7 @@ VITE_API_BASE_URL=http://localhost:8080
 | `OIDC_EXTRA_PROVIDERS` | More trusted OIDC providers, as a JSON list of `{issuer, jwks_uri, audience}` (e.g. Firebase beside INFN's IdP). |
 | (worker) | `python -m app.ledger derive-worker` runs queued derives when `LEDGER_USER_EDIT_DERIVE=manual`; `python -m app.ledger backfill-checksums` records SHA-256 for older attachments. |
 | `LEDGER_USER_EDIT_DERIVE` | How derived links follow a user's edit: `background` (default), `inline`, or `manual` (left for a worker). |
-| `ARGUS_IOC_CATALOG` | An IOC catalogue (`.json` or `.json.gz`) to answer the `ioc_*` tools from instead of the bundled snapshot (docs/ioc-engineer.md). |
+| `ARGUS_IOC_CATALOG` | An IOC catalogue (a `.json`/`.json.gz` file, or an http(s) URL such as infn-epics-ioc's `releases/latest/download/ioc-catalog.json.gz`) to answer the `ioc_*` tools from instead of the bundled snapshot; a URL is re-read every `ARGUS_IOC_CATALOG_TTL` seconds (default 21600) and its last copy kept at `ARGUS_IOC_CATALOG_CACHE` (docs/ioc-engineer.md). |
 
 ## Deployment
 

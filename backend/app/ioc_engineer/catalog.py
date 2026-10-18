@@ -14,6 +14,7 @@ What is read, and from where:
     schemas         ibek-templates/schemas/*.json
     guide           docs/architecture.md
     sources         (with --sources) each driver's own repository: db templates, protocols, README
+    beamlines       (with --beamline) a beamline repository's value files: iocDefaults and the IOC entries
 
 A module's git source is `organization` + `module`, exactly as the ansible role clones it.
 """
@@ -24,8 +25,8 @@ import json
 import os
 import re
 import subprocess
+import time
 from datetime import datetime, timezone
-from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -357,9 +358,73 @@ def _fetch_source(module: dict, into: Path) -> dict:
     return {"url": url, "ref": version, "commit": _git_head(target), **_index_source(target)}
 
 
+# --- beamlines ---------------------------------------------------------------------
+
+VALUE_FILE = re.compile(r"\$\w+/((?:deploy/)?[\w./-]+\.ya?ml)")
+
+
+def _deep_merge(base: dict, over: dict) -> dict:
+    """Helm's merge of value files: maps merge key by key, anything else is replaced by the later file."""
+    out = dict(base)
+    for key, value in (over or {}).items():
+        out[key] = _deep_merge(out[key], value) if isinstance(out.get(key), dict) and isinstance(value, dict) else value
+    return out
+
+
+def _value_files(checkout: Path) -> list:
+    """The value files ArgoCD renders epik8s-chart with, in order: the multi-source `valueFiles` of
+    deploy/templates/*.yaml (SPARC, BTF), else deploy/values.yaml alone (single-source beamlines such as ELI)."""
+    files = []
+    for template in sorted((checkout / "deploy" / "templates").glob("*.y*ml")):
+        for rel in VALUE_FILE.findall(template.read_text(encoding="utf-8", errors="replace")):
+            if rel not in files and (checkout / rel).exists():
+                files.append(rel)
+    return files or (["deploy/values.yaml"] if (checkout / "deploy" / "values.yaml").exists() else [])
+
+
+def _beamline(spec: str, into: Path) -> dict:
+    """One beamline repository (a path, or a git URL with an optional @ref) as epik8s-chart sees it."""
+    url, ref = spec, None
+    if "://" in spec and "@" in spec.rsplit("/", 1)[-1]:
+        url, ref = spec.rsplit("@", 1)
+    if Path(url).is_dir():
+        checkout = Path(url)
+    else:
+        checkout = into / re.sub(r"\.git$", "", url.rstrip("/").rsplit("/", 1)[-1])
+        if not checkout.exists():
+            cmd = ["git", "clone", "-q", "--depth", "1"] + (["--branch", ref] if ref else []) + [url, str(checkout)]
+            done = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            if done.returncode != 0:
+                return {"name": checkout.name, "url": url, "ref": ref,
+                        "error": (done.stderr or "clone failed").strip()[-300:]}
+    values: dict = {}
+    files = _value_files(checkout)
+    for rel in files:
+        data = _yaml(checkout / rel)
+        if isinstance(data, dict) and "__error__" not in data:
+            values = _deep_merge(values, data)
+    raw = (values.get("epicsConfiguration") or {}).get("iocs") or []
+    # A list or a map keyed by name: the chart ranges over either (a map in key order).
+    entries = [dict(v, name=v.get("name") or k) for k, v in sorted(raw.items())] if isinstance(raw, dict) \
+        else [dict(v) for v in raw if isinstance(v, dict)]
+    globals_ = {k: values.get(k) for k in ("beamline", "namespace", "ioc_version", "nfsMounts", "targetRevision",
+                                           "giturl", "gitrev", "baseIp", "startIp") if k in values}
+    return {
+        "name": str(values.get("beamline") or checkout.name),
+        "url": url if not Path(url).is_dir() else None,
+        "ref": ref,
+        "commit": _git_head(checkout),
+        "value_files": files,
+        "globals": globals_,
+        "ioc_defaults": values.get("iocDefaults") or {},
+        "iocs": entries,
+    }
+
+
 # --- the catalogue -----------------------------------------------------------------
 
-def build(repo: Path, sources: Optional[Path] = None, only_collections: tuple = ("infn",)) -> dict:
+def build(repo: Path, sources: Optional[Path] = None, only_collections: tuple = ("infn",),
+          beamlines: tuple = (), workdir: Optional[Path] = None) -> dict:
     repo = Path(repo).resolve()
     built = _built(repo)
     modules, models, problems = _modules(repo, built)
@@ -373,6 +438,15 @@ def build(repo: Path, sources: Optional[Path] = None, only_collections: tuple = 
     schemas = {}
     for path in sorted((repo / "ibek-templates" / "schemas").glob("*.json")):
         schemas[path.stem.replace(".schema", "")] = json.loads(path.read_text(encoding="utf-8"))
+    lines = []
+    if beamlines:
+        into = workdir or sources or Path(os.environ.get("TMPDIR", "/tmp")) / "argus-ioc-beamlines"
+        into.mkdir(parents=True, exist_ok=True)
+        for spec in beamlines:
+            line = _beamline(spec, into)
+            if line.get("error"):
+                problems.append(f"beamline {spec}: {line['error']}")
+            lines.append(line)
     guide = repo / "docs" / "architecture.md"
     return {
         "format": FORMAT,
@@ -391,6 +465,7 @@ def build(repo: Path, sources: Optional[Path] = None, only_collections: tuple = 
         "global_templates": globals_,
         "examples": _examples(repo),
         "schemas": schemas,
+        "beamlines": lines,
         "guide": guide.read_text(encoding="utf-8") if guide.exists() else "",
         "problems": problems,
     }
@@ -412,12 +487,57 @@ def _read(path: Path) -> dict:
     return json.loads(raw)
 
 
-@lru_cache(maxsize=1)
+def _empty_catalog(problem: str) -> dict:
+    return {"format": FORMAT, "modules": [], "entity_models": [], "templates": [], "examples": [], "beamlines": [],
+            "template_dirs": [], "global_templates": [], "schemas": {}, "guide": "", "problems": [problem]}
+
+
+def _fetch(url: str) -> dict:
+    """A published catalogue (e.g. the asset infn-epics-ioc attaches to each release), kept in a local copy so a
+    restart or an unreachable GitHub still answers from the last one fetched."""
+    import requests  # only needed for a remote catalogue
+    cache = Path(os.environ.get("ARGUS_IOC_CATALOG_CACHE") or Path(os.environ.get("TMPDIR", "/tmp")) /
+                 "argus-ioc-catalog.json.gz")
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        catalog = json.loads(gzip.decompress(response.content) if response.content[:2] == b"\x1f\x8b"
+                             else response.content)
+        if catalog.get("format") != FORMAT:
+            raise ValueError(f"catalogue format {catalog.get('format')}, this hub reads {FORMAT}")
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_bytes(response.content)
+        catalog["loaded_from"] = url
+        return catalog
+    except Exception as e:
+        fallback = cache if cache.exists() else BUNDLED
+        catalog = _read(fallback) if fallback.exists() else _empty_catalog("no IOC catalogue")
+        catalog.setdefault("problems", []).insert(0, f"could not fetch {url} ({type(e).__name__}: {e}); "
+                                                     f"answering from {fallback.name}")
+        catalog["loaded_from"] = str(fallback)
+        return catalog
+
+
+_loaded: dict = {}
+
+
 def load() -> dict:
-    """The catalogue this hub answers from: ARGUS_IOC_CATALOG if set, else the bundled snapshot."""
-    path = Path(os.environ.get("ARGUS_IOC_CATALOG") or BUNDLED)
-    if not path.exists():
-        return {"format": FORMAT, "modules": [], "entity_models": [], "templates": [], "examples": [],
-                "template_dirs": [], "global_templates": [], "schemas": {}, "guide": "",
-                "problems": [f"no IOC catalogue at {path}"]}
-    return _read(path)
+    """The catalogue this hub answers from: ARGUS_IOC_CATALOG (a file, or an http(s) URL re-read every
+    ARGUS_IOC_CATALOG_TTL seconds, default six hours) if set, else the bundled snapshot."""
+    source = os.environ.get("ARGUS_IOC_CATALOG") or str(BUNDLED)
+    ttl = float(os.environ.get("ARGUS_IOC_CATALOG_TTL") or 6 * 3600)
+    now = time.monotonic()
+    if _loaded.get("source") == source and (not source.startswith(("http://", "https://"))
+                                            or now - _loaded["at"] < ttl):
+        return _loaded["catalog"]
+    if source.startswith(("http://", "https://")):
+        catalog = _fetch(source)
+    else:
+        path = Path(source)
+        catalog = _read(path) if path.exists() else _empty_catalog(f"no IOC catalogue at {path}")
+        catalog["loaded_from"] = str(path)
+    _loaded.update(source=source, at=now, catalog=catalog)
+    return catalog
+
+
+load.cache_clear = _loaded.clear  # the tests' handle, as with lru_cache

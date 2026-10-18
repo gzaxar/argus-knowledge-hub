@@ -12,6 +12,7 @@ submodules:
 | `Dockerfile`, `Dockerfile.base` | which modules `ansible.sh` actually compiles into the image | tell "defined" apart from "available at pod start" |
 | driver repositories (optional) | db templates, protocol files, README | show a driver's macros and records when writing its entity models |
 | `docs/architecture.md` | how the image, ioc-chart, epik8s-chart and the beamlines fit together | `ioc_guide` |
+| beamline repositories (optional) | the deploy value files: `iocDefaults` and the IOC entries | list, render and check a beamline's IOCs as deployed |
 
 ## The tools
 
@@ -29,6 +30,9 @@ and tagging an image stay with a person.
 | `ioc_render` | The entry rendered as the pod renders it, then checked as `ibek runtime generate` will check it |
 | `ioc_validate` | The same check on an ibek IOC YAML written by hand |
 | `ioc_scaffold_driver` | The `install.yml`, `ibek.support.yaml`, template and fixture for a new driver, with the Dockerfile line, rendered against each other |
+| `ioc_list_beamline` | The beamlines in the catalogue, or one beamline's IOCs: template, devtype, prefix, how the pod starts them |
+| `ioc_get_beamline_ioc` | One IOC as deployed: its entry, the iocDefaults it inherits, the values the pod receives, its render |
+| `ioc_check_beamline` | Every enabled, templated IOC of a beamline rendered and checked: what its next sync would break |
 | `ioc_guide` | The architecture document by section, the workflow, and which commit the catalogue was read from |
 
 ### What `ioc_render` reproduces
@@ -53,8 +57,37 @@ and tagging an image stay with a person.
 
   Values that still hold `{{ … }}` are left for ibek to render.
 
+### What a beamline's IOC receives
+
+`ioc_get_beamline_ioc`, `ioc_check_beamline` and `ioc_render(…, beamline=…)` build the values the pod finds in
+`/tmp/iocconfig.yaml`, in the same order as the charts:
+
+1. **The value files are merged.** For a multi-source beamline (SPARC, BTF), the files are the `valueFiles`
+   named in `deploy/templates/*.yaml`, in that order. Otherwise only `deploy/values.yaml` is read. Maps merge
+   key by key, and anything else is replaced by the later file.
+2. **`iocDefaults` is merged under the entry.** The key is `iocDefaults.<template>`, or `<devtype>` when there
+   is no template. epik8s-chart merges with Sprig's `mustMergeOverwrite`. The entry wins, but an empty value
+   in it (`false`, `0`, `""`, `null`, `[]`) does not replace a non-empty default. Every key this affects is
+   reported under `ignored_by_merge`, because `autosync: false` under a default of `true` silently stays
+   `true`.
+3. **epik8s-chart injects** `beamline`, `iocname` (the name in lower case), `ioc_version` (when the beamline
+   sets it and the IOC has no `image:`) and `nfsMounts`.
+4. **ioc-chart's ConfigMap adds** `<mount>_dir: <mountPath>/<iocname>` for each NFS mount, or `config_dir` and
+   `autosave_dir` when there are none (`data_dir` comes from the chart's volume settings and is not reproduced). It also adds `ioctop`, and each `iocparam` as a
+   top-level `name: value`. Keys from steps 1 to 3 win over these.
+
+How the pod starts an IOC follows ioc-chart's precedence:
+
+- `host:` runs remotely through epik8s-run;
+- `template:` renders through jnjrender;
+- otherwise the pod uses the git config directory.
+
+Only `template:` IOCs are rendered and checked; the others are listed as skipped.
+
 Known limits:
 
+- ioc-chart's own default values (`iocConfig`, `start`, …) also land in `/tmp/iocconfig.yaml`. They are not
+  reproduced; templates do not read them.
 - The check covers what the catalogue's Dockerfiles build. An entry with another `image:` (for example the
   RTEMS image) is checked against the runtime image, and the result says so.
 - `templates/global/` is not appended.
@@ -73,6 +106,11 @@ python -m app.ioc_engineer build --repo ../../infn-epics-ioc --sources /tmp/ioc-
 python -m app.ioc_engineer summary
 ```
 
+`--beamline URL[@REF]` (repeatable, or a local path) reads a beamline repository's deploy value files. The
+snapshot includes ELI-NP (`epik8s-eli`, public). SPARC and BTF live on INFN's GitLab, so add them from a build
+that can reach it:
+`--beamline https://baltig.infn.it/…/epik8-sparc.git --beamline https://baltig.infn.it/…/epik8s-btf.git`.
+
 `--sources DIR` also clones each INFN driver at the version its install.yml names (`organization` + `module`)
 and indexes its db templates (macros, record sample), protocol files (commands), startup scripts and README.
 Repositories the build cannot reach are listed under `sources.failed`. Build from inside the INFN network to
@@ -82,16 +120,31 @@ from, so an answer can be traced back to its files.
 A type that is defined in two collections is taken from the copy the image builds. Dockerfile.base builds the
 upstream modules from `ibek-support-dls`, and Dockerfile builds INFN's from `ibek-support-infn`.
 
-### Refreshing it
+### Following the image's releases
 
-Rebuild and commit the snapshot whenever infn-epics-ioc is tagged, because templates are baked into the image
-and the snapshot should describe the image the beamlines run. Alternatively, publish the catalogue next to the
-image and set `ARGUS_IOC_CATALOG` to it.
+infn-epics-ioc builds the catalogue in CI (`.github/workflows/ioc-catalog.yml`) with this builder. On every
+`v*` tag it attaches the result to the release, so the catalogue describes the image that tag publishes. Point
+the hub at the latest one:
+
+```
+ARGUS_IOC_CATALOG=https://github.com/infn-epics/infn-epics-ioc/releases/latest/download/ioc-catalog.json.gz
+```
+
+- **Refresh.** The hub re-reads a URL every `ARGUS_IOC_CATALOG_TTL` seconds (six hours by default).
+- **Fallback.** It keeps the last copy it fetched (`ARGUS_IOC_CATALOG_CACHE`). When GitHub cannot be reached,
+  it answers from that copy, or from the bundled snapshot if it has none, and says so under `problems`.
+- **Version.** `ioc_guide` reports `loaded_from` and the commits.
+- **Beamlines.** The repository variable `IOC_CATALOG_BEAMLINES` sets which beamlines the CI build reads. Its
+  default is ELI-NP.
+
+The bundled snapshot (`backend/app/ioc_engineer/data/catalog.json.gz`) is used when `ARGUS_IOC_CATALOG` is not
+set. Rebuild it with the command above when you want a newer offline default.
 
 ## Workflow the assistant follows
 
-1. **A device of a known type.** Run `ioc_search`, then `ioc_get_template`. Start from `ioc_get_example`, then
-   run `ioc_render` on the entry until it reports no errors. Add the entry under `epicsConfiguration.iocs`, or
+1. **A device of a known type.** Run `ioc_search`, then `ioc_get_template`. Start from `ioc_get_example`, or
+   from a similar IOC through `ioc_list_beamline`. Then run `ioc_render(values, beamline=…)` on the entry until
+   it reports no errors. Add the entry under `epicsConfiguration.iocs`, or
    rely on `iocDefaults.<template>`. Commit, then sync the ArgoCD application.
 2. **A driver with no template.** Read the entity models in `ioc_get_module`. Write the template, then check it
    with `ioc_render(values, template_source=…)`.
@@ -100,5 +153,6 @@ image and set `ARGUS_IOC_CATALOG` to it.
    1. Add `ansible.sh <folder>` to the Dockerfile.
    2. Run `tests/test_ioc_generate.sh`.
    3. Bump the submodules and tag a release.
-4. **An IOC that does not start.** Render its entry. "Unknown entity type" usually means the module is not in
+4. **Before a new image or a template change.** Run `ioc_check_beamline` for each beamline in the catalogue.
+5. **An IOC that does not start.** Render its entry. "Unknown entity type" usually means the module is not in
    the image's `ansible.sh` list. "Template not found" means the image is older than the template.

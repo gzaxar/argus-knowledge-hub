@@ -880,6 +880,8 @@ TOOLS += [
                 "values": {"type": "string", "description": "The IOC entry as YAML"},
                 "template": {"type": "string", "description": "Override the entry's template:"},
                 "template_source": {"type": "string", "description": "A Jinja2 template to render instead"},
+                "beamline": {"type": "string", "description": "Apply this beamline's iocDefaults and injected "
+                                                              "values first, as epik8s-chart does"},
             },
             "required": ["values"],
         },
@@ -915,6 +917,37 @@ TOOLS += [
             },
             "required": ["folder", "repository"],
         },
+    },
+    {
+        "name": "ioc_list_beamline",
+        "description": "The beamlines in the IOC catalogue (their deploy repositories), or one beamline's IOCs "
+                       "as deployed: template, devtype, devgroup, iocprefix, how the pod starts them (template, "
+                       "remote host, git config), disabled ones, and the count per template.",
+        "handler": ioc.ioc_list_beamline,
+        "inputSchema": {"type": "object", "properties": {
+            "beamline": {"type": "string", "description": "e.g. eli, sparc, btf; omit to list the beamlines"},
+            "template": {"type": "string"},
+            "query": {"type": "string", "description": "A word in the name, prefix, devtype…"}}},
+    },
+    {
+        "name": "ioc_get_beamline_ioc",
+        "description": "One IOC of a beamline: its entry in values.yaml, the iocDefaults it inherits (and any "
+                       "false/0/empty value the chart's merge ignores), the values the pod actually receives "
+                       "(/tmp/iocconfig.yaml), and its render and check.",
+        "handler": ioc.ioc_get_beamline_ioc,
+        "inputSchema": {"type": "object", "properties": {
+            "beamline": {"type": "string"}, "name": {"type": "string"},
+            "render": {"type": "boolean", "description": "Default true"}}, "required": ["beamline", "name"]},
+    },
+    {
+        "name": "ioc_check_beamline",
+        "description": "Render and check every enabled, templated IOC of a beamline against the catalogue's image "
+                       "and templates: which would fail at their next sync, and why. Use it before bumping the "
+                       "image or changing a template the beamline uses.",
+        "handler": ioc.ioc_check_beamline,
+        "inputSchema": {"type": "object", "properties": {
+            "beamline": {"type": "string"}, "template": {"type": "string", "description": "Only this template"}},
+            "required": ["beamline"]},
     },
     {
         "name": "ioc_guide",

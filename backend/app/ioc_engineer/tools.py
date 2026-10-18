@@ -213,6 +213,9 @@ def ioc_guide(db, workspace_id: str, section: Optional[str] = None) -> dict:
     parts = re.split(r"(?m)^## ", text)
     sections = {p.split("\n", 1)[0].strip(): p.split("\n", 1)[1] if "\n" in p else "" for p in parts[1:]}
     about = {"repository": cat.get("repository"), "generated_at": cat.get("generated_at"),
+             "loaded_from": cat.get("loaded_from"),
+             "beamlines": {b["name"]: {"iocs": len(b.get("iocs") or []), "commit": b.get("commit")}
+                           for b in cat.get("beamlines") or []},
              "modules": len(cat["modules"]), "entity_models": len(cat["entity_models"]),
              "templates": len(cat["templates"]), "examples": len(cat["examples"]),
              "problems": cat.get("problems", [])[:30]}
@@ -234,7 +237,9 @@ WORKFLOW = [
     "(ioc_get_module shows the source's macros when the catalogue was built with --sources), then add "
     "ansible.sh <folder> to the Dockerfile, bump the submodules and tag a release.",
     "4. Deploy: add the entry under epicsConfiguration.iocs in the beamline values.yaml (iocDefaults may hold the "
-    "family defaults), commit, sync the ArgoCD application.",
+    "family defaults: ioc_render(values, beamline=…) applies them), commit, sync the ArgoCD application.",
+    "5. A beamline in the catalogue: ioc_list_beamline, ioc_get_beamline_ioc for one IOC as deployed, "
+    "ioc_check_beamline before bumping the image or a template.",
 ]
 
 
@@ -376,12 +381,22 @@ def validate_instance(document: Any, extra_models: Optional[dict] = None) -> dic
 
 
 def ioc_render(db, workspace_id: str, values: Any, template: Optional[str] = None,
-               template_source: Optional[str] = None) -> dict:
+               template_source: Optional[str] = None, beamline: Optional[str] = None) -> dict:
     """Render a beamline IOC entry as the pod will, then check what ibek will make of it."""
     data, problem = _values(values)
     if problem:
         return {"ok": False, "errors": [problem]}
     notes = []
+    if beamline:
+        line = _beamline(beamline)
+        if line is None:
+            return {"ok": False, "errors": [f"No beamline {beamline!r} in the catalogue."],
+                    "beamlines": [b["name"] for b in _beamlines()]}
+        d = deployed_values(line, data)
+        data = d["values"]
+        if d["defaults_key"]:
+            notes.append(f"iocDefaults.{d['defaults_key']} of {line['name']} merged under the entry.")
+        notes += d["ignored_by_merge"]
     if not data.get("iocname"):
         data["iocname"] = str(data.get("name") or "ioc-under-test").lower()
         notes.append(f"iocname is injected by epik8s-chart at deploy time; rendered with iocname={data['iocname']!r}.")
@@ -598,3 +613,170 @@ devices:
             f"Add `ansible.sh {folder}` to the Dockerfile, bump both submodules in infn-epics-ioc, tag a release.",
         ],
     }
+
+
+# --- beamlines ------------------------------------------------------------------------
+
+def _empty(value: Any) -> bool:
+    """What Go's mergo counts as empty, and so never lets overwrite a default."""
+    return value is None or value is False or value == 0 and not isinstance(value, bool) or value in ("", [], {})
+
+
+def _merge_overwrite(defaults: dict, entry: dict, path: str = "", ignored: Optional[list] = None) -> dict:
+    """Sprig's mustMergeOverwrite(deepCopy(defaults), entry), which epik8s-chart uses for iocDefaults: the entry
+    wins key by key, maps merge, and an empty value in the entry (false, 0, "", null, []) does not replace a
+    non-empty default. That last rule surprises people (`autosync: false` under a default of true is ignored),
+    so every such key is reported."""
+    out = dict(defaults)
+    for key, value in entry.items():
+        here = f"{path}{key}"
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _merge_overwrite(out[key], value, f"{here}.", ignored)
+        elif _empty(value) and key in out and not _empty(out[key]):
+            if ignored is not None:
+                ignored.append(f"{here}: {value!r} in the entry is ignored, iocDefaults keeps {out[key]!r}")
+        else:
+            out[key] = value
+    return out
+
+
+def _beamlines() -> list:
+    return load().get("beamlines") or []
+
+
+def _beamline(name: Optional[str]) -> Optional[dict]:
+    lines = _beamlines()
+    if not name and len(lines) == 1:
+        return lines[0]
+    n = (name or "").lower()
+    return next((b for b in lines if b["name"].lower() == n or (b.get("url") or "").lower().rstrip("/").endswith(n)),
+                None)
+
+
+def _mode(values: dict) -> str:
+    """Which branch of ioc-chart's start-up the pod takes: host first, then template, else a git config dir."""
+    if values.get("host"):
+        return "host"
+    if values.get("template"):
+        return "template"
+    return "git"
+
+
+def deployed_values(beamline: dict, entry: dict) -> dict:
+    """The entry as /tmp/iocconfig.yaml holds it in the pod: iocDefaults merged under it, what epik8s-chart
+    injects (beamline, iocname, ioc_version, nfsMounts) and the directories ioc-chart's ConfigMap adds."""
+    ignored: list = []
+    key = entry.get("template") or entry.get("devtype") or ""
+    defaults = (beamline.get("ioc_defaults") or {}).get(key) if key else None
+    merged = _merge_overwrite(defaults, entry, ignored=ignored) if isinstance(defaults, dict) else dict(entry)
+    g = beamline.get("globals") or {}
+    name = str(merged.get("name") or "").lower()
+    injected: dict = {}
+    mounts = merged.get("nfsMounts") or g.get("nfsMounts")
+    if mounts:
+        injected.update({f"{str(m.get('name')).lower()}_dir": f"{m.get('mountPath')}/{name}" for m in mounts
+                         if isinstance(m, dict)})
+    else:
+        injected.update(config_dir="/epics/ioc/config", autosave_dir="/autosave")
+    injected["ioctop"] = merged.get("workdir") or "/epics/ioc/config"
+    # ioc-chart writes each iocparam as a top-level `name: value` line, before the values themselves.
+    for p in merged.get("iocparam") or []:
+        if isinstance(p, dict) and p.get("name"):
+            try:
+                injected[str(p["name"])] = yaml.safe_load(f"{p.get('value')}") if p.get("value") is not None else None
+            except yaml.YAMLError:
+                injected[str(p["name"])] = p.get("value")
+    values = {**injected, **merged}
+    if mounts:
+        values["nfsMounts"] = mounts
+    if g.get("ioc_version") and not merged.get("image"):
+        values["ioc_version"] = g["ioc_version"]
+    values["beamline"] = g.get("beamline") or beamline["name"]
+    values["iocname"] = name
+    return {"values": values, "defaults_key": key if defaults is not None else None, "ignored_by_merge": ignored}
+
+
+def _ioc_row(beamline: dict, entry: dict) -> dict:
+    d = deployed_values(beamline, entry)["values"]
+    return {"name": d["iocname"], "template": d.get("template"), "devtype": d.get("devtype"),
+            "devgroup": d.get("devgroup"), "iocprefix": d.get("iocprefix"), "mode": _mode(d),
+            "disabled": bool(d.get("disable")), "devices": len(d.get("devices") or [])}
+
+
+def ioc_list_beamline(db, workspace_id: str, beamline: Optional[str] = None, template: Optional[str] = None,
+                      query: Optional[str] = None) -> dict:
+    """The beamlines in the catalogue, or one beamline's IOCs as deployed."""
+    line = _beamline(beamline) if beamline else None
+    if line is None:
+        return {"beamlines": [{"name": b["name"], "url": b.get("url"), "commit": b.get("commit"),
+                               "iocs": len(b.get("iocs") or []), "error": b.get("error")} for b in _beamlines()],
+                **({"not_found": beamline} if beamline else {})}
+    rows = [_ioc_row(line, e) for e in line.get("iocs") or []]
+    if template:
+        rows = [r for r in rows if r["template"] == template]
+    if query:
+        q = query.lower()
+        rows = [r for r in rows if any(q in str(v).lower() for v in r.values() if v)]
+    by_template: dict = {}
+    for r in rows:
+        by_template[r["template"] or f"({r['mode']})"] = by_template.get(r["template"] or f"({r['mode']})", 0) + 1
+    return {"beamline": line["name"], "url": line.get("url"), "commit": line.get("commit"),
+            "value_files": line.get("value_files"), "ioc_defaults": sorted(line.get("ioc_defaults") or {}),
+            "total": len(rows), "by_template": by_template, "iocs": rows}
+
+
+def _entry(line: dict, name: str) -> Optional[dict]:
+    n = (name or "").lower()
+    return next((e for e in line.get("iocs") or [] if str(e.get("name", "")).lower() == n), None)
+
+
+def ioc_get_beamline_ioc(db, workspace_id: str, beamline: str, name: str, render: bool = True) -> dict:
+    """One IOC of a beamline: its entry, the iocDefaults it inherits, what the pod receives, and the render."""
+    line = _beamline(beamline)
+    if line is None:
+        return {"found": False, **ioc_list_beamline(db, workspace_id)}
+    entry = _entry(line, name)
+    if entry is None:
+        close = [r["name"] for r in ioc_list_beamline(db, workspace_id, line["name"], query=name)["iocs"]][:20]
+        return {"found": False, "beamline": line["name"], "similar": close}
+    d = deployed_values(line, entry)
+    out = {"found": True, "beamline": line["name"], "entry": entry, "defaults_key": d["defaults_key"],
+           "defaults": (line.get("ioc_defaults") or {}).get(d["defaults_key"]) if d["defaults_key"] else None,
+           "ignored_by_merge": d["ignored_by_merge"], "deployed": d["values"], "mode": _mode(d["values"])}
+    if render and out["mode"] == "template" and not d["values"].get("disable"):
+        out["render"] = ioc_render(db, workspace_id, d["values"])
+    elif out["mode"] != "template":
+        out["note"] = {"host": "runs natively on a remote host through epik8s-run; not an ibek render",
+                       "git": "no template: the pod takes config/iocs/<iocdir|name> from the beamline repository "
+                              "(st.cmd.j2, start.sh); not an ibek render"}[out["mode"]]
+    return out
+
+
+def ioc_check_beamline(db, workspace_id: str, beamline: str, template: Optional[str] = None) -> dict:
+    """Render and check every templated, enabled IOC of a beamline: what would fail at its next sync."""
+    line = _beamline(beamline)
+    if line is None:
+        return {"found": False, **ioc_list_beamline(db, workspace_id)}
+    passed, failed, skipped, ignored = [], [], [], []
+    for entry in line.get("iocs") or []:
+        d = deployed_values(line, entry)
+        v = d["values"]
+        if template and v.get("template") != template:
+            continue
+        if d["ignored_by_merge"]:
+            ignored.append({"ioc": v["iocname"], "keys": d["ignored_by_merge"]})
+        if v.get("disable") or _mode(v) != "template":
+            skipped.append({"ioc": v["iocname"], "why": "disabled" if v.get("disable") else _mode(v)})
+            continue
+        r = ioc_render(db, workspace_id, v)
+        if r["ok"]:
+            passed.append(v["iocname"])
+            continue
+        errors = list(r.get("errors") or [])
+        for o in r.get("outputs") or []:
+            errors += ([o["error"]] if o.get("error") else []) + (o.get("errors") or [])
+        failed.append({"ioc": v["iocname"], "template": v.get("template"), "devtype": v.get("devtype"),
+                       "errors": errors[:5], "more": max(0, len(errors) - 5)})
+    return {"beamline": line["name"], "commit": line.get("commit"), "passed": len(passed), "failed": failed,
+            "skipped": skipped, "ignored_by_merge": ignored,
+            "next": "ioc_get_beamline_ioc shows one IOC's deployed values and full render."}

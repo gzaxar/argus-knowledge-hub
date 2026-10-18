@@ -1,7 +1,7 @@
 ---
 title: IOC engineer
 summary: Getting help with EPICS IOCs built with ibek: find a driver, write a beamline IOC entry, check it before deploying, start a new driver.
-keywords: [ioc, epics, ibek, ibek-templates, ibek-support, driver, support module, template, devtype, values.yaml, epik8s, beamline, st.cmd, container, image, infn-epics-ioc, render, validate, scaffold]
+keywords: [ioc, epics, ibek, beamline check, iocdefaults, ibek-templates, ibek-support, driver, support module, template, devtype, values.yaml, epik8s, beamline, st.cmd, container, image, infn-epics-ioc, render, validate, scaffold]
 order: 180
 ---
 
@@ -27,6 +27,17 @@ lists:
   a reference to an object that does not exist;
 - **rendered_empty**: the keys the template expected and did not find;
 - **warnings**, such as a devtype that matches none of the template's branches.
+
+## Check a whole beamline
+
+Ask "will every ELI IOC still start?" before a new IOC image or a template change. The assistant renders
+every enabled, templated IOC of the beamline as deployed, with its `iocDefaults` merged in. It lists the IOCs
+that would fail and why. It also lists every value the chart's merge ignores: a `false`, `0` or empty value in
+an entry never replaces a default from `iocDefaults`. Ask about one IOC ("show me vgcon01 as deployed") to see
+its entry, its defaults and the values the pod receives.
+
+The beamlines it knows are the ones its catalogue was built with. Ask "which beamlines do you know?" to see
+them.
 
 ## Support new hardware
 

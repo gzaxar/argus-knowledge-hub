@@ -105,8 +105,38 @@ def checkout(tmp_path, monkeypatch):
           - name: G1
     """)
     _write(repo, "docs/architecture.md", "# Arch\n\n## 1. The big picture\n\nOne image.\n\n## 3. ibek-support-infn\n\nDrivers.\n")
+    # A multi-source beamline, as SPARC and BTF are: two value files, iocDefaults per template, iocparam.
+    line = tmp_path / "epik8s-test"
+    _write(line, "deploy/templates/epik8.yaml", """
+        spec:
+          sources:
+            - helm:
+                valueFiles:
+                  - $beamline/deploy/values.yaml
+                  - $beamline/deploy/values-vac.yaml
+    """)
+    _write(line, "deploy/values.yaml", """
+        beamline: testline
+        ioc_version: v9.9
+        iocDefaults:
+          gauge: {devtype: tpg, autosync: true, port: 4002}
+        epicsConfiguration:
+          iocs:
+            vgauge01: {name: vgauge01, template: gauge, iocprefix: TL:VAC, devices: [{name: G1}], autosync: false,
+                       devgroup: vac}
+    """)
+    _write(line, "deploy/values-vac.yaml", """
+        epicsConfiguration:
+          iocs:
+            vgauge01: {name: vgauge01, template: gauge, iocprefix: TL:VAC, devices: [{name: G1}], autosync: false,
+                       iocparam: [{name: server, value: 10.2.2.2}]}
+            vgauge02: {name: vgauge02, template: gauge, devtype: legacy, iocprefix: TL:VAC, server: h,
+                       devices: [{name: G9}]}
+            remote01: {name: remote01, template: gauge, host: box.example.org}
+            off01: {name: off01, template: gauge, disable: true}
+    """)
     out = tmp_path / "catalog.json.gz"
-    catalog.write(catalog.build(repo), out)
+    catalog.write(catalog.build(repo, beamlines=(str(line),)), out)
     monkeypatch.setenv("ARGUS_IOC_CATALOG", str(out))
     catalog.load.cache_clear()
     yield repo
@@ -245,7 +275,8 @@ def test_search_and_guide(checkout):
 def test_the_tools_are_served_over_mcp_and_to_ask_argus(checkout):
     names = {t["name"] for t in mcp_tools.catalogue()}
     assert {"ioc_search", "ioc_get_module", "ioc_get_entity_model", "ioc_get_template", "ioc_get_example",
-            "ioc_render", "ioc_validate", "ioc_scaffold_driver", "ioc_guide"} <= names
+            "ioc_render", "ioc_validate", "ioc_scaffold_driver", "ioc_guide", "ioc_list_beamline",
+            "ioc_get_beamline_ioc", "ioc_check_beamline"} <= names
     found = json.loads(mcp_tools.call(None, "ws", "ioc_get_module", {"name": "gauge-ioc"}))
     assert found["found"] and found["folder"] == "gauge"
 
@@ -257,8 +288,77 @@ def test_the_bundled_snapshot_renders_its_own_fixtures(monkeypatch):
     try:
         cat = catalog.load()
         assert len(cat["templates"]) > 20 and len(cat["entity_models"]) > 300
+        assert any(b["name"] == "eli" and len(b["iocs"]) > 20 for b in cat["beamlines"])
         for name in ("ps-ocem-modbusps-test", "ps-tti-test", "agilent-vac-xgs600-test", "motor-pigcs2-test"):
             r = tools.ioc_render(None, "ws", tools.ioc_get_example(None, "ws", name)["source"])
             assert r["ok"], (name, r)
     finally:
         catalog.load.cache_clear()
+
+
+def test_a_beamline_is_read_from_its_value_files_in_order(checkout):
+    listed = tools.ioc_list_beamline(None, "ws")
+    assert [b["name"] for b in listed["beamlines"]] == ["testline"]
+    line = tools.ioc_list_beamline(None, "ws", "testline")
+    assert line["value_files"] == ["deploy/values.yaml", "deploy/values-vac.yaml"]
+    modes = {r["name"]: (r["mode"], r["disabled"]) for r in line["iocs"]}
+    assert modes == {"off01": ("template", True), "remote01": ("host", False), "vgauge01": ("template", False),
+                     "vgauge02": ("template", False)}
+
+
+def test_an_ioc_is_given_what_the_chart_and_the_configmap_give_it(checkout):
+    ioc = tools.ioc_get_beamline_ioc(None, "ws", "testline", "vgauge01")
+    d = ioc["deployed"]
+    assert ioc["defaults_key"] == "gauge" and d["devtype"] == "tpg" and d["port"] == 4002
+    assert d["server"] == "10.2.2.2" and d["devgroup"] == "vac"  # iocparam; the files' maps merged
+    assert d["iocname"] == "vgauge01" and d["beamline"] == "testline" and d["ioc_version"] == "v9.9"
+    assert d["config_dir"] == "/epics/ioc/config"
+    # Sprig's mergeOverwrite: false in the entry never replaces true from iocDefaults.
+    assert d["autosync"] is True and any("autosync: False" in x for x in ioc["ignored_by_merge"])
+    assert ioc["render"]["ok"] and "PORT: 4002" in ioc["render"]["outputs"][0]["yaml"]
+
+
+def test_a_beamline_check_names_what_its_next_sync_would_break(checkout):
+    report = tools.ioc_check_beamline(None, "ws", "testline")
+    assert report["passed"] == 1
+    assert [f["ioc"] for f in report["failed"]] == ["vgauge02"]
+    assert "legacy.device is defined but not compiled" in report["failed"][0]["errors"][0]
+    assert {s["ioc"]: s["why"] for s in report["skipped"]} == {"off01": "disabled", "remote01": "host"}
+    assert report["ignored_by_merge"][0]["ioc"] == "vgauge01"
+
+
+def test_a_new_entry_can_be_rendered_with_a_beamlines_defaults(checkout):
+    r = tools.ioc_render(None, "ws", "name: vgauge09\ntemplate: gauge\niocprefix: TL\nserver: s\ndevices: [{name: A}]\n",
+                         beamline="testline")
+    assert r["ok"] and any("iocDefaults.gauge of testline" in n for n in r["notes"])
+    assert "PORT: 4002" in r["outputs"][0]["yaml"]
+
+
+def test_a_published_catalogue_is_fetched_and_its_last_copy_kept(checkout, tmp_path, monkeypatch):
+    import gzip as gz
+    import requests
+
+    body = (tmp_path / "catalog.json.gz").read_bytes()
+    calls = []
+
+    class Response:
+        def __init__(self, content, status=200):
+            self.content, self.status_code = content, status
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise requests.HTTPError(str(self.status_code))
+
+    monkeypatch.setattr(requests, "get", lambda url, timeout: calls.append(url) or Response(body))
+    monkeypatch.setenv("ARGUS_IOC_CATALOG", "https://example.org/ioc-catalog.json.gz")
+    monkeypatch.setenv("ARGUS_IOC_CATALOG_CACHE", str(tmp_path / "cache" / "c.json.gz"))
+    monkeypatch.setenv("ARGUS_IOC_CATALOG_TTL", "0")
+    catalog.load.cache_clear()
+    assert catalog.load()["loaded_from"].startswith("https://example.org/")
+    assert tools.ioc_get_module(None, "ws", "gauge")["found"]
+    # GitHub down: the last copy fetched answers, and says so.
+    monkeypatch.setattr(requests, "get", lambda url, timeout: Response(b"", 503))
+    later = catalog.load()
+    assert later["loaded_from"].endswith("c.json.gz") and "could not fetch" in later["problems"][0]
+    assert tools.ioc_get_module(None, "ws", "gauge")["found"] and calls
+    assert gz.decompress((tmp_path / "cache" / "c.json.gz").read_bytes())
