@@ -3,9 +3,10 @@
 # drawings to a conversion service would mean handing INFN's drawings to a
 # third party. Built from source because Debian carries no package for it.
 # GPL-3: used as a command-line program, not linked into this application.
-# Docker's official images, from their mirror on Amazon ECR Public: Docker Hub limits anonymous pulls by
-# address, and the shared CI runners keep hitting it (429). The same images, by the same names.
-FROM public.ecr.aws/docker/library/python:3.11-slim AS libredwg
+# Docker's official images, from Google's Docker Hub mirror (mirror.gcr.io), as the database image and the CI's
+# BuildKit: Docker Hub limits anonymous pulls by address, and Amazon ECR Public's mirror ran out of data for
+# the shared runners too (429). The same images, by the same digests.
+FROM mirror.gcr.io/library/python:3.11-slim AS libredwg
 
 ARG LIBREDWG_VERSION=0.13.3
 
@@ -20,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /tmp/libredwg*
 
 
-FROM public.ecr.aws/docker/library/python:3.11-slim
+FROM mirror.gcr.io/library/python:3.11-slim
 
 LABEL org.opencontainers.image.source="https://github.com/infn-argus/argus-knowledge-hub"
 LABEL org.opencontainers.image.description="ARGUS Knowledge Hub — REST API (assets, tickets, documentation)"
