@@ -87,17 +87,20 @@ Only `template:` IOCs are rendered and checked; the others are listed as skipped
 ### Retired modules and stale examples
 
 A module whose `ansible.sh` line is commented out in a Dockerfile was taken out of the image on purpose. An
-example is the TML motor driver (`technosoft`, `devtype: tml`), which `technosoft-asyn` replaced. Such a
-module is reported as **retired**, and an entity from it fails the check with a pointer to the template's
-other devtypes.
+example is the TML motor driver (`technosoft`), which `technosoft-asyn` replaced. Such a module is reported
+as **retired**, and an entity from it fails the check with a pointer to the template's other devtypes.
 
 Each example is rendered once against the image:
 
-- One that no longer renders clean, such as `motor-tml-test`, `tml-ch2-config` or `tml-ch3-config`, is listed
-  last by `ioc_search`.
-- `ioc_get_example` gives such an example a warning and a `use_instead` list. The closest working examples
-  come first: `tml-ch1-config`, which uses `technosoft-asyn`.
+- One that no longer renders clean is listed last by `ioc_search`.
+- `ioc_get_example` gives such an example a warning and a `use_instead` list, closest working examples first
+  (by the words they share in their names).
 - `ioc_get_template` marks each of its examples `renders_clean`.
+
+The TML examples were the first case. They have since been converted to `technosoft-asyn`, and the `tml`
+branch has been removed from the motor template. In the current snapshot, the one example that does not
+render clean is `vme-dante068-test`: its types exist only in the RTEMS image, which the catalogue does not
+read.
 
 Known limits:
 
