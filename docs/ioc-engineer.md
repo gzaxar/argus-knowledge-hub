@@ -131,8 +131,9 @@ that can reach it:
 
 `--sources DIR` also clones each INFN driver at the version its install.yml names (`organization` + `module`)
 and indexes its db templates (macros, record sample), protocol files (commands), startup scripts and README.
-Repositories the build cannot reach are listed under `sources.failed`. Build from inside the INFN network to
-reach `baltig.infn.it`. Each catalogue records the commit of infn-epics-ioc and of every submodule it was read
+Repositories the build cannot reach are listed under `sources.failed`. The drivers on `baltig.infn.it`
+(`lnf-da-control`) are public, so the CI build on GitHub indexes them too; a private one fails the image build
+as well as the catalogue (`could not read Username`). Each catalogue records the commit of infn-epics-ioc and of every submodule it was read
 from, so an answer can be traced back to its files.
 
 A type that is defined in two collections is taken from the copy the image builds. Dockerfile.base builds the
