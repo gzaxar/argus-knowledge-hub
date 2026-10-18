@@ -1,0 +1,85 @@
+# The backend tests (in the image that will be shipped) and the web app's type-check and build: on every pull
+# request, and as the first step of every release (release.yml calls this workflow), so a pull request is tested
+# exactly as its release will be.
+name: tests
+
+on:
+  pull_request:
+  workflow_call:
+
+# A new push to a pull request replaces its running tests; a release's are never cancelled.
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read          # the database image (ghcr.io) for the test service
+    services:
+      postgres:
+        # As in docker-compose.yml: Ask ARGUS's search needs pgvector. From Google's Docker Hub mirror: Docker
+        # Hub limits anonymous pulls by address, and the shared runners hit it.
+        # With PostGIS too (the spatial model): the database image every release publishes (deploy/postgres),
+        # which production runs since the switch rehearsed with tools/db-image-rehearsal.
+        image: ghcr.io/infn-argus/argus-knowledge-hub-postgres:latest
+        credentials:   # a new GitHub package is private: the workflow's own token reads it
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+        with:
+          # BuildKit itself from Google's Docker Hub mirror, as the images: Docker Hub refuses or times out the
+          # shared runners' anonymous pulls.
+          driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1
+      # The tests run in the image that will be shipped, with its system tools (dwg2dxf, fonts, git).
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          load: true
+          tags: argus-backend:ci
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+      - name: Run the backend tests
+        run: |
+          docker run --rm --network host \
+            -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app \
+            -e TOKEN_PEPPER=ci-only \
+            -v "$PWD/backend/tests:/app/tests:ro" \
+            -v "$PWD/backend/openapi:/app/openapi:ro" \
+            -v "$PWD/tools:/app/tools:ro" \
+            -v "$PWD/backend/requirements-dev.txt:/app/requirements-dev.txt:ro" \
+            argus-backend:ci sh -c "pip install -q -r requirements-dev.txt && \
+              export IMPORT_SECRETS_KEY=\$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())') && \
+              python -m pytest -q -p no:cacheprovider tests \
+              --deselect tests/test_readiness_ops.py::test_a_backup_restores_into_a_scratch_database_and_checks_itself"
+
+  web-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: webapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+      - run: npm ci
+      # Type-checks and builds, as the image does.
+      - run: npm run build

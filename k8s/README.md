@@ -28,7 +28,8 @@ git tag v1.34.0 && git push origin v1.34.0
 `.github/workflows/release.yml` then:
 
 1. runs the backend tests inside the backend image, against Postgres with pgvector, and type-checks
-   and builds the web app; a failure stops the release before anything is pushed;
+   and builds the web app (`.github/workflows/tests.yml`, the same workflow every pull request runs); a
+   failure stops the release before anything is pushed;
 2. builds both images and pushes them to ghcr.io as `1.34.0` and `latest`. The web app is built
    with the production Keycloak and API addresses (`WEB_KEYCLOAK`, `WEB_API` in the workflow);
 3. commits `Deploy 1.34.0` to `main`, setting the image tags in
