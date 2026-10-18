@@ -1,7 +1,7 @@
 ---
 title: IOC engineer
 summary: Getting help with EPICS IOCs built with ibek: find a driver, write a beamline IOC entry, check it before deploying, start a new driver.
-keywords: [ioc, epics, ibek, beamline check, iocdefaults, ibek-templates, ibek-support, driver, support module, template, devtype, values.yaml, epik8s, beamline, st.cmd, container, image, infn-epics-ioc, render, validate, scaffold]
+keywords: [ioc, epics, ibek, beamline check, iocdefaults, pull request, pr, github, ibek-templates, ibek-support, driver, support module, template, devtype, values.yaml, epik8s, beamline, st.cmd, container, image, infn-epics-ioc, render, validate, scaffold]
 order: 180
 ---
 
@@ -53,6 +53,20 @@ The drafts are rendered against each other. Adapt the parameters to the driver's
 1. Run the ibek-support-infn tests.
 2. Bump the submodules in infn-epics-ioc.
 3. Tag a release.
+
+## Open a pull request
+
+When the files are right, ask "open a pull request with them". The answer shows the pull request as a proposed
+change, with its repository, title and files. Nothing leaves ARGUS until you apply it.
+
+1. Check the files and the checks listed under the proposal.
+2. Select it and choose **Apply**. You need the *approve* permission in the workspace. ARGUS opens a draft pull
+   request that lists the checks and names you as the person who confirmed it.
+3. Follow the link to the pull request. The repository's reviewers review it and merge it; ARGUS never merges.
+
+A new driver is two pull requests: the support module on ibek-support-infn, then the template and its fixture
+on ibek-templates. If the option is not offered, an administrator has not installed the GitHub credential
+(docs/ioc-engineer.md).
 
 ## When an IOC does not start
 

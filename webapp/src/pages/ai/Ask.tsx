@@ -211,6 +211,17 @@ function ProposedChanges({ actions, conversationId }: { actions: AskAction[]; co
                     {a.result.key ?? "open"}
                   </Link>
                 )}
+                {a.status === "applied" && a.kind === "pull_request" && a.result?.url && (
+                  <a className="ml-1 text-indigo-600 underline" href={a.result.url} target="_blank" rel="noreferrer">
+                    {a.result.key ?? "pull request"}
+                  </a>
+                )}
+                {a.status === "proposed" && a.kind === "pull_request" && (
+                  <span className="block text-slate-500">
+                    Applying opens a draft pull request that names you as the person who confirmed it; the
+                    repository's reviewers decide, ARGUS does not merge it.
+                  </span>
+                )}
                 {a.error && <span className="block text-rose-600">{a.error}</span>}
               </span>
               <span className={`shrink-0 ${st.tone}`}>{st.word}</span>

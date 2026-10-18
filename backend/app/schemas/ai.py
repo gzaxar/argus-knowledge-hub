@@ -269,10 +269,10 @@ class AskActionOut(BaseModel):
     id: str
     number: int
     turn_seq: int
-    kind: str                       # create | update | relate | unrelate
+    kind: str                       # create | update | relate | unrelate | pull_request
     summary: str
     status: str                     # proposed | applied | failed | discarded
-    result: Optional[dict] = None   # what was made: {uid, key, name} or {relation_id}
+    result: Optional[dict] = None   # what was made: {uid, key, name}, {relation_id} or {url, number, branch, key}
     error: Optional[str] = None
     reason: Optional[str] = None
 

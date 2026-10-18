@@ -59,7 +59,7 @@ class AskAction(Base):
     turn_seq: Mapped[int] = mapped_column(Integer)
     # Its handle in the conversation: A1, A2… and, for a record to be created, the `new:N` others refer to it by.
     number: Mapped[int] = mapped_column(Integer)
-    kind: Mapped[str] = mapped_column(String)               # create | update | relate | unrelate
+    kind: Mapped[str] = mapped_column(String)               # create | update | relate | unrelate | pull_request
     payload: Mapped[dict] = mapped_column(JSONB)
     summary: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String, default="proposed")   # proposed | applied | failed | discarded

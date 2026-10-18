@@ -91,6 +91,11 @@ that node, which leaves every image a container uses. To run one now:
   workspace yet is offered to create one on the workspace screen. Anyone else is made an administrator
   in the app, or in the pod:
   `$KC -n argus exec deploy/argus-api -- python scripts/argus_admin.py user add <email> --admin`.
+- **IOC pull requests (optional).** Ask ARGUS can open the pull requests the IOC engineer drafts, once a
+  person confirms them (docs/ioc-engineer.md). It stays off until the Secret holds `ioc-github-token`: a
+  fine-grained token, or a GitHub App's, with *Contents* and *Pull requests* read and write on the
+  repositories in `iocEngineer.pullRequests.repositories` only:
+  `$KC -n argus patch secret argus-secrets -p '{"stringData":{"ioc-github-token":"<token>"}}'`, then restart the API.
 - **An API token for scripts:** `$KC -n argus exec deploy/argus-api -- python scripts/create_token.py
   <workspace> "<name>" cli`. It is printed once.
 
