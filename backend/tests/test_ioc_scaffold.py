@@ -206,3 +206,24 @@ def test_a_real_device_long_strings_and_queries_that_report_a_setting():
     with pytest.raises(scaffold.Invalid, match="sim_from"):
         scaffold.scaffold({**spec, "parameters": spec["parameters"] + [
             {"name": "Bad", "type": "string", "read": "B?", "sim_from": "Voltage"}]})
+
+
+def test_every_fixture_names_a_devgroup_the_schema_accepts(tmp_path):
+    """Templates live under ps/, motor/, cooling/…, but devgroup is the panels' vocabulary (mag, mot, cool…):
+    ibek-templates' CI validates fixtures against schemas/ioc.schema.json and refused devgroup: ps."""
+    from app.ioc_engineer import catalog, tools
+    allowed = catalog.load()["schemas"]["ioc"]["definitions"]["devgroup"]["enum"]
+    for group in tools.GROUPS:
+        spec = {**scaffold.EXAMPLE, "group": group}
+        fixture = next(v for k, v in scaffold.scaffold(spec)["files"].items() if k.startswith("ibek-templates/tests/"))
+        assert yaml.safe_load(fixture)["devgroup"] in allowed, group
+        drafted = tools.ioc_scaffold_driver(None, "", "x", "x-ioc", group=group)["files"]
+        assert yaml.safe_load(drafted[f"ibek-templates/tests/{group}-x-test.yaml"])["devgroup"] in allowed, group
+    assert tools.devgroup("ps") == "mag" and tools.devgroup("vac") == "vac"
+    r = tmp_path / "rg"
+    (r / "rgApp/Db").mkdir(parents=True)
+    (r / "rgApp/Db/rg.template").write_text('record(ai, "$(P):$(R):X") {}\n')
+    (r / "iocBoot/iocrg").mkdir(parents=True)
+    (r / "iocBoot/iocrg/st.cmd").write_text('dbLoadRecords("db/rg.template", "P=A,R=B")\n')
+    back = ibekize.ibekize("https://github.com/infn-epics/rg", "main", folder="rg", group="ps", checkout=r)
+    assert yaml.safe_load(back["files"]["ibek-templates/tests/ps-rg-test.yaml"])["devgroup"] == "mag"

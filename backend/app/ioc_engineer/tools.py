@@ -27,6 +27,14 @@ JINJA = re.compile(r"\{\{|\{%")
 # Keys an ibek entity may carry besides its model's parameters.
 ENTITY_KEYS = {"type", "entity_enabled"}
 GROUPS = ["ps", "motor", "vac", "daq", "io", "cooling", "modulator", "synch", "mps"]
+# ibek-templates' folders are not its devgroup vocabulary (schemas/ioc.schema.json, the panels' GROUP):
+# a power supply's template is under ps/ and its devgroup is mag. A fixture that says devgroup: ps fails
+# the repository's ajv check.
+DEVGROUP = {"ps": "mag", "motor": "mot", "cooling": "cool", "synch": "timing"}
+
+
+def devgroup(group: str) -> str:
+    return DEVGROUP.get(group, group)
 
 
 # --- lookups -----------------------------------------------------------------------
@@ -613,7 +621,7 @@ entities:
 iocname: "{group}-{folder.lower()}-test"
 template: "{folder}"
 devtype: {devtype}
-devgroup: {group}
+devgroup: {devgroup(group)}
 iocprefix: "TEST:{group.upper()}:{folder.upper()}"
 server: "192.168.1.10"
 port: {int(default_port)}
