@@ -1,7 +1,7 @@
 ---
 title: Documents and the knowledge base
 summary: Writing procedures, manuals and reports; the first revision and later ones, review, approval and publication; confidentiality, sharing, retention and where a document applies.
-keywords: [document, documents, procedure, manual, report, knowledge base, revision, draft, submit, review, reject, approval, approve, publish, new revision, edit, retire, confidentiality, riservato, shared, global, retention, markdown, controlled document, attachment, related by meaning]
+keywords: [document, documents, procedure, manual, report, knowledge base, revision, draft, submit, review, reject, approval, approve, publish, new revision, edit, retire, confidentiality, riservato, shared, global, retention, markdown, controlled document, attachment, related by meaning, export, pdf, print, download, markdown file, .md, save as pdf]
 order: 80
 ---
 
@@ -12,7 +12,11 @@ drawings, notes. A document is linked to the equipment, types and other document
 
 1. **+ New → Document**.
 2. **Title**, **Type** (procedure, manual, report…) and its **Code** (proposed from the type).
-3. **Body**, written in Markdown. Attach files (a PDF, a drawing) if the content is there.
+3. **Body**, written in Markdown. Attach files (a PDF, a drawing) if the content is there. A Markdown or
+   text file (`.md`, `.txt`) attached or dropped on the body asks first: **Use its text as the body** (or
+   *Insert its text here*) puts its words in the document; **Attach it as a file** keeps it as a file. The same
+   choice appears when such a file is given to *Describe it*: **Use the file as the body** instead of the
+   summary the assistant writes.
 4. **Confidentiality**: *Pubblico*, *Interno*, *Riservato*… A *riservato* document is sent to an AI only if the
    workspace allows it, and is never shared with other workspaces.
 5. **Authority level**: whether it is official (*Ufficiale*), informative, or an internal draft.
@@ -60,6 +64,20 @@ A file belongs to one revision: the figures a procedure was approved with stay w
 the **draft**; a published revision's files are not changed. On the phone, the document's **Files** section
 lists the published revision's files and the draft's, and **Attach to the draft** adds a photo, a video, a
 recorded note or a location.
+
+## Export, PDF and print
+
+**Export ▾** on a document, an asset or a ticket gives:
+
+- **Markdown (.md)**: the whole page as a Markdown file — the fields with their names, the body, the steps,
+  where it applies and the list of files (each with its link).
+- **PDF**: opens the page alone in a new tab and the print dialog with it; choose **Save as PDF** as the
+  destination. The file is named after the document's code (or the asset's key, or the ticket).
+- **Print**: the same page, to paper.
+
+A document is exported at the revision on screen; pick another revision first to export that one. An asset's
+export lists its relations, tickets and documents; a ticket's, its equipment and comments. What you may not
+see — a restricted field, a record of another workspace — is not in the export either.
 
 ## Shared documents
 

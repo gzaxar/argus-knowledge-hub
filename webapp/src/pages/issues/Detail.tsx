@@ -21,6 +21,7 @@ import { TransferItemAction } from "../../components/TransferItemAction";
 import { effectiveAttributes } from "../../lib/schemaAttributes";
 import { TicketContextPanel } from "../../components/hub/ContextPanels";
 import { TicketWorkflowCard, WatchersCard } from "../../components/hub/WorkflowPanels";
+import { ExportMenu } from "../../components/ExportMenu";
 import { workflowApi } from "../../api/client";
 import { SemanticRelated } from "../../components/SemanticRelated";
 
@@ -372,6 +373,8 @@ export function IssueDetail() {
           >
             Edit
           </Link>
+          <ExportMenu kind="ticket" uid={i.uid}
+                      className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50" />
           <TransferItemAction
             kind="issue"
             uid={i.uid}

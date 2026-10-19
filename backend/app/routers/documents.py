@@ -11,7 +11,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.auth import Identity, OidcIdentity, PatIdentity, get_identity, require_permission
 from app.db import get_db
-from app.services import knowledge_schedule, notify
+from app.services import knowledge_schedule, markdown_export, notify
 from app.services.permissions import has_permission
 from app.models.attachment import Attachment
 from app.models.document import Document, DocumentRelation, DocumentRevision
@@ -275,6 +275,27 @@ def get_document(
     revision = db.get(DocumentRevision, doc.current_revision_uid) if doc.current_revision_uid else None
     response.headers["ETag"] = versions.etag(versions.document_version(doc, revision))
     return doc
+
+
+@router.get("/{uid}/markdown", **markdown_export.OPENAPI)
+def export_document_markdown(
+    uid: str,
+    revision_uid: Optional[str] = None,
+    workspace_id: str = Depends(require_permission("read", resource="documents")),
+    identity: Identity = Depends(get_identity),
+    db: Session = Depends(get_db),
+):
+    """The document as Markdown: the revision asked for, or the one its page
+    opens on (the current one, else the latest)."""
+    doc = _get_visible_document(uid, workspace_id, identity, db)
+    if revision_uid:
+        revision = _get_revision(doc.uid, revision_uid, db)
+    else:
+        revision = (db.get(DocumentRevision, doc.current_revision_uid) if doc.current_revision_uid else None) \
+            or db.scalar(select(DocumentRevision).where(DocumentRevision.document_uid == doc.uid)
+                         .order_by(DocumentRevision.revision_number.desc()).limit(1))
+    access = markdown_export.access_for(db, identity, workspace_id)
+    return markdown_export.response(markdown_export.document(db, workspace_id, doc, revision, access), doc.code)
 
 
 @router.put("/{uid}", response_model=DocumentOut)

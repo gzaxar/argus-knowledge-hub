@@ -376,6 +376,37 @@ export const labelsApi = {
   },
 };
 
+export type ExportKind = "document" | "asset" | "ticket";
+
+const EXPORT_PATHS: Record<ExportKind, string> = { document: "documents", asset: "assets", ticket: "issues" };
+
+/** A document, asset or ticket as Markdown — the download, and the text the
+ * print view (and so the PDF) is made from. */
+export const exportApi = {
+  markdown: async (kind: ExportKind, uid: string, revisionUid?: string | null) => {
+    const session = await loadSession();
+    if (!session) throw new Error("Not signed in");
+    const query = revisionUid ? `?revision_uid=${encodeURIComponent(revisionUid)}` : "";
+    const resp = await fetch(`${session.baseUrl}/v1/${EXPORT_PATHS[kind]}/${encodeURIComponent(uid)}/markdown${query}`, {
+      headers: authHeaders(session),
+    });
+    if (!resp.ok) throw new ApiError(resp.status, await resp.text());
+    const name = /filename="([^"]+)"/.exec(resp.headers.get("Content-Disposition") ?? "")?.[1] ?? `${uid}.md`;
+    return { text: await resp.text(), filename: name, baseUrl: session.baseUrl };
+  },
+
+  /** Save the Markdown file. Its links to attachments are made absolute, so
+   * outside ARGUS they still say where each file is. */
+  downloadMarkdown: async (kind: ExportKind, uid: string, revisionUid?: string | null) => {
+    const { text, filename, baseUrl } = await exportApi.markdown(kind, uid, revisionUid);
+    const absolute = text.replace(/\]\(\/v1\/attachments\//g, `](${baseUrl}/v1/attachments/`);
+    const url = URL.createObjectURL(new Blob([absolute], { type: "text/markdown;charset=utf-8" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: filename });
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+};
+
 export const attachmentsApi = {
   list: (assetUid: string) =>
     request<Attachment[]>(`/v1/attachments?asset_uid=${assetUid}`),

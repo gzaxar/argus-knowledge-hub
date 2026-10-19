@@ -62,6 +62,11 @@ const ACTIONS: Action[][] = [
  * assists with the syntax rather than hiding it behind a WYSIWYG whose
  * round-trip would quietly rewrite every imported page.
  */
+/** Markdown or plain text: something whose words can be the body itself. */
+function isTextDocument(file: File): boolean {
+  return /\.(md|markdown|txt)$/i.test(file.name) || file.type === "text/markdown";
+}
+
 export function MarkdownEditor({
   value,
   onChange,
@@ -82,6 +87,9 @@ export function MarkdownEditor({
   const [busy, setBusy] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  // A Markdown or text file, held until the writer says whether they want
+  // its text in the body or the file attached.
+  const [textFile, setTextFile] = useState<File | null>(null);
 
   const replaceSelection = (build: (selected: string) => { text: string; cursor?: number }) => {
     const el = area.current;
@@ -124,8 +132,34 @@ export function MarkdownEditor({
     });
   };
 
+  /** A file arriving by Attach, drop or paste. */
+  const receive = (file: File) => {
+    if (isTextDocument(file)) {
+      setFailure(null);
+      setTextFile(file);
+      return;
+    }
+    insertUpload(file);
+  };
+
+  const insertText = async (file: File) => {
+    setTextFile(null);
+    const text = (await file.text()).replace(/\r\n/g, "\n").trim();
+    if (!value.trim()) {
+      onChange(`${text}\n`);
+      return;
+    }
+    if (!area.current) {
+      // Preview only: no caret to insert at, so it goes at the end.
+      onChange(`${value.trimEnd()}\n\n${text}\n`);
+      return;
+    }
+    replaceSelection(() => ({ text: `\n${text}\n` }));
+  };
+
   const insertUpload = async (file: File) => {
     if (!onUpload) return;
+    setTextFile(null);
     setFailure(null);
     setBusy(file.name);
     try {
@@ -178,7 +212,7 @@ export function MarkdownEditor({
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 e.target.value = "";
-                if (file) insertUpload(file);
+                if (file) receive(file);
               }}
             />
           </label>
@@ -219,7 +253,7 @@ export function MarkdownEditor({
               e.preventDefault();
               setDragOver(false);
               const file = e.dataTransfer.files?.[0];
-              if (file) insertUpload(file);
+              if (file) receive(file);
             }}
             onPaste={(e) => {
               // A screenshot in the clipboard is the fastest way anyone
@@ -228,7 +262,7 @@ export function MarkdownEditor({
               const file = Array.from(e.clipboardData.files)[0];
               if (file) {
                 e.preventDefault();
-                insertUpload(file);
+                receive(file);
               }
             }}
             className={`w-full resize-y px-3 py-2 font-mono text-sm outline-none ${
@@ -242,6 +276,31 @@ export function MarkdownEditor({
           </div>
         )}
       </div>
+
+      {textFile && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
+          <span>
+            <b>{textFile.name}</b> is a text document.
+          </span>
+          <button
+            type="button"
+            onClick={() => insertText(textFile)}
+            className="rounded bg-slate-900 px-2 py-1 font-medium text-white hover:bg-slate-800"
+          >
+            {value.trim() ? "Insert its text here" : "Use its text as the body"}
+          </button>
+          <button
+            type="button"
+            onClick={() => insertUpload(textFile)}
+            className="rounded border border-slate-300 bg-white px-2 py-1 hover:bg-slate-50"
+          >
+            Attach it as a file
+          </button>
+          <button type="button" onClick={() => setTextFile(null)} className="text-slate-500 hover:underline">
+            Cancel
+          </button>
+        </div>
+      )}
 
       {failure && (
         <p className="border-t border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">

@@ -62,6 +62,7 @@ jobs:
             -v "$PWD/backend/tests:/app/tests:ro" \
             -v "$PWD/backend/openapi:/app/openapi:ro" \
             -v "$PWD/tools:/app/tools:ro" \
+            -v "$PWD/docs:/docs:ro" \
             -v "$PWD/backend/requirements-dev.txt:/app/requirements-dev.txt:ro" \
             argus-backend:ci sh -c "pip install -q -r requirements-dev.txt && \
               export IMPORT_SECRETS_KEY=\$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())') && \
