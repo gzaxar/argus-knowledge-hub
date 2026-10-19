@@ -42,7 +42,7 @@ PORT_MAKERS = {"drvAsynIPPortConfigure": "ip", "drvAsynSerialPortConfigure": "se
 AFTER_INIT = re.compile(r"^(dbpf|seq|motorUtilInit|create_monitor_set)\b")
 MACRO = re.compile(r"\$[({]([A-Za-z_]\w*)(?:=([^)}]*))?[)}]")
 SKIP_LIBS = {"$(EPICS_BASE_IOC_LIBS)", "$(EPICS_BASE_HOST_LIBS)", "Com", "dbCore", "dbRecStd", "ca"}
-SKIP_DBDS = {"base.dbd"}
+SKIP_DBDS = {"base.dbd", "rsrv.dbd"}       # EPICS base: the generic IOC has them
 # configure/RELEASE names → what an IOC links for them, when the Makefile does not say.
 RELEASE_DEPS = {"ASYN": (["asyn"], ["asyn.dbd", "drvAsynIPPort.dbd", "drvAsynSerialPort.dbd"]),
                 "STREAM": (["stream"], ["stream.dbd"]), "STREAMDEVICE": (["stream"], ["stream.dbd"]),
@@ -133,11 +133,11 @@ def _makefile_lists(root: Path) -> dict:
             if m:
                 found["dbd"] += m.group(1).split()
                 continue
-            m = re.match(r"^(\w+)_DBD\s*\+?=\s*(.+)$", line)
+            m = re.match(r"^([\w-]+)_DBD\s*\+?=\s*(.+)$", line)
             if m:
                 found["named_dbd"].setdefault(m.group(1), []).extend(m.group(2).split())
                 continue
-            m = re.match(r"^(\w+)_LIBS\s*\+?=\s*(.+)$", line)
+            m = re.match(r"^([\w-]+)_LIBS\s*\+?=\s*(.+)$", line)
             if m:
                 found["libs"] += m.group(2).split()
     return found
@@ -160,13 +160,24 @@ def libs_and_dbds(root: Path) -> tuple[list, list, list]:
     mk = _makefile_lists(root)
     notes = []
     libs = [x for x in OrderedDict.fromkeys(mk["libs"]) if x not in SKIP_LIBS and not x.startswith("$(")]
-    own_libs = [x for x in mk["library"] if x not in libs]
     if mk["library"]:
         # A support library: what it builds, plus what it needs; its DBD += is its own support dbd.
         # (its <lib>_DBD += lines are the sources of that dbd, which already includes them)
-        dbds = [d for d in mk["dbd"] if d not in SKIP_DBDS]
-        libs = own_libs + [x for x in libs if x not in mk["library"]]
-        dep_dbds = []
+        # An example IOC built beside it (ppt-modulator's layout) links the library and names the
+        # dbds of what it needs; its own <ioc>.dbd includes base and is not one an IOC loads.
+        dbds = [d for d in mk["dbd"] if d not in SKIP_DBDS and d[: -len(".dbd")] not in mk["prod"]]
+        libs = list(OrderedDict.fromkeys(mk["library"])) + \
+            [x for x in libs if x not in mk["library"] and x not in mk["prod"]]
+        dep_dbds = [d for p in mk["prod"] for d in mk["named_dbd"].get(p, [])
+                    if d not in SKIP_DBDS and d not in dbds]
+        # A dbd of the repository's own that only goes into the IOC's dbd is never installed: then
+        # the IOC's dbd is the one to load (ppt-modulator's install.yml lists ppt.dbd for that reason).
+        local = {f.name for f in _files(root, "*.dbd")}
+        hidden = [d for d in dep_dbds if d in local]
+        if hidden:
+            dep_dbds = [f"{p}.dbd" for p in mk["prod"]] + [d for d in dep_dbds if d not in hidden]
+            notes.append(f"{', '.join(hidden)} only go into the example IOC's dbd, which is listed instead: "
+                         "install them (DBD += in the src Makefile) to list them alone")
     else:
         dbds = []
         dep_dbds = [d for p in mk["prod"] for d in mk["named_dbd"].get(p, []) if d not in SKIP_DBDS]

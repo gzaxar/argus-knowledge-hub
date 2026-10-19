@@ -806,6 +806,7 @@ TOOLS: list[dict[str, Any]] = [
 # infn-epics-ioc's support modules and templates. Answers the same in every workspace: it is about the image.
 from app.ioc_engineer import tools as ioc  # noqa: E402
 from app.ioc_engineer.ibekize import ioc_ibekize_repo as ibekize_tool  # noqa: E402
+from app.ioc_engineer.scaffold import ioc_scaffold_module as scaffold_module_tool  # noqa: E402
 
 TOOLS += [
     {
@@ -971,6 +972,39 @@ TOOLS += [
                 "devtype": {"type": "string"},
             },
             "required": ["url"],
+        },
+    },
+    {
+        "name": "ioc_scaffold_module",
+        "description": "Write a new EPICS support module for hardware that has none, from a description of the "
+                       "device, in the house style of ppt-modulator: the makeBaseApp tree (configure/, Makefiles), "
+                       "an asyn port driver in C++ (driver: asyn; it polls the readbacks and sends the setpoints) "
+                       "or a StreamDevice protocol (driver: stream), one SNL state program per sequence (set, wait, "
+                       "retry, timeout, abort), db templates with <name>_RB and <name>_SP records, the example "
+                       "st.cmd and st-sim.cmd, a Python TCP simulator answering the same commands, and the ibek "
+                       "files (install.yml, ibek.support.yaml, the template and a fixture, rendered against each "
+                       "other). Returns text; it writes nothing and compiles nothing. Ask for the device's commands "
+                       "and replies first; a description that cannot become a module comes back with every "
+                       "problem and an example.",
+        "handler": scaffold_module_tool,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "spec": {
+                    "type": "object",
+                    "description": "The device. name (repository, lower case), app (the <app>App prefix), "
+                                   "description, group, devtype, driver (stream|asyn), transport (ip|serial), ip, "
+                                   "port, tty, baud, terminator (CRLF|LF|CR|none), poll and timeout (s), prefix "
+                                   "and device (the example's P and R), organization, version; parameters: "
+                                   "[{name, type (float|int|bool|enum|string), read (a query), reply (default "
+                                   "%f/%d/%s), write (one conversion, e.g. 'CURR %f'), ack, unit, prec, states, "
+                                   "limits [lo, hi], sim (the simulator's start value)}]; sequences: [{name, "
+                                   "description, retry_delay, steps: [{set, value, wait, equals|above|below, "
+                                   "timeout, delay}]}]. A value or a condition may name one of a bool's or an "
+                                   "enum's states.",
+                },
+            },
+            "required": ["spec"],
         },
     },
     {

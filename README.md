@@ -304,7 +304,10 @@ currently valid* revision rather than to an arbitrary PDF.
   way epik8s-chart merges them), and draft the files a new driver needs. Answered from a catalogue of
   `infn-epics-ioc` and its submodules (`python -m app.ioc_engineer build`). An existing IOC repository can
   be ibekized: its Makefiles, `st.cmd` and db templates read into `install.yml`, `ibek.support.yaml`, a
-  template and a fixture (`ioc_ibekize_repo`). The `ioc_*` MCP tools,
+  template and a fixture (`ioc_ibekize_repo`). Hardware with no EPICS support gets a whole new module from
+  a description of the device (`ioc_scaffold_module`): an asyn port driver or a StreamDevice protocol, SNL
+  state programs, db templates, `st.cmd`, a simulator and the ibek files, in ppt-modulator's layout. The
+  `ioc_*` MCP tools,
   read-only. Ask ARGUS can also open the drafts as a draft pull request once a person with `approve`
   confirms it; reviewers merge it, never ARGUS. [docs/ioc-engineer.md](docs/ioc-engineer.md).
 
