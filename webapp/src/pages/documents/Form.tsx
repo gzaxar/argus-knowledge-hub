@@ -44,6 +44,8 @@ export function DocumentForm() {
       else if (field === "document_type_uid") setDocumentTypeUid(String(value ?? ""));
       else if (field === "code") setCode(String(value ?? ""));
       else if (field === "summary") setBodyMarkdown((b) => (b.trim() ? b : `${String(value)}\n`));
+      // The text of a Markdown file given to the assistant, chosen as the body itself.
+      else if (field === "body_markdown") setBodyMarkdown(String(value ?? ""));
       else if (field.startsWith("attributes.")) {
         const k = field.slice(11);
         setAttributes((prev) => ({ ...prev, [k]: value }));

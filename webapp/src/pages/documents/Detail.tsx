@@ -26,6 +26,7 @@ import { DocumentContextPanel } from "../../components/hub/ContextPanels";
 import { DocumentControlCard, SupersededBanner, VerifyAttachment } from "../../components/hub/DocumentControl";
 import { errorText } from "../../components/hub/LedgerPanels";
 import { SemanticRelated } from "../../components/SemanticRelated";
+import { ExportMenu } from "../../components/ExportMenu";
 import { FollowButton } from "../../components/FollowButton";
 import { useShowKeys } from "../../api/displayPrefs";
 
@@ -362,6 +363,7 @@ export function DocumentDetail() {
         </div>
         <div className="flex gap-2">
           <FollowButton subject="document" uid={doc.uid} />
+          <ExportMenu kind="document" uid={doc.uid} revisionUid={viewed?.uid} />
           {doc.current_revision_uid && (
             <button
               onClick={() => {

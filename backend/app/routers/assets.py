@@ -26,7 +26,7 @@ from app.schemas.asset import (
     RelationCreate,
     RelationOut,
 )
-from app.services import asset_keys, versions
+from app.services import asset_keys, markdown_export, versions
 from app.services.attribute_validation import validate_attributes
 from app.services.current_user_attrs import stamp_current_user_attributes
 from app.services.relations import rebuild_asset_relations, rebuild_asset_relations_with_neighbors
@@ -310,6 +310,17 @@ def get_asset(
     out.version = versions.asset_version(db, uid)
     response.headers["ETag"] = versions.etag(out.version)
     return out
+
+
+@router.get("/{uid}/markdown", **markdown_export.OPENAPI)
+def export_asset_markdown(
+    uid: str, workspace_id: str = Depends(require_permission("read")),
+    identity=Depends(get_identity), grants=Depends(get_grants), db: Session = Depends(get_db),
+):
+    """The record as Markdown: its fields, relations, tickets, documents and files."""
+    asset = _get_visible_asset(uid, workspace_id, db, grants)
+    access = markdown_export.access_for(db, identity, workspace_id)
+    return markdown_export.response(markdown_export.asset(db, workspace_id, asset, access), asset.key)
 
 
 @router.put("/{uid}", response_model=AssetOut)

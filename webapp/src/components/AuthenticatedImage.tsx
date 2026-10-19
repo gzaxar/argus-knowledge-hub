@@ -17,6 +17,7 @@ export function AuthenticatedImage({
   fetchBlobUrl?: (uid: string) => Promise<string>;
 }) {
   const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -30,7 +31,10 @@ export function AuthenticatedImage({
         objectUrl = url;
         setSrc(url);
       })
-      .catch(() => setSrc(null));
+      .catch(() => {
+        setSrc(null);
+        setFailed(true);
+      });
     return () => {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -42,6 +46,8 @@ export function AuthenticatedImage({
       <div
         className={`flex items-center justify-center bg-slate-100 text-slate-400 ${className ?? ""}`}
         style={style}
+        // The print view waits for these before opening the print dialog.
+        data-loading={failed ? undefined : ""}
       >
         …
       </div>

@@ -116,6 +116,9 @@ export function GuidedEntry({
   const [used, setUsed] = useState<Set<string>>(new Set());
   const photo = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  // A Markdown or text file given for a document: its words can be the body
+  // itself, rather than the summary the assistant writes of them.
+  const [fileText, setFileText] = useState<{ name: string; text: string; used: boolean } | null>(null);
 
   const debounced = useDebounced(draft, 400);
   const guide = useQuery({
@@ -209,6 +212,10 @@ export function GuidedEntry({
                   e.target.value = "";
                   if (!file) return;
                   setPreview(file.type.startsWith("image/") ? URL.createObjectURL(file) : null);
+                  setFileText(null);
+                  if (kind === "document" && /\.(md|markdown|txt)$/i.test(file.name)) {
+                    file.text().then((t) => setFileText({ name: file.name, text: t.replace(/\r\n/g, "\n").trim(), used: false }));
+                  }
                   assist.mutate(file);
                 }}
               />
@@ -226,6 +233,25 @@ export function GuidedEntry({
           <p className="mt-1 text-xs text-slate-500">
             Fill in the form; the checklist below tells you what is missing and what already exists.
           </p>
+        )}
+        {fileText && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-indigo-200 bg-indigo-50 px-2 py-1.5 text-xs text-indigo-900">
+            <span className="min-w-0 flex-1">
+              Put the whole of <b>{fileText.name}</b> in the body, instead of a summary of it?
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                if (draft.body_markdown && String(draft.body_markdown).trim()
+                    && !confirm("Replace what the body says now with the file's text?")) return;
+                onApply({ body_markdown: fileText.text });
+                setFileText({ ...fileText, used: true });
+              }}
+              className="shrink-0 rounded bg-slate-900 px-2 py-1 font-medium text-white hover:bg-slate-800"
+            >
+              {fileText.used ? "In the body" : "Use the file as the body"}
+            </button>
+          </div>
         )}
         {assist.isError && (
           <p className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-700">

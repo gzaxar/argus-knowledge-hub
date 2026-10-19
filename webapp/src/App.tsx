@@ -69,6 +69,7 @@ import { TransferStatus } from "./pages/workspace/TransferStatus";
 import { AccountPage } from "./pages/account/Account";
 import { RobotTokensPage } from "./pages/workspace/RobotTokens";
 import { AdminTokensPage } from "./pages/admin/Tokens";
+import { PrintPage } from "./pages/Print";
 
 /** Sends /imports/... to the workspace-scoped equivalent, keeping whatever
  * came after it. */
@@ -89,6 +90,8 @@ export function App() {
   return (
     <TokenGate>
       <Routes>
+        {/* Export ▸ PDF / Print: the record alone on the page, no app around it. */}
+        <Route path="/print/:kind/:uid" element={<PrintPage />} />
         <Route element={<AppShell />}>
           <Route path="/" element={<Dashboard />} />
 

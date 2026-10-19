@@ -70,7 +70,8 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-ARGUS-API-Version", "Deprecation", "Sunset", "Link", "ETag"],
+    # Content-Disposition: the file name of an export, read by the web from another origin.
+    expose_headers=["X-ARGUS-API-Version", "Deprecation", "Sunset", "Link", "ETag", "Content-Disposition"],
 )
 
 @app.middleware("http")

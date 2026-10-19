@@ -39,7 +39,7 @@ from app.schemas.issue import (
     IssueUpdate,
 )
 from app.services.asset_ticket_links import ensure_asset_link, sync_subject_link
-from app.services import field_policy, notify, versions, workflows
+from app.services import field_policy, markdown_export, notify, versions, workflows
 from app.services.visibility import can_see, hidden_fields, redacted_attributes, visible_issues_clause
 from app.services.issue_history import (
     TRACKED_FIELDS,
@@ -169,6 +169,18 @@ def get_issue(
     issue = _get_owned_issue(uid, workspace_id, db)
     response.headers["ETag"] = versions.etag(issue.version or 1)
     return issue_out(db, issue)
+
+
+@router.get("/{uid}/markdown", **markdown_export.OPENAPI)
+def export_issue_markdown(
+    uid: str, workspace_id: str = Depends(require_permission("read", resource="tickets")),
+    identity=Depends(get_identity), db: Session = Depends(get_db),
+):
+    """The ticket as Markdown: its fields, equipment, comments and files."""
+    issue = _get_owned_issue(uid, workspace_id, db)
+    access = markdown_export.access_for(db, identity, workspace_id)
+    stem = (issue.attributes or {}).get("argus_source_key") or issue.title
+    return markdown_export.response(markdown_export.ticket(db, workspace_id, issue, access), stem)
 
 
 def _move(db: Session, issue: Issue, target: str, actor: Optional[str]) -> None:

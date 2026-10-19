@@ -25,6 +25,7 @@ import { AssetContextPanel } from "../../components/hub/ContextPanels";
 import { SemanticRelated } from "../../components/SemanticRelated";
 import { LocationCard } from "../../components/LocationCard";
 import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
+import { ExportMenu } from "../../components/ExportMenu";
 import { FollowButton } from "../../components/FollowButton";
 import { useShowKeys } from "../../api/displayPrefs";
 
@@ -242,6 +243,8 @@ export function AssetDetail() {
           >
             Edit
           </Link>
+          <ExportMenu kind="asset" uid={a.uid}
+                      className="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50" />
           <TransferItemAction kind="asset" uid={a.uid} />
           <button
             onClick={() => {
