@@ -182,3 +182,23 @@ def test_substitutions_in_both_forms():
     assert ibekize.parse_substitutions(text) == [("a.template", {"N": "1", "PORT": "P1"}),
                                                  ("a.template", {"N": "2", "PORT": "P1"}),
                                                  ("b.template", {"N": "7", "PORT": "P2"})]
+
+
+def test_a_library_with_an_example_ioc_beside_it(tmp_path):
+    """ppt-modulator's layout: the IOC links the module's own library, and a dbd of the repository's own that only
+    goes into the IOC's dbd is never installed, so the IOC's dbd is the one listed. Names may have hyphens."""
+    r = tmp_path / "bcm"
+    _write(r, "bcmApp/src/Makefile", """
+        LIBRARY_IOC += bcmSupport
+        bcmSupport_LIBS += asyn calc
+        PROD_IOC = bcm-rf-ioc
+        DBD += bcm-rf-ioc.dbd
+        bcm-rf-ioc_DBD += base.dbd asyn.dbd calcSupport.dbd bcmMon.dbd
+        bcm-rf-ioc_LIBS += bcmSupport asyn calc
+    """)
+    _write(r, "bcmApp/src/bcmMon.dbd", "registrar(bcmMonRegister)\n")
+    libs, dbds, notes = ibekize.libs_and_dbds(r)
+    assert libs == ["bcmSupport", "asyn", "calc"]
+    assert dbds == ["bcm-rf-ioc.dbd", "asyn.dbd", "calcSupport.dbd"] and "bcmMon.dbd only go" in notes[0]
+    _write(r, "bcmApp/src/Makefile", (r / "bcmApp/src/Makefile").read_text() + "DBD += bcmMon.dbd\n")
+    assert ibekize.libs_and_dbds(r)[1] == ["bcmMon.dbd", "asyn.dbd", "calcSupport.dbd"]   # installed: alone

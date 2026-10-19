@@ -268,7 +268,12 @@ WORKFLOW = [
     "then ioc_render your entry: it must come back with no errors.",
     "2. Existing driver but no template: ioc_get_module (entity models, required parameters), write the template, "
     "check it with ioc_render(values, template_source=…).",
-    "3. New driver: ioc_scaffold_driver, adapt the entity models to the driver's db templates and st.cmd "
+    "3. Hardware with no EPICS support yet: ioc_scaffold_module from a description of the device (its commands "
+    "and replies, the sequences an operator steps through) writes the whole module: makeBaseApp tree, an asyn "
+    "port driver or a StreamDevice protocol, SNL state programs, db templates, st.cmd, a simulator, and its ibek "
+    "files. Build it in the devcontainer and run it against the simulator before the pull requests.",
+    "3b. A driver repository that exists but has no ibek files: ioc_ibekize_repo; a bare ibek skeleton for one: "
+    "ioc_scaffold_driver, adapt the entity models to the driver's db templates and st.cmd "
     "(ioc_get_module shows the source's macros when the catalogue was built with --sources), then add "
     "ansible.sh <folder> to the Dockerfile, bump the submodules and tag a release.",
     "4. Deploy: add the entry under epicsConfiguration.iocs in the beamline values.yaml (iocDefaults may hold the "

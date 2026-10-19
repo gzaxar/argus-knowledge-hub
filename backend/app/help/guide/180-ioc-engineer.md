@@ -1,7 +1,7 @@
 ---
 title: IOC engineer
 summary: Getting help with EPICS IOCs built with ibek: find a driver, write a beamline IOC entry, check it before deploying, start a new driver.
-keywords: [ioc, epics, ibek, ibekize, existing repository, st.cmd, beamline check, iocdefaults, pull request, pr, github, ibek-templates, ibek-support, driver, support module, template, devtype, values.yaml, epik8s, beamline, st.cmd, container, image, infn-epics-ioc, render, validate, scaffold]
+keywords: [ioc, epics, ibek, ibekize, existing repository, st.cmd, beamline check, iocdefaults, pull request, pr, github, ibek-templates, ibek-support, driver, support module, template, devtype, values.yaml, epik8s, beamline, st.cmd, container, image, infn-epics-ioc, render, validate, scaffold, new module, asyn driver, asynportdriver, snl, sequencer, state program, simulator, streamdevice, protocol]
 order: 180
 ---
 
@@ -52,6 +52,35 @@ https://github.com/infn-epics/my-driver". The assistant reads the repository and
 The drafts are rendered against each other. The answer lists which values came from where, which parameters
 have no example, and which `st.cmd` lines were copied as written. Review those, then ask for the two pull
 requests.
+
+## Write a module for hardware with no EPICS support
+
+For a device nobody has written EPICS support for, describe it: "write a module for the ACME power supply: TCP
+port 4001, `MEAS:CURR?` returns the current, `CURR <value>` sets it, `OUTP 0|1` switches the output; an auto-on
+sequence switches the output on, then ramps to 10 A". The assistant asks for whatever is missing, such as
+replies, terminators and limits. It never invents a command. Then it writes the whole module, in the same
+layout as ppt-modulator:
+
+- `configure/` and the Makefiles;
+- the driver, of one of two kinds:
+  - an asyn port driver in C++, which polls the readbacks and sends setpoints when they are written;
+  - a StreamDevice protocol, one per command;
+- one SNL state program per sequence, with step, wait, retry, timeout and abort;
+- the db templates, with a `<name>_RB` record for each value the device reports and a `<name>_SP` record for
+  each value you set;
+- `st.cmd`, and `st-sim.cmd` for running against a simulator of the device that answers the same commands;
+- the ibek files: `install.yml`, the support definition, the template and a fixture.
+
+The ibek files are rendered against each other, as every draft is. The C++ and SNL are not compiled by ARGUS.
+
+Before connecting to hardware:
+
+1. Create the repository; ARGUS cannot.
+2. Run `make` in the devcontainer.
+3. Start the simulator, then the IOC with `st-sim.cmd`, and try every record and sequence.
+4. Check every command against the device's manual.
+
+Then ask for the two pull requests: the ibek files and the template.
 
 ## Support new hardware
 

@@ -31,6 +31,7 @@ submodules and tagging an image stay with people.
 | `ioc_render` | The entry rendered as the pod renders it, then checked as `ibek runtime generate` will check it |
 | `ioc_validate` | The same check on an ibek IOC YAML written by hand |
 | `ioc_ibekize_repo` | An existing IOC repository (makeBaseApp tree with an example `st.cmd`) read into its `install.yml`, `ibek.support.yaml`, template and fixture, rendered against each other, with a report of where each value came from |
+| `ioc_scaffold_module` | A new support module for hardware with no EPICS support, from a description of the device, in ppt-modulator's layout: makeBaseApp tree, an asyn port driver (C++) or a StreamDevice protocol, SNL state programs, db templates, `st.cmd` and `st-sim.cmd`, a TCP simulator, and the ibek files rendered against each other |
 | `ioc_scaffold_driver` | The `install.yml`, `ibek.support.yaml`, template and fixture for a new driver, with the Dockerfile line, rendered against each other |
 | `ioc_list_beamline` | The beamlines in the catalogue, or one beamline's IOCs: template, devtype, prefix, how the pod starts them |
 | `ioc_get_beamline_ioc` | One IOC as deployed: its entry, the iocDefaults it inherits, the values the pod receives, its render |
@@ -125,7 +126,7 @@ It clones the repository shallow, without submodules or hooks, and reads it; not
 
 | From | It writes |
 |---|---|
-| `*App/src/Makefile` (`*_LIBS`, `*_DBD`, `PROD_IOC` / `LIBRARY_IOC`, make variables expanded), else `configure/RELEASE` | `install.yml`: `module`, `organization`, `version`, `libs` and `dbds`, without base or the IOC itself. A support library lists its own library and dbd. |
+| `*App/src/Makefile` (`*_LIBS`, `*_DBD`, `PROD_IOC` / `LIBRARY_IOC`, make variables expanded), else `configure/RELEASE` | `install.yml`: `module`, `organization`, `version`, `libs` and `dbds`, without base or the IOC itself. A support library lists its own library and dbd. An example IOC built beside it (ppt-modulator's layout) adds what it links and the dbds it names; its own `<ioc>.dbd` is listed only when a dbd of the repository's own goes into it and is never installed. |
 | `*.proto` files and `Db/Makefile` | `protocol_files`: `db/<file>` when the Db Makefile installs the file, else its path in the repository |
 | the example `st.cmd`: port set-up (`drvAsynIPPortConfigure`, `drvAsynSerialPortConfigure`, `drvModbusAsynConfigure`, `modbusInterposeConfig`, `asynSetOption`, driver `*Config*` commands) | a `controller` entity. Its port is `name`, and the address becomes `IP`/`TCPPORT` (or `TTY`), with the example's values as defaults. Derived ports become `{{name}}_<port>`. Its `pre_init` lines are the set-up. |
 | `dbLoadRecords` and `dbLoadTemplate` (pattern and key=value substitution files), with `epicsEnvSet` values expanded | one entity per db template, with one typed parameter per macro. The default is the template's `$(M=default)`, or else the value `st.cmd` gives when every load agrees. A macro naming one of the controller's ports becomes the `controller` object. |
@@ -151,6 +152,85 @@ indexes, all 42 drafts pass their self-check.
 What it cannot know: whether a macro that looks numeric is an integer or a float (it follows the example), and
 which `st.cmd` values are site-specific rather than defaults. The drafts then go to two pull requests
 (*Opening a pull request*).
+
+## Writing a new module
+
+`ioc_scaffold_module` takes a description of the device (`spec`). Everything in it is checked before a file is
+written. A description that fails comes back with every problem at once, and an example.
+
+```yaml
+name: acme-ps                 # the repository
+app: acme                     # acmeApp, the acmeSupport library, the acme IOC
+description: ACME 3 kW power supply
+group: ps
+driver: asyn                  # asyn: a C++ asynPortDriver; stream: a StreamDevice protocol
+transport: ip                 # ip (ip, port) or serial (tty, baud)
+ip: 192.168.1.50
+port: 4001
+terminator: CRLF              # CRLF, LF, CR or none
+poll: 1.0                     # seconds between readback polls (stream: the nearest SCAN)
+timeout: 1.0
+parameters:
+  - {name: Current, type: float, unit: A, prec: 3, read: "MEAS:CURR?", write: "CURR %f", limits: [0, 100]}
+  - {name: Voltage, type: float, unit: V, read: "MEAS:VOLT?"}
+  - {name: Output, type: bool, states: [Off, On], read: "OUTP?", write: "OUTP %d"}
+  - {name: Mode, type: enum, states: [Local, Remote], read: "SYST:MODE?"}
+  - {name: Ident, type: string, read: "*IDN?", sim: "ACME,PS3000,SIM,1.0"}
+sequences:
+  - name: AutoOn
+    retry_delay: 5.0
+    steps:
+      - {set: Output, value: On, wait: Output, equals: On, timeout: 10}
+      - {set: Current, value: 10, wait: Current, above: 9.5, timeout: 60}
+```
+
+A parameter's `type` is one of `float`, `int`, `bool`, `enum` or `string`. It may also have:
+
+- `read`: a query with no conversion;
+- `reply`: the reply format, by default `%f`, `%d` or `%s` for the type;
+- `write`: a command with exactly one conversion;
+- `ack`: the device's answer to a write;
+- `unit`, `prec` and `limits` (`DRVL`/`DRVH`);
+- `states`: two names for a `bool`, 2 to 16 for an `enum`;
+- `sim`: the simulator's starting value.
+
+Commands are printable ASCII. The terminator is added to them.
+
+A step sets a parameter that has a write command, waits for one that has a read command, or both. It waits
+with `equals`, `above` or `below`. A value may name one of the parameter's states.
+
+What it writes, under `<name>/`:
+
+| Directory | It writes |
+|---|---|
+| `Makefile`, `configure/` | the makeBaseApp top. `RELEASE` names asyn, StreamDevice and the sequencer at the image's paths; put local paths in `RELEASE.local`. |
+| `<app>App/src/` | `<app>Support` (the driver and the state programs, with their registrars in `<app>Support.dbd`) and the `<app>` IOC that links it |
+| `<app>App/src/<app>Driver.{h,cpp}` (asyn) | an `asynPortDriver`. It talks to an octet port (`<app>Configure(port, octetPort, pollPeriod, timeout)`). A thread queries each readback and sets the parameter, or raises a COMM alarm. A write sends the command and, if `ack` is given, compares the answer. |
+| `<app>App/Db/<app>.proto` (stream) | `get_<name>` and `set_<name>`. A whole-line string reply is read with `%#s`. |
+| `<app>App/Db/<app>.template` | `$(P):$(R):<name>_RB` (`I/O Intr`, or `$(SCAN)` with stream) and `$(P):$(R):<name>_SP` (autosaved). With asyn, also `$(P):$(R):Connected`. |
+| `<app>App/src/<app><Seq>.st`, `<app>App/Db/<app><Seq>.template` | the state program (`option +r`) and its records: `:Start`, `:Abort`, `:State` (Idle, Running, Done, Failed, Aborted), `:Step`, `:Message`. Each step's command is sent again every `RETRY_DELAY` seconds until its condition holds. When the step's timeout passes, the program stops in Failed, with the value it last read. |
+| `iocBoot/ioc<app>/` | `st.cmd` for the device and `st-sim.cmd` for the simulator |
+| `sim/<app>_sim.py` | a TCP simulator. A query answers the stored value, a command changes it. |
+
+Beside it, the ibek files:
+
+- `install.yml`: libs `asyn`, `stream`, `seq` and `pv` as needed, then `<app>Support`; the dbds; the protocol file;
+- the support definition: one `controller` entity. It has `IP`/`TCPPORT` (or `TTY`/`BAUD`), plus `POLL` and
+  `TIMEOUT` with asyn, or `SCAN` with stream, and `RETRY_DELAY` when there are sequences. It loads every
+  template, and its `post_init` starts the state programs;
+- the template and a fixture.
+
+The template and the fixture are rendered and validated against each other.
+
+What ARGUS does not do is compile. The hub has no EPICS toolchain, and the answer says so. The generator was
+checked against EPICS 7.0.8, asyn R4-45, sequencer 2.2.9 and StreamDevice 2.8.24:
+
+- both drivers, with TCP and serial transport, compile without a warning;
+- each IOC runs against its simulator. Readbacks and setpoints work, including an enum with an
+  acknowledgement and whole-line strings. A sequence finishes, times out into Failed, and can be aborted;
+- the `st.cmd` that `ibek runtime generate` (3.1.2) writes from the drafts runs two controllers.
+
+`ioc_ibekize_repo` reads a generated module back into the same libs and dbds.
 
 ## Opening a pull request
 
