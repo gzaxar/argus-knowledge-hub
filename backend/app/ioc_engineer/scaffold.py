@@ -1252,6 +1252,7 @@ The module is described for ibek in `ibek-support-infn/{m['folder']}` (`{m['fold
 
 def _ibek(m: dict) -> tuple[str, str, str, str]:
     from app.ioc_engineer.ibekize import _dump
+    from app.ioc_engineer.tools import devgroup
     a, stream = m["app"], m["driver"] == "stream"
     dbds = ["asyn.dbd", "drvAsynIPPort.dbd", "drvAsynSerialPort.dbd"] + (["stream.dbd"] if stream else [])
     libs = ["asyn"] + (["stream"] if stream else []) + (["seq", "pv"] if m["sequences"] else [])
@@ -1334,7 +1335,7 @@ def _ibek(m: dict) -> tuple[str, str, str, str]:
           "{%- if iocexit %}", "    dbl", "    exit", "{%- else %}", '    dbl("*") > {{ config_dir }}/pvlist.txt',
           "    dbl", "{%- endif %}", ""]
     fixture = OrderedDict([("iocname", f"{m['group']}-{a.lower()}-test"), ("template", a),
-                           ("devtype", m["devtype"]), ("devgroup", m["group"]), ("iocprefix", m["prefix"])])
+                           ("devtype", m["devtype"]), ("devgroup", devgroup(m["group"])), ("iocprefix", m["prefix"])])
     if m["transport"] == "ip":
         fixture["server"], fixture["port"] = m["ip"], m["port"]
     else:

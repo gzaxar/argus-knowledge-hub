@@ -554,6 +554,7 @@ def _beamline_value(macro: str, spec: dict) -> str:
 
 def _template_and_fixture(prefix, folder, group, devtype, controller_params, entities, host, tcp, tty,
                           ports, root_port) -> tuple[str, str]:
+    from app.ioc_engineer.tools import devgroup
     lines = ["ioc_name: {{ iocname }}", f"description: {folder} (drafted by the ARGUS IOC engineer)", "",
              "entities:", f"- type: {prefix}.controller", '  name: "{{ iocname }}_ctrl"']
     if "IP" in controller_params:
@@ -574,7 +575,7 @@ def _template_and_fixture(prefix, folder, group, devtype, controller_params, ent
     # The fixture: the IOC as its st.cmd starts it, two devices from its example loads where they differ.
     first = entities[0]["examples"][0] if entities and entities[0]["examples"] else {}
     fixture = {"iocname": f"{group}-{folder.lower()}-test", "template": folder, "devtype": devtype,
-               "devgroup": group, "iocprefix": str(first.get("P", f"TEST:{group.upper()}:{folder.upper()}")).rstrip(":")}
+               "devgroup": devgroup(group), "iocprefix": str(first.get("P", f"TEST:{group.upper()}:{folder.upper()}")).rstrip(":")}
     if host:
         fixture["server"] = host
         fixture["port"] = int(tcp) if str(tcp).isdigit() else tcp
