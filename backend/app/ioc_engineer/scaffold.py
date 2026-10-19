@@ -171,12 +171,19 @@ def normalize(spec: Any) -> dict:
         except (TypeError, ValueError):
             p.append(f"{where}.sim: the simulator's starting value, a {kind}")
             sim = 0
+        sim_from = raw.get("sim_from")
         params[pn] = {"name": pn, "type": kind, "read": read, "reply": reply, "write": write, "ack": ack,
+                      "sim_from": str(sim_from) if sim_from is not None else None,
                       "unit": _text(raw.get("unit"), "", 15), "prec": int(raw.get("prec", 3)),
                       "states": states, "limits": limits, "sim": sim,
                       "description": _text(raw.get("description"), pn, 40)}
     if not params:
         p.append("parameters: at least one quantity the device reads or sets")
+    for q in params.values():
+        if q["sim_from"] is not None and (q["sim_from"] not in params or q["sim_from"] == q["name"]
+                                          or params[q["sim_from"]]["type"] != q["type"]):
+            p.append(f"parameter {q['name']}.sim_from: another parameter of the same type, whose simulated "
+                     "value this query reports")
 
     seqs: "OrderedDict[str, dict]" = OrderedDict()
     for i, raw in enumerate(spec.get("sequences") or []):
@@ -280,7 +287,7 @@ def _c(text: str) -> str:
 
 def _scanf(fmt: str, kind: str) -> str:
     """The reply format as sscanf reads it: no precision, a double for floats, a bounded string."""
-    out = {"float": "%lf", "string": "%39s"}.get(kind)
+    out = {"float": "%lf", "string": "%255s"}.get(kind)
     return CONV.sub(lambda m: out or "%" + ("d" if m.group(1) in "di" else m.group(1)), fmt)
 
 
@@ -483,7 +490,7 @@ def _record(m: dict, p: dict, side: str) -> str:
     kind, stream = p["type"], m["driver"] == "stream"
     rtype = {("float", "RB"): "ai", ("float", "SP"): "ao", ("int", "RB"): "longin", ("int", "SP"): "longout",
              ("bool", "RB"): "bi", ("bool", "SP"): "bo", ("enum", "RB"): "mbbi", ("enum", "SP"): "mbbo",
-             ("string", "RB"): "stringin", ("string", "SP"): "stringout"}[(kind, side)]
+             ("string", "RB"): "lsi", ("string", "SP"): "lso"}[(kind, side)]
     io = "INP" if side == "RB" else "OUT"
     if stream:
         dtyp = "stream"
@@ -507,6 +514,9 @@ def _record(m: dict, p: dict, side: str) -> str:
     if kind in ("float", "int") and side == "SP" and p["limits"]:
         lo, hi = p["limits"]
         lines += [f'    field(DRVL, "{_num(lo)}")', f'    field(DRVH, "{_num(hi)}")']
+    if kind == "string":
+        # lsi/lso, not stringin/stringout: an identification string is longer than 40 characters.
+        lines.append('    field(SIZV, "256")')
     if kind == "bool":
         lines += [f'    field(ZNAM, "{p["states"][0]}")', f'    field(ONAM, "{p["states"][1]}")']
     if kind == "enum":
@@ -671,10 +681,10 @@ def _driver_cpp(m: dict) -> str:
         rb = f"P_{_pv(p, 'RB')}"
         if p["type"] == "string" and p["reply"] == "%s":
             # The whole reply, spaces included (an *IDN? answer), and an empty one is a value too.
-            parse = (f"        char v[40];\n        if (epicsSnprintf(v, sizeof(v), \"%s\", in) >= 0) {{\n"
+            parse = (f"        char v[256];\n        if (epicsSnprintf(v, sizeof(v), \"%s\", in) >= 0) {{\n"
                      f"            setStringParam({rb}, v);")
         elif p["type"] == "string":
-            parse = (f"        char v[40];\n        if (sscanf(in, {_c(_scanf(p['reply'], 'string'))}, v) == 1) {{\n"
+            parse = (f"        char v[256];\n        if (sscanf(in, {_c(_scanf(p['reply'], 'string'))}, v) == 1) {{\n"
                      f"            setStringParam({rb}, v);")
         elif p["type"] == "float":
             parse = (f"        double v;\n        if (sscanf(in, {_c(_scanf(p['reply'], 'float'))}, &v) == 1) {{\n"
@@ -1104,7 +1114,7 @@ def _boot(m: dict, sim_cmd: str, real_cmd: str) -> dict:
 def _sim(m: dict) -> str:
     cast = {"float": "float", "int": "int", "bool": "int", "enum": "int", "string": "str"}
     state = ",\n".join(f"    {p['name']!r}: {p['sim']!r}" for p in m["parameters"].values())
-    reads = ",\n".join(f"    {p['read']!r}: ({p['name']!r}, {p['reply']!r})"
+    reads = ",\n".join(f"    {p['read']!r}: ({(p['sim_from'] or p['name'])!r}, {p['reply']!r})"
                        for p in m["parameters"].values() if p["read"])
     writes = ",\n".join(f"    (re.compile({_sim_regex(p['write'])!r}), {p['name']!r}, {cast[p['type']]}, {p['ack']!r})"
                         for p in m["parameters"].values() if p["write"])
@@ -1348,7 +1358,7 @@ def _records(m: dict) -> list:
         for side, cmd in (("RB", p["read"]), ("SP", p["write"])):
             if cmd:
                 rtype = {"float": "ai/ao", "int": "longin/longout", "bool": "bi/bo", "enum": "mbbi/mbbo",
-                         "string": "stringin/stringout"}[p["type"]].split("/")[0 if side == "RB" else 1]
+                         "string": "lsi/lso"}[p["type"]].split("/")[0 if side == "RB" else 1]
                 unit = f" [{p['unit']}]" if p["unit"] else ""
                 out.append({"pv": f"$(P):$(R):{_pv(p, side)}", "record": rtype,
                             "what": f"{p['description']}{unit}: `{cmd}`"})

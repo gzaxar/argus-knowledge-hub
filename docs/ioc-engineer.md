@@ -192,9 +192,12 @@ A parameter's `type` is one of `float`, `int`, `bool`, `enum` or `string`. It ma
 - `ack`: the device's answer to a write;
 - `unit`, `prec` and `limits` (`DRVL`/`DRVH`);
 - `states`: two names for a `bool`, 2 to 16 for an `enum`;
-- `sim`: the simulator's starting value.
+- `sim`: the simulator's starting value;
+- `sim_from`: another parameter of the same type, whose simulated value this query reports. For example, `VOLT?` reports the voltage that `VOLT` set, while `MEAS:VOLT?` reports the measured voltage.
 
 Commands are printable ASCII. The terminator is added to them.
+
+Strings are `lsi`/`lso` records of 256 characters, because an identification string is longer than the 40 characters of `stringin`. Read the whole value with `caget -S '<pv>.VAL$'`.
 
 A step sets a parameter that has a write command, waits for one that has a read command, or both. It waits
 with `equals`, `above` or `below`. A value may name one of the parameter's states.
@@ -231,6 +234,23 @@ checked against EPICS 7.0.8, asyn R4-45, sequencer 2.2.9 and StreamDevice 2.8.24
 - the `st.cmd` that `ibek runtime generate` (3.1.2) writes from the drafts runs two controllers.
 
 `ioc_ibekize_repo` reads a generated module back into the same libs and dbds.
+
+[`docs/examples/keysight-e36100.yaml`](examples/keysight-e36100.yaml) describes a real device: the Keysight
+E36100B series bench supply (E36103B, 20 V / 2 A), with the SCPI commands of its programming guide:
+
+- `MEAS:VOLT?` and `MEAS:CURR?`;
+- `VOLT`, `CURR` and `VOLT:PROT`, with their queries;
+- `OUTP`;
+- `*IDN?` and `SYST:ERR?`.
+
+It is reached over a raw socket on LAN port 5025, with LF terminators. It has two sequences:
+
+- `RampOn`: set the current limit, switch on at 0 V, then ramp to 12 V;
+- `SafeOff`: ramp to 0 V, then switch off.
+
+The module generated from it builds without warnings and runs against its simulator, and both sequences
+reach Done. Before connecting it to a supply, check the reply formats on the instrument, for example
+`MEAS:VOLT?` answering `+1.20000000E+01`. Then try the sequences with the output unloaded.
 
 ## Opening a pull request
 

@@ -1,0 +1,44 @@
+# Keysight E36100B series (E36103B: 20 V / 2 A), SCPI over a raw socket (LAN port 5025), LF-terminated.
+# Commands from the E36100B Programming Guide (SCPI): MEASure, SOURce VOLTage/CURRent, OUTPut, *IDN?, SYSTem:ERRor?.
+name: keysight-e36100
+app: e36100
+description: Keysight E36100B series DC power supply (E36103B 20 V / 2 A)
+group: ps
+devtype: e36100
+driver: asyn
+transport: ip
+ip: 192.168.1.60
+port: 5025
+terminator: LF
+poll: 1.0
+timeout: 2.0
+prefix: "TEST:PS:E36100"
+device: PS01
+parameters:
+  - {name: Voltage, type: float, unit: V, prec: 4, description: "Output voltage",
+     read: "MEAS:VOLT?", write: "VOLT %f", limits: [0, 20]}
+  - {name: VoltageSet, type: float, unit: V, prec: 4, description: "Programmed voltage", read: "VOLT?", sim_from: Voltage}
+  - {name: Current, type: float, unit: A, prec: 4, description: "Output current / current limit",
+     read: "MEAS:CURR?", write: "CURR %f", limits: [0, 2]}
+  - {name: CurrentSet, type: float, unit: A, prec: 4, description: "Programmed current limit", read: "CURR?", sim_from: Current}
+  - {name: OVP, type: float, unit: V, prec: 2, description: "Over-voltage protection level",
+     read: "VOLT:PROT?", write: "VOLT:PROT %f", limits: [0, 22], sim: 22.0}
+  - {name: Output, type: bool, states: ["Off", "On"], description: "Output state", read: "OUTP?", write: "OUTP %d"}
+  - {name: Ident, type: string, description: "Identification", read: "*IDN?",
+     sim: "Keysight Technologies,E36103B,SIM00001,1.0"}
+  - {name: Error, type: string, description: "Oldest error in the queue", read: "SYST:ERR?", sim: '+0,"No error"'}
+sequences:
+  - name: RampOn
+    description: "Set the current limit, switch the output on at 0 V, then ramp to the operating voltage"
+    retry_delay: 2.0
+    steps:
+      - {set: Current, value: 1.0, delay: 0.5}
+      - {set: Voltage, value: 0, wait: Voltage, below: 0.05, timeout: 10}
+      - {set: Output, value: "On", wait: Output, equals: "On", timeout: 6}
+      - {set: Voltage, value: 12, wait: Voltage, above: 11.95, timeout: 10}
+  - name: SafeOff
+    description: "Ramp to 0 V, then switch the output off"
+    retry_delay: 2.0
+    steps:
+      - {set: Voltage, value: 0, wait: Voltage, below: 0.05, timeout: 10}
+      - {set: Output, value: "Off", wait: Output, equals: "Off", timeout: 6}
