@@ -188,3 +188,21 @@ def test_the_mcp_tool_answers_with_the_problems_and_an_example():
     done = tool["handler"](None, "ws", scaffold.EXAMPLE)
     assert done["self_check"]["ok"] and done["already_exists"] == [] and "not compiled" in done["not_checked"]
     assert Path(next(iter(done["files"]))).parts[0] == "acme-ps"
+
+
+def test_a_real_device_long_strings_and_queries_that_report_a_setting():
+    """The Keysight E36100B description in docs/examples: strings are lsi/lso (an *IDN? answer is longer than 40
+    characters), and VOLT? is simulated as what VOLT set, not as a quantity of its own."""
+    spec = yaml.safe_load((Path(__file__).resolve().parents[2] / "docs/examples/keysight-e36100.yaml").read_text())
+    out = scaffold.scaffold(spec)
+    assert out["self_check"]["ok"], out["self_check"]
+    files = out["files"]
+    template = files["keysight-e36100/e36100App/Db/e36100.template"]
+    assert 'record(lsi, "$(P):$(R):Ident_RB")' in template and 'field(SIZV, "256")' in template
+    assert "char v[256];" in files["keysight-e36100/e36100App/src/e36100Driver.cpp"]
+    sim = files["keysight-e36100/sim/e36100_sim.py"]
+    assert "'VOLT?': ('Voltage', '%f')" in sim and "'MEAS:VOLT?': ('Voltage', '%f')" in sim
+    assert out["module"]["state_programs"] == ["e36100RampOn", "e36100SafeOff"]
+    with pytest.raises(scaffold.Invalid, match="sim_from"):
+        scaffold.scaffold({**spec, "parameters": spec["parameters"] + [
+            {"name": "Bad", "type": "string", "read": "B?", "sim_from": "Voltage"}]})
