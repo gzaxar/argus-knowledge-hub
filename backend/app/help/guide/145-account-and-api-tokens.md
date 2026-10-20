@@ -1,7 +1,7 @@
 ---
 title: My account, API tokens and the mobile app
 summary: Seeing who you are to ARGUS and what you may do; personal access tokens for your scripts; robot tokens for machines such as a facility's daily-logbook uploader; and where the mobile app is described.
-keywords: [olog, phoebus, epik8s, elog, electronic logbook, logbook entry, account, profile, me, who am i, permissions, roles, groups, token, api token, personal access token, pat, robot, robot token, service account, bot, logbook, daily logbook, upload, script, curl, api, automation, scope, expiry, revoke, mobile, app, android, ios, flutter, field, pkce, argus-mobile]
+keywords: [olog, phoebus, epik8s, elog, electronic logbook, logbook entry, account, profile, me, who am i, permissions, roles, groups, token, api token, personal access token, pat, robot, robot token, service account, bot, logbook, daily logbook, upload, script, curl, api, automation, scope, expiry, revoke, mobile, app, android, ios, flutter, field, pkce, argus-mobile, mcp, librechat, assistant, ai assistant, claude, list_workspaces]
 order: 145
 ---
 
@@ -52,6 +52,18 @@ A workspace owner (or an administrator) makes them:
 
 Give each machine its own token, so one can be revoked without stopping the others. A robot token needs
 no `X-Workspace-Id` header.
+
+## Use ARGUS from an AI assistant (MCP)
+
+ARGUS is an MCP server at `<api>/mcp` (transport *streamable HTTP*), so an assistant such as LibreChat or
+Claude can look up equipment, tickets, documents and the knowledge graph. Give it a **personal access token
+with the read scope** — the assistant then sees exactly what you may see, and can change nothing — and the
+workspace to ask in as `X-Workspace-Id` (not needed if the token is fixed to one workspace).
+
+A token that is not fixed to a workspace can ask in **every workspace where you hold a role**: the
+`list_workspaces` tool lists them, and every tool takes an optional `workspace` to ask in another one for
+that call. A workspace where you hold no role is refused; a robot token, or a personal token fixed to one
+workspace, stays in its own.
 
 ## If an API request is refused
 
