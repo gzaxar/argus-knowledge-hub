@@ -131,8 +131,14 @@ def token_scope(identity) -> Optional[TokenScope]:
 _WRITES = {"create", "modify", "delete", "approve", "admin"}
 
 
-def _method_allowed(scope: TokenScope, method: str) -> bool:
-    if method in ("GET", "HEAD", "OPTIONS"):
+# POSTs that only read: the MCP server takes every request, tools/list and
+# tools/call alike, as a POST, and all its tools are read-only — a read-only
+# token is exactly what an assistant such as LibreChat should be given.
+_READ_ONLY_POSTS = ("/mcp", "/mcp/")
+
+
+def _method_allowed(scope: TokenScope, method: str, path: str = "") -> bool:
+    if method in ("GET", "HEAD", "OPTIONS") or (method == "POST" and path in _READ_ONLY_POSTS):
         return "read" in scope.scopes
     return bool(scope.scopes & _WRITES)
 
@@ -203,9 +209,10 @@ def get_identity(
         identity = identity_for_token(db, token)
         if identity is None:
             raise HTTPException(status_code=401, detail="Invalid or revoked token")
-        if not _method_allowed(token_scope(identity), request.method):
+        if not _method_allowed(token_scope(identity), request.method, request.url.path):
             raise HTTPException(status_code=403, detail=(
-                "This token may only read" if request.method not in ("GET", "HEAD", "OPTIONS")
+                "This token may only read"
+                if request.method not in ("GET", "HEAD", "OPTIONS") and request.url.path not in _READ_ONLY_POSTS
                 else "This token has no read scope"))
         token.last_used_at = datetime.now(timezone.utc)
         db.commit()

@@ -280,3 +280,106 @@ def test_a_title_match_outranks_a_text_match(world):
     db.close()
     found = tool(raw, "search_documents", {"query": "vacuum"})
     assert found["documents"][0]["matched"] == "title"
+
+
+# --- asking in another workspace ----------------------------------------
+
+def _person_in(*workspaces: str, fixed_to: str | None = None) -> tuple[str, str]:
+    """A person who is a viewer in these workspaces, and a personal token of theirs."""
+    from datetime import datetime, timezone
+
+    from app.models.role import RoleBinding
+    from app.models.user import User
+    t = secrets.token_hex(4)
+    db = SessionLocal()
+    db.add(User(id=f"p-{t}", email=f"p-{t}@argus.test", name="Pia"))
+    db.flush()
+    for ws in workspaces:
+        db.add(RoleBinding(workspace_id=ws, subject_type="user", subject_id=f"p-{t}", role_id="viewer",
+                           created_at=datetime.now(timezone.utc)))
+    raw = f"argus_pat_{secrets.token_urlsafe(16)}"
+    db.add(ApiToken(kind="personal", user_id=f"p-{t}", workspace_id=fixed_to, token_hash=hash_token(raw),
+                    scopes=["read"]))
+    db.commit()
+    db.close()
+    return f"p-{t}", raw
+
+
+def _second_workspace() -> str:
+    other = f"mcp2-{secrets.token_hex(4)}"
+    db = SessionLocal()
+    db.add(Workspace(id=other, name="Second"))
+    db.commit()
+    db.close()
+    return other
+
+
+def person_rpc(raw: str, ws: str, method: str, params: dict | None = None):
+    return client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}},
+                       headers={**auth(raw), "X-Workspace-Id": ws})
+
+
+def test_every_tool_takes_a_workspace_and_list_workspaces_is_offered(world):
+    _ids, raw = world
+    tools = {t["name"]: t for t in rpc(raw, "tools/list").json()["result"]["tools"]}
+    assert "list_workspaces" in tools
+    assert "workspace" in tools["search_objects"]["inputSchema"]["properties"]
+    # Ask ARGUS shares the catalogue and works in one workspace: it is not given the argument.
+    from app.services.mcp_tools import catalogue
+    assert all("workspace" not in t["inputSchema"].get("properties", {}) for t in catalogue())
+
+
+def test_a_personal_token_asks_in_each_of_its_owners_workspaces(world):
+    ids, _raw = world
+    second = _second_workspace()
+    _user, raw = _person_in(ids["ws"], second)
+
+    listed = json.loads(person_rpc(raw, second, "tools/call", {"name": "list_workspaces"})
+                        .json()["result"]["content"][0]["text"])
+    assert listed["current"] == second
+    assert {w["id"] for w in listed["workspaces"]} >= {ids["ws"], second}
+
+    # Asked from the second workspace, about the first one's camera.
+    here = person_rpc(raw, second, "tools/call", {"name": "get_object", "arguments": {"uid_or_key": ids["key"]}})
+    assert json.loads(here.json()["result"]["content"][0]["text"])["found"] is False
+    there = person_rpc(raw, second, "tools/call",
+                       {"name": "get_object", "arguments": {"uid_or_key": ids["key"], "workspace": ids["ws"]}})
+    body = there.json()["result"]
+    assert body["isError"] is False, body
+    assert json.loads(body["content"][0]["text"])["found"] is True
+
+
+def test_a_workspace_the_owner_has_no_role_in_is_refused(world):
+    ids, _raw = world
+    second = _second_workspace()
+    _user, raw = _person_in(second)
+    resp = person_rpc(raw, second, "tools/call",
+                      {"name": "search_objects", "arguments": {"workspace": ids["ws"]}})
+    body = resp.json()["result"]
+    assert body["isError"] is True and "may not ask" in body["content"][0]["text"]
+    listed = json.loads(person_rpc(raw, second, "tools/call", {"name": "list_workspaces"})
+                        .json()["result"]["content"][0]["text"])
+    assert ids["ws"] not in {w["id"] for w in listed["workspaces"]}
+
+
+def test_a_token_fixed_to_a_workspace_and_a_robot_stay_in_theirs(world):
+    ids, robot = world
+    second = _second_workspace()
+    _user, fixed = _person_in(ids["ws"], second, fixed_to=second)
+    resp = person_rpc(fixed, second, "tools/call", {"name": "search_objects", "arguments": {"workspace": ids["ws"]}})
+    assert resp.json()["result"]["isError"] is True
+    resp = rpc(robot, "tools/call", {"name": "search_objects", "arguments": {"workspace": second}})
+    assert resp.json()["result"]["isError"] is True
+    listed = json.loads(rpc(robot, "tools/call", {"name": "list_workspaces"}).json()["result"]["content"][0]["text"])
+    assert [w["id"] for w in listed["workspaces"]] == [ids["ws"]]
+
+
+def test_a_read_only_token_reaches_mcp_but_still_writes_nothing(world):
+    """MCP takes everything as a POST; that must not turn a read token into a writing one."""
+    ids, _raw = world
+    _user, raw = _person_in(ids["ws"])
+    listed = person_rpc(raw, ids["ws"], "tools/list")
+    assert listed.status_code == 200 and listed.json()["result"]["tools"]
+    write = client.post("/v1/issues", json={"uid": f"x-{secrets.token_hex(4)}", "title": "nope"},
+                        headers={**auth(raw), "X-Workspace-Id": ids["ws"]})
+    assert write.status_code == 403 and "may only read" in write.text
