@@ -392,12 +392,16 @@ def test_records_carry_the_address_of_their_page(world, monkeypatch):
     found = tool(raw, "search_documents", {"query": "Camera"})
     doc = next(d for d in found["documents"] if d["uid"] == ids["document"])
     assert doc["url"] == f"https://argus.example.org/documents/{ids['document']}?ws={ids['ws']}"
+    # And ready to paste: the code and the title, linked.
+    assert doc["link"] == f"[{doc['code']} — Camera replacement]({doc['url']})"
     obj = tool(raw, "get_object", {"uid_or_key": ids["key"]})
     assert obj["url"] == f"https://argus.example.org/assets/{ids['camera']}?ws={ids['ws']}"
+    assert obj["link"] == f"[{ids['key']} — FI4-B-CAM-VIS-001]({obj['url']})"
     # Its neighbours too: the rack it is mounted in.
     assert f"https://argus.example.org/assets/{ids['rack']}?ws={ids['ws']}" in json.dumps(obj["relations"])
     tickets = tool(raw, "search_tickets", {})
     assert all(t["url"].startswith("https://argus.example.org/tickets/") for t in tickets["tickets"])
+    assert any(t["link"] == f"[Camera drops frames]({t['url']})" for t in tickets["tickets"])
 
 
 def test_ask_argus_tools_give_no_addresses(world):
