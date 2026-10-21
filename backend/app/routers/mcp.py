@@ -22,6 +22,7 @@ from app.auth import Identity, PatIdentity, get_identity, grants_of, require_per
 from app.db import get_db
 from app.models.workspace import Workspace
 from app.services.mcp_tools import call, catalogue
+from app.services.notify import web_url
 from app.services.permissions import resolve_permission
 from app.services.visibility import set_current_grants
 
@@ -47,6 +48,8 @@ INSTRUCTIONS = (
     "Every tool works in one workspace: the request's own (its X-Workspace-Id, or the one the token is "
     "fixed to) unless you pass `workspace`. list_workspaces says which ones you may ask in; to answer "
     "across workspaces, call a tool once per workspace.\n"
+    "Records come with a `url`, the page of that record in ARGUS: when you cite one, link it, for "
+    "example [PROC-012 Bake-out procedure](url), so the reader can open it.\n"
     "Everything here is read-only."
 )
 
@@ -173,7 +176,7 @@ async def rpc(
                 })
             set_current_grants(grants_of(db, identity, target))
         try:
-            text = call(db, target, name, arguments)
+            text = call(db, target, name, arguments, link_base=web_url())
         except KeyError:
             return _error(request_id, -32602, f"No such tool: {name}")
         except Exception as e:

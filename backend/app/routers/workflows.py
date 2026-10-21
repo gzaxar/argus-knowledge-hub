@@ -194,8 +194,9 @@ def set_subscription(workspace_id: str, body: SubscriptionIn, identity=Depends(g
     from app.services.permissions import resolve_permission
     if not isinstance(identity, OidcIdentity):
         raise HTTPException(status_code=422, detail="Subscriptions belong to a person, not an API token.")
-    if not resolve_permission(db, identity.user, workspace_id, "read", "objects") and \
-            not resolve_permission(db, identity.user, workspace_id, "read", "tickets"):
+    # A workspace where they may read some kind of record: documents only is enough to hear about documents.
+    if not any(resolve_permission(db, identity.user, workspace_id, "read", r)
+               for r in ("objects", "tickets", "documents")):
         raise HTTPException(status_code=404, detail="Workspace not found")
     sub = db.scalar(select(NotificationSubscription).where(NotificationSubscription.user_id == identity.user.id,
                                                            NotificationSubscription.workspace_id == workspace_id))
@@ -283,8 +284,10 @@ def my_notifications_everywhere(after: int = 0, include_read: bool = Query(False
     out, names, allowed = [], {}, {}
     for n in rows:
         if n.workspace_id not in allowed:
-            allowed[n.workspace_id] = resolve_permission(db, identity.user, n.workspace_id, "read", "tickets") or \
-                resolve_permission(db, identity.user, n.workspace_id, "read", "objects")
+            # Any kind of record they may read there: a person who may read only documents still hears
+            # about the new documents they subscribed to.
+            allowed[n.workspace_id] = any(resolve_permission(db, identity.user, n.workspace_id, "read", r)
+                                          for r in ("tickets", "objects", "documents"))
             ws = db.get(Workspace, n.workspace_id)
             names[n.workspace_id] = ws.name if ws else n.workspace_id
         if allowed[n.workspace_id] or _shared_subject(db, identity, n):
