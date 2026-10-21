@@ -26,7 +26,7 @@ from app.schemas.asset import (
     RelationCreate,
     RelationOut,
 )
-from app.services import asset_keys, markdown_export, versions
+from app.services import asset_keys, markdown_export, pdf_export, versions
 from app.services.attribute_validation import validate_attributes
 from app.services.current_user_attrs import stamp_current_user_attributes
 from app.services.relations import rebuild_asset_relations, rebuild_asset_relations_with_neighbors
@@ -321,6 +321,19 @@ def export_asset_markdown(
     asset = _get_visible_asset(uid, workspace_id, db, grants)
     access = markdown_export.access_for(db, identity, workspace_id)
     return markdown_export.response(markdown_export.asset(db, workspace_id, asset, access), asset.key)
+
+
+@router.get("/{uid}/pdf", **pdf_export.OPENAPI)
+def export_asset_pdf(
+    uid: str, workspace_id: str = Depends(require_permission("read")),
+    identity=Depends(get_identity), grants=Depends(get_grants), db: Session = Depends(get_db),
+):
+    """The same record as an A4 PDF."""
+    asset = _get_visible_asset(uid, workspace_id, db, grants)
+    access = markdown_export.access_for(db, identity, workspace_id)
+    text = markdown_export.asset(db, workspace_id, asset, access)
+    files = db.scalars(select(Attachment).where(Attachment.asset_uid == asset.uid))
+    return pdf_export.response(pdf_export.render(text, f"{asset.key} — {asset.name}", files), asset.key)
 
 
 @router.put("/{uid}", response_model=AssetOut)

@@ -1,7 +1,7 @@
 ---
 title: The mobile app (ARGUS Field)
 summary: Installing ARGUS Field, signing in, finding equipment by scanning its label, registering units, tickets and documents on the phone, attaching photos, video, notes and places, notifications, working offline, and withdrawing a phone's access.
-keywords: [mobile, app, phone, android, ios, argus field, field, install, apk, google play, update, sign in, pkce, argus-mobile, scan, qr code, barcode, serial, ocr, read text, nameplate, register, copy from similar, label, attach, photo, video, recorded note, audio, location, where i am, notifications, news, subscribe, offline, outbox, saved copies, cache, settings, dark mode, graph, revoke device, wipe, privacy]
+keywords: [export, pdf, print, share, markdown, mobile, app, phone, android, ios, argus field, field, install, apk, google play, update, sign in, pkce, argus-mobile, scan, qr code, barcode, serial, ocr, read text, nameplate, register, copy from similar, label, attach, photo, video, recorded note, audio, location, where i am, notifications, news, subscribe, offline, outbox, saved copies, cache, settings, dark mode, graph, revoke device, wipe, privacy]
 order: 150
 ---
 
@@ -89,6 +89,8 @@ A unit is never created from a scan alone: you check the values and register.
 - **Documents**: the revision to work from, said before its text (a draft is never presented as something to work
   from); the draft's workflow (**Edit draft**, **Send for review**, **Approve**, **Publish**, **Start a new
   revision**); files; **Related by meaning**.
+- **Export** (**⇪** at the top of each of them): **Open as PDF** (in the phone's PDF viewer), **Print**, **Send
+  PDF** or **Send Markdown** to mail, Drive, Files or any other app. The same files as Export on the web.
 
 ## Attach a photo, video, note or place
 

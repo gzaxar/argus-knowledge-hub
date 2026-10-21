@@ -395,6 +395,22 @@ export const exportApi = {
     return { text: await resp.text(), filename: name, baseUrl: session.baseUrl };
   },
 
+  /** Save the record as a PDF the server lays out (A4, its pictures included): one click, no print dialog. */
+  downloadPdf: async (kind: ExportKind, uid: string, revisionUid?: string | null) => {
+    const session = await loadSession();
+    if (!session) throw new Error("Not signed in");
+    const query = revisionUid ? `?revision_uid=${encodeURIComponent(revisionUid)}` : "";
+    const resp = await fetch(`${session.baseUrl}/v1/${EXPORT_PATHS[kind]}/${encodeURIComponent(uid)}/pdf${query}`, {
+      headers: authHeaders(session),
+    });
+    if (!resp.ok) throw new ApiError(resp.status, await resp.text());
+    const name = /filename="([^"]+)"/.exec(resp.headers.get("Content-Disposition") ?? "")?.[1] ?? `${uid}.pdf`;
+    const url = URL.createObjectURL(await resp.blob());
+    const a = Object.assign(document.createElement("a"), { href: url, download: name });
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
   /** Save the Markdown file. Its links to attachments are made absolute, so
    * outside ARGUS they still say where each file is. */
   downloadMarkdown: async (kind: ExportKind, uid: string, revisionUid?: string | null) => {
