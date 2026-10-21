@@ -39,7 +39,7 @@ from app.schemas.issue import (
     IssueUpdate,
 )
 from app.services.asset_ticket_links import ensure_asset_link, sync_subject_link
-from app.services import field_policy, markdown_export, notify, versions, workflows
+from app.services import field_policy, markdown_export, notify, pdf_export, versions, workflows
 from app.services.visibility import can_see, hidden_fields, redacted_attributes, visible_issues_clause
 from app.services.issue_history import (
     TRACKED_FIELDS,
@@ -181,6 +181,20 @@ def export_issue_markdown(
     access = markdown_export.access_for(db, identity, workspace_id)
     stem = (issue.attributes or {}).get("argus_source_key") or issue.title
     return markdown_export.response(markdown_export.ticket(db, workspace_id, issue, access), stem)
+
+
+@router.get("/{uid}/pdf", **pdf_export.OPENAPI)
+def export_issue_pdf(
+    uid: str, workspace_id: str = Depends(require_permission("read", resource="tickets")),
+    identity=Depends(get_identity), db: Session = Depends(get_db),
+):
+    """The same ticket as an A4 PDF, its pictures included."""
+    issue = _get_owned_issue(uid, workspace_id, db)
+    access = markdown_export.access_for(db, identity, workspace_id)
+    text = markdown_export.ticket(db, workspace_id, issue, access)
+    files = db.scalars(select(Attachment).where(Attachment.issue_uid == issue.uid))
+    stem = (issue.attributes or {}).get("argus_source_key") or issue.title
+    return pdf_export.response(pdf_export.render(text, issue.title, files), stem)
 
 
 def _move(db: Session, issue: Issue, target: str, actor: Optional[str]) -> None:

@@ -156,3 +156,65 @@ def test_another_workspace_cannot_export(world):
     for path in (f"/v1/documents/{ws}-doc/markdown", f"/v1/assets/{ws}-ps/markdown",
                  f"/v1/issues/{ws}-t1/markdown"):
         assert client.get(path, headers=headers).status_code == 404, path
+
+
+# --- the same, as a PDF --------------------------------------------------
+
+def _pdf_text(data: bytes) -> str:
+    from io import BytesIO
+
+    from pypdf import PdfReader
+    return "\n".join(page.extract_text() for page in PdfReader(BytesIO(data)).pages)
+
+
+def test_each_record_comes_as_a_pdf_with_its_text(world, tmp_path):
+    ws, t = world["ws"], world["t"]
+    # The document's picture is a real file, laid out in the PDF.
+    from PIL import Image
+    picture = tmp_path / "plot.png"
+    Image.new("RGB", (300, 150), (200, 220, 255)).save(picture)
+    db = SessionLocal()
+    plot = db.get(Attachment, f"{ws}-plot")
+    plot.storage_path, plot.mime_type = str(picture), "image/png"
+    db.commit()
+    db.close()
+
+    resp = client.get(f"/v1/documents/{ws}-doc/pdf", headers=world["headers"])
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"] == "application/pdf"
+    assert f'filename="PRC-{t}-1.pdf"' in resp.headers["content-disposition"]
+    assert resp.content.startswith(b"%PDF")
+    text = _pdf_text(resp.content)
+    assert "Cycling the quadrupoles" in text and "Body of revision 1." in text
+    assert "/v1/attachments" not in text
+    from io import BytesIO
+
+    from pypdf import PdfReader
+    assert any(page.images for page in PdfReader(BytesIO(resp.content)).pages), "the picture is in it"
+
+    asset = client.get(f"/v1/assets/{ws}-ps/pdf", headers=world["headers"])
+    assert asset.status_code == 200 and "QUAA001" in _pdf_text(asset.content)
+    assert "12000" not in _pdf_text(asset.content), "a restricted field stays out of the PDF too"
+    ticket = client.get(f"/v1/issues/{ws}-t1/pdf", headers=world["headers"])
+    assert ticket.status_code == 200 and "Same on QUAA002." in _pdf_text(ticket.content)
+
+
+def test_a_picture_from_elsewhere_is_not_fetched():
+    """Imported text can point anywhere; the server does not call out to draw it."""
+    from app.services import pdf_export
+    data = pdf_export.render("Text\n\n![diagram](http://169.254.169.254/latest/x.png)\n", "T", [])
+    assert "[picture: diagram]" in _pdf_text(data)
+
+
+def test_another_workspace_cannot_get_the_pdf(world):
+    db = SessionLocal()
+    other = f"mdx-{secrets.token_hex(4)}"
+    db.add(Workspace(id=other, name="Other"))
+    raw = secrets.token_urlsafe(16)
+    db.flush()
+    db.add(ApiToken(workspace_id=other, token_hash=hash_token(raw)))
+    db.commit()
+    db.close()
+    ws = world["ws"]
+    for path in (f"/v1/documents/{ws}-doc/pdf", f"/v1/assets/{ws}-ps/pdf", f"/v1/issues/{ws}-t1/pdf"):
+        assert client.get(path, headers={"Authorization": f"Bearer {raw}"}).status_code == 404, path

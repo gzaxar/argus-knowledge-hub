@@ -6,18 +6,16 @@ import { MarkdownView } from "../components/MarkdownView";
 
 const KINDS: ExportKind[] = ["document", "asset", "ticket"];
 
-/** A document, asset or ticket on a plain page, for paper or for a PDF.
+/** A document, asset or ticket on a plain page, for paper.
  *
- * Opened in its own tab by Export ▸ PDF / Print: no sidebar, no buttons in
- * the printout, and the print dialog opens by itself once the text and its
- * pictures are in. The tab's title is the file name, which is what the
- * browser offers when saving as PDF.
+ * Opened in its own tab by Export ▸ Print: no sidebar, no buttons in the
+ * printout, and the print dialog opens by itself once the text and its
+ * pictures are in. (Export ▸ PDF is a file the server lays out.)
  */
 export function PrintPage() {
   const { kind, uid } = useParams<{ kind: string; uid: string }>();
   const [params] = useSearchParams();
   const revision = params.get("revision");
-  const pdf = params.get("pdf") === "1";
   const valid = KINDS.includes(kind as ExportKind) && !!uid;
   const printed = useRef(false);
 
@@ -61,13 +59,7 @@ export function PrintPage() {
         }
       `}</style>
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2 text-sm print:hidden">
-        <span className="text-slate-600">
-          {pdf ? (
-            <>In the print dialog choose <b>Save as PDF</b> as the destination.</>
-          ) : (
-            "Printing opens by itself once the page is ready."
-          )}
-        </span>
+        <span className="text-slate-600">Printing opens by itself once the page is ready.</span>
         <div className="flex gap-2">
           <button
             type="button"
@@ -75,7 +67,7 @@ export function PrintPage() {
             disabled={!md.data}
             className="rounded bg-slate-900 px-3 py-1.5 text-white disabled:opacity-40"
           >
-            {pdf ? "Save as PDF…" : "Print…"}
+            Print…
           </button>
           <button type="button" onClick={() => window.close()} className="rounded border border-slate-300 px-3 py-1.5">
             Close

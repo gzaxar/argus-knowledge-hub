@@ -18,6 +18,7 @@ import '../../widgets/common.dart';
 import '../../widgets/related_by_meaning.dart';
 import '../../widgets/rich_content.dart';
 import 'relation_graph_screen.dart';
+import '../../widgets/export_menu.dart';
 
 /// Equipment or a Position, next to the machine: what it is, what is installed there now (or
 /// where this unit is installed), what it connects to, the open tickets and documents that
@@ -33,6 +34,7 @@ class AssetScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(r.value?.name ?? 'Record'), actions: [
         if (r.value != null) FollowButton(subject: 'asset', uid: uid),
+        if (r.value != null) ExportMenu(kind: ExportKind.asset, uid: uid, name: r.value!.key),
         if (r.value != null && r.value!.recordStatus != 'Merged')
           IconButton(
             key: const Key('asset-edit'),

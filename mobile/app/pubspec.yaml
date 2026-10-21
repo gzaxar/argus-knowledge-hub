@@ -40,6 +40,9 @@ dependencies:
   cryptography_flutter: ^2.3.4
   workmanager: ^0.10.10
   flutter_local_notifications: ^22.3.1
+  # Export: send a record's PDF or Markdown on (mail, Drive, Files), and print the PDF.
+  share_plus: ^13.3.1
+  printing: ^5.15.1
 
 dev_dependencies:
   flutter_test:

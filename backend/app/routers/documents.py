@@ -11,7 +11,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.auth import Identity, OidcIdentity, PatIdentity, get_identity, require_permission
 from app.db import get_db
-from app.services import knowledge_schedule, markdown_export, notify
+from app.services import knowledge_schedule, markdown_export, notify, pdf_export
 from app.services.permissions import has_permission
 from app.models.attachment import Attachment
 from app.models.document import Document, DocumentRelation, DocumentRevision
@@ -287,6 +287,27 @@ def export_document_markdown(
 ):
     """The document as Markdown: the revision asked for, or the one its page
     opens on (the current one, else the latest)."""
+    doc, text = _document_markdown(uid, revision_uid, workspace_id, identity, db)
+    return markdown_export.response(text, doc.code)
+
+
+@router.get("/{uid}/pdf", **pdf_export.OPENAPI)
+def export_document_pdf(
+    uid: str,
+    revision_uid: Optional[str] = None,
+    workspace_id: str = Depends(require_permission("read", resource="documents")),
+    identity: Identity = Depends(get_identity),
+    db: Session = Depends(get_db),
+):
+    """The same document as an A4 PDF, its pictures included."""
+    doc, text = _document_markdown(uid, revision_uid, workspace_id, identity, db)
+    files = db.scalars(select(Attachment).join(DocumentRevision, DocumentRevision.uid == Attachment.document_revision_uid)
+                       .where(DocumentRevision.document_uid == doc.uid))
+    return pdf_export.response(pdf_export.render(text, f"{doc.code} — {doc.title}", files), doc.code)
+
+
+def _document_markdown(uid: str, revision_uid: Optional[str], workspace_id: str, identity: Identity,
+                       db: Session) -> tuple[Document, str]:
     doc = _get_visible_document(uid, workspace_id, identity, db)
     if revision_uid:
         revision = _get_revision(doc.uid, revision_uid, db)
@@ -295,7 +316,7 @@ def export_document_markdown(
             or db.scalar(select(DocumentRevision).where(DocumentRevision.document_uid == doc.uid)
                          .order_by(DocumentRevision.revision_number.desc()).limit(1))
     access = markdown_export.access_for(db, identity, workspace_id)
-    return markdown_export.response(markdown_export.document(db, workspace_id, doc, revision, access), doc.code)
+    return doc, markdown_export.document(db, workspace_id, doc, revision, access)
 
 
 @router.put("/{uid}", response_model=DocumentOut)
