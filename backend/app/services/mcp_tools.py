@@ -1034,6 +1034,17 @@ _PAGES = {"asset": "assets", "ticket": "tickets", "document": "documents"}
 _NOT_PAGES = {"group", "person", "type"}
 
 
+def _link_text(o: dict) -> str:
+    """How a record is named in a link: its code or key with its title or name, as a reader knows it."""
+    ident = o.get("code") or o.get("key") or o.get("source_key") or o.get("sublabel")
+    name = o.get("title") or o.get("name") or o.get("label")
+    parts = [str(ident)] if ident else []
+    if name and name != ident:
+        parts.append(str(name))
+    # Brackets would end the link text early.
+    return (" — ".join(parts) or str(o.get("uid"))).replace("[", "(").replace("]", ")")
+
+
 def add_links(result: Any, workspace_id: str, base: str) -> Any:
     """Give every record in a result the address of its page in the web app, so an
     assistant outside ARGUS (LibreChat, Claude) can link what it cites. The same records
@@ -1064,6 +1075,8 @@ def add_links(result: Any, workspace_id: str, base: str) -> Any:
             where = page(v) if isinstance(uid, str) else None
             if where and "url" not in v:
                 v["url"] = f"{base}/{where}/{quote(uid, safe='')}?ws={quote(workspace_id, safe='')}"
+                # Ready to paste into an answer, so a model need not compose the link itself.
+                v["link"] = f"[{_link_text(v)}]({v['url']})"
             for item in list(v.values()):
                 walk(item)
 

@@ -48,8 +48,8 @@ INSTRUCTIONS = (
     "Every tool works in one workspace: the request's own (its X-Workspace-Id, or the one the token is "
     "fixed to) unless you pass `workspace`. list_workspaces says which ones you may ask in; to answer "
     "across workspaces, call a tool once per workspace.\n"
-    "Records come with a `url`, the page of that record in ARGUS: when you cite one, link it, for "
-    "example [PROC-012 Bake-out procedure](url), so the reader can open it.\n"
+    "Records come with a `url`, the page of that record in ARGUS, and a `link`, the same as a ready "
+    "Markdown link: when you cite a record, write its `link` as given, so the reader can open it.\n"
     "Everything here is read-only."
 )
 
