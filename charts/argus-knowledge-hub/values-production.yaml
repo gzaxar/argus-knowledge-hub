@@ -7,9 +7,9 @@ hosts:
 
 images:
   backend:
-    tag: "1.35.35"
+    tag: "1.35.36"
   web:
-    tag: "1.35.35"
+    tag: "1.35.36"
   # PostgreSQL 16 with pgvector and PostGIS (deploy/postgres): rehearsed on this installation's data with
   # tools/db-image-rehearsal on 2026-10-13 (every check passed but the administrator sign-in, not run). The
   # data directory is the same; going back is setting pgvector/pgvector:pg16-trixie again, until the GIS
