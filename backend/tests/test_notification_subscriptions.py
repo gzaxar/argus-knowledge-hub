@@ -123,3 +123,39 @@ def test_the_phone_asks_for_what_is_new_since_it_last_looked(world):
     assert rows[0]["workspace_name"] == "Linac" and rows[0]["issue_uid"]
     later = client.get("/v1/notifications/everywhere", params={"after": rows[0]["id"]}).json()
     assert [r["title"] for r in later] == ["New ticket: Second"]
+
+
+def test_a_reader_of_documents_only_hears_about_new_documents(world):
+    """The phone's list keeps a workspace's news for anyone who may read some kind of record there, documents
+    included: a person whose role reads only documents is told about the new ones they subscribed to."""
+    w = world
+    t = secrets.token_hex(3)
+    db = SessionLocal()
+    dee = User(id=str(uuid.uuid4()), email=f"dee-{t}@argus.test", name="dee", is_admin=False)
+    db.add(dee)
+    db.flush()
+    db.add(Membership(workspace_id=w["ws"], user_id=dee.id, can_read=False, can_read_tickets=False,
+                      can_read_documents=True))
+    db.commit()
+    db.refresh(dee)
+    db.expunge(dee)
+    db.close()
+    try:
+        as_(dee)
+        assert w["ws"] in {s["workspace_id"] for s in client.get("/v1/notifications/subscriptions").json()}
+        assert client.put(f"/v1/notifications/subscriptions/{w['ws']}", json={"documents": True}).status_code == 200
+        as_(w["ann"])
+        assert client.post("/v1/documents", headers={"X-Workspace-Id": w["ws"]},
+                           json={"uid": str(uuid.uuid4()), "title": "Interlock test"}).status_code == 201
+        as_(dee)
+        news = [n["title"] for n in client.get("/v1/notifications/everywhere").json()]
+        assert any(t.startswith("New document:") and "Interlock test" in t for t in news), news
+    finally:
+        db = SessionLocal()
+        from app.models.workflow import Notification, NotificationSubscription
+        db.query(Notification).filter(Notification.recipient == dee.id).delete()
+        db.query(NotificationSubscription).filter(NotificationSubscription.user_id == dee.id).delete()
+        db.query(Membership).filter(Membership.user_id == dee.id).delete()
+        db.delete(db.get(User, dee.id))
+        db.commit()
+        db.close()
