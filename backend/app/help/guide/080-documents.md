@@ -71,9 +71,12 @@ recorded note or a location.
 
 - **Markdown (.md)**: the whole page as a Markdown file — the fields with their names, the body, the steps,
   where it applies and the list of files (each with its link).
-- **PDF**: opens the page alone in a new tab and the print dialog with it; choose **Save as PDF** as the
-  destination. The file is named after the document's code (or the asset's key, or the ticket).
-- **Print**: the same page, to paper.
+- **PDF**: downloads at once an A4 PDF that ARGUS lays out, with the pictures in the text. The file is named
+  after the document's code (or the asset's key, or the ticket).
+- **Print**: opens the page alone in a new tab, with the print dialog.
+
+On the phone, the export button (**⇪**) at the top of a document, a piece of equipment or a ticket gives
+**Open as PDF**, **Print**, **Send PDF** and **Send Markdown** (to mail, Drive, Files…).
 
 A document is exported at the revision on screen; pick another revision first to export that one. An asset's
 export lists its relations, tickets and documents; a ticket's, its equipment and comments. What you may not

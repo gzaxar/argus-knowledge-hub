@@ -16,6 +16,7 @@ import '../../widgets/related_by_meaning.dart';
 import '../../widgets/type_tree.dart';
 import '../../widgets/rich_content.dart';
 import 'report_screen.dart' show impactOptions;
+import '../../widgets/export_menu.dart';
 
 /// A ticket in the field (flutter-app-design §9): read it, comment, add a photo, and move it
 /// through the transitions the server's workflow allows. A closure of a safety ticket from here
@@ -151,6 +152,12 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
             tooltip: 'Edit',
             icon: const Icon(Icons.edit_outlined),
             onPressed: () => context.push('/ticket/${widget.uid}/edit'),
+          ),
+        if (r.hasValue)
+          ExportMenu(
+            kind: ExportKind.ticket,
+            uid: widget.uid,
+            name: (r.value!.attributes['argus_source_key'] as String?) ?? r.value!.title,
           ),
       ]),
       body: r.when(

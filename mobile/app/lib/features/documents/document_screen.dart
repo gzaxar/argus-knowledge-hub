@@ -15,6 +15,7 @@ import '../../widgets/common.dart';
 import '../../widgets/related_by_meaning.dart';
 import '../../widgets/rich_content.dart';
 import '../../widgets/type_tree.dart';
+import '../../widgets/export_menu.dart';
 
 /// A procedure or document. The field must never mistake a draft or an outdated revision for the
 /// one to work from, so the state is said before the content (flutter-app-design §5.5).
@@ -31,7 +32,10 @@ class DocumentScreen extends ConsumerWidget {
       appBar: AppBar(
           title: Text((ref.watch(showKeysProvider) ? r.value?.code : r.value?.title) ?? r.value?.code ?? 'Document',
               maxLines: 1, overflow: TextOverflow.ellipsis),
-          actions: [if (r.value != null) FollowButton(subject: 'document', uid: uid)]),
+          actions: [
+            if (r.value != null) FollowButton(subject: 'document', uid: uid),
+            if (r.value != null) ExportMenu(kind: ExportKind.document, uid: uid, name: r.value!.code),
+          ]),
       body: r.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => ProblemView(e, onRetry: () => ref.invalidate(documentDetailProvider(uid))),
