@@ -66,7 +66,13 @@ export function MarkdownView({
             <h4 className="mb-1 mt-3 text-sm font-semibold text-slate-800">{children}</h4>
           ),
           p: ({ children }) => <p className="my-2">{children}</p>,
-          a: ({ href, children }) => (
+          a: ({ href, children }) =>
+            // A page of ARGUS itself (a record an answer cites) opens here, like any other link in the app.
+            href && /^\/(assets|tickets|documents)\//.test(href) ? (
+              <Link to={href} className="text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-600">
+                {children}
+              </Link>
+            ) : (
             <a
               href={href}
               target="_blank"
@@ -75,7 +81,7 @@ export function MarkdownView({
             >
               {children}
             </a>
-          ),
+            ),
           ul: ({ children }) => <ul className="my-2 list-disc space-y-1 pl-6">{children}</ul>,
           ol: ({ children }) => <ol className="my-2 list-decimal space-y-1 pl-6">{children}</ol>,
           li: ({ children }) => <li className="pl-0.5">{children}</li>,

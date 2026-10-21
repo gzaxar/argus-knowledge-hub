@@ -1029,8 +1029,52 @@ def catalogue() -> list[dict]:
     ]
 
 
-def call(db: Session, workspace_id: str, name: str, arguments: dict) -> str:
-    """Run one tool and return its result as text, which is what MCP carries."""
+# The web page of each kind of record a result can name.
+_PAGES = {"asset": "assets", "ticket": "tickets", "document": "documents"}
+_NOT_PAGES = {"group", "person", "type"}
+
+
+def add_links(result: Any, workspace_id: str, base: str) -> Any:
+    """Give every record in a result the address of its page in the web app, so an
+    assistant outside ARGUS (LibreChat, Claude) can link what it cites. The same records
+    the web's Ask page links: a code is a document, a key an asset, a source_key a ticket;
+    a graph node says its kind. `?ws=` opens the page in the workspace that was asked."""
+    from urllib.parse import quote
+
+    def page(o: dict) -> Optional[str]:
+        kind = o.get("kind")
+        if kind in _PAGES:
+            return _PAGES[kind]
+        if kind in _NOT_PAGES:
+            return None
+        if "code" in o:
+            return "documents"
+        if "key" in o:
+            return "assets"
+        if "source_key" in o:
+            return "tickets"
+        return None
+
+    def walk(v: Any) -> None:
+        if isinstance(v, list):
+            for item in v:
+                walk(item)
+        elif isinstance(v, dict):
+            uid = v.get("uid")
+            where = page(v) if isinstance(uid, str) else None
+            if where and "url" not in v:
+                v["url"] = f"{base}/{where}/{quote(uid, safe='')}?ws={quote(workspace_id, safe='')}"
+            for item in list(v.values()):
+                walk(item)
+
+    if base:
+        walk(result)
+    return result
+
+
+def call(db: Session, workspace_id: str, name: str, arguments: dict, link_base: str = "") -> str:
+    """Run one tool and return its result as text, which is what MCP carries.
+    With `link_base` (the web app's address), records carry the URL of their page."""
     tool = BY_NAME.get(name)
     if tool is None:
         raise KeyError(name)
@@ -1040,5 +1084,5 @@ def call(db: Session, workspace_id: str, name: str, arguments: dict) -> str:
         for key, value in (arguments or {}).items()
         if key in tool["inputSchema"].get("properties", {})
     }
-    result = handler(db, workspace_id, **allowed)
+    result = add_links(handler(db, workspace_id, **allowed), workspace_id, link_base)
     return json.dumps(result, ensure_ascii=False, default=str, indent=2)

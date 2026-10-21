@@ -114,6 +114,29 @@ function recordLinks(steps: AskStep[]): Map<string, string> {
   return links;
 }
 
+const escapeRegExp = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** The answer with every record code it names as plain text made a link too.
+ * Codes in backticks are linked by MarkdownView already; a model does not
+ * always write them that way. Code blocks, code spans and existing links are
+ * left alone. */
+function linkPlainCodes(markdown: string, links: Map<string, string>): string {
+  const codes = [...links.keys()].filter((c) => c.length >= 3).sort((a, b) => b.length - a.length);
+  if (codes.length === 0) return markdown;
+  const pattern = new RegExp(`(?<![\\w:/.-])(${codes.map(escapeRegExp).join("|")})(?![\\w:/-])`, "g");
+  return markdown
+    .split(/(```[\s\S]*?```)/)
+    .map((block, i) =>
+      i % 2 === 1
+        ? block
+        : block
+            .split(/(`[^`\n]*`|\[[^\]\n]*\]\([^)\n]*\))/)
+            .map((part, j) => (j % 2 === 1 ? part : part.replace(pattern, (code) => `[${code}](${links.get(code)})`)))
+            .join(""),
+    )
+    .join("");
+}
+
 function StepRow({ step }: { step: Turn["steps"][number] }) {
   const [open, setOpen] = useState(false);
   const summary = step.running ? "" : summaryOf(step);
@@ -285,7 +308,7 @@ function AssistantTurn({ turn, actions, conversationId }: {
       )}
       {turn.content && (
         <div className="px-4 py-3">
-          <MarkdownView markdown={turn.content} codeLink={(t) => links.get(t)} />
+          <MarkdownView markdown={linkPlainCodes(turn.content, links)} codeLink={(t) => links.get(t)} />
         </div>
       )}
       {actions.length > 0 && <ProposedChanges actions={actions} conversationId={conversationId} />}

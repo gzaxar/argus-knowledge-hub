@@ -383,3 +383,29 @@ def test_a_read_only_token_reaches_mcp_but_still_writes_nothing(world):
     write = client.post("/v1/issues", json={"uid": f"x-{secrets.token_hex(4)}", "title": "nope"},
                         headers={**auth(raw), "X-Workspace-Id": ids["ws"]})
     assert write.status_code == 403 and "may only read" in write.text
+
+
+def test_records_carry_the_address_of_their_page(world, monkeypatch):
+    """So an assistant outside ARGUS can link what it cites."""
+    monkeypatch.setenv("ARGUS_WEB_URL", "https://argus.example.org/")
+    ids, raw = world
+    found = tool(raw, "search_documents", {"query": "Camera"})
+    doc = next(d for d in found["documents"] if d["uid"] == ids["document"])
+    assert doc["url"] == f"https://argus.example.org/documents/{ids['document']}?ws={ids['ws']}"
+    obj = tool(raw, "get_object", {"uid_or_key": ids["key"]})
+    assert obj["url"] == f"https://argus.example.org/assets/{ids['camera']}?ws={ids['ws']}"
+    # Its neighbours too: the rack it is mounted in.
+    assert f"https://argus.example.org/assets/{ids['rack']}?ws={ids['ws']}" in json.dumps(obj["relations"])
+    tickets = tool(raw, "search_tickets", {})
+    assert all(t["url"].startswith("https://argus.example.org/tickets/") for t in tickets["tickets"])
+
+
+def test_ask_argus_tools_give_no_addresses(world):
+    """Ask ARGUS links records itself; the in-app catalogue stays as it was."""
+    from app.services.mcp_tools import call
+    ids, _raw = world
+    db = SessionLocal()
+    try:
+        assert '"url"' not in call(db, ids["ws"], "search_documents", {"query": "Camera"})
+    finally:
+        db.close()
