@@ -92,6 +92,17 @@ import type {
   AskConversationDetail,
   AskFeedbackResult,
   Statistics,
+  TemplateListing,
+  TemplateChoice,
+  TemplateVariant,
+  OfficialTemplate,
+  TemplateComparison,
+  TemplateProblem,
+  TemplateDescription,
+  ReshapeSource,
+  ReshapeResult,
+  ReshapeSaved,
+  ReshapeGeneration,
   ChatEvent,
   KnowledgeStatus,
   SemanticGraph,
@@ -2321,4 +2332,50 @@ export const spreadsheetImportApi = {
 export const statisticsApi = {
   get: (days: number, refreshStorage = false) =>
     request<Statistics>(`/v1/admin/statistics?days=${days}${refreshStorage ? "&refresh_storage=true" : ""}`),
+};
+
+/** Templates for documents reworked from raw text, and the rework itself. */
+export const templatesApi = {
+  list: (documentType?: string) =>
+    request<TemplateListing[]>(`/v1/document-templates${documentType ? `?${new URLSearchParams({ document_type: documentType })}` : ""}`),
+  resolve: (documentType: string, template?: string | null) =>
+    request<TemplateChoice>(`/v1/document-templates/resolve?${new URLSearchParams({
+      document_type: documentType, ...(template ? { template } : {}) })}`),
+  official: (ref: string) => request<OfficialTemplate>(`/v1/document-templates/${encodeURIComponent(ref)}`),
+  variant: (ref: string) => request<TemplateVariant>(`/v1/document-templates/${encodeURIComponent(ref)}`),
+  validate: (source: string) =>
+    request<{ valid: boolean; problems: TemplateProblem[]; template: TemplateDescription | null }>(
+      "/v1/document-templates/validate", { method: "POST", body: json({ source }) }),
+  create: (base: string, scope: "workspace" | "personal", name?: string) =>
+    request<TemplateVariant>("/v1/document-templates", { method: "POST", body: json({ base, scope, name }) }),
+  save: (ref: string, source: string) =>
+    request<TemplateVariant>(`/v1/document-templates/${encodeURIComponent(ref)}`, { method: "PUT", body: json({ source }) }),
+  publish: (ref: string, note?: string) =>
+    request<TemplateVariant>(`/v1/document-templates/${encodeURIComponent(ref)}/publish`, {
+      method: "POST", body: json({ note: note || null }) }),
+  setActive: (ref: string, active: boolean) =>
+    request<TemplateVariant>(`/v1/document-templates/${encodeURIComponent(ref)}/active`, {
+      method: "PUT", body: json({ active }) }),
+  compare: (ref: string) => request<TemplateComparison>(`/v1/document-templates/${encodeURIComponent(ref)}/compare`),
+  rebase: (ref: string) =>
+    request<TemplateVariant>(`/v1/document-templates/${encodeURIComponent(ref)}/rebase`, { method: "POST" }),
+  archive: (ref: string) =>
+    request<void>(`/v1/document-templates/${encodeURIComponent(ref)}`, { method: "DELETE" }),
+};
+
+export interface ReshapeRequest {
+  source: ReshapeSource; document_type_uid: string; template?: string | null; template_source?: string | null;
+  title?: string | null; confidentiality?: "pubblico" | "interno" | "riservato"; document_uid?: string | null;
+}
+
+export const reshapeApi = {
+  /** The draft and what to check: nothing is saved. */
+  preview: (body: ReshapeRequest) => request<ReshapeResult>("/v1/ai/reshape", { method: "POST", body: json(body) }),
+  /** Save as a new document (draft) or as the next draft revision of `documentUid`. */
+  save: (body: Record<string, unknown>, documentUid?: string | null) =>
+    request<ReshapeSaved>(documentUid ? `/v1/documents/${encodeURIComponent(documentUid)}/reshape` : "/v1/documents/reshape",
+                          { method: "POST", body: json(body) }),
+  /** How the document's revisions were made from raw text. */
+  generations: (documentUid: string) =>
+    request<ReshapeGeneration[]>(`/v1/documents/${encodeURIComponent(documentUid)}/generations`),
 };

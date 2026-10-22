@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   aiApi,
   ApiError,
@@ -112,6 +112,7 @@ export function GuidedEntry({
   const accept = (canSee ? "image/*," : "") + ".pdf,.docx,.xlsx,.xlsm,.eml,.txt,.md,.csv";
 
   const [text, setText] = useState("");
+  const navigate = useNavigate();
   const [result, setResult] = useState<AssistResult | null>(null);
   const [used, setUsed] = useState<Set<string>>(new Set());
   const photo = useRef<HTMLInputElement>(null);
@@ -219,6 +220,20 @@ export function GuidedEntry({
                   assist.mutate(file);
                 }}
               />
+              {kind === "document" && (
+                <button
+                  type="button"
+                  disabled={!(text.trim() || fileText)}
+                  onClick={() => navigate(
+                    `/documents/reshape${draft.document_type_uid ? `?document_type_uid=${encodeURIComponent(String(draft.document_type_uid))}` : ""}`,
+                    { state: { reshape: { text: fileText?.text ?? text, kind: fileText ? "import" : "intake",
+                                          filename: fileText?.name } } })}
+                  className="rounded border border-slate-300 px-3 py-1.5 text-xs disabled:opacity-40"
+                  title="Rewrite this text as a whole draft that follows the type's template, with what to check"
+                >
+                  Rework with the template
+                </button>
+              )}
               <span className="text-[11px] text-slate-400">suggestions only — you decide what is saved</span>
             </div>
             {profiles.isSuccess && (

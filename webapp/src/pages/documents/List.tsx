@@ -74,12 +74,22 @@ export function DocumentList() {
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-900">Documents</h1>
-        <Link
-          to="/documents/new"
-          className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-        >
-          New document
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link to="/documents/templates" className="text-sm text-slate-600 hover:underline">Templates</Link>
+          <Link
+            to="/documents/reshape"
+            className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+            title="Notes, an e-mail or a transcript, rewritten as a draft that follows the type's template"
+          >
+            Rework from raw text
+          </Link>
+          <Link
+            to="/documents/new"
+            className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            New document
+          </Link>
+        </div>
       </div>
 
       {isLoading && <p className="mt-4 text-sm text-slate-500">Loading…</p>}

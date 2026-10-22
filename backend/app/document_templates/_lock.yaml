@@ -1,0 +1,19 @@
+# The official templates' versions and the exact text each version is. A test fails when a template's text
+# changes without its version going up (tests/test_document_templates.py): a version once shipped is never
+# changed, because documents record which version made them. To change a template, raise its `version` and
+# update its line here (python -m app.services.doc_templates lock).
+# ---
+commissioning-record: {version: 1, sha256: e14c57643620bfc197388057374c68657a97916008b1d0e370260d5260b3a351}
+design-report: {version: 1, sha256: 25b48b0099de51b206de0190760f9697fbe1468ab370d81ec19019d156b85b47}
+drawing: {version: 1, sha256: 12efa75c2798b2b7fe23dc2d73f1c41cddf59502d0adc5c2c3d7648063076952}
+logbook-entry: {version: 1, sha256: 4f82975b8fe41d4f1964ba0dd113dd9d8552b70c2f5d5103a5a29b3eaf0890f2}
+maintenance-report: {version: 1, sha256: 600855698c4f8b44230c35c0507157e71b17ad74ecd23a4f6a555a3d9a553116}
+manual: {version: 1, sha256: 6f6292a72ae8d1c330f850bbdd343d7d5c6db94f9a321bd990482aa443b89fa0}
+meeting-minutes: {version: 1, sha256: 209c46d01c3b5e943a597eaee1d4f09775a165453723ff51bb16c6717fe42c15}
+note: {version: 1, sha256: bcdfaa275461c638b720814108142792fefa0dfc1dc6dca1532a3b61bf0bdc80}
+procedure: {version: 1, sha256: 45dcf29431a060336c626b92984e07b5a4c6566edd29de9335891a24d87309a4}
+runbook: {version: 1, sha256: cb56690fd3f90f111ba84e5fbb135a71721f15d4b1e7c292f6c40704ab31e647}
+safety-document: {version: 1, sha256: 7c5e70e09819c9bf81181e7b296d002ea905a60b9cdbf04529a1ad9d86faacc2}
+specification: {version: 1, sha256: 162356fead63086ca5982e30135864f10e5c0a6f2863f69de901548f764bae13}
+test-report: {version: 1, sha256: 9c630718addb395423b541e6867e662dda05be585007d4ec913c0249c9061e4c}
+work-instruction: {version: 1, sha256: 7054d70fa2df031c67e4f01375ea4b1092246603c0b1fa0393070c4afc04fa52}
