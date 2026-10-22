@@ -430,6 +430,66 @@
         "title": "AskConversationOut",
         "type": "object"
       },
+      "AskFeedbackIn": {
+        "description": "A rating of one of the conversation's answers: the `answer_index`-th (from 0), or the last.",
+        "properties": {
+          "answer_index": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Index"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "rating": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Rating",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "title": "AskFeedbackIn",
+        "type": "object"
+      },
+      "AskFeedbackOut": {
+        "properties": {
+          "rating": {
+            "title": "Rating",
+            "type": "string"
+          },
+          "reported": {
+            "title": "Reported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "rating",
+          "reported"
+        ],
+        "title": "AskFeedbackOut",
+        "type": "object"
+      },
       "AskIn": {
         "properties": {
           "question": {
@@ -476,6 +536,17 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
           },
           "role": {
             "title": "Role",
@@ -7812,6 +7883,42 @@
         "title": "MeOut",
         "type": "object"
       },
+      "MemberCandidateOut": {
+        "description": "Someone who has signed in, as offered when adding a member: `member` when they are one already.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "member": {
+            "title": "Member",
+            "type": "boolean"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "email",
+          "name",
+          "member"
+        ],
+        "title": "MemberCandidateOut",
+        "type": "object"
+      },
       "MemberDirectoryOut": {
         "properties": {
           "email": {
@@ -13341,6 +13448,97 @@
         ]
       }
     },
+    "/v1/admin/statistics": {
+      "get": {
+        "description": "Usage over the last `days` days, anonymous, and the storage (`refresh_storage`: measured again now).",
+        "operationId": "statistics_v1_admin_statistics_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 366,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "refresh_storage",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Refresh Storage",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Statistics",
+        "tags": [
+          "statistics"
+        ]
+      }
+    },
     "/v1/admin/tokens": {
       "get": {
         "operationId": "all_tokens_v1_admin_tokens_get",
@@ -14588,6 +14786,112 @@
           }
         ],
         "summary": "Discard Actions",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/ai/conversations/{conversation_id}/feedback": {
+      "post": {
+        "description": "Rate one of your answers, once: up, or down with an optional word on what was wrong. The rating is\nkept anonymously (services/ask_feedback.py): the question, the answer and how it was made, not who asked;\nan answer rated down becomes a ticket for the people who look after Ask ARGUS.",
+        "operationId": "rate_an_answer_v1_ai_conversations__conversation_id__feedback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-ARGUS-Client",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Argus-Client"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskFeedbackIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskFeedbackOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rate An Answer",
         "tags": [
           "ai"
         ]
@@ -54180,6 +54484,113 @@
           }
         ],
         "summary": "Put Asset Key Rule",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/v1/workspaces/{workspace_id}/member-candidates": {
+      "get": {
+        "description": "People who have signed in at least once, matching every word of `q` in their e-mail or name: whom the\nworkspace's owner can add as a member. Those who are members already come back flagged.",
+        "operationId": "member_candidates_v1_workspaces__workspace_id__member_candidates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 15,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MemberCandidateOut"
+                  },
+                  "title": "Response Member Candidates V1 Workspaces  Workspace Id  Member Candidates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Member Candidates",
         "tags": [
           "workspaces"
         ]

@@ -2,8 +2,8 @@ from typing import Optional
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -27,6 +27,7 @@ from app.services.workspace_ids import rule as id_rule, save_rule, slugify, uniq
 from app.schemas.workspace import (
     CleanupOptions,
     DefaultAccess,
+    MemberCandidateOut,
     MemberDirectoryOut,
     MembershipOut,
     MembershipUpdate,
@@ -555,6 +556,29 @@ def list_members(
         )
         for m, u in rows
     ]
+
+
+@router.get("/workspaces/{workspace_id}/member-candidates", response_model=list[MemberCandidateOut])
+def member_candidates(
+    workspace_id: str,
+    q: str = Query("", max_length=200),
+    limit: int = Query(15, ge=1, le=50),
+    identity: Identity = Depends(get_identity),
+    db: Session = Depends(get_db),
+):
+    """People who have signed in at least once, matching every word of `q` in their e-mail or name: whom the
+    workspace's owner can add as a member. Those who are members already come back flagged."""
+    _require_owner_or_admin(workspace_id, identity, db)
+    query = select(User)
+    for word in q.lower().split():
+        escaped = word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = f"%{escaped}%"
+        query = query.where(or_(func.lower(User.email).like(like, escape="\\"),
+                                func.lower(func.coalesce(User.name, "")).like(like, escape="\\")))
+    users = db.scalars(query.order_by(func.lower(func.coalesce(User.name, User.email))).limit(limit)).all()
+    members = set(db.scalars(select(Membership.user_id).where(
+        Membership.workspace_id == workspace_id, Membership.user_id.in_([u.id for u in users]))))
+    return [MemberCandidateOut(user_id=u.id, email=u.email, name=u.name, member=u.id in members) for u in users]
 
 
 @router.put("/workspaces/{workspace_id}/members", response_model=MembershipOut)

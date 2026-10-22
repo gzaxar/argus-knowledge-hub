@@ -11,6 +11,7 @@ is not one this endpoint serves — and the third passes a naive health
 check and then fails on first use, so it is checked explicitly.
 """
 import json
+import time
 from dataclasses import dataclass
 from typing import Iterator, Optional
 
@@ -52,6 +53,39 @@ class Endpoint:
 
 class LLMError(RuntimeError):
     """Something the caller should show a person, not a stack trace."""
+
+
+def _post(purpose: str, model: Optional[str], url: str, **kwargs) -> requests.Response:
+    """requests.post, counted for the usage statistics: the call, how long it took and the tokens the provider
+    reports (estimated from the text when it reports none; services/usage.py)."""
+    from app.services import usage
+    started = time.monotonic()
+    try:
+        resp = requests.post(url, **kwargs)
+    except requests.RequestException:
+        usage.note_llm(model, purpose, seconds=time.monotonic() - started, failed=True, prompt_tokens=0,
+                       completion_tokens=0)
+        raise
+    if kwargs.get("stream"):
+        return resp                                     # converse_stream counts it as it ends
+    reported, text = None, ""
+    if resp.status_code < 400:
+        try:
+            body = resp.json()
+            reported = body.get("usage") if isinstance(body, dict) else None
+            if not reported and isinstance(body, dict):
+                text = str(((body.get("choices") or [{}])[0].get("message") or {}).get("content") or body.get("text")
+                           or "")
+        except (ValueError, AttributeError, IndexError):
+            pass
+    sent = kwargs.get("json") or kwargs.get("data") or {}
+    usage.note_llm(model, purpose, seconds=time.monotonic() - started, failed=resp.status_code >= 400,
+                   prompt_tokens=(reported or {}).get("prompt_tokens") if reported else None,
+                   completion_tokens=(reported or {}).get("completion_tokens", 0) if reported else None,
+                   prompt_text="" if reported else json.dumps(sent.get("messages") or sent.get("input")
+                                                              or sent.get("documents") or "", ensure_ascii=False),
+                   completion_text=text)
+    return resp
 
 
 def list_models(endpoint: Endpoint) -> list[str]:
@@ -154,7 +188,7 @@ def complete(endpoint: Endpoint, system: str, user: str,
     """`extra` goes into the request as it is, for a provider-specific switch
     such as vLLM's chat_template_kwargs; a provider that rejects it answers 400."""
     try:
-        resp = requests.post(
+        resp = _post("complete", endpoint.model, 
             f"{endpoint.root}/chat/completions",
             headers=endpoint.headers(),
             json={
@@ -192,7 +226,7 @@ def complete_structured(endpoint: Endpoint, system: str, user: str) -> str:
     told not to; a provider that does not know the switch refuses it (400/422) and is asked again without.
     A reply cut off before any answer is an error that says so, not an empty answer."""
     try:
-        resp = requests.post(
+        resp = _post("structured", endpoint.model, 
             f"{endpoint.root}/chat/completions",
             headers=endpoint.headers(),
             json={"model": endpoint.model,
@@ -230,7 +264,7 @@ def rerank(endpoint: Endpoint, query: str, documents: list[str]) -> list[tuple[i
     roots = [endpoint.root] + ([endpoint.root + "/v1"] if not endpoint.root.endswith("/v1") else [])
     for root in roots:
         try:
-            resp = requests.post(f"{root}/rerank", headers=endpoint.headers(), json=body, timeout=TIMEOUT_SECONDS * 6)
+            resp = _post("rerank", endpoint.rerank_model, f"{root}/rerank", headers=endpoint.headers(), json=body, timeout=TIMEOUT_SECONDS * 6)
         except requests.RequestException as e:
             raise LLMError(f"Could not reach {endpoint.root}: {e}") from e
         if resp.status_code == 404:
@@ -264,7 +298,7 @@ def converse(endpoint: Endpoint, messages: list[dict], tools: Optional[list[dict
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
     try:
-        resp = requests.post(
+        resp = _post("chat", endpoint.model, 
             f"{endpoint.root}/chat/completions",
             headers=endpoint.headers(),
             json=payload,
@@ -296,21 +330,33 @@ def converse_stream(endpoint: Endpoint, messages: list[dict], tools: Optional[li
     `converse` returns, tool calls included. A tool call arrives in fragments (its name, then its
     arguments a few characters at a time) keyed by index, and is only usable once the stream ends.
     """
+    from app.services import usage
+    # The tokens used come in a last chunk when asked for (OpenAI, vLLM); a provider that does not know the
+    # option refuses it, and is asked again without.
     payload: dict = {"model": endpoint.model, "messages": messages, **endpoint.budget(),
-                     "temperature": 0, "stream": True}
+                     "temperature": 0, "stream": True, "stream_options": {"include_usage": True}}
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
+    started = time.monotonic()
     try:
-        resp = requests.post(f"{endpoint.root}/chat/completions", headers=endpoint.headers(), json=payload,
-                             stream=True, timeout=COMPLETION_TIMEOUT_SECONDS)
+        resp = _post("chat", endpoint.model, f"{endpoint.root}/chat/completions", headers=endpoint.headers(),
+                     json=payload, stream=True, timeout=COMPLETION_TIMEOUT_SECONDS)
+        if resp.status_code in (400, 422) and "stream_options" in (resp.text or ""):
+            payload.pop("stream_options")
+            resp = _post("chat", endpoint.model, f"{endpoint.root}/chat/completions", headers=endpoint.headers(),
+                         json=payload, stream=True, timeout=COMPLETION_TIMEOUT_SECONDS)
     except requests.RequestException as e:
         raise LLMError(f"Could not reach {endpoint.root}: {e}") from e
     if resp.status_code >= 400:
         detail = (resp.text or "")[:300]
+        usage.note_llm(endpoint.model, "chat", seconds=time.monotonic() - started, failed=True, prompt_tokens=0,
+                       completion_tokens=0)
         raise LLMError(f"The endpoint answered {resp.status_code}: {detail}")
     content: list[str] = []
+    thought: list[str] = []
     calls: dict[int, dict] = {}
+    reported: Optional[dict] = None
     try:
         for line in resp.iter_lines(decode_unicode=True):
             if not line or not line.startswith("data:"):
@@ -322,12 +368,15 @@ def converse_stream(endpoint: Endpoint, messages: list[dict], tools: Optional[li
                 chunk = json.loads(data)
             except ValueError:
                 continue
+            if chunk.get("usage"):
+                reported = chunk["usage"]
             choices = chunk.get("choices") or []
             if not choices:
                 continue
             delta = choices[0].get("delta") or {}
             thinking = delta.get("reasoning") or delta.get("reasoning_content")
             if thinking:
+                thought.append(thinking)
                 yield "reasoning", thinking
             if delta.get("content"):
                 content.append(delta["content"])
@@ -346,6 +395,12 @@ def converse_stream(endpoint: Endpoint, messages: list[dict], tools: Optional[li
         raise LLMError(f"The connection to {endpoint.root} dropped: {e}") from e
     finally:
         resp.close()
+        usage.note_llm(endpoint.model, "chat", seconds=time.monotonic() - started,
+                       prompt_tokens=(reported or {}).get("prompt_tokens") if reported else None,
+                       completion_tokens=(reported or {}).get("completion_tokens", 0) if reported else None,
+                       prompt_text="" if reported else json.dumps(messages, ensure_ascii=False, default=str),
+                       completion_text="".join(thought) + "".join(content)
+                       + json.dumps(list(calls.values()), ensure_ascii=False))
     message: dict = {"role": "assistant", "content": "".join(content)}
     if calls:
         message["tool_calls"] = [calls[i] for i in sorted(calls)]
@@ -359,7 +414,7 @@ def embed(endpoint: Endpoint, texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
     try:
-        resp = requests.post(
+        resp = _post("embed", endpoint.embedding_model, 
             f"{endpoint.root}/embeddings",
             headers=endpoint.headers(),
             json={"model": endpoint.embedding_model, "input": texts},
@@ -387,7 +442,7 @@ def transcribe(endpoint: Endpoint, audio: bytes, filename: str, mime_type: str,
     if language:
         data["language"] = language
     try:
-        resp = requests.post(f"{endpoint.root}/audio/transcriptions", headers=headers, data=data,
+        resp = _post("transcribe", endpoint.asr_model, f"{endpoint.root}/audio/transcriptions", headers=headers, data=data,
                              files={"file": (filename, audio, mime_type)}, timeout=COMPLETION_TIMEOUT_SECONDS * 3)
     except requests.RequestException as e:
         raise LLMError(f"Could not reach {endpoint.root}: {e}") from e
@@ -413,7 +468,7 @@ def look(endpoint: Endpoint, image: bytes, mime_type: str, system: str, user: st
 
     encoded = base64.b64encode(image).decode("ascii")
     try:
-        resp = requests.post(
+        resp = _post("vision", endpoint.vision_model, 
             f"{endpoint.root}/chat/completions",
             headers=endpoint.headers(),
             json={

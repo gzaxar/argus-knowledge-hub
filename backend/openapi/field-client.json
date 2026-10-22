@@ -226,6 +226,17 @@
             "title": "Id",
             "type": "string"
           },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
           "role": {
             "title": "Role",
             "type": "string"

@@ -13,10 +13,14 @@ itself: an instance administrator; for a high-risk export (a full one, or one ca
 recent sign-in, and, where separation of duties is in force, someone other than the export's requester. Exports
 carrying restricted classes are not scheduled: generating one needs a recent sign-in every time.
 
-A run does nothing when nothing was recorded since the last publication (`skip_unchanged`), and stops when the
-analysis needs a person — a new dependency without an outcome, an attachment to inspect, a secret found: the
-export waits on the Portability page, and the schedule waits for it to be published or revoked before it makes
-another. Three failures in a row switch the schedule off.
+A run does nothing when nothing was recorded since the last publication (`skip_unchanged`). A dependency that
+appeared since the schedule was set (a record now referring to something outside the scope, or to something no
+longer here) does not stop it: the run keeps it as an external reference — the outcome that changes neither the
+scope nor what the export carries — records that outcome on the schedule for the runs after it, and audits it.
+A run stops only when the analysis needs a person for something it cannot settle so — an attachment to inspect, a
+secret found, a dependency that can only be blocked or brought in: the export waits on the Portability page, and
+the schedule carries on with it once a person has settled it there (or revoked it). Three failures in a row switch
+the schedule off.
 
 Runs are started by `python -m app.portability scheduled` (a CronJob in the Helm chart, every 15 minutes) or by
 "Run now". A run claims its schedule in the database first, so two runners never run it at once.
@@ -223,6 +227,9 @@ def run(engine: Engine, db: Session, sched: PortabilitySchedule, cfg: Optional[s
                 return _finish(db, sched, "failed", f"{pending.id}: {e}", pending.id)
         if pending.state in ("generating", "verifying", "publishing"):
             return _finish(db, sched, "waiting", f"{pending.id} is still {pending.state}", pending.id)
+        if pending.state == "awaiting_approval":
+            # Its own export, stopped at the analysis by an earlier run: settled now if it can be, else it waits.
+            return _carry_on(engine, db, sched, pending, actor, cfg)
         return _finish(db, sched, "waiting", f"{pending.id} is {pending.state.replace('_', ' ')}: it needs a person "
                                              "on the Portability page before the next run", pending.id)
     base = db.get(PortabilityExport, sched.last_published_export_id or sched.source_export_id)
@@ -248,6 +255,33 @@ def run(engine: Engine, db: Session, sched: PortabilitySchedule, cfg: Optional[s
         exp_id = exp.id
         service.analyse_export(db, exp, actor, cfg)
         db.commit()
+    except Exception as e:  # noqa: BLE001 — every failure is recorded on the schedule
+        db.rollback()
+        return _finish(db, sched, "failed", str(e) or e.__class__.__name__, exp_id)
+    return _carry_on(engine, db, sched, exp, actor, cfg)
+
+
+def automatic_outcomes(exp: PortabilityExport) -> dict:
+    """The outcomes a run gives on its own to the dependencies its analysis left without one: each kept as an
+    external reference, where that is an outcome for it. Nothing joins the scope and nothing is left out."""
+    closure = (exp.analysis or {}).get("closure") or {}
+    unresolved = set(closure.get("unresolved") or [])
+    return {d["id"]: "external_reference" for d in closure.get("dependencies") or []
+            if d["id"] in unresolved and "external_reference" in (d.get("options") or [])}
+
+
+def _carry_on(engine: Engine, db: Session, sched: PortabilitySchedule, exp: PortabilityExport, actor: str,
+              cfg: service.Config) -> dict:
+    """From an analysed export of the schedule's to its publication: new dependencies settled as external
+    references, then the standing approval, generation and publication."""
+    try:
+        auto = automatic_outcomes(exp)
+        if auto:
+            exp = service.set_export_decisions(db, exp, auto, f"{actor} (automatic outcome)", cfg)
+            sched = db.get(PortabilitySchedule, sched.id)
+            sched.decisions = {**(sched.decisions or {}), **auto}
+            _event(db, sched, "schedule_outcomes", actor, {"export": exp.id, "decisions": auto})
+            db.commit()
         if not exp.analysis.get("ready"):
             return _finish(db, sched, "waiting", f"{exp.id} needs a person: " + "; ".join(
                 exp.analysis.get("warnings") or ["its analysis is not complete"]), exp.id)
@@ -262,7 +296,7 @@ def run(engine: Engine, db: Session, sched: PortabilitySchedule, cfg: Optional[s
         return _finish(db, sched, "published", f"published {exp.id} as {exp.git.get('tag')}", exp.id)
     except Exception as e:  # noqa: BLE001 — every failure is recorded on the schedule
         db.rollback()
-        return _finish(db, sched, "failed", str(e) or e.__class__.__name__, exp_id)
+        return _finish(db, sched, "failed", str(e) or e.__class__.__name__, exp.id)
 
 
 def run_due(engine: Engine, cfg: Optional[service.Config] = None, at: Optional[datetime] = None) -> list[dict]:

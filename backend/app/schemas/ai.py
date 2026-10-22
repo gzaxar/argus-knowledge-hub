@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -238,7 +238,22 @@ class AskMessageOut(BaseModel):
     stopped: Optional[str] = None
     error: Optional[str] = None
     seconds: Optional[float] = None
+    # Its person's rating of an answer, once given: up | down.
+    rating: Optional[str] = None
     created_at: Optional[datetime] = None
+
+
+class AskFeedbackIn(BaseModel):
+    """A rating of one of the conversation's answers: the `answer_index`-th (from 0), or the last."""
+    answer_index: Optional[int] = Field(default=None, ge=0)
+    rating: Literal["up", "down"]
+    comment: Optional[str] = Field(default=None, max_length=5000)
+
+
+class AskFeedbackOut(BaseModel):
+    rating: str
+    # A ticket was opened for the people who look after Ask ARGUS (an answer rated down).
+    reported: bool
 
 
 class AskConversationOut(BaseModel):

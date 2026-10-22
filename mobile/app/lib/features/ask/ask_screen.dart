@@ -268,6 +268,7 @@ class _AskScreenState extends ConsumerState<AskScreen> {
                             turn: _turns[i],
                             speaking: _speaking == i,
                             onReadAloud: () => _readAloud(_turns[i]),
+                            onRate: _conversationId == null ? null : (rating) => _rate(i, rating),
                           ),
                         ),
                 ),
@@ -346,6 +347,28 @@ class _AskScreenState extends ConsumerState<AskScreen> {
 
   void _say(String message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 
+  /// Rate an answer: up at once; down after asking, optionally, what was wrong.
+  Future<void> _rate(int index, String rating) async {
+    final turn = _turns[index];
+    final conversationId = _conversationId;
+    if (conversationId == null || turn.rating != null) return;
+    String? comment;
+    if (rating == 'down') {
+      comment = await showDialog<String>(context: context, builder: (_) => const _FeedbackDialog());
+      if (comment == null || !mounted) return;
+    }
+    try {
+      final reported = await ref.read(askRepositoryProvider).rate(conversationId, index, rating, comment: comment);
+      if (!mounted) return;
+      setState(() => turn.rating = rating);
+      _say(reported ? 'Thanks — sent, without your name, to the people who improve Ask ARGUS.' : 'Thanks!');
+    } on Problem catch (p) {
+      if (!mounted) return;
+      if (p.message.contains('rated already')) setState(() => turn.rating = rating);
+      _say(p.message);
+    }
+  }
+
   Widget _composer(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return SafeArea(
@@ -422,12 +445,56 @@ class _Hint extends StatelessWidget {
       );
 }
 
+/// What was wrong with an answer, optionally: the text (maybe empty) to send it, null to cancel.
+class _FeedbackDialog extends StatefulWidget {
+  const _FeedbackDialog();
+
+  @override
+  State<_FeedbackDialog> createState() => _FeedbackDialogState();
+}
+
+class _FeedbackDialogState extends State<_FeedbackDialog> {
+  final _comment = TextEditingController();
+
+  @override
+  void dispose() {
+    _comment.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Not useful'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          TextField(
+            key: const Key('ask-feedback-comment'),
+            controller: _comment,
+            autofocus: true,
+            maxLines: 4,
+            maxLength: 5000,
+            decoration: const InputDecoration(hintText: 'What was wrong or missing? (optional)'),
+          ),
+          Text('Sent without your name: the question, the answer and how it was found (workspace, model, lookups).',
+              style: Theme.of(context).textTheme.bodySmall),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(
+              key: const Key('ask-feedback-send'),
+              onPressed: () => Navigator.pop(context, _comment.text),
+              child: const Text('Send')),
+        ],
+      );
+}
+
 class _TurnView extends StatelessWidget {
-  const _TurnView({required this.turn, required this.speaking, required this.onReadAloud});
+  const _TurnView({required this.turn, required this.speaking, required this.onReadAloud, this.onRate});
 
   final AskTurn turn;
   final bool speaking;
   final VoidCallback onReadAloud;
+  /// Rate the answer (up | down); null while the conversation is not saved yet.
+  final void Function(String rating)? onRate;
 
   @override
   Widget build(BuildContext context) {
@@ -476,15 +543,33 @@ class _TurnView extends StatelessWidget {
                   onLink: (path) => context.push(path)),
             ),
             if (turn.finished)
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton(
+              Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                if (onRate != null && turn.rating == null) ...[
+                  IconButton(
+                    key: const Key('ask-rate-up'),
+                    tooltip: 'Useful',
+                    icon: const Icon(Icons.thumb_up_outlined),
+                    onPressed: () => onRate!('up'),
+                  ),
+                  IconButton(
+                    key: const Key('ask-rate-down'),
+                    tooltip: 'Not useful',
+                    icon: const Icon(Icons.thumb_down_outlined),
+                    onPressed: () => onRate!('down'),
+                  ),
+                ] else if (turn.rating != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Icon(turn.rating == 'up' ? Icons.thumb_up : Icons.thumb_down,
+                        size: 18, color: scheme.outline),
+                  ),
+                IconButton(
                   key: const Key('ask-read-aloud'),
                   tooltip: speaking ? 'Stop reading' : 'Read aloud',
                   icon: Icon(speaking ? Icons.stop_circle_outlined : Icons.volume_up_outlined),
                   onPressed: onReadAloud,
                 ),
-              ),
+              ]),
           ]),
         )
       else if (!turn.finished)

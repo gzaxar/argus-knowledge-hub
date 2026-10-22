@@ -90,6 +90,14 @@ class MemberDirectoryOut(BaseModel):
     name: Optional[str]
 
 
+class MemberCandidateOut(BaseModel):
+    """Someone who has signed in, as offered when adding a member: `member` when they are one already."""
+    user_id: str
+    email: str
+    name: Optional[str]
+    member: bool
+
+
 class MeOut(BaseModel):
     auth_type: Literal["pat", "oidc"]
     workspace_id: Optional[str] = None

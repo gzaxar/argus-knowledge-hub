@@ -7,6 +7,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { NewWorkspace } from "./pages/admin/NewWorkspace";
 import { AdminSettings } from "./pages/admin/Settings";
 import { AdminUsers } from "./pages/admin/Users";
+import { StatisticsPage } from "./pages/admin/Statistics";
 import { AdminWorkspaces } from "./pages/admin/Workspaces";
 import { ExportDetailPage } from "./pages/admin/portability/ExportDetail";
 import { ImportDetailPage } from "./pages/admin/portability/ImportDetail";
@@ -182,6 +183,7 @@ export function App() {
           <Route path="/admin/workspaces" element={<AdminWorkspaces />} />
           <Route path="/admin/new-workspace" element={<NewWorkspace />} />
           <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/statistics" element={<StatisticsPage />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/ai" element={<InstallationAI />} />
           <Route path="/admin/tokens" element={<AdminTokensPage />} />

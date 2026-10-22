@@ -45,6 +45,7 @@ import type {
   IntegrityReport,
   Me,
   Member,
+  MemberCandidate,
   MemberDirectoryEntry,
   MemberInput,
   MyWorkspace,
@@ -89,6 +90,8 @@ import type {
   HelpTopic,
   HelpTopicSummary,
   AskConversationDetail,
+  AskFeedbackResult,
+  Statistics,
   ChatEvent,
   KnowledgeStatus,
   SemanticGraph,
@@ -694,6 +697,9 @@ export const workspacesApi = {
     }),
   listMembers: (workspaceId: string) =>
     request<Member[]>(`/v1/workspaces/${workspaceId}/members`),
+  /** People who have signed in, matching `q` by e-mail or name: whom one can add as a member. */
+  memberCandidates: (workspaceId: string, q: string) =>
+    request<MemberCandidate[]>(`/v1/workspaces/${workspaceId}/member-candidates?${new URLSearchParams({ q })}`),
   upsertMember: (workspaceId: string, input: MemberInput) =>
     request<Member>(`/v1/workspaces/${workspaceId}/members`, { method: "PUT", body: json(input) }),
   removeMember: (workspaceId: string, userId: string) =>
@@ -1131,6 +1137,11 @@ export const aiApi = {
   reindexKnowledge: () => request<{ started: boolean }>("/v1/ai/knowledge/reindex", { method: "POST" }),
   conversations: () => request<AskConversation[]>("/v1/ai/conversations"),
   conversation: (id: string) => request<AskConversationDetail>(`/v1/ai/conversations/${encodeURIComponent(id)}`),
+  /** Rate one of the conversation's answers (the `answerIndex`-th, from 0), once; kept anonymously. */
+  rateAnswer: (id: string, answerIndex: number, rating: "up" | "down", comment?: string) =>
+    request<AskFeedbackResult>(`/v1/ai/conversations/${encodeURIComponent(id)}/feedback`, {
+      method: "POST", body: json({ answer_index: answerIndex, rating, comment: comment || null }),
+    }),
   deleteConversation: (id: string) =>
     request<void>(`/v1/ai/conversations/${encodeURIComponent(id)}`, { method: "DELETE" }),
   /** Changes the assistant proposed in a conversation; nothing changes until they are applied. */
@@ -2304,4 +2315,10 @@ export const spreadsheetImportApi = {
       plan: JSON.stringify(plan),
       expect_digest: digest,
     }),
+};
+
+/** How ARGUS is used, anonymously (administrators). */
+export const statisticsApi = {
+  get: (days: number, refreshStorage = false) =>
+    request<Statistics>(`/v1/admin/statistics?days=${days}${refreshStorage ? "&refresh_storage=true" : ""}`),
 };
