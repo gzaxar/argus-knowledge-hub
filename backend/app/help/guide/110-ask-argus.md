@@ -1,7 +1,7 @@
 ---
 title: Ask ARGUS
 summary: Asking questions in your own words, checking the answers, following up, letting the assistant propose changes you confirm, and using it on the phone.
-keywords: [ask, ask argus, rate, rating, feedback, thumbs up, thumbs down, not useful, wrong answer, chat, voice, speak, microphone, hands-free, read aloud, phone, mobile, assistant, ai, question, answer, conversation, propose, proposal, apply, discard, create with ai, help, how to, register from a photo, dictate, transcribe, document from a photo]
+keywords: [ask, ask argus, rate, rating, feedback, thumbs up, thumbs down, not useful, wrong answer, chat, voice, speak, microphone, hands-free, orb, repeat, slower, show the source, interrupt, read aloud, phone, mobile, assistant, ai, question, answer, conversation, propose, proposal, apply, discard, create with ai, help, how to, register from a photo, dictate, transcribe, document from a photo]
 order: 110
 ---
 
@@ -77,8 +77,27 @@ start the same.
    cite open the record. Follow-ups continue the conversation; **New conversation** starts afresh; **Earlier
    conversations** reopens past ones, the web's included.
 3. The **speaker** under an answer reads it aloud; **👍 / 👎** rate it (see *Rate an answer*).
-4. **Hands-free** (the headset icon): each answer is read aloud, then the app listens for the next question. It
-   stops when you say nothing, or when you press the headset again.
+4. **Hands-free** (the headset icon): a spoken conversation. See *Hands-free* below.
+
+## Hands-free
+
+The orb at the bottom shows what ARGUS is doing, in movement and shape as well as words: a slow glow while it
+waits (*Ready when you are*), rings that follow your voice while it listens (*Listening*), traces running into
+the core while it looks things up (*Looking it up…*), waves leaving the core while it answers (*ARGUS is
+answering*), and a still, angular shape with a message when something went wrong.
+
+- What you are saying shows under the orb as it is heard; it is sent when you pause.
+- Answers are spoken **short**: the essential in a sentence or two. The whole answer and its sources stay on the
+  screen. A longer answer ends with *Do you want the details?*: say **yes** for the rest, or ask something else.
+- An ambiguous question gets **one** clarifying question back.
+- Say **repeat** (*ripeti*), **slower** (*più lentamente*), **show the source** (*mostra la fonte*) or **stop**.
+- Silence does not end it: it keeps listening, and after a few minutes of nothing it waits for a tap on the orb.
+  **End** or *stop* ends it; so does leaving the screen.
+- To interrupt an answer, tap **Interrupt** or the orb. Interrupting by speaking is not possible: while the phone
+  speaks, its speech recognition cannot listen without hearing the phone itself.
+- A problem says which it is (ARGUS unreachable, microphone not allowed, speech not recognised) and offers
+  **Retry**; the conversation is kept.
+- With the phone's *reduce motion* setting on, the orb is drawn still, with an icon for each state.
 
 Spoken questions are turned into words by the phone's speech-recognition service (on Android usually Google's,
 on iOS Apple's), which may process the audio under its own terms; only the recognised words go to ARGUS.

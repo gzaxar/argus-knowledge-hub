@@ -148,3 +148,14 @@ def test_a_think_tag_split_across_pieces_is_still_left_out():
     assert "".join(f.feed(p) for p in ["Hello <thi", "nk>secret</th", "ink> world"]) == "Hello  world"
     f = _ThinkFilter()
     assert "".join(f.feed(p) for p in ["a < b", " and c"]) + f.pending == "a < b and c"
+
+
+def test_a_spoken_turn_asks_for_a_short_answer_and_one_clarifying_question(chat_world, monkeypatch):
+    w = chat_world
+    as_(w["ann"])
+    sent = scripted_stream(monkeypatch, [answer("One camera."), answer("Which camera?")])
+    client.post("/v1/ai/chat", headers=w["h"], json={"question": "What cameras?", "voice": True})
+    system = sent[0][0]["content"]
+    assert "spoken" in system and "exactly one" in system and "clarifying question" in system
+    client.post("/v1/ai/chat", headers=w["h"], json={"question": "And the other?"})
+    assert "spoken" not in sent[1][0]["content"], "only a spoken turn is asked for it"

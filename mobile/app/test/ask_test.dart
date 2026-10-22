@@ -37,13 +37,24 @@ class FakeVoice implements Voice {
   final said = <String>[];
   final heard = <String>[];
   bool allowed = true;
+  int listens = 0;
 
   @override
   Future<bool> canListen() async => allowed;
 
   @override
-  Future<void> listen(void Function(String words, bool last) onWords) async {
-    final words = heard.isEmpty ? '' : heard.removeAt(0);
+  bool get canListenWhileSpeaking => false;
+
+  @override
+  Future<void> setRate(double rate) async {}
+
+  @override
+  Future<void> listen(void Function(String words, bool last) onWords,
+      {void Function(double level)? onLevel, void Function(VoiceError error)? onError}) async {
+    listens++;
+    // Nobody speaking: the recogniser keeps listening, and nothing is reported.
+    if (heard.isEmpty) return;
+    final words = heard.removeAt(0);
     onWords(words, false);
     onWords(words, true);
   }
@@ -52,7 +63,7 @@ class FakeVoice implements Voice {
   Future<void> stopListening() async {}
 
   @override
-  Future<void> speak(String text) async => said.add(text);
+  Future<void> speak(String text, {void Function()? onWord}) async => said.add(text);
 
   @override
   Future<void> quiet() async {}
@@ -82,7 +93,11 @@ void main() {
     expect(app.server.sent('POST', '/v1/ai/chat').last, {'question': 'And after that?', 'conversation_id': 'conv-1'});
   });
 
-  testWidgets('a spoken question is sent, and hands-free reads the answer aloud and listens again', (tester) async {
+  testWidgets('hands-free: the question is heard and sent as spoken, the answer said, and it keeps listening '
+      'through silence until it is ended', (tester) async {
+    // Reduced motion: the orb is drawn still, so the screen settles (its moving form: handsfree_test.dart).
+    tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
     final voice = FakeVoice()..heard.add('How is IP-0001 reset?');
     final app = await start(tester, overrides: [voiceProvider.overrideWithValue(voice)]);
     app.server.routes['GET /v1/ai/status'] = _json(_usable);
@@ -91,11 +106,23 @@ void main() {
 
     await app.tap('ask-handsfree');
 
-    expect(app.server.sent('POST', '/v1/ai/chat').single['question'], 'How is IP-0001 reset?');
+    expect(find.byKey(const Key('ask-handsfree-panel')), findsOneWidget);
+    expect(find.byKey(const Key('ask-input')), findsNothing, reason: 'the panel takes the composer\'s place');
+    final sent = app.server.sent('POST', '/v1/ai/chat').single;
+    expect(sent['question'], 'How is IP-0001 reset?');
+    expect(sent['voice'], true, reason: 'a spoken turn asks for a short answer');
     expect(voice.said, ['Follow PROC-12: switch SLICE-IP-0001 off, wait a minute.'], reason: 'read without Markdown marks');
-    // It listened again and heard nothing: hands-free ends, no second question is sent.
-    expect(app.server.sent('POST', '/v1/ai/chat'), hasLength(1));
+    expect(find.textContaining('Follow PROC-12', findRichText: true), findsOneWidget,
+        reason: 'the full answer and its sources stay on the screen');
+    // Nothing more is said: it is still on, and listening.
+    expect(tester.widget<IconButton>(find.byKey(const Key('ask-handsfree'))).isSelected, isTrue);
+    expect(find.text('Listening'), findsOneWidget);
+    expect(voice.listens, 2);
+
+    await app.tap('ask-handsfree-close');
+    expect(find.byKey(const Key('ask-handsfree-panel')), findsNothing);
     expect(tester.widget<IconButton>(find.byKey(const Key('ask-handsfree'))).isSelected, isFalse);
+    expect(app.server.sent('POST', '/v1/ai/chat'), hasLength(1));
   });
 
   testWidgets('a finished answer can be read aloud on request', (tester) async {
