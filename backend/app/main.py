@@ -245,6 +245,9 @@ from app.routers import statistics as statistics_router  # noqa: E402
 
 app.include_router(help_router.router)
 app.include_router(statistics_router.router)
+from app.routers import activities as activities_router  # noqa: E402
+
+app.include_router(activities_router.router)
 for _r in portability_router.ROUTERS:
     app.include_router(_r)
 

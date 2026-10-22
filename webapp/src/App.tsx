@@ -9,6 +9,7 @@ import { AdminSettings } from "./pages/admin/Settings";
 import { AdminUsers } from "./pages/admin/Users";
 import { StatisticsPage } from "./pages/admin/Statistics";
 import { DocumentReshape } from "./pages/documents/Reshape";
+import { ActivitiesPage } from "./pages/activities/Activities";
 import { DocumentTemplatePage, DocumentTemplates } from "./pages/documents/Templates";
 import { AdminWorkspaces } from "./pages/admin/Workspaces";
 import { ExportDetailPage } from "./pages/admin/portability/ExportDetail";
@@ -127,6 +128,7 @@ export function App() {
           <Route path="/documents/suggestions" element={<DocumentSuggestions />} />
           <Route path="/documents/new" element={<DocumentForm />} />
           <Route path="/documents/reshape" element={<DocumentReshape />} />
+          <Route path="/activities" element={<ActivitiesPage />} />
           <Route path="/documents/templates" element={<DocumentTemplates />} />
           <Route path="/documents/templates/:ref" element={<DocumentTemplatePage />} />
           <Route path="/documents/:uid" element={<DocumentDetail />} />

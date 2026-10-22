@@ -68,6 +68,7 @@ const SECTIONS: Record<SectionKey, SectionConfig> = {
     links: [
       { to: "/tickets", label: "All tickets", end: true },
       { to: "/tickets/board", label: "Board" },
+      { to: "/activities", label: "Activities" },
       { to: "/tickets/search", label: "Search" },
       { to: "/search/advanced?entity=tickets", label: "Advanced query" },
       { to: "/tickets/workflows", label: "Workflows" },

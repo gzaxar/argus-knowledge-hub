@@ -5,6 +5,7 @@ README.md
 analysis_options.yaml
 git_push.sh
 lib/api.dart
+lib/api/activities_api.dart
 lib/api/ai_api.dart
 lib/api/asset_subresources_api.dart
 lib/api/assets_api.dart
@@ -37,6 +38,9 @@ lib/auth/authentication.dart
 lib/auth/http_basic_auth.dart
 lib/auth/http_bearer_auth.dart
 lib/auth/oauth.dart
+lib/model/activity_action.dart
+lib/model/activity_change.dart
+lib/model/activity_in.dart
 lib/model/ai_status.dart
 lib/model/approve_action.dart
 lib/model/ask_conversation_detail.dart
@@ -56,6 +60,7 @@ lib/model/asset_update.dart
 lib/model/assist_in.dart
 lib/model/attachment_out.dart
 lib/model/capabilities_out.dart
+lib/model/capture_in.dart
 lib/model/chat_in.dart
 lib/model/close_review_in.dart
 lib/model/decide_in.dart

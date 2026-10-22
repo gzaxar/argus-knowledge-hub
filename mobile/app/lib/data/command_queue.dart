@@ -9,6 +9,7 @@ import '../core/local_store.dart';
 import '../core/problem.dart';
 import '../domain/capture.dart';
 import 'api_service.dart';
+import 'activity_repository.dart';
 import 'capture_repositories.dart';
 import 'replacement_repositories.dart';
 
@@ -58,7 +59,7 @@ class PendingCommand {
 
   final String id;
   final String key; // the idempotency key, the same for every retry (§3.2)
-  final String kind; // ticket.create, ticket.comment, ticket.transition, attachment.upload, replacement.submit, intake.outcome
+  final String kind; // ticket.create, ticket.comment, ticket.transition, attachment.upload, replacement.submit, intake.outcome, activity.create, activity.action
   final String workspaceId;
   final String label; // what the person did, in their words: "Report: pump tripped"
   final Map<String, Object?> payload;
@@ -188,7 +189,7 @@ class CommandExecutor {
           uid: p['uid'] as String,
           title: p['title'] as String,
           description: (p['description'] ?? '') as String,
-          subjectUid: p['asset_uid'] as String,
+          subjectUid: p['asset_uid'] as String?,
           kindUid: p['schema_uid'] as String?,
           attributes: Map<String, Object?>.from((p['attributes'] ?? const {}) as Map),
         );
@@ -224,6 +225,14 @@ class CommandExecutor {
           ..evidence = p['evidence'] == null ? null : Map<String, Object?>.from(p['evidence'] as Map);
         final r = await ReplacementRepository(api).submit(d);
         return r.applied ? 'Replaced.' : 'Waiting for review: ${r.reasons.join('; ')}.';
+      case 'activity.create':
+        // The uid was chosen on the phone and the key is the same at every retry: one activity, however often.
+        await ActivityRepository(api).create(Map<String, Object?>.from(p), key: c.key);
+        return null;
+      case 'activity.action':
+        await ActivityRepository(api).act(p['id'] as String, p['action'] as String,
+            body: Map<String, Object?>.from((p['body'] ?? const {}) as Map), key: c.key);
+        return null;
       case 'intake.outcome':
         await IntakeRepository(api).recordOutcome(p['run_id'] as String, p['record_uid'] as String,
             Map<String, Object?>.from((p['final'] ?? const {}) as Map));

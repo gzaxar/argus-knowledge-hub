@@ -1985,3 +1985,20 @@ export interface ReshapeGeneration {
            document_date_basis?: string | null; document_date_confirmed?: boolean | null };
   issues: unknown[]; model: string | null; created_at: string; created_by: string | null;
 }
+
+/** Activities (backend routers/activities.py). An id is a uid, or `<series uid>@<occurrence key>`. */
+export type ActivityStatus = "planned" | "in_progress" | "completed" | "cancelled" | "skipped";
+export interface Activity {
+  id: string; uid: string | null; series_uid: string | null; occurrence_key: string | null; workspace_id: string;
+  owner_user_id: string | null; assignee_user_id: string | null; title: string; description: string | null;
+  visibility: "workspace" | "private"; status: ActivityStatus; timezone: string; all_day: boolean;
+  planned_start: string | null; planned_end: string | null; due_at: string | null;
+  actual_start: string | null; actual_end: string | null; asset_uid: string | null; ticket_uid: string | null;
+  document_uid: string | null; note: string | null; recurrence: string | null; recurring: boolean; overdue: boolean;
+  created_at: string | null; may_change: boolean; provenance?: Record<string, unknown> | null;
+  series?: { uid: string; rrule: string; first_local: string; timezone: string; text: string; ended: boolean };
+}
+export interface ActivityPage {
+  items: Activity[]; counts: Record<string, number>; total: number; offset: number; limit: number;
+  next_offset: number | null; truncated: boolean; basis: "planned" | "actual"; timezone: string;
+}

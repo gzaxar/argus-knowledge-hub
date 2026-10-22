@@ -224,6 +224,21 @@ class _AssetBodyState extends ConsumerState<_AssetBody> {
           onTap: () => context.push('/document/${d.uid}'),
         ),
       Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.tonalIcon(
+            key: const Key('asset-capture'),
+            onPressed: () => context.push(Uri(path: '/capture', queryParameters: {
+              'asset': a.uid,
+              'label': [a.key, a.name].where((x) => x.isNotEmpty).join(' — '),
+            }).toString()),
+            icon: const Icon(Icons.mic),
+            label: const Text('Capture by voice: a fault, or work done'),
+          ),
+        ),
+      ),
+      Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Align(
           alignment: Alignment.centerLeft,

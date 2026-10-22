@@ -41,16 +41,18 @@ Please follow the [installation procedure](#installation--usage) and then run th
 import 'package:argus_api/api.dart';
 
 
-final api_instance = AiApi();
-final chatIn = ChatIn(); // ChatIn | 
-final authorization = authorization_example; // String | 
+final api_instance = ActivitiesApi();
+final activityId = activityId_example; // String | 
+final action = action_example; // String | 
 final xWorkspaceId = xWorkspaceId_example; // String | 
+final authorization = authorization_example; // String | 
+final activityAction = ActivityAction(); // ActivityAction | 
 
 try {
-    final result = api_instance.chat(chatIn, authorization, xWorkspaceId);
+    final result = api_instance.actOnActivity(activityId, action, xWorkspaceId, authorization, activityAction);
     print(result);
 } catch (e) {
-    print('Exception when calling AiApi->chat: $e\n');
+    print('Exception when calling ActivitiesApi->actOnActivity: $e\n');
 }
 
 ```
@@ -61,6 +63,12 @@ All URIs are relative to *http://localhost*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
+*ActivitiesApi* | [**actOnActivity**](doc//ActivitiesApi.md#actonactivity) | **POST** /v1/activities/{activity_id}/{action} | Act On Activity
+*ActivitiesApi* | [**changeActivity**](doc//ActivitiesApi.md#changeactivity) | **PATCH** /v1/activities/{activity_id} | Change Activity
+*ActivitiesApi* | [**classifyCapture**](doc//ActivitiesApi.md#classifycapture) | **POST** /v1/capture/classify | Classify Capture
+*ActivitiesApi* | [**createActivity**](doc//ActivitiesApi.md#createactivity) | **POST** /v1/activities | Create Activity
+*ActivitiesApi* | [**getActivity**](doc//ActivitiesApi.md#getactivity) | **GET** /v1/activities/{activity_id} | Get Activity
+*ActivitiesApi* | [**listActivities**](doc//ActivitiesApi.md#listactivities) | **GET** /v1/activities | List Activities
 *AiApi* | [**chat**](doc//AiApi.md#chat) | **POST** /v1/ai/chat | Chat
 *AiApi* | [**draftADocument**](doc//AiApi.md#draftadocument) | **POST** /v1/ai/draft-document | Draft A Document
 *AiApi* | [**getConversation**](doc//AiApi.md#getconversation) | **GET** /v1/ai/conversations/{conversation_id} | Get Conversation
@@ -171,6 +179,9 @@ Class | Method | HTTP request | Description
 ## Documentation For Models
 
  - [AIStatus](doc//AIStatus.md)
+ - [ActivityAction](doc//ActivityAction.md)
+ - [ActivityChange](doc//ActivityChange.md)
+ - [ActivityIn](doc//ActivityIn.md)
  - [ApproveAction](doc//ApproveAction.md)
  - [AskConversationDetail](doc//AskConversationDetail.md)
  - [AskConversationOut](doc//AskConversationOut.md)
@@ -189,6 +200,7 @@ Class | Method | HTTP request | Description
  - [AssistIn](doc//AssistIn.md)
  - [AttachmentOut](doc//AttachmentOut.md)
  - [CapabilitiesOut](doc//CapabilitiesOut.md)
+ - [CaptureIn](doc//CaptureIn.md)
  - [ChatIn](doc//ChatIn.md)
  - [CloseReviewIn](doc//CloseReviewIn.md)
  - [DecideIn](doc//DecideIn.md)

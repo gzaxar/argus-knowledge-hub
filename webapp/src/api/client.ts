@@ -92,6 +92,8 @@ import type {
   AskConversationDetail,
   AskFeedbackResult,
   Statistics,
+  Activity,
+  ActivityPage,
   TemplateListing,
   TemplateChoice,
   TemplateVariant,
@@ -2378,4 +2380,22 @@ export const reshapeApi = {
   /** How the document's revisions were made from raw text. */
   generations: (documentUid: string) =>
     request<ReshapeGeneration[]>(`/v1/documents/${encodeURIComponent(documentUid)}/generations`),
+};
+
+/** An activity id in a URL path: an occurrence's `@` and `:` stay readable. */
+const activityPath = (id: string) => encodeURIComponent(id).replace(/%40/g, "@").replace(/%3A/g, ":");
+
+export const activitiesApi = {
+  list: (params: Record<string, string | number | boolean | undefined>) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") q.set(k, String(v));
+    return request<ActivityPage>(`/v1/activities?${q}`);
+  },
+  get: (id: string) => request<Activity>(`/v1/activities/${activityPath(id)}`),
+  create: (body: Record<string, unknown>) =>
+    request<Activity>("/v1/activities", { method: "POST", body: json(body) }),
+  change: (id: string, changes: Record<string, unknown>, scope: "this" | "future" | "series" = "this") =>
+    request<Activity>(`/v1/activities/${activityPath(id)}?scope=${scope}`, { method: "PATCH", body: json(changes) }),
+  act: (id: string, action: "start" | "complete" | "skip" | "cancel" | "reopen", body: Record<string, unknown> = {}) =>
+    request<Activity>(`/v1/activities/${activityPath(id)}/${action}`, { method: "POST", body: json(body) }),
 };

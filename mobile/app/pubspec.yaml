@@ -43,6 +43,7 @@ dependencies:
   # Export: send a record's PDF or Markdown on (mail, Drive, Files), and print the PDF.
   share_plus: ^13.3.1
   printing: ^5.15.1
+  flutter_timezone: ^5.1.1
 
 dev_dependencies:
   flutter_test:

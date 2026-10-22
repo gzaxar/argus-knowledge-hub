@@ -240,7 +240,7 @@ class TicketCommands {
     required String uid,
     required String title,
     required String description,
-    required String subjectUid,
+    String? subjectUid,
     String? kindUid,
     Map<String, Object?> attributes = const {},
   }) async {
