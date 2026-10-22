@@ -368,10 +368,26 @@ def _temporary(exc: smtplib.SMTPException) -> bool:
     return getattr(exc, "smtp_code", 500) < 500
 
 
+# Domains that can never receive mail (RFC 2606 / 6761): test and example accounts carry them, and sending to
+# them only bounces back to the sender's mailbox.
+UNDELIVERABLE_TLDS = (".test", ".invalid", ".example", ".localhost", ".local")
+UNDELIVERABLE_DOMAINS = {"example.com", "example.org", "example.net"}
+
+
+def deliverable(address: str) -> bool:
+    """Whether mail to `address` can arrive at all: an address, at a domain that can exist."""
+    if "@" not in (address or ""):
+        return False
+    domain = address.rsplit("@", 1)[1].strip().lower().rstrip(">").rstrip(".")
+    return bool(domain) and domain not in UNDELIVERABLE_DOMAINS and not domain.endswith(UNDELIVERABLE_TLDS) \
+        and "." in domain
+
+
 def deliver_pending(db: Session, at: Optional[datetime] = None) -> int:
     """E-mail the notifications not yet sent, when SMTP is configured: each one as it happens, or together in
-    a person's daily digest, as they chose (none of what they muted). A recipient with no e-mail address, or
-    one who wants none, keeps it in the app only. What is older than NOTIFY_EMAIL_MAX_AGE_HOURS (48) is not
+    a person's daily digest, as they chose (none of what they muted). A recipient with no e-mail address, one at a
+    domain that cannot receive mail (a test account: .test, .invalid, example.com…), or one who wants none, keeps
+    it in the app only. What is older than NOTIFY_EMAIL_MAX_AGE_HOURS (48) is not
     e-mailed late — a mail server set up today does not send a year of history. A recipient refused for good
     (5xx) does not stop the others; a mail server that cannot be reached, or defers (4xx, as a relay does until
     it is signed in to), leaves the rest for the next run."""
@@ -399,7 +415,7 @@ def deliver_pending(db: Session, at: Optional[datetime] = None) -> int:
         address = (user.email if user else None) or (n.recipient if "@" in n.recipient else "")
         pref = preference(db, user)
         mode = pref.email if pref is not None else "instant"
-        if n.created_at < oldest or "@" not in address or mode == "off" or \
+        if n.created_at < oldest or not deliverable(address) or mode == "off" or \
                 category_of(n.kind) in ((pref.muted or []) if pref is not None else []):
             n.delivered_at = at
         elif mode == "digest" and pref is not None:
@@ -462,6 +478,8 @@ def send_test(user: User) -> str:
         raise MailError("E-mail is not configured on this installation (SMTP_HOST).")
     if not user.email or "@" not in user.email:
         raise MailError("Your account has no e-mail address.")
+    if not deliverable(user.email):
+        raise MailError(f"{user.email} is at a domain that cannot receive mail.")
     smtp = _connect()
     try:
         smtp.send_message(_message(user.email, "[ARGUS] Test message",
