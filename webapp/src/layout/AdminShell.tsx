@@ -59,7 +59,7 @@ export function AdminShell() {
       <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
         <div className="border-b border-slate-200 px-4 py-4">
           <Link to="/" className="text-xs text-slate-500 hover:text-slate-700">
-            &larr; Back to ARGUS Asset Knowledge Hub
+            &larr; Back to ARGUS Knowledge Hub
           </Link>
           <p className="mt-1 text-sm font-semibold text-slate-900">Administration</p>
         </div>

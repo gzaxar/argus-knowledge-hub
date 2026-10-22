@@ -391,7 +391,7 @@ export function AppShell() {
       <aside className="flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white">
         <Link to="/" className="flex items-baseline gap-2 border-b border-slate-200 px-4 py-2.5" title="Operations cockpit">
           <span className="text-sm font-bold tracking-wide text-slate-900">ARGUS</span>
-          <span className="truncate text-[11px] text-slate-500">Assets · Service · Knowledge</span>
+          <span className="truncate text-sm text-slate-600">Knowledge Hub</span>
         </Link>
         <WorkspaceSwitcher />
 
