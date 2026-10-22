@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ApiError, workspacesApi } from "../../api/client";
 import { getActiveProfile } from "../../api/session";
+import { SortHeader, useSort } from "../../components/SortableTable";
 
 export function AdminUsers() {
   const queryClient = useQueryClient();
@@ -24,6 +25,18 @@ export function AdminUsers() {
       return words.every((w) => text.includes(w));
     });
   }, [users.data, query, adminsOnly]);
+  // Last login newest first; people who never signed in go last whichever the direction.
+  const { sorted, sort, toggle } = useSort(
+    shown,
+    {
+      email: (u) => u.email,
+      name: (u) => u.name,
+      last_login: (u) => (u.last_login_at ? new Date(u.last_login_at) : null),
+      admin: (u) => u.is_admin,
+    },
+    { key: "email", dir: "asc" },
+    "admin-users",
+  );
 
   const setAdminMutation = useMutation({
     mutationFn: ({ userId, isAdmin }: { userId: string; isAdmin: boolean }) =>
@@ -74,14 +87,15 @@ export function AdminUsers() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
               <tr>
-                <th className="px-4 py-2">Email</th>
-                <th className="px-4 py-2">Name</th>
-                <th className="px-4 py-2">Last login</th>
-                <th className="px-4 py-2 text-center">Admin</th>
+                <SortHeader label="Email" column="email" sort={sort} onSort={toggle} />
+                <SortHeader label="Name" column="name" sort={sort} onSort={toggle} />
+                <SortHeader label="Last login" column="last_login" sort={sort} onSort={toggle} time />
+                <SortHeader label="Admin" column="admin" sort={sort} onSort={(k) => toggle(k, "desc")}
+                            className="px-4 py-2 text-center" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {shown.map((u) => (
+              {sorted.map((u) => (
                 <tr key={u.id}>
                   <td className="px-4 py-2 font-medium text-slate-900">{u.email}</td>
                   <td className="px-4 py-2 text-slate-500">{u.name ?? "—"}</td>
