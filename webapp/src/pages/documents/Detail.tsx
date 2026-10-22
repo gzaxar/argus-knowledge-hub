@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { reshapeApi } from "../../api/client";
 import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
 import {
   ApiError,
@@ -424,8 +425,18 @@ export function DocumentDetail() {
             + New revision
           </button>
         )}
+        {!openRevision && doc.current_revision_uid && (
+          <Link
+            to={`/documents/reshape?document=${encodeURIComponent(doc.uid)}${doc.document_type_uid ? `&document_type_uid=${encodeURIComponent(doc.document_type_uid)}` : ""}`}
+            className="rounded border border-dashed border-slate-300 px-3 py-1 text-xs text-slate-500 hover:bg-slate-50"
+            title="A new draft revision rewritten from notes, an e-mail or a transcript"
+          >
+            + Revision from raw text
+          </Link>
+        )}
       </div>
 
+      {viewed && <MadeFromRawText documentUid={doc.uid} revisionUid={viewed.uid} state={viewed.state} />}
       {viewed && (
         <div className="mt-4 rounded-lg border border-slate-200 bg-white p-5">
           <div className="flex items-center justify-between">
@@ -795,6 +806,31 @@ export function DocumentDetail() {
           &larr; All documents
         </Link>
       </p>
+    </div>
+  );
+}
+
+const OPERATIONAL = ["Procedure", "Safety Document", "Runbook", "Work Instruction"];
+
+/** How this revision was made from raw text, when it was: the template and its exact version, where the original
+ * is, the dates; and, until it is published, that it is not yet a validated instruction. */
+function MadeFromRawText({ documentUid, revisionUid, state }: { documentUid: string; revisionUid: string; state: string }) {
+  const gens = useQuery({
+    queryKey: ["document-generations", documentUid],
+    queryFn: () => reshapeApi.generations(documentUid),
+  });
+  const g = gens.data?.find((x) => x.revision_uid === revisionUid);
+  if (!g) return null;
+  const unpublished = !["published", "superseded", "retired"].includes(state);
+  return (
+    <div className="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs text-indigo-900">
+      Reworked from raw text ({g.source.kind}) with template <b>{g.template.id}</b> v{g.template.version}
+      {" "}({g.template.scope}){g.model ? `, model ${g.model}` : ""}, on {new Date(g.created_at).toLocaleString()}.
+      {g.dates.document_date && <> Document date {g.dates.document_date}{g.dates.document_date_basis ? ` (${g.dates.document_date_basis}${g.dates.document_date_confirmed ? ", confirmed" : ""})` : ""}.</>}
+      {" "}The original text is among this revision's files.
+      {unpublished && OPERATIONAL.some((t) => g.template.id.startsWith(t.toLowerCase().replace(/ /g, "-"))) && (
+        <span className="mt-1 block font-medium text-amber-800">Not usable as an operational instruction until validated and published.</span>
+      )}
     </div>
   );
 }

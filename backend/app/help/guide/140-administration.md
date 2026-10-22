@@ -27,19 +27,22 @@ administrators:
 
 ## Statistics
 
-**Administration → Statistics** opens with the **storage**: for the attachment files, the database and the
-portability archives, what is used, the room planned (the volume's size in the deployment), what is still
-available (the planned room left or the free space on the disk under it, whichever runs out first; the
-database's disk is on another node and is not seen), the growth per day and, at that rate, roughly when it is
-full; then the attachments' growth since their first upload, the daily measurements (taken hourly, the trend
-builds up from the first day), the attachments by workspace and the largest database tables. **Measure now**
-measures again.
+**Administration → Statistics** has four tabs, for the last 7 to 365 days:
 
-It then shows, for the last 7 to 365 days: requests per day by client (web, Android app,
-assistants through MCP, scripts); people per day and the most at the same time (per five minutes); the language
-model's calls and tokens by model, purpose and workspace; activity in each workspace (requests, changes,
-records created, Ask questions); the most used, slowest and failing functions; how Ask ARGUS answers; and how its
-answers were rated, with those rated not useful.
+- **Usage**: who is on now and the most at the same time (per five minutes), sign-ins, requests and people per
+  day by client (web, Android app, assistants through MCP, scripts), and the activity in each workspace
+  (requests, changes, records created, Ask questions).
+- **AI**: the language model's calls and tokens by day, model, purpose and workspace; Ask ARGUS questions, how
+  the answers ended, the lookups it uses most, and the ratings, with the answers rated not useful (each one a
+  ticket).
+- **Storage**: for the attachment files, the database and the portability archives, what is used, the room
+  planned (the volume's size in the deployment), what is still available (the planned room left or the free
+  space on the disk under it, whichever runs out first; the database's disk is on another node and is not seen),
+  the growth per day and, at that rate, roughly when it is full; the attachments' growth since their first
+  upload, the daily measurements (taken hourly, the trend builds up from the first day), the attachments by
+  workspace and the largest database tables. **Measure now** measures again.
+- **Nerds**: for whoever looks after ARGUS — the most used routes, the slowest, those that failed (server
+  errors), and the most used by client.
 
 Nobody is named: people are counted as a keyed hash per five minutes, and the ratings keep no author. Tokens a
 provider does not report are estimated. `ARGUS_USAGE_STATS=0` switches the counting off.

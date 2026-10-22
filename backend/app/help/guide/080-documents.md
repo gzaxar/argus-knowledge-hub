@@ -1,7 +1,7 @@
 ---
 title: Documents and the knowledge base
 summary: Writing procedures, manuals and reports; the first revision and later ones, review, approval and publication; confidentiality, sharing, retention and where a document applies.
-keywords: [document, documents, procedure, manual, report, knowledge base, revision, draft, submit, review, reject, approval, approve, publish, new revision, edit, retire, confidentiality, riservato, shared, global, retention, markdown, controlled document, attachment, related by meaning, export, pdf, print, download, markdown file, .md, save as pdf]
+keywords: [document, documents, rework, raw text, notes, email, e-mail, transcript, minutes, template, templates, variant, rielabora, testo grezzo, procedure, manual, report, knowledge base, revision, draft, submit, review, reject, approval, approve, publish, new revision, edit, retire, confidentiality, riservato, shared, global, retention, markdown, controlled document, attachment, related by meaning, export, pdf, print, download, markdown file, .md, save as pdf]
 order: 80
 ---
 
@@ -24,6 +24,47 @@ drawings, notes. A document is linked to the equipment, types and other document
 
 Saving creates the document and its **revision 1, a draft**. On the phone, a document can also start from a
 recording or a photo of a page, and **Tidy with AI** writes rough text up (see *Guided and AI-assisted entry*).
+
+## Rework from raw text
+
+**Documents → Rework from raw text** turns notes, an e-mail, a transcript or an imported page into a draft that
+follows the template of a document type. It is also offered from **New document** ("Rework with the template",
+for the text you described or the file you added) and on a document's page (**+ Revision from raw text**).
+
+1. Paste the text, or open a `.txt`, `.md` or `.eml` file. Say what it is and, if you know it, when it was
+   written. An e-mail's own Date / Inviato line is read first. Tick **The text was written now** only if it was.
+2. Choose the document type. The page says which template applies and why: your choice, else your own copy set
+   as yours, else the workspace's variant, else the official template.
+3. **Preview**: nothing is saved. You see the original (lines used in the draft in green, lines not carried over
+   in amber), the draft to edit, and what to check: what is missing (`[da confermare]` in the draft), what was
+   deduced (`[da verificare]`), the dates and where each came from, weekdays that do not match their dates,
+   lines that read like instructions to an assistant (always treated as text), and records the text names, to
+   link if you want.
+4. **Save as draft**: a new document, or the document's next revision, in draft. The original text is kept among
+   the revision's files, and the page shows the template and the exact version that made it. Submit, approve and
+   publish as usual. A procedure, work instruction, safety document or runbook says it is not usable as an
+   instruction until it is validated and published. A drawing or manual card points to the original.
+
+The workspace's AI settings apply: confidential (*riservato*) material is sent to the model only where the
+workspace allows it. **Draft with AI** and **Review** on the editor are unchanged and work on these drafts too.
+
+## Document templates
+
+**Documents → Templates** lists, for each type, the official template shipped with ARGUS (read-only), the
+workspace's variants and your own copies. **Make a workspace variant** (for those who may approve documents) or
+**Make my copy** (for you alone) starts from the official one. In the editor:
+
+- the front matter declares fields and sections; the body uses `{{field:key}}`, `{{section:key}}`,
+  `{{meta:title}}`, and `{{#section:key}} … {{/section:key}}` around what is left out when empty. Mistakes are
+  shown with their line as you type;
+- **Try** runs the draft template on sample text, saving nothing;
+- **Publish** makes a new version that never changes. **Use it by default** makes it the one that applies, in
+  the workspace or for you;
+- **Compare** shows your changes against the official version it came from, and, when ARGUS ships a newer
+  official version, what changed in it. Your variant is never updated by itself.
+
+The rules every template follows cannot be changed by a template: nothing invented, sources quoted, a person
+approves.
 
 ## From draft to published
 

@@ -8,6 +8,8 @@ import { NewWorkspace } from "./pages/admin/NewWorkspace";
 import { AdminSettings } from "./pages/admin/Settings";
 import { AdminUsers } from "./pages/admin/Users";
 import { StatisticsPage } from "./pages/admin/Statistics";
+import { DocumentReshape } from "./pages/documents/Reshape";
+import { DocumentTemplatePage, DocumentTemplates } from "./pages/documents/Templates";
 import { AdminWorkspaces } from "./pages/admin/Workspaces";
 import { ExportDetailPage } from "./pages/admin/portability/ExportDetail";
 import { ImportDetailPage } from "./pages/admin/portability/ImportDetail";
@@ -124,6 +126,9 @@ export function App() {
           <Route path="/documents/search" element={<DocumentSearch />} />
           <Route path="/documents/suggestions" element={<DocumentSuggestions />} />
           <Route path="/documents/new" element={<DocumentForm />} />
+          <Route path="/documents/reshape" element={<DocumentReshape />} />
+          <Route path="/documents/templates" element={<DocumentTemplates />} />
+          <Route path="/documents/templates/:ref" element={<DocumentTemplatePage />} />
           <Route path="/documents/:uid" element={<DocumentDetail />} />
 
           <Route path="/graph" element={<GraphExplorer />} />

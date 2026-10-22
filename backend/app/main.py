@@ -173,7 +173,12 @@ app.include_router(assets.relations_router)
 app.include_router(issues.router)
 app.include_router(glpi.router)
 app.include_router(spreadsheet_import.router)
+# Before the documents' own routes: /v1/documents/reshape is not a document's uid.
+from app.routers import document_templates as document_templates_router  # noqa: E402
+app.include_router(document_templates_router.documents_router)
 app.include_router(documents.router)
+app.include_router(document_templates_router.router)
+app.include_router(document_templates_router.ai_router)
 app.include_router(asset_subresources.router)
 app.include_router(attachments.router)
 app.include_router(global_values.router)
