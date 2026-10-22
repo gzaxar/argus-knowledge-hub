@@ -590,6 +590,11 @@ export interface MemberDirectoryEntry {
   name: string | null;
 }
 
+export interface MemberCandidate extends MemberDirectoryEntry {
+  /** Already a member of the workspace. */
+  member: boolean;
+}
+
 export interface Member {
   user_id: string;
   email: string;
@@ -1336,7 +1341,15 @@ export interface AskMessage {
   stopped: string | null;
   error: string | null;
   seconds: number | null;
+  /** Its person's rating of an answer, once given. */
+  rating?: "up" | "down" | null;
   created_at: string | null;
+}
+
+export interface AskFeedbackResult {
+  rating: "up" | "down";
+  /** A ticket was opened for the people who look after Ask ARGUS. */
+  reported: boolean;
 }
 
 export interface AskConversationDetail extends AskConversation {
@@ -1848,4 +1861,47 @@ export interface SemanticGraph {
   available: boolean;
   reason: string | null;
   basis: string | null;
+}
+
+/** GET /v1/admin/statistics: anonymous usage (backend routers/statistics.py). */
+export interface StatisticsFunction { function: string; count: number; errors: number; avg_ms: number }
+export interface StatisticsLLMRow {
+  calls: number; failures: number; prompt_tokens: number; completion_tokens: number; estimated_calls: number;
+  avg_seconds: number; model?: string; purpose?: string; workspace?: string;
+}
+export interface StorageArea {
+  area: "attachments" | "database" | "portability" | string;
+  used_bytes: number; files: number | null; complete: boolean;
+  planned_bytes: number | null; disk_free_bytes: number | null; disk_total_bytes: number | null;
+  available_bytes: number | null; growth_per_day_bytes: number | null; days_left: number | null;
+}
+export interface StorageReport {
+  measured_at: string | null;
+  areas: StorageArea[];
+  trend: { day: string; attachments?: number; database?: number; portability?: number }[];
+  attachment_growth: { day: string; added_bytes: number; added_files: number; total_bytes: number }[];
+  attachments_by_workspace: { workspace: string; files: number; bytes: number }[];
+  largest_tables: { table: string; bytes: number }[];
+}
+export interface Statistics {
+  storage: StorageReport;
+  from: string; to: string; days: number; counting: boolean;
+  now: { active_5m: number; active_15m: number; active_24h: number };
+  users: { total: number; signed_in_7d: number; signed_in_30d: number; new_in_period: number };
+  requests_per_day: { day: string; web: number; app: number; mcp: number; api: number }[];
+  people_per_day: { day: string; web: number; app: number; mcp: number; api: number; all: number;
+                    peak_at_once: number; peak_at: string | null }[];
+  functions: { top: StatisticsFunction[]; slowest: StatisticsFunction[]; failing: StatisticsFunction[];
+               by_client: Record<string, { function: string; count: number }[]> };
+  workspaces: { workspace: string; name: string; requests: number; writes: number; objects_created: number;
+                tickets_created: number; documents_created: number; ask_questions: number }[];
+  llm: { per_day: { day: string; calls: number; prompt_tokens: number; completion_tokens: number }[];
+         by_model: (StatisticsLLMRow & { model: string })[]; by_purpose: (StatisticsLLMRow & { purpose: string })[];
+         by_workspace: (StatisticsLLMRow & { workspace: string })[] };
+  ask: { questions_per_day: { day: string; questions: number }[]; outcomes: Record<string, number>;
+         avg_seconds: number | null; tools: { tool: string; count: number }[] };
+  feedback: { per_day: { day: string; up: number; down: number }[]; by_model: { model: string; up: number; down: number }[];
+              recent_negative: { at: string | null; workspace: string; question: string; comment: string | null;
+                                 model: string | null; client: string | null; ticket_uid: string | null }[];
+              workspace: string; assignee: string | null };
 }

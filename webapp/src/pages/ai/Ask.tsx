@@ -57,12 +57,14 @@ interface Turn {
   seq?: number;
   /** Proposals made while this turn streamed. */
   actions?: AskAction[];
+  /** Its rating, once given. */
+  rating?: "up" | "down" | null;
 }
 
 function fromMessage(m: AskMessage): Turn {
   return {
     id: m.id, role: m.role, content: m.content, steps: m.steps ?? [], thinking: "",
-    stopped: m.stopped, error: m.error, seconds: m.seconds, seq: m.seq,
+    stopped: m.stopped, error: m.error, seconds: m.seconds, seq: m.seq, rating: m.rating ?? null,
   };
 }
 
@@ -277,8 +279,63 @@ function ProposedChanges({ actions, conversationId }: { actions: AskAction[]; co
   );
 }
 
-function AssistantTurn({ turn, actions, conversationId }: {
-  turn: Turn; actions: AskAction[]; conversationId: string | null;
+/** Was this answer useful? Up, or down with an optional word on what was wrong: kept without the asker's
+ * name, and an answer rated down reaches the people who look after Ask ARGUS as a ticket. */
+function RateAnswer({ conversationId, answerIndex, initial }: {
+  conversationId: string | null; answerIndex: number; initial?: "up" | "down" | null;
+}) {
+  const [rating, setRating] = useState<"up" | "down" | null>(initial ?? null);
+  const [asking, setAsking] = useState(false);
+  const [comment, setComment] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+  const send = useMutation({
+    mutationFn: (v: { rating: "up" | "down"; comment?: string }) =>
+      aiApi.rateAnswer(conversationId!, answerIndex, v.rating, v.comment),
+    onSuccess: (r) => {
+      setRating(r.rating);
+      setAsking(false);
+      setNote(r.reported ? "Thanks — sent, without your name, to the people who improve Ask ARGUS." : "Thanks!");
+    },
+    onError: (e) => setNote(e instanceof Error ? e.message : "Could not send the rating."),
+  });
+  if (!conversationId) return null;
+  if (rating && !asking) {
+    return <span className="ml-auto text-slate-500">{note ?? (rating === "up" ? "You found this useful" : "You found this not useful")}</span>;
+  }
+  return (
+    <span className="ml-auto flex flex-wrap items-center gap-1.5">
+      {!asking && (
+        <>
+          <span>Useful?</span>
+          <button type="button" title="Useful" aria-label="Useful" disabled={send.isPending}
+                  onClick={() => send.mutate({ rating: "up" })}
+                  className="rounded px-1.5 py-0.5 text-sm hover:bg-emerald-50">👍</button>
+          <button type="button" title="Not useful" aria-label="Not useful" disabled={send.isPending}
+                  onClick={() => setAsking(true)}
+                  className="rounded px-1.5 py-0.5 text-sm hover:bg-rose-50">👎</button>
+        </>
+      )}
+      {asking && (
+        <span className="flex w-full flex-wrap items-center gap-2 text-xs text-slate-600">
+          <input autoFocus value={comment} onChange={(e) => setComment(e.target.value)} maxLength={5000}
+                 onKeyDown={(e) => { if (e.key === "Enter") send.mutate({ rating: "down", comment }); }}
+                 placeholder="What was wrong or missing? (optional)"
+                 className="min-w-64 flex-1 rounded border border-slate-300 px-2 py-1 text-xs" />
+          <button type="button" disabled={send.isPending} onClick={() => send.mutate({ rating: "down", comment })}
+                  className="rounded bg-slate-900 px-2 py-1 text-white disabled:opacity-50">Send</button>
+          <button type="button" onClick={() => setAsking(false)} className="underline">Cancel</button>
+          <span className="w-full text-[11px] text-slate-400">
+            Sent without your name: the question, the answer and how it was found (workspace, model, lookups).
+          </span>
+        </span>
+      )}
+      {note && !asking && <span className="text-rose-600">{note}</span>}
+    </span>
+  );
+}
+
+function AssistantTurn({ turn, actions, conversationId, answerIndex }: {
+  turn: Turn; actions: AskAction[]; conversationId: string | null; answerIndex: number;
 }) {
   const [showThinking, setShowThinking] = useState(false);
   const links = useMemo(() => recordLinks(turn.steps), [turn.steps]);
@@ -329,6 +386,7 @@ function AssistantTurn({ turn, actions, conversationId }: {
           )}
           {turn.stopped === "cancelled" && <span className="text-amber-700">Stopped.</span>}
           {turn.stopped === "failed" && <span className="text-rose-600">{turn.error}</span>}
+          <RateAnswer conversationId={conversationId} answerIndex={answerIndex} initial={turn.rating} />
         </div>
       )}
     </div>
@@ -547,13 +605,14 @@ export function Ask() {
               </header>
             )}
             {loaded.isLoading && <p className="text-sm text-slate-400">Loading the conversation…</p>}
-            {turns.map((t) =>
+            {turns.map((t, i) =>
               t.role === "user" ? (
                 <div key={t.id} className="self-end whitespace-pre-wrap rounded-lg bg-slate-900 px-3 py-2 text-sm text-white">
                   {t.content}
                 </div>
               ) : (
-                <AssistantTurn key={t.id} turn={t} actions={actionsOf(t)} conversationId={current} />
+                <AssistantTurn key={t.id} turn={t} actions={actionsOf(t)} conversationId={current}
+                               answerIndex={turns.slice(0, i).filter((x) => x.role === "assistant").length} />
               ),
             )}
             <div ref={bottom} />

@@ -17,6 +17,7 @@ class AskMessageOut {
     this.createdAt,
     this.error,
     required this.id,
+    this.rating,
     required this.role,
     this.seconds,
     required this.seq,
@@ -31,6 +32,8 @@ class AskMessageOut {
   String? error;
 
   String id;
+
+  String? rating;
 
   String role;
 
@@ -48,6 +51,7 @@ class AskMessageOut {
     other.createdAt == createdAt &&
     other.error == error &&
     other.id == id &&
+    other.rating == rating &&
     other.role == role &&
     other.seconds == seconds &&
     other.seq == seq &&
@@ -61,6 +65,7 @@ class AskMessageOut {
     (createdAt == null ? 0 : createdAt!.hashCode) +
     (error == null ? 0 : error!.hashCode) +
     (id.hashCode) +
+    (rating == null ? 0 : rating!.hashCode) +
     (role.hashCode) +
     (seconds == null ? 0 : seconds!.hashCode) +
     (seq.hashCode) +
@@ -68,7 +73,7 @@ class AskMessageOut {
     (stopped == null ? 0 : stopped!.hashCode);
 
   @override
-  String toString() => 'AskMessageOut[content=$content, createdAt=$createdAt, error=$error, id=$id, role=$role, seconds=$seconds, seq=$seq, steps=$steps, stopped=$stopped]';
+  String toString() => 'AskMessageOut[content=$content, createdAt=$createdAt, error=$error, id=$id, rating=$rating, role=$role, seconds=$seconds, seq=$seq, steps=$steps, stopped=$stopped]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -84,6 +89,11 @@ class AskMessageOut {
       json[r'error'] = null;
     }
       json[r'id'] = this.id;
+    if (this.rating != null) {
+      json[r'rating'] = this.rating;
+    } else {
+      json[r'rating'] = null;
+    }
       json[r'role'] = this.role;
     if (this.seconds != null) {
       json[r'seconds'] = this.seconds;
@@ -127,6 +137,7 @@ class AskMessageOut {
         createdAt: mapDateTime(json, r'created_at', r''),
         error: mapValueOfType<String>(json, r'error'),
         id: mapValueOfType<String>(json, r'id')!,
+        rating: mapValueOfType<String>(json, r'rating'),
         role: mapValueOfType<String>(json, r'role')!,
         seconds: json[r'seconds'] == null
             ? null

@@ -53,6 +53,11 @@ spec:
           ports: [{containerPort: 8080}]
           env:
             {{- include "argus.apiEnv" . | nindent 12 }}
+            # The room planned for each volume (local-path volumes do not enforce it): the Statistics page's
+            # storage section measures what is used against it.
+            - {name: ARGUS_STORAGE_ATTACHMENTS_SIZE, value: {{ .Values.api.attachmentsSize | quote }}}
+            - {name: ARGUS_STORAGE_PORTABILITY_SIZE, value: {{ .Values.api.portabilitySize | quote }}}
+            - {name: ARGUS_STORAGE_DATABASE_SIZE, value: {{ .Values.postgres.size | quote }}}
           readinessProbe:
             httpGet: {path: /health, port: 8080}
             initialDelaySeconds: 5

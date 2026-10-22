@@ -102,9 +102,15 @@ first one was.
   people's identities) it needs a recent sign-in and, under separation of duties, an administrator other than
   the export's requester. An export carrying **restricted classes** is not repeated: generating one needs a
   recent sign-in every time.
-- A run whose analysis needs a decision (a new dependency, an attachment to inspect, a secret found) **waits for
-  you**: the new export is on the Portability page, and no other run starts until it is published or revoked.
-  Three failures in a row switch the schedule off; switch it on again once the cause is fixed.
+- A **new dependency** does not stop a run: a record now referring to something outside the export (or to
+  something no longer on this installation) is kept as an **external reference**, the outcome that changes
+  neither the scope nor what the export carries. The run records that outcome on the schedule, for the runs
+  after it, and in the audit.
+- A run stops only for what it cannot settle so: an attachment to inspect, a secret found, a dependency that can
+  only be blocked or brought in. The export then **waits for you** on the Portability page (the ★ recommended
+  outcomes are already chosen: **Save outcomes and analyse again**, then **Approve**), and the next run carries
+  it on once it is settled. Three failures in a row switch the schedule off; switch it on again once the cause
+  is fixed.
 
 **Administration → Portability → Exports** lists the periodic exports, with their last and next run, **On**,
 how often, **Run now** and **Remove** (what was published stays published). Runs are started every 15 minutes

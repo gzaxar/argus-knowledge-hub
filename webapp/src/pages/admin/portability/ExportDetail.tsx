@@ -256,8 +256,12 @@ export function ExportDetailPage() {
 function Dependencies({ e, onSaved, onError }: { e: ExportView; onSaved: (v: ExportView) => void; onError: (x: unknown) => void }) {
   const deps: Dependency[] = e.analysis.closure?.dependencies ?? [];
   const editable = e.state === "awaiting_approval" || e.state === "failed";
-  const [draft, setDraft] = useState<Record<string, string>>({});
-  useEffect(() => setDraft({}), [e.id, e.state]);
+  // Rows still without an outcome start on the recommended one, so saving is one press.
+  const suggested = useCallback(() => Object.fromEntries(
+    deps.filter((d) => !d.outcome && recommended(d)).map((d) => [d.id, recommended(d)!])), [deps]);
+  const [draft, setDraft] = useState<Record<string, string>>(() => (editable ? suggested() : {}));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setDraft(editable ? suggested() : {}), [e.id, e.state, e.analysis]);
   const save = useMutation({ mutationFn: () => portabilityApi.decideExport(e.id, draft), onSuccess: onSaved, onError });
   return (
     <Section title="Dependencies" id="dependencies"
@@ -269,7 +273,8 @@ function Dependencies({ e, onSaved, onError }: { e: ExportView; onSaved: (v: Exp
       {deps.length > 0 && editable && (
         <p className="mb-2 text-xs text-slate-500">
           What is exported refers to things it does not carry: say what to do with each, then save. <i>Not found here</i>{" "}
-          means the target no longer exists on this installation (deleted or merged): keep it as a reference.
+          means the target no longer exists on this installation (deleted or merged): keep it as a reference. Rows without
+          an outcome start on the recommended one (★). A scheduled run keeps new dependencies as external references by itself.
         </p>
       )}
       {deps.length === 0 ? <Empty>Nothing outside the scope is referenced.</Empty> : (

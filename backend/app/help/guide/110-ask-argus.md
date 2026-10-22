@@ -1,7 +1,7 @@
 ---
 title: Ask ARGUS
 summary: Asking questions in your own words, checking the answers, following up, letting the assistant propose changes you confirm, and using it on the phone.
-keywords: [ask, ask argus, chat, voice, speak, microphone, hands-free, read aloud, phone, mobile, assistant, ai, question, answer, conversation, propose, proposal, apply, discard, create with ai, help, how to, register from a photo, dictate, transcribe, document from a photo]
+keywords: [ask, ask argus, rate, rating, feedback, thumbs up, thumbs down, not useful, wrong answer, chat, voice, speak, microphone, hands-free, read aloud, phone, mobile, assistant, ai, question, answer, conversation, propose, proposal, apply, discard, create with ai, help, how to, register from a photo, dictate, transcribe, document from a photo]
 order: 110
 ---
 
@@ -28,8 +28,16 @@ revision or date. Lookups do not make every conclusion correct.
 *Not found* can mean the information is not there, that you may not read it, or that it has not been indexed
 yet. In a follow-up, give asset keys, dates and the part of the machine.
 
-To report a wrong answer, give the question, the part of the answer that is wrong, the records that show it and
-what it should have said. Leave out secrets and unrelated personal information.
+## Rate an answer
+
+Under each answer, **👍** says it was useful; **👎** asks, optionally, what was wrong or missing. Each answer is
+rated once. The rating is kept **without your name**: the question, the answer, the workspace, the model, the
+ARGUS version, the client and the lookups it made (not what they returned). An answer rated not useful becomes
+an **Argus Knowledge** ticket for the people who improve Ask ARGUS (the *ARGUS Knowledge feedback* workspace,
+seen only by them and administrators).
+
+In the comment, say what is wrong, the records that show it and what it should have said. Leave out secrets and
+unrelated personal information.
 
 ## Let it make changes for you
 
@@ -68,7 +76,7 @@ start the same.
 2. You see the lookups while it works. Answers are formatted (lists, bold, tables), and the record keys they
    cite open the record. Follow-ups continue the conversation; **New conversation** starts afresh; **Earlier
    conversations** reopens past ones, the web's included.
-3. The **speaker** under an answer reads it aloud.
+3. The **speaker** under an answer reads it aloud; **👍 / 👎** rate it (see *Rate an answer*).
 4. **Hands-free** (the headset icon): each answer is read aloud, then the app listens for the next question. It
    stops when you say nothing, or when you press the headset again.
 
