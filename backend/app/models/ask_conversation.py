@@ -40,6 +40,10 @@ class AskMessage(Base):
     stopped: Mapped[Optional[str]] = mapped_column(String, nullable=True)   # answered | exhausted | failed | cancelled
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     seconds: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # The model that wrote an answer, and the rating its person gave it (up | down), once: the rating itself
+    # is kept apart, without them (models/usage.py AskFeedback).
+    model: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    rating: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

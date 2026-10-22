@@ -112,6 +112,25 @@ void main() {
     expect(voice.said, ['Follow PROC-12: switch SLICE-IP-0001 off, wait a minute.']);
   });
 
+  testWidgets('an answer is rated: down asks what was wrong, and is sent once', (tester) async {
+    final app = await start(tester);
+    app.server.routes['GET /v1/ai/status'] = _json(_usable);
+    app.server.routes['POST /v1/ai/chat'] = _answer;
+    app.server.routes['POST /v1/ai/conversations/conv-1/feedback'] = _json({'rating': 'down', 'reported': true});
+    await app.tap('nav-ask');
+    await app.type('ask-input', 'How is IP-0001 reset?');
+    await app.tap('ask-send');
+
+    await app.tap('ask-rate-down');
+    await app.type('ask-feedback-comment', 'It named the wrong pump.');
+    await app.tap('ask-feedback-send');
+
+    expect(app.server.sent('POST', '/v1/ai/conversations/conv-1/feedback').single,
+        {'answer_index': 0, 'rating': 'down', 'comment': 'It named the wrong pump.'});
+    expect(find.textContaining('without your name'), findsOneWidget);
+    expect(find.byKey(const Key('ask-rate-up')), findsNothing, reason: 'an answer is rated once');
+  });
+
   testWidgets('without a usable AI endpoint the assistant says why instead of offering itself', (tester) async {
     final app = await start(tester);
     app.server.routes['GET /v1/ai/status'] = _json({

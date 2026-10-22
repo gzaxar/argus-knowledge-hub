@@ -1,12 +1,15 @@
 """Periodic Git exports: a published export repeated at an interval, as increments on the last publication,
-skipped when nothing changed, waiting for a person when its analysis needs one, and switched off after
-repeated failures. Setting one follows the rules for approving the export itself."""
+skipped when nothing changed, keeping new dependencies as external references by themselves, waiting for a
+person only when its analysis needs one for something else, and switched off after repeated failures. Setting one follows the rules for approving the export itself."""
 from datetime import timedelta
+
+import uuid
 
 import pytest
 from sqlalchemy.orm import Session
 
 from app.ledger import service as ledger_service
+from app.models.document import DocumentRelation
 from app.models.portability import PortabilityEvent, PortabilityExport, PortabilitySchedule
 from app.portability import schedules, service
 from app.portability.service import ServiceError
@@ -72,6 +75,53 @@ def test_a_complete_chain_repeats_the_export_as_it_was(dbs, env):
     with Session(src) as db:
         exp = db.get(PortabilityExport, out["export"])
         assert exp.mode == "workspace" and exp.base_export_id is None and exp.workspaces == first["workspaces"]
+
+
+def _refer_to_a_missing_record(eng, s):
+    """A document of the exported workspace now names a record that is not on this installation."""
+    with Session(eng) as db:
+        db.add(DocumentRelation(workspace_id=s.inv, from_document_uid=s.doc, to_type="asset",
+                                to_uid=str(uuid.uuid4()), relation_type="references"))
+        db.commit()
+
+
+def test_a_new_dependency_does_not_stop_a_run_it_stays_an_external_reference(dbs, env):
+    src = dbs()
+    s = populate(src, env.tmp)
+    first, _ = run_export(src, env, s)
+    sid = _schedule(src, env, first["id"], skip_unchanged=False)
+    _refer_to_a_missing_record(src, s)
+    out = _run(src, env, sid)
+    assert out["outcome"] == "published", out["message"]
+    with Session(src) as db:
+        exp = db.get(PortabilityExport, out["export"])
+        assert exp.decisions["document_relation:missing"] == "external_reference"
+        assert "standing approval" in exp.approved_by
+        sched = db.get(PortabilitySchedule, sid)
+        assert sched.decisions["document_relation:missing"] == "external_reference"   # kept for later runs
+        kinds = [e.kind for e in db.query(PortabilityEvent).filter_by(subject_kind="schedule", subject_id=sid)]
+    assert "schedule_outcomes" in kinds
+
+
+def test_an_export_a_run_left_waiting_is_carried_on_by_the_next_one(dbs, env):
+    """Exports stopped by a run before automatic outcomes existed are not left waiting for ever."""
+    src = dbs()
+    s = populate(src, env.tmp)
+    first, _ = run_export(src, env, s)
+    sid = _schedule(src, env, first["id"], skip_unchanged=False)
+    _refer_to_a_missing_record(src, s)
+    with Session(src) as db:
+        sched = db.get(PortabilitySchedule, sid)
+        exp = service.create_export(db, schedules.actor_of(sched), mode="incremental", workspaces=list(sched.workspaces),
+                                    classifications=[], destination=dict(sched.destination),
+                                    decisions=dict(sched.decisions), base_export_id=first["id"], cfg=env.cfg("src"))
+        service.analyse_export(db, exp, schedules.actor_of(sched), env.cfg("src"))
+        assert not exp.analysis["ready"] and exp.state == "awaiting_approval"
+        sched.last_export_id = exp.id
+        waiting = exp.id
+        db.commit()
+    out = _run(src, env, sid)
+    assert out["outcome"] == "published" and out["export"] == waiting, out["message"]
 
 
 def test_a_run_whose_analysis_needs_a_person_waits_for_one(dbs, env, monkeypatch):

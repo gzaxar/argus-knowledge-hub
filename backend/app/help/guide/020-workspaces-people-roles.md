@@ -49,8 +49,9 @@ You need to be an administrator.
    same way: they add up.
 4. To take a role away, remove that line from *Granted roles*.
 
-**Members** is the older, per-person way of giving access: *Invite by email* works only for someone who has
-signed in once. Prefer roles on **Access**.
+**Members** is the older, per-person way of giving access to the workspace named at the top of the page: type
+part of a name or an e-mail in **Add a member** and pick the person (only people who have signed in once are
+offered; those already members are marked). Prefer roles on **Access**.
 
 People who sign in with the hub's own Keycloak also need a **login there**: an administrator creates it in
 Keycloak's admin console (*Users → Add user*, then *Credentials → Set password*, with *Temporary* on so they
@@ -64,7 +65,7 @@ reviews** gives the whole workspace.
 
 ## Make someone an administrator
 
-**Administration → Users**, find the person, and switch **Admin** on. Use it sparingly: an administrator sees
+**Administration → Users**, find the person (type part of the name or e-mail), and switch **Admin** on. Use it sparingly: an administrator sees
 and can change everything. The very first administrators of a new installation are set by whoever runs it
 (`ARGUS_BOOTSTRAP_ADMINS`).
 

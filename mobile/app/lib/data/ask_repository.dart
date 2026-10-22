@@ -67,6 +67,8 @@ class AskTurn {
   final List<AskLookup> lookups;
   String? stopped;
   String? error;
+  /// Its rating, once given here: up | down.
+  String? rating;
 
   bool get finished => stopped != null;
 
@@ -178,6 +180,17 @@ class AskRepository {
     ];
   }
 
+  /// Rate the conversation's [answerIndex]-th answer (from 0), once: up, or down with an optional comment.
+  /// Kept without the person's name; an answer rated down reaches the people who look after Ask ARGUS as a
+  /// ticket. True when it did.
+  Future<bool> rate(String conversationId, int answerIndex, String rating, {String? comment}) async {
+    final r = await _api.json((c) => c.invokeAPI(
+        '/v1/ai/conversations/${Uri.encodeComponent(conversationId)}/feedback', 'POST', [],
+        {'answer_index': answerIndex, 'rating': rating, if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim()},
+        {}, {}, 'application/json'));
+    return r is Map && r['reported'] == true;
+  }
+
   /// A conversation's turns: each question with the answer that followed it.
   Future<List<AskTurn>> conversation(String id) async {
     final d = await _api.call((c) => _api.ai(c).getConversation(id));
@@ -190,6 +203,7 @@ class AskRepository {
           ..answer = m.content
           ..stopped = m.stopped ?? 'answered'
           ..error = m.error
+          ..rating = m.rating
           ..lookups.addAll([
             for (final (i, s) in (m.steps ?? const <api.AskStep>[]).indexed)
               AskLookup(index: i, tool: s.tool, error: s.error, done: true, result: s.result),

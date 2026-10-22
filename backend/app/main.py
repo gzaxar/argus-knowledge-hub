@@ -111,6 +111,23 @@ async def api_policy_and_legacy_hosts(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def usage_counts(request: Request, call_next):
+    """Counts the request, anonymously, for the Statistics page (services/usage.py)."""
+    from app.services import usage
+    if not usage.counted(request.method, request.url.path):
+        return await call_next(request)
+    holder = usage.begin(request.headers, request.url.path)
+    status = 500
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        return response
+    finally:
+        route = request.scope.get("route")
+        usage.end(holder, f"{request.method} {getattr(route, 'path', None) or '(no route)'}", status)
+
+
 @app.exception_handler(DBAPIError)
 async def database_refusal(request: Request, exc: DBAPIError):
     """The database's own refusals: an append-only audit table, or a
@@ -219,8 +236,10 @@ for _r in beam_model.ROUTERS:
     app.include_router(_r)
 from app.routers import portability as portability_router  # noqa: E402
 from app.routers import help as help_router  # noqa: E402
+from app.routers import statistics as statistics_router  # noqa: E402
 
 app.include_router(help_router.router)
+app.include_router(statistics_router.router)
 for _r in portability_router.ROUTERS:
     app.include_router(_r)
 

@@ -1,7 +1,7 @@
 ---
 title: Administration and the production installation
 summary: The administration pages, the production installation (addresses, sign-in, releases, the mobile app's distribution), backups, and where operators find the details.
-keywords: [administration, package, packages, it, electrical, hydraulic, hvac, plant, domain, template, workspace template, catalogue package, accelerator catalogue, core facility, admin, settings, workspace identifiers, users, production, deployment, release, version, argo cd, keycloak, kubernetes, backup, restore, disk, operations, google play, apk, privacy, mirror]
+keywords: [administration, statistics, storage, disk, disk space, free space, occupancy, quota, volume, usage, tokens used, active users, concurrent users, feedback, package, packages, it, electrical, hydraulic, hvac, plant, domain, template, workspace template, catalogue package, accelerator catalogue, core facility, admin, settings, workspace identifiers, users, production, deployment, release, version, argo cd, keycloak, kubernetes, backup, restore, disk, operations, google play, apk, privacy, mirror]
 order: 140
 ---
 
@@ -10,7 +10,10 @@ the sign-in service only says who they are.
 
 ## The administration pages
 
-For administrators, **Administration** (**⚙ Workspace** menu, top right):
+**Administration** (**⚙ Workspace** menu, top right) has two groups, and every page says which it is in:
+**This workspace** (Access, Members, Packages, Keys, Imports, GLPI, icons, transfer, migration, the AI endpoint,
+robot tokens) changes only the workspace named there; **Whole installation** changes every workspace and is for
+administrators:
 
 | Page | For |
 |---|---|
@@ -20,6 +23,26 @@ For administrators, **Administration** (**⚙ Workspace** menu, top right):
 | **AI** | the AI settings every workspace without its own uses (see *AI settings*) |
 | **API tokens** | every personal and robot token: who made it, what it may do, expiry, last use; revoke any |
 | **Portability** | exports and imports (see *Export and import*) |
+| **Statistics** | how ARGUS is used, anonymously (below) |
+
+## Statistics
+
+**Administration → Statistics** opens with the **storage**: for the attachment files, the database and the
+portability archives, what is used, the room planned (the volume's size in the deployment), what is still
+available (the planned room left or the free space on the disk under it, whichever runs out first; the
+database's disk is on another node and is not seen), the growth per day and, at that rate, roughly when it is
+full; then the attachments' growth since their first upload, the daily measurements (taken hourly, the trend
+builds up from the first day), the attachments by workspace and the largest database tables. **Measure now**
+measures again.
+
+It then shows, for the last 7 to 365 days: requests per day by client (web, Android app,
+assistants through MCP, scripts); people per day and the most at the same time (per five minutes); the language
+model's calls and tokens by model, purpose and workspace; activity in each workspace (requests, changes,
+records created, Ask questions); the most used, slowest and failing functions; how Ask ARGUS answers; and how its
+answers were rated, with those rated not useful.
+
+Nobody is named: people are counted as a keyed hash per five minutes, and the ratings keep no author. Tokens a
+provider does not report are estimated. `ARGUS_USAGE_STATS=0` switches the counting off.
 
 ## Workspace templates (packages)
 

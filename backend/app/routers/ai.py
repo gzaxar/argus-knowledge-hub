@@ -8,7 +8,7 @@ values file or a chat window to get there.
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -19,6 +19,8 @@ from app.models.ai_suggestion import AISuggestion
 from app.models.document import Document
 from app.models.schema import Schema
 from app.schemas.ai import (
+    AskFeedbackIn,
+    AskFeedbackOut,
     AIStatus,
     AskActionIds,
     AskActionOut,
@@ -579,7 +581,7 @@ def _chat_events(workspace_id: str, owner: str, question: str, conversation_id: 
                 db.add(AskMessage(id=str(uuid.uuid4()), conversation_id=conversation.id, seq=(last or 0) + 1,
                                   role="assistant", content=final.get("answer") or "",
                                   steps=final.get("steps") or steps, stopped=final.get("stopped"),
-                                  error=final.get("error"), seconds=final.get("seconds")))
+                                  error=final.get("error"), seconds=final.get("seconds"), model=endpoint.model))
                 convo = db.get(AskConversation, conversation.id)
                 if convo is not None:
                     convo.updated_at = datetime.now(timezone.utc)
@@ -677,6 +679,41 @@ def delete_conversation(
 ):
     db.delete(_own_conversation(db, workspace_id, identity, conversation_id))
     db.commit()
+
+
+@router.post("/conversations/{conversation_id}/feedback", response_model=AskFeedbackOut)
+def rate_an_answer(
+    conversation_id: str,
+    body: AskFeedbackIn,
+    workspace_id: str = Depends(require_permission("read")),
+    identity=Depends(get_identity),
+    db: Session = Depends(get_db),
+    x_argus_client: Optional[str] = Header(None, alias="X-ARGUS-Client"),
+):
+    """Rate one of your answers, once: up, or down with an optional word on what was wrong. The rating is
+    kept anonymously (services/ask_feedback.py): the question, the answer and how it was made, not who asked;
+    an answer rated down becomes a ticket for the people who look after Ask ARGUS."""
+    from app.models.ask_conversation import AskMessage
+    from app.services import ask_feedback
+    conversation = _own_conversation(db, workspace_id, identity, conversation_id)
+    messages = list(db.scalars(select(AskMessage).where(AskMessage.conversation_id == conversation.id)
+                               .order_by(AskMessage.seq)))
+    answers = [m for m in messages if m.role == "assistant"]
+    index = len(answers) - 1 if body.answer_index is None else body.answer_index
+    if not 0 <= index < len(answers):
+        raise HTTPException(status_code=409, detail="That answer is not saved yet: try again in a moment.")
+    answer = answers[index]
+    if answer.rating:
+        raise HTTPException(status_code=409, detail="This answer has been rated already.")
+    question = next((m.content for m in reversed(messages) if m.role == "user" and m.seq < answer.seq), "")
+    client = x_argus_client if (x_argus_client or "").lower().startswith("flutter") else "web"
+    answer.rating = body.rating
+    feedback = ask_feedback.record(db, workspace_id=workspace_id, rating=body.rating, comment=body.comment,
+                                   question=question, answer=answer.content, steps=answer.steps,
+                                   model=answer.model, client=client, stopped=answer.stopped, error=answer.error,
+                                   seconds=answer.seconds)
+    db.commit()
+    return AskFeedbackOut(rating=feedback.rating, reported=feedback.ticket_uid is not None)
 
 
 @router.get("/conversations/{conversation_id}/actions", response_model=list[AskActionOut])

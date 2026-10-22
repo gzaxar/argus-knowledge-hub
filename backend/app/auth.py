@@ -195,6 +195,13 @@ def _resolve_oidc_user(db: Session, claims: dict) -> User:
     return user
 
 
+def _note_usage(identity) -> None:
+    """Who is asking, for the anonymous usage counts (kept only as a keyed hash, services/usage.py)."""
+    from app.services import usage
+    user = getattr(identity, "user", None)
+    usage.note_user(getattr(user, "id", None), getattr(identity, "workspace_id", None))
+
+
 def get_identity(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
@@ -216,6 +223,7 @@ def get_identity(
                 else "This token has no read scope"))
         token.last_used_at = datetime.now(timezone.utc)
         db.commit()
+        _note_usage(identity)
         return identity
 
     if oidc_configured():
@@ -227,7 +235,9 @@ def get_identity(
             user = _resolve_oidc_user(db, claims)
             user.last_login_at = datetime.now(timezone.utc)
             db.commit()
-            return OidcIdentity(user=user, claims=claims)
+            identity = OidcIdentity(user=user, claims=claims)
+            _note_usage(identity)
+            return identity
 
     raise HTTPException(status_code=401, detail="Invalid or revoked token")
 

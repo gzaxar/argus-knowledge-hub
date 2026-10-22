@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ApiError, workspacesApi } from "../../api/client";
-import { DefaultAccess, Member, MemberInput } from "../../api/types";
+import { DefaultAccess, Member, MemberCandidate, MemberInput } from "../../api/types";
 
 const OBJECT_FLAGS = [
   ["can_read", "Read"],
@@ -144,10 +144,9 @@ export function WorkspaceMembers() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["members", workspaceId] }),
   });
 
-  const invite = (e: React.FormEvent) => {
-    e.preventDefault();
+  const add = (address: string) => {
     upsertMutation.mutate({
-      email: email.trim(),
+      email: address.trim(),
       can_read: true,
       can_create: false,
       can_modify: false,
@@ -165,6 +164,13 @@ export function WorkspaceMembers() {
     setEmail("");
   };
 
+  const [filter, setFilter] = useState("");
+  const filterWords = filter.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shownMembers = (members.data ?? []).filter((m) => {
+    const text = `${m.email} ${m.name ?? ""}`.toLowerCase();
+    return filterWords.every((w) => text.includes(w));
+  });
+
   if (members.isError) {
     const forbidden = members.error instanceof ApiError && members.error.status === 403;
     return (
@@ -178,7 +184,10 @@ export function WorkspaceMembers() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-slate-900">Members</h1>
+      <h1 className="text-2xl font-semibold text-slate-900">
+        Members of {workspace.data?.name ?? workspaceId}{" "}
+        <code className="rounded bg-slate-100 px-1.5 py-0.5 align-middle text-sm font-normal text-slate-600">{workspaceId}</code>
+      </h1>
       <p className="mt-1 text-sm text-slate-500">
         {scoped ? (
           <>
@@ -192,23 +201,19 @@ export function WorkspaceMembers() {
         )}
       </p>
 
-      <form onSubmit={invite} className="mt-6 flex gap-3">
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Invite by email (they must have signed in once)"
-          required
-          type="email"
-          className="w-80 rounded border border-slate-300 px-3 py-1.5 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={upsertMutation.isPending}
-          className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-        >
-          Add
-        </button>
-      </form>
+      <div className="mt-6 flex flex-wrap items-start gap-3">
+        <AddMember workspaceId={workspaceId!} value={email} onChange={setEmail} onAdd={add}
+                   busy={upsertMutation.isPending} />
+        {(members.data?.length ?? 0) > 8 && (
+          <input
+            type="search"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filter members…"
+            className="w-56 rounded border border-slate-300 px-3 py-1.5 text-sm"
+          />
+        )}
+      </div>
       {upsertMutation.isError && (
         <p className="mt-2 text-sm text-red-600">
           {upsertMutation.error instanceof ApiError
@@ -274,7 +279,7 @@ export function WorkspaceMembers() {
                   <td className="px-4 py-2" />
                 </tr>
               )}
-              {members.data.map((m) => (
+              {shownMembers.map((m) => (
                 <tr key={m.user_id}>
                   <td className="px-4 py-2 font-medium text-slate-900">{m.email}</td>
                   <td className="px-4 py-2 text-slate-500">{m.name ?? "—"}</td>
@@ -292,7 +297,7 @@ export function WorkspaceMembers() {
                   <td className="px-4 py-2 text-right">
                     <button
                       onClick={() => {
-                        if (confirm(`Remove ${m.email} from this workspace?`)) {
+                        if (confirm(`Remove ${m.email} from ${workspace.data?.name ?? workspaceId}?`)) {
                           removeMutation.mutate(m.user_id);
                         }
                       }}
@@ -315,5 +320,100 @@ export function WorkspaceMembers() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Add a member: type part of a name or an e-mail and pick among the people who have signed in. */
+function AddMember({ workspaceId, value, onChange, onAdd, busy }: {
+  workspaceId: string;
+  value: string;
+  onChange: (v: string) => void;
+  onAdd: (email: string) => void;
+  busy: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [debounced, setDebounced] = useState(value);
+  const [active, setActive] = useState(0);
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(value.trim()), 200);
+    return () => window.clearTimeout(t);
+  }, [value]);
+  const candidates = useQuery({
+    queryKey: ["member-candidates", workspaceId, debounced],
+    queryFn: () => workspacesApi.memberCandidates(workspaceId, debounced),
+    enabled: open && debounced.length >= 2,
+    staleTime: 30_000,
+  });
+  const list: MemberCandidate[] = candidates.data ?? [];
+  useEffect(() => setActive(0), [debounced]);
+
+  const pick = (c: MemberCandidate) => {
+    if (c.member) return;
+    onAdd(c.email);
+    setOpen(false);
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const chosen = open ? list[active] : undefined;
+        if (chosen && !chosen.member) pick(chosen);
+        else if (value.includes("@")) onAdd(value);
+      }}
+      className="flex gap-3"
+    >
+      <div className="relative">
+        <input
+          value={value}
+          onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") { e.preventDefault(); setActive((i) => Math.min(i + 1, list.length - 1)); }
+            if (e.key === "ArrowUp") { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
+            if (e.key === "Escape") setOpen(false);
+          }}
+          placeholder="Add a member: type a name or an e-mail…"
+          autoComplete="off"
+          className="w-96 rounded border border-slate-300 px-3 py-1.5 text-sm"
+        />
+        {open && debounced.length >= 2 && (
+          <ul className="absolute z-20 mt-1 max-h-80 w-full overflow-auto rounded border border-slate-200 bg-white py-1 text-sm shadow-lg">
+            {candidates.isLoading && <li className="px-3 py-1.5 text-slate-400">Searching…</li>}
+            {candidates.data && list.length === 0 && (
+              <li className="px-3 py-1.5 text-slate-500">
+                Nobody who has signed in matches. People appear here after their first sign-in to ARGUS.
+              </li>
+            )}
+            {list.map((c, i) => (
+              <li key={c.user_id}>
+                <button
+                  type="button"
+                  disabled={c.member}
+                  onMouseDown={(e) => { e.preventDefault(); pick(c); }}
+                  onMouseEnter={() => setActive(i)}
+                  className={`flex w-full items-baseline justify-between gap-3 px-3 py-1.5 text-left ${
+                    c.member ? "cursor-default text-slate-400" : i === active ? "bg-slate-100" : "hover:bg-slate-50"}`}
+                >
+                  <span className="truncate">
+                    <span className="font-medium">{c.name || c.email}</span>
+                    {c.name && <span className="ml-2 text-xs text-slate-500">{c.email}</span>}
+                  </span>
+                  {c.member && <span className="shrink-0 text-xs">already a member</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <button
+        type="submit"
+        disabled={busy || !value.trim()}
+        className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+      >
+        Add
+      </button>
+    </form>
   );
 }
