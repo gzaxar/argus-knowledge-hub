@@ -225,6 +225,8 @@ class ChatIn(BaseModel):
     question: str
     # Omitted to start a conversation; given to continue one.
     conversation_id: Optional[str] = None
+    # Spoken (the app's hands-free mode): a short answer first, one clarifying question when ambiguous.
+    voice: bool = False
 
 
 class AskMessageOut(BaseModel):

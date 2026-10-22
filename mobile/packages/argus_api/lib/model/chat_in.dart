@@ -15,25 +15,30 @@ class ChatIn {
   ChatIn({
     this.conversationId,
     required this.question,
+    this.voice = false,
   });
 
   String? conversationId;
 
   String question;
 
+  bool voice;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is ChatIn &&
     other.conversationId == conversationId &&
-    other.question == question;
+    other.question == question &&
+    other.voice == voice;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
     (conversationId == null ? 0 : conversationId!.hashCode) +
-    (question.hashCode);
+    (question.hashCode) +
+    (voice.hashCode);
 
   @override
-  String toString() => 'ChatIn[conversationId=$conversationId, question=$question]';
+  String toString() => 'ChatIn[conversationId=$conversationId, question=$question, voice=$voice]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -43,6 +48,7 @@ class ChatIn {
       json[r'conversation_id'] = null;
     }
       json[r'question'] = this.question;
+      json[r'voice'] = this.voice;
     return json;
   }
 
@@ -67,6 +73,7 @@ class ChatIn {
       return ChatIn(
         conversationId: mapValueOfType<String>(json, r'conversation_id'),
         question: mapValueOfType<String>(json, r'question')!,
+        voice: mapValueOfType<bool>(json, r'voice') ?? false,
       );
     }
     return null;

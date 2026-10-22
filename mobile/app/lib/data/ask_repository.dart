@@ -140,10 +140,13 @@ class AskRepository {
         reason: usable ? null : (s.reason ?? 'The assistant is not set up for this workspace (Administration → AI).'));
   }
 
-  Stream<AskEvent> ask(String question, {String? conversationId}) async* {
+  /// [voice]: the answer will be read aloud (hands-free) — the server asks for the essential first, briefly, and
+  /// one clarifying question when the question is ambiguous.
+  Stream<AskEvent> ask(String question, {String? conversationId, bool voice = false}) async* {
     await for (final e in _api.events('/v1/ai/chat', {
       'question': question,
       'conversation_id': ?conversationId,
+      if (voice) 'voice': true,
     })) {
       switch (e['type']) {
         case 'conversation':

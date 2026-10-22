@@ -1257,6 +1257,11 @@
           "question": {
             "title": "Question",
             "type": "string"
+          },
+          "voice": {
+            "default": false,
+            "title": "Voice",
+            "type": "boolean"
           }
         },
         "required": [
