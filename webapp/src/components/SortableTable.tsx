@@ -82,6 +82,7 @@ export function SortHeader({
   onSort,
   time = false,
   className = "px-4 py-2",
+  rowSpan,
 }: {
   label: string;
   column: string;
@@ -89,11 +90,13 @@ export function SortHeader({
   onSort: (key: string, firstDir?: SortDir) => void;
   time?: boolean;
   className?: string;
+  /** For a header of more than one row. */
+  rowSpan?: number;
 }) {
   const active = sort.key === column;
   const arrow = active ? (sort.dir === "asc" ? "▲" : "▼") : "↕";
   return (
-    <th className={className} aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
+    <th className={className} rowSpan={rowSpan} aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
       <button
         type="button"
         onClick={() => onSort(column, time ? "desc" : "asc")}

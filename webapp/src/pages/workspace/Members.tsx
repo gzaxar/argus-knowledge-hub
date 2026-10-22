@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ApiError, workspacesApi } from "../../api/client";
 import { DefaultAccess, Member, MemberCandidate, MemberInput } from "../../api/types";
+import { SortHeader, useSort } from "../../components/SortableTable";
 
 const OBJECT_FLAGS = [
   ["can_read", "Read"],
@@ -166,10 +167,16 @@ export function WorkspaceMembers() {
 
   const [filter, setFilter] = useState("");
   const filterWords = filter.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const shownMembers = (members.data ?? []).filter((m) => {
+  const filteredMembers = (members.data ?? []).filter((m) => {
     const text = `${m.email} ${m.name ?? ""}`.toLowerCase();
     return filterWords.every((w) => text.includes(w));
   });
+  const { sorted: shownMembers, sort, toggle } = useSort(
+    filteredMembers,
+    { email: (m) => m.email, name: (m) => m.name },
+    { key: "email", dir: "asc" },
+    "workspace-members",
+  );
 
   if (members.isError) {
     const forbidden = members.error instanceof ApiError && members.error.status === 403;
@@ -229,8 +236,8 @@ export function WorkspaceMembers() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
               <tr>
-                <th className="px-4 py-2" rowSpan={2}>Email</th>
-                <th className="px-4 py-2" rowSpan={2}>Name</th>
+                <SortHeader label="Email" column="email" sort={sort} onSort={toggle} rowSpan={2} />
+                <SortHeader label="Name" column="name" sort={sort} onSort={toggle} rowSpan={2} />
                 {groups.map((g) => (
                   <th
                     key={g.key}
