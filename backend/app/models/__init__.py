@@ -75,3 +75,4 @@ from app.models import package  # noqa: F401,E402
 from app.models import spatial  # noqa: F401,E402
 from app.models import usage  # noqa: F401,E402
 from app.models import document_template  # noqa: F401,E402
+from app.models import activity  # noqa: F401,E402

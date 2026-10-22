@@ -108,6 +108,8 @@ class AppDrawer extends ConsumerWidget {
         }),
         const Divider(indent: 28, endIndent: 28),
         const _Section('App'),
+        _Item('drawer-activities', Icons.event_note_outlined, 'Activities', () => open('/activities')),
+        _Item('drawer-capture', Icons.mic_none, 'Capture by voice', () => open('/capture')),
         _Item('drawer-query', Icons.manage_search, 'Advanced query', () => open('/query')),
         if (hasMap) ...[
           _Item('drawer-nearby', Icons.near_me_outlined, 'Near me', () => open('/nearby')),

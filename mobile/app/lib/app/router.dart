@@ -31,6 +31,9 @@ import '../features/documents/document_screen.dart';
 import '../features/documents/document_list_screen.dart';
 import '../features/documents/document_write_screen.dart';
 import '../features/documents/document_reshape_screen.dart';
+import '../features/activities/activities_screen.dart';
+import '../features/activities/activity_screen.dart';
+import '../features/activities/capture_screen.dart';
 import '../features/tickets/ticket_edit_screen.dart';
 import '../features/tickets/ticket_list_screen.dart';
 import '../features/home/home_screen.dart';
@@ -141,6 +144,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               workspaceId: st.uri.queryParameters['ws'], child: () => AssetScreen(uid: st.pathParameters['uid']!))),
       GoRoute(path: '/asset/:uid/edit', builder: (_, st) => AssetEditScreen(uid: st.pathParameters['uid']!)),
       GoRoute(path: '/ticket/:uid/edit', builder: (_, st) => TicketEditScreen(uid: st.pathParameters['uid']!)),
+      GoRoute(
+          path: '/capture',
+          builder: (_, st) => CaptureScreen(
+              assetUid: st.uri.queryParameters['asset'], assetLabel: st.uri.queryParameters['label'])),
+      GoRoute(path: '/activities', builder: (_, _) => const ActivitiesScreen()),
+      GoRoute(path: '/activity/:id', builder: (_, st) => ActivityScreen(id: st.pathParameters['id']!)),
       GoRoute(
           path: '/documents/reshape',
           builder: (_, st) => DocumentReshapeScreen(

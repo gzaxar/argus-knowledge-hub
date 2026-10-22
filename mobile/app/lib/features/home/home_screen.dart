@@ -181,6 +181,28 @@ class _Cockpit extends ConsumerWidget {
         if (r.isLoading && c == null) const LinearProgressIndicator(),
         if (c == null) const _Hint(),
         const _PhoneNewsOffer(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Row(children: [
+            Expanded(
+              child: FilledButton.icon(
+                key: const Key('home-capture'),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                onPressed: () => context.push('/capture'),
+                icon: const Icon(Icons.mic),
+                label: const Text('Capture by voice'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              key: const Key('home-activities'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52)),
+              onPressed: () => context.push('/activities'),
+              icon: const Icon(Icons.event_note_outlined),
+              label: const Text('Activities'),
+            ),
+          ]),
+        ),
         if (c != null) ...[
           _Kpis(c),
           _MyWork(fallback: c.mine),
