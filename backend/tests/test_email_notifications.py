@@ -32,6 +32,16 @@ class FakeSMTP:
         return [m for m in self.sent if m["To"] == address]
 
 
+REAL_DELIVERABLE = notify.deliverable
+
+
+@pytest.fixture(autouse=True)
+def fake_servers_reach_test_addresses(monkeypatch):
+    """The people here have test addresses (@argus.test), which a real server could never reach: the fake
+    servers of these tests can."""
+    monkeypatch.setattr(notify, "deliverable", lambda address: "@" in (address or ""))
+
+
 @pytest.fixture()
 def mail(monkeypatch):
     monkeypatch.setenv("SMTP_HOST", "smtp.example.org")
@@ -228,3 +238,30 @@ def test_a_relay_that_defers_keeps_them_for_the_next_run(people, monkeypatch):
     assert [m["Subject"] for m in smtp.to(w["bob"].email)] == ["[ARGUS] Assigned to you: deferred"]
     db.rollback()
     db.close()
+
+
+def test_addresses_at_domains_that_cannot_receive_mail_are_not_emailed():
+    deliverable = REAL_DELIVERABLE
+    for address in ("owner.test@argus.test", "play-review@argus-review.invalid", "a@example.com", "b@x.example",
+                    "c@host.localhost", "nobody", ""):
+        assert not deliverable(address), address
+    for address in ("andrea.michelotti@lnf.infn.it", "someone@gmail.com", "Name <x@lnf.infn.it>"):
+        assert deliverable(address), address
+
+
+def test_a_test_account_keeps_its_notifications_in_the_app(people, monkeypatch):
+    monkeypatch.setattr(notify, "deliverable", REAL_DELIVERABLE)
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.org")
+    smtp = FakeSMTP()
+    monkeypatch.setattr(notify, "_connect", lambda: smtp)
+    db = SessionLocal()
+    try:
+        n = _note(db, people["ws"], people["ann"])               # ann-…@argus.test
+        db.commit()
+        notify.deliver_pending(db)
+        db.commit()
+        assert smtp.sent == []
+        assert db.get(Notification, n.id).delivered_at is not None   # settled: not retried at every run
+    finally:
+        db.rollback()
+        db.close()
