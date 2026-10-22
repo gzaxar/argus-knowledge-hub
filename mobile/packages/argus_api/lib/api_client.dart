@@ -190,6 +190,10 @@ class ApiClient {
           return AskConversationDetail.fromJson(value);
         case 'AskConversationOut':
           return AskConversationOut.fromJson(value);
+        case 'AskFeedbackIn':
+          return AskFeedbackIn.fromJson(value);
+        case 'AskFeedbackOut':
+          return AskFeedbackOut.fromJson(value);
         case 'AskMessageOut':
           return AskMessageOut.fromJson(value);
         case 'AskStep':
@@ -286,6 +290,10 @@ class ApiClient {
           return OutcomeIn.fromJson(value);
         case 'ReplaceIn':
           return ReplaceIn.fromJson(value);
+        case 'ReshapeIn':
+          return ReshapeIn.fromJson(value);
+        case 'ReshapeSave':
+          return ReshapeSave.fromJson(value);
         case 'RevokeIn':
           return RevokeIn.fromJson(value);
         case 'SchemaOut':
@@ -294,6 +302,8 @@ class ApiClient {
           return SemanticEdgeOut.fromJson(value);
         case 'SemanticGraphOut':
           return SemanticGraphOut.fromJson(value);
+        case 'SourceIn':
+          return SourceIn.fromJson(value);
         case 'SubscriptionIn':
           return SubscriptionIn.fromJson(value);
         case 'SwapIn':

@@ -71,7 +71,8 @@ runs the same e-mail and extraction through the API (the model is scripted, so t
   are not read. MIME-encoded headers are not decoded.
 - Official templates are written in English, with headings in English. A draft keeps the source's language in
   its content.
-- The Android app does not offer the rework yet. The web's intake ("Describe it" on New document) hands its text
-  over to it.
+- On the Android app, the rework is on **Docs** (the wand), on a document's page (a new revision), and from a
+  document started by voice or from a photo. The web's intake ("Describe it" on New document) hands its text over
+  to it.
 - The operational notice is part of the draft's body and on the document page while the revision is unpublished.
   Removing it from the body before approval is left to the reviewer, and publishing is not blocked by it.

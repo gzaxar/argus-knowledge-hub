@@ -9,6 +9,7 @@ lib/api/ai_api.dart
 lib/api/asset_subresources_api.dart
 lib/api/assets_api.dart
 lib/api/attachments_api.dart
+lib/api/document_templates_api.dart
 lib/api/documents_api.dart
 lib/api/field_client_api.dart
 lib/api/global_values_api.dart
@@ -40,6 +41,8 @@ lib/model/ai_status.dart
 lib/model/approve_action.dart
 lib/model/ask_conversation_detail.dart
 lib/model/ask_conversation_out.dart
+lib/model/ask_feedback_in.dart
+lib/model/ask_feedback_out.dart
 lib/model/ask_message_out.dart
 lib/model/ask_step.dart
 lib/model/asset_comment_create.dart
@@ -88,10 +91,13 @@ lib/model/my_workspace_out.dart
 lib/model/observation_in.dart
 lib/model/outcome_in.dart
 lib/model/replace_in.dart
+lib/model/reshape_in.dart
+lib/model/reshape_save.dart
 lib/model/revoke_in.dart
 lib/model/schema_out.dart
 lib/model/semantic_edge_out.dart
 lib/model/semantic_graph_out.dart
+lib/model/source_in.dart
 lib/model/subscription_in.dart
 lib/model/swap_in.dart
 lib/model/transition_in.dart

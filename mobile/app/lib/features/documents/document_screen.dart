@@ -143,12 +143,28 @@ class _WorkflowState extends ConsumerState<_Workflow> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Align(
           alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            key: const Key('doc-new-revision'),
-            onPressed: _busy ? null : () => _run('A new draft revision was started.', () => repo.newRevision(widget.uid, published)),
-            icon: const Icon(Icons.edit_note),
-            label: const Text('Start a new revision'),
-          ),
+          child: Wrap(spacing: 8, runSpacing: 4, children: [
+            OutlinedButton.icon(
+              key: const Key('doc-new-revision'),
+              onPressed: _busy ? null : () => _run('A new draft revision was started.', () => repo.newRevision(widget.uid, published)),
+              icon: const Icon(Icons.edit_note),
+              label: const Text('Start a new revision'),
+            ),
+            OutlinedButton.icon(
+              key: const Key('doc-reshape-revision'),
+              onPressed: _busy
+                  ? null
+                  : () {
+                      final type = ref.read(documentDetailProvider(widget.uid)).value?.documentTypeUid;
+                      context.push(Uri(path: '/documents/reshape', queryParameters: {
+                        'document': widget.uid,
+                        'type': ?type,
+                      }).toString());
+                    },
+              icon: const Icon(Icons.auto_fix_high),
+              label: const Text('From raw text'),
+            ),
+          ]),
         ),
       );
     }

@@ -93,8 +93,9 @@ The **+** beside the question box offers:
   check and register (see *The mobile app (ARGUS Field)*).
 - **Find or register by its label**: scan a QR code or barcode, read a printed serial, or type it; if nothing
   carries it, register a new unit.
-- **Write a document by voice**: record it; the workspace's speech-to-text model transcribes it; you check the
-  text in the editor; the recording is kept with the draft.
+- **Write a document by voice**: pick the document type and record it; the workspace's speech-to-text model
+  transcribes it and the assistant writes it up with the type's template (see *Dictate a document* in *The mobile
+  app*); you review the draft and what to check; the transcript is kept with it, the recording only if you choose.
 - **Write a document from a photo**: photograph a page; its text is read on the phone; the photo is kept with
   the draft.
 

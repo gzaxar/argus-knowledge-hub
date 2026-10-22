@@ -39,7 +39,21 @@ class _DocumentListScreenState extends ConsumerState<DocumentListScreen> {
       appBar: AppBar(
         leading: const ShellMenuButton(),
         title: const Text('Documents'),
-        actions: [SortMenu(order: _order, onChanged: (o) => setState(() => _order = o))],
+        actions: [
+          IconButton(
+            key: const Key('documents-dictate'),
+            tooltip: 'Dictate a document',
+            icon: const Icon(Icons.mic_none),
+            onPressed: () => context.push('/documents/reshape?dictate=1'),
+          ),
+          IconButton(
+            key: const Key('documents-reshape'),
+            tooltip: 'Rework from raw text',
+            icon: const Icon(Icons.auto_fix_high),
+            onPressed: () => context.push('/documents/reshape'),
+          ),
+          SortMenu(order: _order, onChanged: (o) => setState(() => _order = o)),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         key: const Key('documents-new'),

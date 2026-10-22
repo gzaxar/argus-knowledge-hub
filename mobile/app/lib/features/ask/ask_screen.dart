@@ -8,7 +8,6 @@ import '../../app/providers.dart';
 import '../../core/problem.dart';
 import '../../data/ask_repository.dart';
 import '../../domain/capture.dart';
-import '../../widgets/attach_menu.dart';
 import '../../widgets/common.dart';
 import '../../widgets/rich_content.dart';
 import '../shell/app_shell.dart';
@@ -289,7 +288,8 @@ class _AskScreenState extends ConsumerState<AskScreen> {
             ('register-photo', Icons.add_a_photo_outlined, 'Register equipment from a photo',
                 'Its nameplate is read and the form filled in'),
             ('scan', Icons.qr_code_scanner, 'Find or register by its label', 'QR code, barcode, serial or printed text'),
-            ('doc-voice', Icons.mic_none, 'Write a document by voice', 'Dictate it: what you say is transcribed'),
+            ('doc-voice', Icons.mic_none, 'Write a document by voice',
+                "Dictate it: transcribed, then written up with the type's template for you to review"),
             ('doc-photo', Icons.document_scanner_outlined, 'Write a document from a photo',
                 'A page, a sign, a whiteboard: its text is read'),
           ])
@@ -310,10 +310,8 @@ class _AskScreenState extends ConsumerState<AskScreen> {
       case 'scan':
         context.push('/scan');
       case 'doc-voice':
-        final recording = await recordNote(context, ref);
-        if (recording == null || !mounted) return;
-        await _startDocument('Transcribing your recording…', 'recording', recording,
-            () => ref.read(askRepositoryProvider).transcribe(recording));
+        // Dictated, transcribed and reworked with the type's template, to review (documents/document_reshape_screen).
+        context.push('/documents/reshape?dictate=1');
       case 'doc-photo':
         final reader = ref.read(textReaderProvider);
         if (!reader.available) {

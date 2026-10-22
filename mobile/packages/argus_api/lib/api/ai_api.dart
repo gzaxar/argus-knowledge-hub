@@ -296,6 +296,160 @@ class AiApi {
     return null;
   }
 
+  /// Rate An Answer
+  ///
+  /// Rate one of your answers, once: up, or down with an optional word on what was wrong. The rating is kept anonymously (services/ask_feedback.py): the question, the answer and how it was made, not who asked; an answer rated down becomes a ticket for the people who look after Ask ARGUS.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] conversationId (required):
+  ///
+  /// * [AskFeedbackIn] askFeedbackIn (required):
+  ///
+  /// * [String] xARGUSClient:
+  ///
+  /// * [String] authorization:
+  ///
+  /// * [String] xWorkspaceId:
+  Future<Response> rateAnAnswerWithHttpInfo(String conversationId, AskFeedbackIn askFeedbackIn, { String? xARGUSClient, String? authorization, String? xWorkspaceId, }) async {
+    // ignore: prefer_const_declarations
+    final path = r'/v1/ai/conversations/{conversation_id}/feedback'
+      .replaceAll('{conversation_id}', conversationId);
+
+    // ignore: prefer_final_locals
+    Object? postBody = askFeedbackIn;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (xARGUSClient != null) {
+      headerParams[r'X-ARGUS-Client'] = parameterToString(xARGUSClient);
+    }
+    if (authorization != null) {
+      headerParams[r'authorization'] = parameterToString(authorization);
+    }
+    if (xWorkspaceId != null) {
+      headerParams[r'X-Workspace-Id'] = parameterToString(xWorkspaceId);
+    }
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      path,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Rate An Answer
+  ///
+  /// Rate one of your answers, once: up, or down with an optional word on what was wrong. The rating is kept anonymously (services/ask_feedback.py): the question, the answer and how it was made, not who asked; an answer rated down becomes a ticket for the people who look after Ask ARGUS.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] conversationId (required):
+  ///
+  /// * [AskFeedbackIn] askFeedbackIn (required):
+  ///
+  /// * [String] xARGUSClient:
+  ///
+  /// * [String] authorization:
+  ///
+  /// * [String] xWorkspaceId:
+  Future<AskFeedbackOut?> rateAnAnswer(String conversationId, AskFeedbackIn askFeedbackIn, { String? xARGUSClient, String? authorization, String? xWorkspaceId, }) async {
+    final response = await rateAnAnswerWithHttpInfo(conversationId, askFeedbackIn,  xARGUSClient: xARGUSClient, authorization: authorization, xWorkspaceId: xWorkspaceId, );
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'AskFeedbackOut',) as AskFeedbackOut;
+    
+    }
+    return null;
+  }
+
+  /// Reshape Preview
+  ///
+  /// The draft a template makes of the raw text, with what is missing or uncertain, the dates and the suggested links. Nothing is saved: no document, no revision, no file.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [ReshapeIn] reshapeIn (required):
+  ///
+  /// * [String] authorization:
+  ///
+  /// * [String] xWorkspaceId:
+  Future<Response> reshapePreviewWithHttpInfo(ReshapeIn reshapeIn, { String? authorization, String? xWorkspaceId, }) async {
+    // ignore: prefer_const_declarations
+    final path = r'/v1/ai/reshape';
+
+    // ignore: prefer_final_locals
+    Object? postBody = reshapeIn;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (authorization != null) {
+      headerParams[r'authorization'] = parameterToString(authorization);
+    }
+    if (xWorkspaceId != null) {
+      headerParams[r'X-Workspace-Id'] = parameterToString(xWorkspaceId);
+    }
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      path,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Reshape Preview
+  ///
+  /// The draft a template makes of the raw text, with what is missing or uncertain, the dates and the suggested links. Nothing is saved: no document, no revision, no file.
+  ///
+  /// Parameters:
+  ///
+  /// * [ReshapeIn] reshapeIn (required):
+  ///
+  /// * [String] authorization:
+  ///
+  /// * [String] xWorkspaceId:
+  Future<Object?> reshapePreview(ReshapeIn reshapeIn, { String? authorization, String? xWorkspaceId, }) async {
+    final response = await reshapePreviewWithHttpInfo(reshapeIn,  authorization: authorization, xWorkspaceId: xWorkspaceId, );
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'Object',) as Object;
+    
+    }
+    return null;
+  }
+
   /// Status
   ///
   /// What the application asks before offering an AI action.  A feature that cannot work should not be presented as if it could, and the reason belongs here rather than in a failed request later.

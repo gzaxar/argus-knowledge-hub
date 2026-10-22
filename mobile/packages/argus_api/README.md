@@ -65,6 +65,8 @@ Class | Method | HTTP request | Description
 *AiApi* | [**draftADocument**](doc//AiApi.md#draftadocument) | **POST** /v1/ai/draft-document | Draft A Document
 *AiApi* | [**getConversation**](doc//AiApi.md#getconversation) | **GET** /v1/ai/conversations/{conversation_id} | Get Conversation
 *AiApi* | [**listConversations**](doc//AiApi.md#listconversations) | **GET** /v1/ai/conversations | List Conversations
+*AiApi* | [**rateAnAnswer**](doc//AiApi.md#rateananswer) | **POST** /v1/ai/conversations/{conversation_id}/feedback | Rate An Answer
+*AiApi* | [**reshapePreview**](doc//AiApi.md#reshapepreview) | **POST** /v1/ai/reshape | Reshape Preview
 *AiApi* | [**status**](doc//AiApi.md#status) | **GET** /v1/ai/status | Status
 *AiApi* | [**transcribeRecording**](doc//AiApi.md#transcriberecording) | **POST** /v1/ai/transcribe | Transcribe Recording
 *AssetSubresourcesApi* | [**createComments**](doc//AssetSubresourcesApi.md#createcomments) | **POST** /v1/assets/{asset_uid}/comments | Create Comments
@@ -79,6 +81,7 @@ Class | Method | HTTP request | Description
 *AssetsApi* | [**updateAsset**](doc//AssetsApi.md#updateasset) | **PUT** /v1/assets/{uid} | Update Asset
 *AttachmentsApi* | [**downloadAttachment**](doc//AttachmentsApi.md#downloadattachment) | **GET** /v1/attachments/{uid} | Download Attachment
 *AttachmentsApi* | [**listAttachments**](doc//AttachmentsApi.md#listattachments) | **GET** /v1/attachments | List Attachments
+*DocumentTemplatesApi* | [**resolveTemplate**](doc//DocumentTemplatesApi.md#resolvetemplate) | **GET** /v1/document-templates/resolve | Resolve Template
 *DocumentsApi* | [**approveRevision**](doc//DocumentsApi.md#approverevision) | **POST** /v1/documents/{uid}/revisions/{rev_uid}/approve | Approve Revision
 *DocumentsApi* | [**createDocument**](doc//DocumentsApi.md#createdocument) | **POST** /v1/documents | Create Document
 *DocumentsApi* | [**createRelation**](doc//DocumentsApi.md#createrelation) | **POST** /v1/documents/{uid}/relations | Create Relation
@@ -89,6 +92,8 @@ Class | Method | HTTP request | Description
 *DocumentsApi* | [**listRevisionAttachments**](doc//DocumentsApi.md#listrevisionattachments) | **GET** /v1/documents/{uid}/revisions/{rev_uid}/attachments | List Revision Attachments
 *DocumentsApi* | [**listRevisions**](doc//DocumentsApi.md#listrevisions) | **GET** /v1/documents/{uid}/revisions | List Revisions
 *DocumentsApi* | [**publishRevision**](doc//DocumentsApi.md#publishrevision) | **POST** /v1/documents/{uid}/revisions/{rev_uid}/publish | Publish Revision
+*DocumentsApi* | [**reshapeSaveNew**](doc//DocumentsApi.md#reshapesavenew) | **POST** /v1/documents/reshape | Reshape Save New
+*DocumentsApi* | [**reshapeSaveRevision**](doc//DocumentsApi.md#reshapesaverevision) | **POST** /v1/documents/{uid}/reshape | Reshape Save Revision
 *DocumentsApi* | [**submitRevision**](doc//DocumentsApi.md#submitrevision) | **POST** /v1/documents/{uid}/revisions/{rev_uid}/submit | Submit Revision
 *DocumentsApi* | [**updateDocument**](doc//DocumentsApi.md#updatedocument) | **PUT** /v1/documents/{uid} | Update Document
 *DocumentsApi* | [**updateRevision**](doc//DocumentsApi.md#updaterevision) | **PUT** /v1/documents/{uid}/revisions/{rev_uid} | Update Revision
@@ -169,6 +174,8 @@ Class | Method | HTTP request | Description
  - [ApproveAction](doc//ApproveAction.md)
  - [AskConversationDetail](doc//AskConversationDetail.md)
  - [AskConversationOut](doc//AskConversationOut.md)
+ - [AskFeedbackIn](doc//AskFeedbackIn.md)
+ - [AskFeedbackOut](doc//AskFeedbackOut.md)
  - [AskMessageOut](doc//AskMessageOut.md)
  - [AskStep](doc//AskStep.md)
  - [AssetCommentCreate](doc//AssetCommentCreate.md)
@@ -217,10 +224,13 @@ Class | Method | HTTP request | Description
  - [ObservationIn](doc//ObservationIn.md)
  - [OutcomeIn](doc//OutcomeIn.md)
  - [ReplaceIn](doc//ReplaceIn.md)
+ - [ReshapeIn](doc//ReshapeIn.md)
+ - [ReshapeSave](doc//ReshapeSave.md)
  - [RevokeIn](doc//RevokeIn.md)
  - [SchemaOut](doc//SchemaOut.md)
  - [SemanticEdgeOut](doc//SemanticEdgeOut.md)
  - [SemanticGraphOut](doc//SemanticGraphOut.md)
+ - [SourceIn](doc//SourceIn.md)
  - [SubscriptionIn](doc//SubscriptionIn.md)
  - [SwapIn](doc//SwapIn.md)
  - [TransitionIn](doc//TransitionIn.md)
