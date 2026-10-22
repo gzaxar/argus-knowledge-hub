@@ -227,6 +227,23 @@ class _DocumentWriteScreenState extends ConsumerState<DocumentWriteScreen> {
               alignLabelWithHint: true,
             ),
           ),
+        if (widget.isNew && ref.watch(askAvailabilityProvider).value?.usable == true) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const Key('doc-write-reshape'),
+              onPressed: _saving
+                  ? null
+                  : () => context.pushReplacement(
+                      Uri(path: '/documents/reshape', queryParameters: {'type': ?_type}).toString(),
+                      extra: DocumentSeed(
+                          title: _title.text, body: _body!.text, original: widget.seed?.original, from: widget.seed?.from)),
+              icon: const Icon(Icons.dashboard_customize_outlined),
+              label: const Text("Rework with the type's template"),
+            ),
+          ),
+        ],
         if (ref.watch(askAvailabilityProvider).value?.usable == true) ...[
           const SizedBox(height: 8),
           Align(

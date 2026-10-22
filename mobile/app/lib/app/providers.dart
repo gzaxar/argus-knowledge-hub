@@ -13,6 +13,7 @@ import '../core/problem.dart';
 import '../core/session.dart';
 import '../data/api_service.dart';
 import '../data/ask_repository.dart';
+import '../data/reshape_repository.dart';
 import '../data/browse_repository.dart';
 import '../data/capture_repositories.dart';
 import '../data/graph_repository.dart';
@@ -539,6 +540,7 @@ final myReviewItemsProvider = FutureProvider.autoDispose<List<ReviewItem>>((ref)
 // --------------------------------------------------------------------------- ask
 
 final askRepositoryProvider = Provider((ref) => AskRepository(ref.watch(apiServiceProvider)));
+final reshapeRepositoryProvider = Provider((ref) => ReshapeRepository(ref.watch(apiServiceProvider)));
 
 /// The phone's speech recognition and voice. Tests put a fake here.
 final voiceProvider = Provider<Voice>((_) => DeviceVoice());

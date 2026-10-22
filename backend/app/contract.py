@@ -127,6 +127,13 @@ FIELD_OPERATIONS = [
     ("post", "/v1/ai/chat"),
     ("get", "/v1/ai/conversations"),
     ("get", "/v1/ai/conversations/{conversation_id}"),
+    ("post", "/v1/ai/conversations/{conversation_id}/feedback"),
+    # Rework from raw text: which template applies, the preview (nothing saved), and the draft saved as a new
+    # document or as a document's next revision. Their answers are untyped JSON, read by the app itself.
+    ("get", "/v1/document-templates/resolve"),
+    ("post", "/v1/ai/reshape"),
+    ("post", "/v1/documents/reshape"),
+    ("post", "/v1/documents/{uid}/reshape"),
 ]
 
 
