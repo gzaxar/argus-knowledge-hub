@@ -84,7 +84,7 @@ export function TokenGate({ children }: { children: ReactNode }) {
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="w-full max-w-md space-y-4 rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
           <div>
-            <h1 className="text-xl font-semibold text-slate-900">ARGUS Asset Knowledge Hub</h1>
+            <h1 className="text-xl font-semibold text-slate-900">ARGUS Knowledge Hub</h1>
             <p className="mt-1 text-sm text-slate-500">Sign in to continue.</p>
           </div>
           {infnLoginEnabled && <InfnSignInButton />}

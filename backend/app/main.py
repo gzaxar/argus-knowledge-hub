@@ -57,7 +57,7 @@ from app.services import api_policy, legacy_hosts  # noqa: E402
 
 # Every request carries the viewer's restricted-class grants (I-ACL-1).
 app = FastAPI(
-    title="ARGUS Asset Knowledge Hub API", version="1.0.0", dependencies=[Depends(bind_grants)],
+    title="ARGUS Knowledge Hub API", version="1.0.0", dependencies=[Depends(bind_grants)],
     contact={"name": "Andrea Michelotti", "email": "andrea.michelotti@infn.it"},
     license_info={"name": "EUPL-1.2", "identifier": "EUPL-1.2"},
 )
