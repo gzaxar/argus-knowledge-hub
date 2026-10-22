@@ -110,6 +110,21 @@ own apps. Location data embedded in photos is removed by the server.
 **Docs → New document**, or from a record (**Write a document about it**). **Ask → +** also starts one by voice or from
 a photo of a page; **Tidy with AI** writes rough text up (see *Guided and AI-assisted entry*).
 
+**Rework from raw text** (the wand on **Docs**) turns notes, an e-mail, a dictation or a photographed page into a
+draft that follows the type's template, as on the web (see *Documents → Rework from raw text*). Paste the text,
+say when it was written or that it was written now, pick the type (the template that applies is shown), and
+**Preview**: nothing is saved. Then **Draft** to edit, **To check** for what is missing, deduced or contradictory
+and the records it names, **Original** for the lines used. **Save as draft** makes a draft that goes through
+review as usual. A document started from a photo offers **Rework with the type's template**: the photo goes with
+the draft. On a document with nothing open, **From raw text** makes its next revision.
+
+**Dictate a document** (the microphone on **Docs**, or **Ask → + → Write a document by voice**): pick the type,
+speak, stop. What you said is transcribed by the workspace's speech model and written up at once with the type's
+template, for you to review in **Draft** and **To check** before saving. **Dictate more** adds to it. The transcript
+is kept with the draft as its source; the recording too only if you tick **Also keep the recording with the
+draft** (off by default). A dictation counts as written now: confirm the date before saving. Check names, codes
+and numbers in what was heard.
+
 ## Notifications
 
 **Settings → Notifications**:

@@ -30,6 +30,7 @@ import '../features/diagnostics/diagnostics_screen.dart';
 import '../features/documents/document_screen.dart';
 import '../features/documents/document_list_screen.dart';
 import '../features/documents/document_write_screen.dart';
+import '../features/documents/document_reshape_screen.dart';
 import '../features/tickets/ticket_edit_screen.dart';
 import '../features/tickets/ticket_list_screen.dart';
 import '../features/home/home_screen.dart';
@@ -140,6 +141,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               workspaceId: st.uri.queryParameters['ws'], child: () => AssetScreen(uid: st.pathParameters['uid']!))),
       GoRoute(path: '/asset/:uid/edit', builder: (_, st) => AssetEditScreen(uid: st.pathParameters['uid']!)),
       GoRoute(path: '/ticket/:uid/edit', builder: (_, st) => TicketEditScreen(uid: st.pathParameters['uid']!)),
+      GoRoute(
+          path: '/documents/reshape',
+          builder: (_, st) => DocumentReshapeScreen(
+              seed: st.extra is DocumentSeed ? st.extra as DocumentSeed : null,
+              documentUid: st.uri.queryParameters['document'],
+              documentTypeUid: st.uri.queryParameters['type'],
+              dictate: st.uri.queryParameters['dictate'] == '1')),
       GoRoute(
           path: '/documents/new',
           builder: (_, st) => DocumentWriteScreen(

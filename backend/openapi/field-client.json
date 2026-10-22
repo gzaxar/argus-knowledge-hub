@@ -192,6 +192,66 @@
         "title": "AskConversationOut",
         "type": "object"
       },
+      "AskFeedbackIn": {
+        "description": "A rating of one of the conversation's answers: the `answer_index`-th (from 0), or the last.",
+        "properties": {
+          "answer_index": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Index"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "rating": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Rating",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "title": "AskFeedbackIn",
+        "type": "object"
+      },
+      "AskFeedbackOut": {
+        "properties": {
+          "rating": {
+            "title": "Rating",
+            "type": "string"
+          },
+          "reported": {
+            "title": "Reported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "rating",
+          "reported"
+        ],
+        "title": "AskFeedbackOut",
+        "type": "object"
+      },
       "AskMessageOut": {
         "properties": {
           "content": {
@@ -3375,6 +3435,181 @@
         "title": "ReplaceIn",
         "type": "object"
       },
+      "ReshapeIn": {
+        "properties": {
+          "confidentiality": {
+            "enum": [
+              "pubblico",
+              "interno",
+              "riservato"
+            ],
+            "title": "Confidentiality",
+            "type": "string"
+          },
+          "document_type_uid": {
+            "title": "Document Type Uid",
+            "type": "string"
+          },
+          "document_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "reworking into a new revision of this one",
+            "title": "Document Uid"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceIn"
+          },
+          "template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "official:<id>, a variant's uid or uid@version",
+            "title": "Template"
+          },
+          "template_source": {
+            "anyOf": [
+              {
+                "maxLength": 65536,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Source"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "source",
+          "document_type_uid"
+        ],
+        "title": "ReshapeIn",
+        "type": "object"
+      },
+      "ReshapeSave": {
+        "properties": {
+          "authority_level": {
+            "enum": [
+              "ufficiale",
+              "informativo",
+              "bozza_interna"
+            ],
+            "title": "Authority Level",
+            "type": "string"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "confidentiality": {
+            "enum": [
+              "pubblico",
+              "interno",
+              "riservato"
+            ],
+            "title": "Confidentiality",
+            "type": "string"
+          },
+          "confirm_document_date": {
+            "default": false,
+            "title": "Confirm Document Date",
+            "type": "boolean"
+          },
+          "dates": {
+            "title": "Dates",
+            "type": "object"
+          },
+          "document_type_uid": {
+            "title": "Document Type Uid",
+            "type": "string"
+          },
+          "extraction": {
+            "title": "Extraction",
+            "type": "object"
+          },
+          "issues": {
+            "title": "Issues"
+          },
+          "link_assets": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Link Assets",
+            "type": "array"
+          },
+          "markdown": {
+            "maxLength": 500000,
+            "minLength": 1,
+            "title": "Markdown",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceIn"
+          },
+          "template": {
+            "description": "the template the preview used: official:<id>, uid or uid@version",
+            "title": "Template",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "document_type_uid",
+          "template",
+          "title",
+          "markdown"
+        ],
+        "title": "ReshapeSave",
+        "type": "object"
+      },
       "RevokeIn": {
         "properties": {
           "reason": {
@@ -3583,6 +3818,83 @@
           "edges"
         ],
         "title": "SemanticGraphOut",
+        "type": "object"
+      },
+      "SourceIn": {
+        "properties": {
+          "filename": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "kind": {
+            "enum": [
+              "paste",
+              "email",
+              "intake",
+              "import"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "original_date": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Date"
+          },
+          "sender": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sender"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "text": {
+            "maxLength": 60000,
+            "title": "Text",
+            "type": "string"
+          },
+          "text_is_current": {
+            "default": false,
+            "title": "Text Is Current",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "SourceIn",
         "type": "object"
       },
       "SubscriptionIn": {
@@ -4011,6 +4323,112 @@
         ]
       }
     },
+    "/v1/ai/conversations/{conversation_id}/feedback": {
+      "post": {
+        "description": "Rate one of your answers, once: up, or down with an optional word on what was wrong. The rating is\nkept anonymously (services/ask_feedback.py): the question, the answer and how it was made, not who asked;\nan answer rated down becomes a ticket for the people who look after Ask ARGUS.",
+        "operationId": "rate_an_answer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-ARGUS-Client",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Argus-Client"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskFeedbackIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskFeedbackOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rate An Answer",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
     "/v1/ai/draft-document": {
       "post": {
         "description": "A first draft for the editor. Saves nothing.",
@@ -4087,6 +4505,85 @@
           }
         ],
         "summary": "Draft A Document",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/ai/reshape": {
+      "post": {
+        "description": "The draft a template makes of the raw text, with what is missing or uncertain, the dates and the suggested\nlinks. Nothing is saved: no document, no revision, no file.",
+        "operationId": "reshape_preview",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReshapeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reshape Preview",
         "tags": [
           "ai"
         ]
@@ -5845,6 +6342,100 @@
         ]
       }
     },
+    "/v1/document-templates/resolve": {
+      "get": {
+        "description": "Which template applies for a document type, and why — before anything is generated.",
+        "operationId": "resolve_template",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "document_type",
+            "required": true,
+            "schema": {
+              "title": "Document Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "template",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Template"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resolve Template",
+        "tags": [
+          "document templates"
+        ]
+      }
+    },
     "/v1/documents": {
       "get": {
         "operationId": "list_documents",
@@ -6008,6 +6599,85 @@
           }
         ],
         "summary": "Create Document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/v1/documents/reshape": {
+      "post": {
+        "description": "Save the reworked draft as a new document, at revision 1, in draft.",
+        "operationId": "reshape_save_new",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReshapeSave"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reshape Save New",
         "tags": [
           "documents"
         ]
@@ -6343,6 +7013,94 @@
           }
         ],
         "summary": "Create Relation",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/v1/documents/{uid}/reshape": {
+      "post": {
+        "description": "Save the reworked draft as the document's next revision, in draft.",
+        "operationId": "reshape_save_revision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReshapeSave"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reshape Save Revision",
         "tags": [
           "documents"
         ]
