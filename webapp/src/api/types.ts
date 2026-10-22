@@ -1883,18 +1883,30 @@ export interface StorageReport {
   attachments_by_workspace: { workspace: string; files: number; bytes: number }[];
   largest_tables: { table: string; bytes: number }[];
 }
+export interface StatisticsTotals {
+  requests: number; people: number; records_new: number; records_changed: number; ask_questions: number; tokens: number;
+}
 export interface Statistics {
   storage: StorageReport;
   from: string; to: string; days: number; counting: boolean;
   now: { active_5m: number; active_15m: number; active_24h: number };
   users: { total: number; signed_in_7d: number; signed_in_30d: number; new_in_period: number };
   requests_per_day: { day: string; web: number; app: number; mcp: number; api: number }[];
+  /** New: from the records (imports included). Changed, deleted: operations made through ARGUS. */
+  records_per_day: { day: string; objects_new: number; tickets_new: number; documents_new: number;
+                     objects_changed: number; tickets_changed: number; documents_changed: number;
+                     objects_deleted: number; tickets_deleted: number; documents_deleted: number }[];
   people_per_day: { day: string; web: number; app: number; mcp: number; api: number; all: number;
                     peak_at_once: number; peak_at: string | null }[];
   functions: { top: StatisticsFunction[]; slowest: StatisticsFunction[]; failing: StatisticsFunction[];
                by_client: Record<string, { function: string; count: number }[]> };
   workspaces: { workspace: string; name: string; requests: number; writes: number; objects_created: number;
-                tickets_created: number; documents_created: number; ask_questions: number }[];
+                tickets_created: number; documents_created: number; ask_questions: number;
+                objects_changed: number; tickets_changed: number; documents_changed: number;
+                /** Changes through ARGUS plus records created, each day of the period. */
+                activity_per_day: number[] }[];
+  /** Totals of this period and of the one before it, of the same length. */
+  current: StatisticsTotals; previous: StatisticsTotals;
   llm: { per_day: { day: string; calls: number; prompt_tokens: number; completion_tokens: number }[];
          by_model: (StatisticsLLMRow & { model: string })[]; by_purpose: (StatisticsLLMRow & { purpose: string })[];
          by_workspace: (StatisticsLLMRow & { workspace: string })[] };
@@ -1904,4 +1916,72 @@ export interface Statistics {
               recent_negative: { at: string | null; workspace: string; question: string; comment: string | null;
                                  model: string | null; client: string | null; ticket_uid: string | null }[];
               workspace: string; assignee: string | null };
+}
+
+/** Document templates and "Rework from raw text" (backend routers/document_templates.py). */
+export type TemplateScope = "official" | "workspace" | "personal" | "draft";
+export interface TemplateProblem { message: string; line: number | null; severity: "error" | "warning" }
+export interface TemplateListing {
+  ref: string; scope: TemplateScope; id: string; name: string; document_type: string; version: number;
+  published: boolean; active: boolean; editable: boolean;
+  base?: { id: string; version: number }; official_update?: number | null;
+}
+export interface TemplateDescription {
+  id: string; version: number; document_type: string; title: string; language: string; description: string;
+  fields: { key: string; label: string; type: string; required: boolean; description: string; options: string[] }[];
+  sections: { key: string; title: string; kind: string; required: boolean; description: string; columns: string[] }[];
+  instructions: string; missing_marker: string; inferred_marker: string;
+}
+export interface TemplateChoice {
+  ref: string; scope: TemplateScope; id: string; version: number; name: string; document_type: string; reason: string;
+  template?: TemplateDescription;
+}
+export interface TemplateVariant {
+  ref: string; scope: "workspace" | "personal"; name: string; document_type: string;
+  base: { id: string; version: number }; official_update: number | null; latest_version: number; active: boolean;
+  draft_source: string; draft_problems: TemplateProblem[];
+  versions: { version: number; note: string | null; created_at: string; created_by: string | null }[];
+  owner_user_id: string | null; updated_at: string;
+}
+export interface OfficialTemplate {
+  ref: string; scope: "official"; name: string; document_type: string; latest_version: number; source: string;
+  template: TemplateDescription;
+}
+export interface TemplateComparison {
+  base: { id: string; version: number }; against_base: string;
+  official_update: { version: number; changes: string } | null;
+}
+export interface ReshapeSource {
+  text: string; kind: "paste" | "email" | "intake" | "import"; original_date?: string | null; sender?: string | null;
+  subject?: string | null; text_is_current?: boolean; filename?: string | null;
+}
+export interface ReshapeIssue { kind: string; message: string; where?: string; lines?: number[] }
+export interface ReshapeDates {
+  inserted_at: string; source_date: string | null; source_date_basis: string | null; event_date: string | null;
+  document_date: string | null; document_date_basis: string | null; document_date_needs_confirmation: boolean;
+  email_headers: Record<string, string>;
+}
+export interface ReshapeEvidence { status: "present" | "inferred" | "absent"; evidence: number[]; quote: string | null }
+export interface ReshapeResult {
+  title: string; markdown: string;
+  extraction: {
+    title: string;
+    fields: Record<string, ReshapeEvidence & { value: unknown }>;
+    sections: Record<string, { items: (ReshapeEvidence & { text?: string; cells?: Record<string, string> })[] }>;
+  };
+  dates: ReshapeDates; missing: string[]; ambiguities: { text: string; lines: number[] }[]; issues: ReshapeIssue[];
+  suggested_type: string | null; uncited_lines: number[]; notices: { operational: string | null; reference: string | null };
+  source_lines: number; template: TemplateChoice; model: string;
+  links: { kind: "asset" | "document" | "ticket"; uid: string; label: string; matched_on: string }[];
+}
+export interface ReshapeSaved {
+  document_uid: string; code: string; revision_uid: string; revision_number: number; state: string;
+}
+export interface ReshapeGeneration {
+  uid: string; revision_uid: string;
+  template: { id: string; version: number; scope: string; version_uid: string };
+  source: { kind: string; attachment_uid: string | null; filename?: string | null };
+  dates: { inserted_at?: string; source_date?: string | null; event_date?: string | null; document_date?: string | null;
+           document_date_basis?: string | null; document_date_confirmed?: boolean | null };
+  issues: unknown[]; model: string | null; created_at: string; created_by: string | null;
 }

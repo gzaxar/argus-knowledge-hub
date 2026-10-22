@@ -241,3 +241,41 @@ def test_storage_is_measured_kept_per_day_and_projected(world, tmp_path, monkeyp
         db.execute(delete(UsageStorage).where(UsageStorage.day == datetime.now(timezone.utc).date()))
         db.commit()
         db.close()
+
+
+def test_operations_on_records_are_told_apart():
+    from app.routers.statistics import record_operation as op
+    assert op("POST /v1/assets") == ("objects", "new")
+    assert op("POST /v1/documents/reshape") == ("documents", "new")
+    assert op("PUT /v1/issues/{uid}") == ("tickets", "changed")
+    assert op("POST /v1/issues/{uid}/transition") == ("tickets", "changed")
+    assert op("DELETE /v1/assets/{asset_uid}/labels/{label_uid}") == ("objects", "changed")
+    assert op("DELETE /v1/documents/{uid}") == ("documents", "deleted")
+    assert op("POST /v1/issues/bulk-delete") == ("tickets", "deleted")
+    assert op("POST /v1/issues/{uid}/watchers") == (None, None)             # following is not changing
+    assert op("GET /v1/assets/{uid}") == (None, None)
+
+
+def test_new_and_changed_records_per_day(world):
+    from app.models.asset import Asset
+    from app.models.schema import Schema
+    w = world
+    db = SessionLocal()
+    db.add(Schema(uid=f"{w['ws']}:pump", workspace_id=w["ws"], name="Pump", applies_to="objects"))
+    db.flush()
+    db.add(Asset(uid=f"{w['ws']}-a1", workspace_id=w["ws"], schema_uid=f"{w['ws']}:pump",
+                 key=f"{w['ws'].upper()}:A1", name="Pump", type="Pump"))
+    db.commit()
+    db.close()
+    as_(w["ann"])
+    for _ in range(2):
+        holder = usage.begin({"x-workspace-id": w["ws"]}, "/v1/assets/x")
+        usage.end(holder, "PUT /v1/assets/{uid}", 200)
+    body = client.get("/v1/admin/statistics?days=1").json()
+    today = body["records_per_day"][-1]
+    assert today["objects_new"] >= 1 and today["objects_changed"] >= 2
+    row = next(x for x in body["workspaces"] if x["workspace"] == w["ws"])
+    assert row["objects_created"] == 1 and row["objects_changed"] == 2
+    assert row["activity_per_day"][-1] == 3                       # the trend: one created, two changed
+    assert set(body["previous"]) == set(body["current"]) >= {"requests", "people", "records_new", "records_changed"}
+    assert body["current"]["records_changed"] >= 2

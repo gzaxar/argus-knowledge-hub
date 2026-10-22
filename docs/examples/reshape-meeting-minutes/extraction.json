@@ -1,0 +1,120 @@
+{
+  "title": {
+    "value": "Riunione vuoto linac",
+    "status": "inferred",
+    "evidence": "L4",
+    "quote": "riunione vuoto linac"
+  },
+  "fields": {
+    "meeting_date": {
+      "value": "oggi",
+      "status": "present",
+      "evidence": "L6",
+      "quote": "ecco i punti di oggi"
+    },
+    "participants": {
+      "value": [
+        "Marco Rossi",
+        "Laura Ferrari",
+        "Paolo Roberti"
+      ],
+      "status": "present",
+      "evidence": "L7",
+      "quote": "Presenti: Marco Rossi, Laura Ferrari, Paolo Roberti."
+    },
+    "place": {
+      "value": null,
+      "status": "absent"
+    },
+    "chair": {
+      "value": "Marco Rossi",
+      "status": "present",
+      "evidence": "L1",
+      "quote": "Marco Rossi chaired the meeting"
+    },
+    "invented": {
+      "value": "x",
+      "status": "present"
+    }
+  },
+  "sections": {
+    "summary": {
+      "items": [
+        {
+          "text": "Stato del vuoto del linac e della pompa IP-02.",
+          "status": "inferred",
+          "evidence": "L8"
+        }
+      ]
+    },
+    "updates": {
+      "items": [
+        {
+          "text": "La pompa IP-02 della sezione 1 perde corrente da settimana scorsa.",
+          "status": "present",
+          "evidence": "L8",
+          "quote": "La pompa IP-02 della sezione 1 perde corrente"
+        }
+      ]
+    },
+    "decisions": {
+      "items": [
+        {
+          "text": "Sostituire la pompa IP-02 durante lo stop di novembre.",
+          "status": "present",
+          "evidence": "L9",
+          "quote": "Abbiamo deciso di sostituire la pompa IP-02"
+        }
+      ]
+    },
+    "proposals": {
+      "items": [
+        {
+          "text": "Aggiungere un secondo manometro sulla sezione 2 (da valutare).",
+          "status": "present",
+          "evidence": "L10",
+          "quote": "Laura propone di aggiungere un secondo manometro"
+        }
+      ]
+    },
+    "actions": {
+      "items": [
+        {
+          "cells": {
+            "action": "Ordinare la pompa di ricambio",
+            "owner": "Paolo",
+            "due": "domani"
+          },
+          "status": "present",
+          "evidence": "L11",
+          "quote": "Paolo ordina la pompa di ricambio entro domani"
+        }
+      ]
+    },
+    "open_questions": {
+      "items": []
+    }
+  },
+  "dates": {
+    "source_date": {
+      "value": "2025-10-14",
+      "evidence": "L2",
+      "quote": "14 ottobre 2025"
+    },
+    "event_date": {
+      "value": "oggi",
+      "evidence": "L6",
+      "quote": "oggi"
+    }
+  },
+  "missing": [
+    "Luogo della riunione"
+  ],
+  "ambiguities": [
+    {
+      "text": "La riga 12 contiene un'istruzione rivolta all'assistente",
+      "evidence": "L12"
+    }
+  ],
+  "suggested_type": null
+}

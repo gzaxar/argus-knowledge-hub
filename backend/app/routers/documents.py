@@ -153,6 +153,16 @@ def create_document(
     identity: Identity = Depends(get_identity),
     db: Session = Depends(get_db),
 ):
+    doc, _ = new_document(db, body, workspace_id, identity)
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
+def new_document(db: Session, body: DocumentCreate, workspace_id: str, identity: Identity
+                 ) -> tuple[Document, DocumentRevision]:
+    """A document and its first, draft revision, checked and announced; not committed (the caller does, so
+    another flow — a draft reworked from raw text — can add to the same transaction)."""
     if db.get(Document, body.uid) is not None:
         raise HTTPException(status_code=409, detail="Document uid already exists")
 
@@ -193,9 +203,8 @@ def create_document(
     if doc.confidentiality != "riservato":
         notify.announce(db, workspace_id, "documents", "new_document", f"New document: {doc.code} {doc.title}",
                         _actor_user_id(identity), doc.uid)
-    db.commit()
-    db.refresh(doc)
-    return doc
+    db.flush()
+    return doc, revision
 
 
 @router.post("/retype", response_model=RetypeResult)
@@ -452,7 +461,17 @@ def create_revision(
     identity: Identity = Depends(get_identity),
     db: Session = Depends(get_db),
 ):
+    revision = new_revision(db, uid, body, workspace_id, identity)
+    db.commit()
+    db.refresh(revision)
+    return revision
+
+
+def new_revision(db: Session, uid: str, body: DocumentRevisionCreate, workspace_id: str,
+                 identity: Identity) -> DocumentRevision:
+    """The document's next revision, as a draft; refused while another is open. Not committed."""
     doc = _get_owned_document(uid, workspace_id, db)
+    _check_confidentiality(doc, workspace_id, identity, db)
     open_revision = db.scalar(
         select(DocumentRevision).where(
             DocumentRevision.document_uid == uid,
@@ -480,8 +499,7 @@ def create_revision(
     )
     db.add(revision)
     notify.document_changed(db, doc, f"revision {revision.revision_number} started", _actor_user_id(identity))
-    db.commit()
-    db.refresh(revision)
+    db.flush()
     return revision
 
 
