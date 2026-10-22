@@ -206,9 +206,18 @@ class _ThinkFilter:
         return "".join(out)
 
 
+VOICE = (
+    "\n\nThis conversation is spoken: the answer is read aloud and the full text stays on the screen. Start with "
+    "the essential answer in one or two short sentences a listener understands at first hearing — no tables, no "
+    "lists, no codes read letter by letter unless they are the answer — then, after a blank line, the details "
+    "and references. If the question is ambiguous, do not guess and do not list possibilities: ask exactly one "
+    "short clarifying question and nothing else, keeping what was said before in the conversation."
+)
+
+
 def ask_events(db: Session, workspace_id: str, endpoint: Endpoint, question: str,
                history: Optional[list] = None, stream: bool = True, proposer=None,
-               context: Optional[str] = None):
+               context: Optional[str] = None, voice: bool = False):
     """The answer to a question, as it is worked out: what the model is doing, each lookup as it starts
     and what it found, the answer as it is written, and last the whole of it ("done").
 
@@ -217,11 +226,14 @@ def ask_events(db: Session, workspace_id: str, endpoint: Endpoint, question: str
     "arguments"}, {"type": "step", "index", "tool", "arguments", "result", "error", "seconds",
     "summary"}, {"type": "proposal", "action"}, {"type": "done", "answer", "steps", "stopped", "seconds", "error"}.
 
+    `voice`: the answer is spoken (the app's hands-free mode): the essential first, briefly; one clarifying
+    question when the question is ambiguous.
+
     With a `proposer` (services/ask_actions.py) the model may also propose changes, which it keeps for the
     person to apply; `context` says what became of the ones proposed earlier in the conversation.
     """
     from app.services import ask_actions
-    system = SYSTEM + (ask_actions.SYSTEM if proposer else "")
+    system = SYSTEM + (ask_actions.SYSTEM if proposer else "") + (VOICE if voice else "")
     messages: list[dict[str, Any]] = [{"role": "system", "content": system}, *_history(history),
                                       *([{"role": "system", "content": context}] if context else []),
                                       {"role": "user", "content": question}]

@@ -527,7 +527,7 @@ def _sse(event: dict) -> str:
 
 
 def _chat_events(workspace_id: str, owner: str, question: str, conversation_id: Optional[str],
-                 endpoint: Endpoint, grants, can_propose: bool = False):
+                 endpoint: Endpoint, grants, can_propose: bool = False, voice: bool = False):
     """The chat turn as server-sent events, saved as it ends. Runs after the request's own session is
     gone, so it has its own, and the viewer's restricted-class grants are set again here: the lookups
     must see what the person may see, no more."""
@@ -559,7 +559,7 @@ def _chat_events(workspace_id: str, owner: str, question: str, conversation_id: 
         proposer = ask_actions.Proposer(db, workspace_id, conversation.id, seq) if can_propose else None
         try:
             for event in ask_events(db, workspace_id, endpoint, question, history=history, proposer=proposer,
-                                    context=ask_actions.context(db, conversation.id)):
+                                    context=ask_actions.context(db, conversation.id), voice=voice):
                 if event["type"] == "step":
                     steps.append({k: event[k] for k in ("tool", "arguments", "result", "error", "seconds")})
                 if event["type"] == "done":
@@ -617,7 +617,7 @@ def chat(
     config = _usable_config(db, workspace_id)
     return StreamingResponse(
         _chat_events(workspace_id, owner, question, body.conversation_id, endpoint_for(config), current_grants(),
-                     can_propose=_may_change(db, identity, workspace_id)),
+                     can_propose=_may_change(db, identity, workspace_id), voice=body.voice),
         media_type="text/event-stream",
         # Proxies (the cluster's ingress, nginx) would otherwise hold the events back until the end.
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
