@@ -28,6 +28,7 @@ part 'auth/oauth.dart';
 part 'auth/http_basic_auth.dart';
 part 'auth/http_bearer_auth.dart';
 
+part 'api/activities_api.dart';
 part 'api/ai_api.dart';
 part 'api/asset_subresources_api.dart';
 part 'api/assets_api.dart';
@@ -54,6 +55,9 @@ part 'api/uploads_api.dart';
 part 'api/workspaces_api.dart';
 
 part 'model/ai_status.dart';
+part 'model/activity_action.dart';
+part 'model/activity_change.dart';
+part 'model/activity_in.dart';
 part 'model/approve_action.dart';
 part 'model/ask_conversation_detail.dart';
 part 'model/ask_conversation_out.dart';
@@ -72,6 +76,7 @@ part 'model/asset_update.dart';
 part 'model/assist_in.dart';
 part 'model/attachment_out.dart';
 part 'model/capabilities_out.dart';
+part 'model/capture_in.dart';
 part 'model/chat_in.dart';
 part 'model/close_review_in.dart';
 part 'model/decide_in.dart';

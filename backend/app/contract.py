@@ -134,6 +134,14 @@ FIELD_OPERATIONS = [
     ("post", "/v1/ai/reshape"),
     ("post", "/v1/documents/reshape"),
     ("post", "/v1/documents/{uid}/reshape"),
+    # Activities and quick capture: lists and ranges, one activity, its changes and actions, and the proposal
+    # made of what was said (untyped JSON, read by the app itself).
+    ("get", "/v1/activities"),
+    ("post", "/v1/activities"),
+    ("get", "/v1/activities/{activity_id}"),
+    ("patch", "/v1/activities/{activity_id}"),
+    ("post", "/v1/activities/{activity_id}/{action}"),
+    ("post", "/v1/capture/classify"),
 ]
 
 

@@ -184,6 +184,12 @@ class ApiClient {
           return value is DateTime ? value : DateTime.tryParse(value);
         case 'AIStatus':
           return AIStatus.fromJson(value);
+        case 'ActivityAction':
+          return ActivityAction.fromJson(value);
+        case 'ActivityChange':
+          return ActivityChange.fromJson(value);
+        case 'ActivityIn':
+          return ActivityIn.fromJson(value);
         case 'ApproveAction':
           return ApproveAction.fromJson(value);
         case 'AskConversationDetail':
@@ -220,6 +226,8 @@ class ApiClient {
           return AttachmentOut.fromJson(value);
         case 'CapabilitiesOut':
           return CapabilitiesOut.fromJson(value);
+        case 'CaptureIn':
+          return CaptureIn.fromJson(value);
         case 'ChatIn':
           return ChatIn.fromJson(value);
         case 'CloseReviewIn':

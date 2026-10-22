@@ -1,3 +1,4 @@
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,7 @@ import '../core/session.dart';
 import '../data/api_service.dart';
 import '../data/ask_repository.dart';
 import '../data/reshape_repository.dart';
+import '../data/activity_repository.dart';
 import '../data/browse_repository.dart';
 import '../data/capture_repositories.dart';
 import '../data/graph_repository.dart';
@@ -541,6 +543,17 @@ final myReviewItemsProvider = FutureProvider.autoDispose<List<ReviewItem>>((ref)
 
 final askRepositoryProvider = Provider((ref) => AskRepository(ref.watch(apiServiceProvider)));
 final reshapeRepositoryProvider = Provider((ref) => ReshapeRepository(ref.watch(apiServiceProvider)));
+final activityRepositoryProvider = Provider((ref) => ActivityRepository(ref.watch(apiServiceProvider)));
+
+/// The phone's time zone (IANA, e.g. Europe/Rome): what "today", "tomorrow" and a recurrence's local time are
+/// read in. UTC when the platform cannot say.
+final deviceTimezoneProvider = FutureProvider<String>((ref) async {
+  try {
+    return (await FlutterTimezone.getLocalTimezone()).identifier;
+  } catch (_) {
+    return 'UTC';
+  }
+});
 
 /// The phone's speech recognition and voice. Tests put a fake here.
 final voiceProvider = Provider<Voice>((_) => DeviceVoice());
