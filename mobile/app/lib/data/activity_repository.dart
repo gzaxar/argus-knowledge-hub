@@ -27,6 +27,8 @@ class ActivityItem {
         ownerUserId = json['owner_user_id']?.toString(),
         assigneeUserId = json['assignee_user_id']?.toString(),
         note = json['note']?.toString(),
+        workspaceId = json['workspace_id']?.toString(),
+        workspaceIds = [for (final w in (json['workspace_ids'] as List? ?? [json['workspace_id']])) if (w != null) '$w'],
         overdue = json['overdue'] == true,
         mayChange = json['may_change'] != false;
 
@@ -45,6 +47,9 @@ class ActivityItem {
   final String? ownerUserId;
   final String? assigneeUserId;
   final String? note;
+  /// Its own workspace (where its links are), and every workspace it is in, its own first.
+  final String? workspaceId;
+  final List<String> workspaceIds;
   final bool overdue;
   final bool mayChange;
 

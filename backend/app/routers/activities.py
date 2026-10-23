@@ -1,7 +1,8 @@
 """Activities and quick capture (services/activities.py, services/capture.py, services/recurrence.py).
 
 - `GET /v1/activities?from=&to=&basis=planned|actual&…` — the activities of a range the person may see, with
-  counts; a `view` of today / upcoming / completed for the phone's lists.
+  counts; a `view` of today / upcoming / completed for the phone's lists, or `attention` for the cockpit (under
+  way, overdue, planned today; and how many were done today).
 - `POST /v1/activities` — one activity, or a recurring series (`rrule`); a client `uid` (and the
   Idempotency-Key header) makes a retry find what it made.
 - `GET /v1/activities/{id}`, `PATCH /v1/activities/{id}?scope=this|future|series`,
@@ -13,6 +14,8 @@
   as a comment), the activity by `POST /v1/activities`.
 
 Activities need the right to read the workspace (any of its objects, tickets or documents): everyone works.
+An activity may be in several workspaces (`workspace_ids`, its own first): it is added only to workspaces the
+person may read, and its links are records of its own workspace, seen under that workspace's rules.
 """
 from __future__ import annotations
 
@@ -40,8 +43,10 @@ def _user_id(identity: Identity) -> Optional[str]:
 def _may(db: Session, identity: Identity, workspace_id: str, action: str, resource: str) -> bool:
     from app.services.permissions import resolve_permission
     if isinstance(identity, PatIdentity):
-        return identity.may(action, resource)
+        return identity.workspace_id == workspace_id and identity.may(action, resource)
     if identity.token is not None and not identity.token.may(action, resource):
+        return False
+    if identity.token is not None and identity.token.workspace_id and identity.token.workspace_id != workspace_id:
         return False
     return resolve_permission(db, identity.user, workspace_id, action, resource)
 
@@ -57,33 +62,48 @@ def _workspace(identity: Identity, db: Session, header: Optional[str]) -> str:
     return ws
 
 
+def _may_cached(db: Session, identity: Identity):
+    known: dict = {}
+
+    def may(workspace_id: str, action: str, resource: str) -> bool:
+        key = (workspace_id, action, resource)
+        if key not in known:
+            known[key] = _may(db, identity, workspace_id, action, resource)
+        return known[key]
+    return may
+
+
 def _viewer(db: Session, identity: Identity, ws: str) -> svc.Viewer:
+    """Who is looking, from workspace `ws`. A linked record is judged in its own workspace — an activity added to
+    `ws` from another may refer to records there, seen only by those who may see them there."""
     from app.models.asset import Asset
     from app.models.document import Document
     from app.models.issue import Issue
-    from app.services.visibility import can_see
-    read_tickets = _may(db, identity, ws, "read", "tickets")
-    read_objects = _may(db, identity, ws, "read", "objects")
-    read_documents = _may(db, identity, ws, "read", "documents")
+    from app.services.visibility import asset_visible_in, can_see
+    may = _may_cached(db, identity)
     uid = _user_id(identity)
 
     def asset(a_uid: str) -> bool:
         a = db.get(Asset, a_uid)
-        return a is None or (read_objects and can_see(a))
+        if a is None:
+            return True
+        here = may(ws, "read", "objects") and asset_visible_in(a, ws)
+        return can_see(a) and (here or may(a.workspace_id, "read", "objects"))
 
     def ticket(t_uid: str) -> bool:
         t = db.get(Issue, t_uid)
-        return t is None or (read_tickets and t.workspace_id == ws)
+        return t is None or may(t.workspace_id, "read", "tickets")
 
     def document(d_uid: str) -> bool:
         d = db.get(Document, d_uid)
         if d is None:
             return True
-        if not read_documents or d.confidentiality == "riservato" and d.owner_user_id != uid and \
-                not _may(db, identity, ws, "approve", "documents"):
+        if not may(d.workspace_id, "read", "documents") or d.confidentiality == "riservato" and \
+                d.owner_user_id != uid and not may(d.workspace_id, "approve", "documents"):
             return False
         return True
-    return svc.Viewer(user_id=uid, read_tickets=read_tickets, modify_tickets=_may(db, identity, ws, "modify", "tickets"),
+    read_tickets = may(ws, "read", "tickets")
+    return svc.Viewer(user_id=uid, read_tickets=read_tickets, modify_tickets=may(ws, "modify", "tickets"),
                       sees_asset=asset, sees_ticket=ticket, sees_document=document)
 
 
@@ -120,6 +140,25 @@ def _list(db: Session, identity: Identity, ws: str, *, start, end, basis, view, 
             merged = {i.id: i for i in planned["items"] + done["items"]}
             items = sorted(merged.values(), key=lambda i: (i.planned_start or i.actual_start or i.actual_end or at))
             result = {"items": items, "counts": planned["counts"], "truncated": planned["truncated"]}
+        elif view == "attention":
+            reach = day_start - timedelta(days=60)
+            planned = svc.in_range(db, ws, viewer, reach, day_end, basis="planned", filters=filters, at=at)
+            started = svc.in_range(db, ws, viewer, reach, day_end, basis="actual", filters=filters, at=at)
+            merged = {i.id: i for i in planned["items"] + started["items"]}
+
+            def today(i):
+                return i.planned_start is not None and day_start <= i.planned_start < day_end
+            wanted = [i for i in merged.values()
+                      if i.status == "in_progress" or (i.status == "planned" and (i.overdue(at) or today(i)))]
+            wanted.sort(key=lambda i: (i.status != "in_progress", not i.overdue(at),
+                                       i.planned_start or i.actual_start or at))
+            counts = {"in_progress": sum(i.status == "in_progress" for i in wanted),
+                      "overdue": sum(i.overdue(at) for i in wanted),
+                      "today": sum(i.status == "planned" and today(i) for i in wanted),
+                      "done_today": sum(1 for i in merged.values() if i.status == "completed" and i.actual_end
+                                        and day_start <= i.actual_end < day_end),
+                      "total": len(wanted)}
+            result = {"items": wanted, "counts": counts, "truncated": planned["truncated"] or started["truncated"]}
         elif view == "upcoming":
             result = svc.in_range(db, ws, viewer, day_end, day_end + timedelta(days=30), basis="planned",
                                   filters=filters, at=at)
@@ -148,7 +187,7 @@ def list_activities(
     start: Optional[datetime] = Query(None, alias="from"),
     end: Optional[datetime] = Query(None, alias="to"),
     basis: Literal["planned", "actual"] = "planned",
-    view: Optional[Literal["today", "upcoming", "completed"]] = None,
+    view: Optional[Literal["today", "upcoming", "completed", "attention"]] = None,
     tz: str = "UTC",
     status: Optional[str] = Query(None, description="comma-separated statuses"),
     owner: Optional[str] = None,
@@ -167,7 +206,8 @@ def list_activities(
 ):
     """The activities of a range the person may see, by planned or actual time, filtered, with counts. A `view`
     sets the range: `today` (planned today, under way, or done today), `upcoming` (the next 30 days) or
-    `completed` (done in the last 30 days), in the time zone `tz`. Counts are of the whole range under the same
+    `completed` (done in the last 30 days), or `attention` (under way, overdue or planned today: the cockpit), in
+    the time zone `tz`. Counts are of the whole range under the same
     filters except status, and never include what the person may not see."""
     ws = _workspace(identity, db, x_workspace_id)
     try:
@@ -206,9 +246,9 @@ def get_series(uid: str, identity: Identity = Depends(get_identity), db: Session
                x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id")):
     ws = _workspace(identity, db, x_workspace_id)
     s = db.get(ActivitySeries, uid)
-    if s is None or s.workspace_id != ws:
+    if s is None or not svc.series_belongs(db, s, ws):
         raise HTTPException(status_code=404, detail="No such series")
-    item = svc.series_item(s)
+    item = svc.fill_workspaces(db, [svc.series_item(s)])[0]
     viewer = _viewer(db, identity, ws)
     if not svc.sees(viewer, item):
         raise HTTPException(status_code=404, detail="No such series")
@@ -237,6 +277,8 @@ class ActivityIn(BaseModel):
     document_uid: Optional[str] = None
     note: Optional[str] = Field(default=None, max_length=10000)
     rrule: Optional[str] = Field(default=None, max_length=300)
+    # Further workspaces it is in, besides the one it is created in.
+    workspace_ids: Optional[list[str]] = Field(default=None, max_length=50)
     # The AI proposal it came from: the transcript, the model, what was proposed — kept with it.
     provenance: Optional[dict] = None
 
@@ -257,6 +299,8 @@ class ActivityChange(BaseModel):
     document_uid: Optional[str] = None
     note: Optional[str] = Field(default=None, max_length=10000)
     rrule: Optional[str] = Field(default=None, max_length=300)
+    # All the workspaces it is to be in (its own first is kept if listed); see services/activities.set_workspaces.
+    workspace_ids: Optional[list[str]] = Field(default=None, min_length=1, max_length=50)
 
 
 class ActivityAction(BaseModel):
@@ -266,8 +310,9 @@ class ActivityAction(BaseModel):
     note: Optional[str] = Field(default=None, max_length=10000)
 
 
-def _check_links(db: Session, viewer: svc.Viewer, fields: dict, ws: str) -> None:
-    """A link to a record of another workspace, or one the person may not see, is refused."""
+def _check_links(db: Session, viewer: svc.Viewer, fields: dict, ws: str, workspaces: Optional[list[str]] = None) -> None:
+    """A link to a record of another workspace than the activity's own (`ws`), or to one the person may not see,
+    is refused; an assignee is someone of one of the activity's `workspaces`."""
     from app.models.asset import Asset
     from app.models.document import Document
     from app.models.issue import Issue
@@ -284,8 +329,16 @@ def _check_links(db: Session, viewer: svc.Viewer, fields: dict, ws: str) -> None
         from app.models.user import User
         from app.services.permissions import resolve_permission
         user = db.get(User, assignee)
-        if user is None or not any(resolve_permission(db, user, ws, "read", r) for r in ("objects", "tickets", "documents")):
-            raise HTTPException(status_code=422, detail="assignee: not someone of this workspace")
+        if user is None or not any(resolve_permission(db, user, w, "read", r) for w in (workspaces or [ws])
+                                   for r in ("objects", "tickets", "documents")):
+            raise HTTPException(status_code=422, detail="assignee: not someone of the activity's workspaces")
+
+
+def _check_workspaces(db: Session, identity: Identity, wanted: Optional[list[str]], already: list[str]) -> None:
+    """A workspace is added only by someone who may read it."""
+    for w in wanted or []:
+        if w not in already and not any(_may(db, identity, w, "read", r) for r in ("objects", "tickets", "documents")):
+            raise HTTPException(status_code=422, detail=f"workspace_ids: {w} is not a workspace of yours")
 
 
 @router.post("/activities", status_code=201)
@@ -296,12 +349,14 @@ def create_activity(body: ActivityIn, identity: Identity = Depends(get_identity)
     viewer = _viewer(db, identity, ws)
     if viewer.user_id is None and body.visibility == "private":
         raise HTTPException(status_code=422, detail="a private activity belongs to a person")
-    fields = body.model_dump(exclude={"uid", "rrule"})
+    fields = body.model_dump(exclude={"uid", "rrule", "workspace_ids"})
     for k in svc.TIME_FIELDS:
         fields[k] = _aware(fields[k])
-    _check_links(db, viewer, fields, ws)
+    _check_links(db, viewer, fields, ws, [ws, *(body.workspace_ids or [])])
+    _check_workspaces(db, identity, body.workspace_ids, [ws])
     try:
-        item = svc.create(db, ws, fields, author=viewer.user_id, rrule=body.rrule, uid=body.uid)
+        item = svc.create(db, ws, fields, author=viewer.user_id, rrule=body.rrule, uid=body.uid,
+                          workspace_ids=body.workspace_ids)
     except (ActivityError, recurrence.RuleError) as e:
         db.rollback()
         _fail(e)
@@ -319,13 +374,15 @@ def change_activity(activity_id: str, body: ActivityChange, scope: Literal["this
     item, viewer = _visible_item(db, identity, ws, activity_id)
     if not svc.may_change(viewer, item):
         raise HTTPException(status_code=403, detail="You may not change this activity")
-    changes = body.model_dump(exclude_unset=True, exclude={"rrule"})
+    changes = body.model_dump(exclude_unset=True, exclude={"rrule", "workspace_ids"})
     for k in svc.TIME_FIELDS:
         if k in changes:
             changes[k] = _aware(changes[k])
-    _check_links(db, viewer, changes, ws)
+    _check_links(db, viewer, changes, item.workspace_id, body.workspace_ids or item.workspace_ids)
+    _check_workspaces(db, identity, body.workspace_ids, item.workspace_ids)
     try:
-        out = svc.update(db, ws, activity_id, changes, scope=scope, author=viewer.user_id, rrule=body.rrule)
+        out = svc.update(db, ws, activity_id, changes, scope=scope, author=viewer.user_id, rrule=body.rrule,
+                         workspace_ids=body.workspace_ids)
     except (ActivityError, recurrence.RuleError) as e:
         db.rollback()
         _fail(e)
@@ -360,7 +417,7 @@ def end_series(uid: str, identity: Identity = Depends(get_identity), db: Session
     ws = _workspace(identity, db, x_workspace_id)
     s = db.get(ActivitySeries, uid)
     viewer = _viewer(db, identity, ws)
-    if s is None or s.workspace_id != ws or not svc.sees(viewer, svc.series_item(s)):
+    if s is None or not svc.series_belongs(db, s, ws) or not svc.sees(viewer, svc.series_item(s)):
         raise HTTPException(status_code=404, detail="No such series")
     if not svc.may_change(viewer, svc.series_item(s)):
         raise HTTPException(status_code=403, detail="You may not change this series")

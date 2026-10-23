@@ -16,6 +16,13 @@ final activityListProvider = FutureProvider.autoDispose.family<ActivityPage, Str
   return ref.watch(activityRepositoryProvider).list(view: view, timezone: tz, filters: const {'mine': 'true'});
 });
 
+/// The cockpit's activities: the workspace's, under way, overdue or planned today (not only mine).
+final cockpitActivitiesProvider = FutureProvider.autoDispose<ActivityPage>((ref) async {
+  ref.watch(workspaceIdProvider);
+  final tz = await ref.watch(deviceTimezoneProvider.future);
+  return ref.watch(activityRepositoryProvider).list(view: 'attention', timezone: tz, limit: 5);
+});
+
 /// What the workspace view asks: a range, by planned or done date, filtered.
 class ActivityQuery {
   const ActivityQuery({required this.from, required this.to, this.basis = 'planned', this.filters = const {}});

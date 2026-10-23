@@ -11,6 +11,10 @@ only when something happens to it — done, skipped, rescheduled, edited — nam
 
 Visibility: `workspace` (members who may read the workspace's tickets see it) or `private` (its owner and its
 assignee only). An activity referring to a record its viewer may not see is not shown to them either.
+
+**Workspaces.** An activity or a series belongs to its own workspace (`workspace_id`, where its links to an asset,
+ticket or document are) and to any further ones listed in `activity_workspaces`: it is listed, counted and opened
+in each, under that workspace's rules. A series' occurrences are in the series' workspaces.
 """
 from datetime import datetime
 from typing import Optional
@@ -55,6 +59,20 @@ class ActivitySeries(Base):
     created_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class ActivityWorkspace(Base):
+    """A further workspace an activity (not an occurrence: those follow their series) or a series is in."""
+    __tablename__ = "activity_workspaces"
+    __table_args__ = (UniqueConstraint("workspace_id", "activity_uid", name="uq_activity_workspace"),
+                      UniqueConstraint("workspace_id", "series_uid", name="uq_activity_series_workspace"))
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[str] = mapped_column(String, ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    activity_uid: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("activities.uid", ondelete="CASCADE"), nullable=True, index=True)
+    series_uid: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("activity_series.uid", ondelete="CASCADE"), nullable=True, index=True)
 
 
 class Activity(Base):
