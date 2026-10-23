@@ -9,6 +9,7 @@ import '../../app/providers.dart';
 import '../../app/queue.dart';
 import '../../domain/models.dart';
 import '../../widgets/common.dart';
+import '../activities/activities_screen.dart';
 import '../shell/app_shell.dart';
 
 /// Home: find a record by scanning its label or by typing (flutter-app-design §5.1).
@@ -174,6 +175,7 @@ class _Cockpit extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(cockpitProvider);
+        ref.invalidate(cockpitActivitiesProvider);
         ref.invalidate(myWorkProvider);
         ref.invalidate(notificationsProvider);
       },
@@ -206,6 +208,7 @@ class _Cockpit extends ConsumerWidget {
         if (c != null) ...[
           _Kpis(c),
           _MyWork(fallback: c.mine),
+          const _CockpitActivities(),
           if (c.openTickets != null) ...[
             const SectionHeader('Equipment needing attention'),
             if (c.hotspots.isEmpty) const _Empty('No equipment has open tickets.'),
@@ -229,6 +232,31 @@ class _Cockpit extends ConsumerWidget {
         ],
       ]),
     );
+  }
+}
+
+/// The workspace's activities needing attention — under way, overdue, planned today — as on the web's cockpit.
+/// Nothing shows if they cannot be read (offline, or a server without activities).
+class _CockpitActivities extends ConsumerWidget {
+  const _CockpitActivities();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final page = ref.watch(cockpitActivitiesProvider).value;
+    if (page == null) return const SizedBox.shrink();
+    final c = page.counts;
+    return Column(key: const Key('cockpit-activities'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const SectionHeader('Activities'),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text('${c['in_progress'] ?? 0} under way · ${c['overdue'] ?? 0} overdue · ${c['today'] ?? 0} today'
+            ' · ${c['done_today'] ?? 0} done today', style: Theme.of(context).textTheme.bodySmall),
+      ),
+      if (page.items.isEmpty) const _Empty('Nothing under way, overdue or planned for today.'),
+      for (final a in page.items) ActivityTile(activity: a, onChanged: () => ref.invalidate(cockpitActivitiesProvider)),
+      if (page.total > page.items.length)
+        TextButton(onPressed: () => context.push('/activities'), child: Text('${page.total - page.items.length} more')),
+    ]);
   }
 }
 

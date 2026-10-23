@@ -1990,6 +1990,8 @@ export interface ReshapeGeneration {
 export type ActivityStatus = "planned" | "in_progress" | "completed" | "cancelled" | "skipped";
 export interface Activity {
   id: string; uid: string | null; series_uid: string | null; occurrence_key: string | null; workspace_id: string;
+  /** Every workspace it is in, its own first. */
+  workspace_ids: string[];
   owner_user_id: string | null; assignee_user_id: string | null; title: string; description: string | null;
   visibility: "workspace" | "private"; status: ActivityStatus; timezone: string; all_day: boolean;
   planned_start: string | null; planned_end: string | null; due_at: string | null;

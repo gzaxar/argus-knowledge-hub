@@ -1,7 +1,7 @@
 ---
 title: Activities and capture by voice
 summary: Recording work planned, under way and done — one-off or recurring — and capturing a fault or a piece of work by voice, proposed as a ticket or an activity for you to confirm; the workspace's activities by planned or done date, as a calendar or a list.
-keywords: [activity, activities, work, planned, in progress, under way, done, completed, skipped, cancelled, recurring, every monday, series, occurrence, this and future, calendar, capture, voice, dictate, speak, ticket or activity, quick capture, overdue, maintenance, inspection, timezone, daylight saving]
+keywords: [activity, activities, cockpit, several workspaces, other workspace, shared, work, planned, in progress, under way, done, completed, skipped, cancelled, recurring, every monday, series, occurrence, this and future, calendar, capture, voice, dictate, speak, ticket or activity, quick capture, overdue, maintenance, inspection, timezone, daylight saving]
 order: 75
 ---
 
@@ -19,6 +19,13 @@ open is an activity about that ticket, and the ticket is left as it is.
   is assigned to. An activity about a record you may not see is not shown to you — not in lists, counts or search.
 - **Who changes it**: its owner and its assignee; for a workspace activity, also those who may change the
   workspace's tickets.
+- **Which workspaces**: the one it was created in, and any other of **your** workspaces you add it to — a
+  round that covers two facilities is one activity, listed and counted in both. In each workspace it follows
+  that workspace's rules above. Change them with **Change…** (web) or **Change** (phone). It may leave the
+  workspace it was created in only if it refers to no asset, ticket or document, because those records belong
+  to that workspace. Someone who cannot see a record it refers to does not see the activity, in any workspace.
+  A recurring activity's occurrences are in the series' workspaces, so the workspaces change for **this and
+  future occurrences** or **the entire series**, not for one occurrence.
 
 ## Recurring activities
 
@@ -51,6 +58,9 @@ kept on the phone as a draft, proposed when you open it again online; nothing is
 record waits in **Unsent changes** while ARGUS cannot be reached, and is sent once — never twice — when it can.
 
 ## The activity lists
+
+The **cockpit** (home page, web and phone) lists the workspace's activities that need attention: those
+**under way**, those **overdue** and those **planned for today**, with how many were **done today**.
 
 On the phone, **Activities** (home page or menu): **Today**, **Upcoming** (30 days), **Completed** (the last 30
 days) — yours; start or finish one with a tap. **Workspace**, on the phone and on the web (**Service desk →

@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { activitiesApi, membersApi, problemText } from "../../api/client";
-import type { Activity, ActivityStatus } from "../../api/types";
+import { Link, useSearchParams } from "react-router-dom";
+import { activitiesApi, membersApi, problemText, workspacesApi } from "../../api/client";
+import type { Activity, ActivityStatus, MyWorkspace } from "../../api/types";
+import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
 
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 const STATUSES: { id: ActivityStatus; label: string; tone: string }[] = [
@@ -20,6 +21,32 @@ const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), 
 const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const fromIsoDay = (s: string) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
 const weekStart = (d: Date) => addDays(day0(d), -((d.getDay() + 6) % 7));
+
+/** The workspaces one may put an activity in: one's own, readable. */
+function useMyWorkspaces(): MyWorkspace[] {
+  const q = useQuery({ queryKey: ["my-workspaces"], queryFn: workspacesApi.listMine });
+  return (q.data ?? []).filter((w) => w.can_read || w.can_read_tickets);
+}
+
+/** Choose workspaces among one's own; ones already chosen that are not one's own stay, shown by count. */
+function WorkspacePicker({ value, onChange, mine }: { value: string[]; onChange: (v: string[]) => void; mine: MyWorkspace[] }) {
+  const others = value.filter((id) => !mine.some((w) => w.id === id)).length;
+  return (
+    <fieldset className="space-y-1">
+      <legend className="text-xs text-slate-600">In the workspaces</legend>
+      {mine.map((w) => (
+        <label key={w.id} className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={value.includes(w.id)}
+                 onChange={(e) => onChange(e.target.checked ? [...value, w.id] : value.filter((x) => x !== w.id))} />
+          {w.name}
+        </label>
+      ))}
+      {others > 0 && <p className="text-xs text-slate-500">and {others} more you are not a member of (kept)</p>}
+    </fieldset>
+  );
+}
+
+const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
 
 function when(a: Activity, basis: "planned" | "actual"): Date | null {
   const v = basis === "actual" ? (a.actual_start ?? a.actual_end) : (a.planned_start ?? a.due_at);
@@ -48,7 +75,12 @@ export function ActivitiesPage() {
   const [ticket, setTicket] = useState("");
   const [q, setQ] = useState("");
   const [limit, setLimit] = useState(200);
-  const [open, setOpen] = useState<string | null>(null);
+  const [search, setSearch] = useSearchParams();
+  const [open, setOpenState] = useState<string | null>(() => search.get("open"));
+  const setOpen = (id: string | null) => {
+    setOpenState(id);
+    if (!id && search.has("open")) { search.delete("open"); setSearch(search, { replace: true }); }
+  };
   const [creating, setCreating] = useState(false);
 
   const params = {
@@ -274,6 +306,9 @@ function ActivityPanel({ id, names, onClose, onChanged }: {
   const [title, setTitle] = useState("");
   const [planned, setPlanned] = useState("");
   const [scope, setScope] = useState<"this" | "future" | "series">("this");
+  const [workspaces, setWorkspaces] = useState<string[]>([]);
+  const mine = useMyWorkspaces();
+  const wsName = (id: string) => mine.find((w) => w.id === id)?.name;
   const [error, setError] = useState<string | null>(null);
   const done = (x: Activity) => { setError(null); setEditing(false); setCurrent(x.id); qc.setQueryData(["activity", x.id], x); onChanged(); };
   const act = useMutation({ mutationFn: (action: "start" | "complete" | "skip" | "cancel" | "reopen") => activitiesApi.act(current, action),
@@ -282,9 +317,11 @@ function ActivityPanel({ id, names, onClose, onChanged }: {
     mutationFn: () => activitiesApi.change(current, {
       ...(title !== a.data?.title ? { title } : {}),
       ...(planned ? { planned_start: new Date(planned).toISOString() } : {}),
+      ...(a.data && !sameSet(workspaces, a.data.workspace_ids) ? { workspace_ids: workspaces } : {}),
     }, scope),
     onSuccess: done, onError: (e) => setError(problemText(e)) });
   const x = a.data;
+  const workspacesChanged = !!x && editing && !sameSet(workspaces, x.workspace_ids);
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-black/20" onClick={onClose}>
       <aside className="h-full w-full max-w-md overflow-y-auto bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -305,6 +342,10 @@ function ActivityPanel({ id, names, onClose, onChanged }: {
               <dt className="text-slate-500">Started</dt><dd>{fmt(x.actual_start, false)}</dd>
               <dt className="text-slate-500">Done</dt><dd>{fmt(x.actual_end, x.all_day)}</dd>
               <dt className="text-slate-500">Recorded</dt><dd>{fmt(x.created_at, false)}</dd>
+              <dt className="text-slate-500">Workspaces</dt>
+              <dd>{x.workspace_ids.map((id) => wsName(id) ?? null).filter(Boolean).join(", ") || "—"}
+                {x.workspace_ids.some((id) => !wsName(id)) &&
+                  <span className="text-xs text-slate-400"> + {x.workspace_ids.filter((id) => !wsName(id)).length} other</span>}</dd>
               <dt className="text-slate-500">Owner</dt><dd>{x.owner_user_id ? names.get(x.owner_user_id) ?? x.owner_user_id : "—"}</dd>
               {x.assignee_user_id && <><dt className="text-slate-500">Assignee</dt><dd>{names.get(x.assignee_user_id) ?? x.assignee_user_id}</dd></>}
               {x.series && <><dt className="text-slate-500">Repeats</dt><dd>{x.series.text} <span className="text-xs text-slate-400">({x.series.timezone})</span></dd></>}
@@ -322,7 +363,7 @@ function ActivityPanel({ id, names, onClose, onChanged }: {
                 {x.status === "planned" && x.recurring && <button type="button" onClick={() => act.mutate("skip")} className="rounded border border-slate-300 px-3 py-1">Skip this one</button>}
                 {(x.status === "planned" || x.status === "in_progress") && <button type="button" onClick={() => act.mutate("cancel")} className="rounded border border-slate-300 px-3 py-1">Cancel</button>}
                 {!(x.status === "planned" || x.status === "in_progress") && <button type="button" onClick={() => act.mutate("reopen")} className="rounded border border-slate-300 px-3 py-1">Reopen</button>}
-                <button type="button" onClick={() => { setEditing(true); setTitle(x.title); setPlanned(""); }} className="rounded border border-slate-300 px-3 py-1">Change…</button>
+                <button type="button" onClick={() => { setEditing(true); setTitle(x.title); setPlanned(""); setWorkspaces(x.workspace_ids); }} className="rounded border border-slate-300 px-3 py-1">Change…</button>
               </div>
             )}
             {editing && (
@@ -330,13 +371,22 @@ function ActivityPanel({ id, names, onClose, onChanged }: {
                 <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded border border-slate-300 px-2 py-1" aria-label="Title" />
                 <label className="block text-xs text-slate-600">New planned time (leave empty to keep it)
                   <input type="datetime-local" value={planned} onChange={(e) => setPlanned(e.target.value)} className="mt-1 w-full rounded border border-slate-300 px-2 py-1" /></label>
+                <WorkspacePicker value={workspaces} onChange={setWorkspaces} mine={mine} />
+                {workspacesChanged && (x.asset_uid || x.ticket_uid || x.document_uid) && !workspaces.includes(x.workspace_id) && (
+                  <p className="text-xs text-amber-800">It refers to records of {wsName(x.workspace_id) ?? "its own workspace"}: it cannot leave it while it does.</p>
+                )}
+                {x.recurring && workspacesChanged && scope === "this" && (
+                  <p className="text-xs text-amber-800">The workspaces belong to the series: choose “this and future” or “the entire series”.</p>
+                )}
                 {x.recurring && (
                   <select value={scope} onChange={(e) => setScope(e.target.value as typeof scope)} className="w-full rounded border border-slate-300 px-2 py-1" aria-label="Apply to">
                     <option value="this">This occurrence</option><option value="future">This and future occurrences</option><option value="series">The entire series</option>
                   </select>
                 )}
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => save.mutate()} disabled={save.isPending} className="rounded bg-slate-900 px-3 py-1 text-white">Save</button>
+                  <button type="button" onClick={() => save.mutate()}
+                          disabled={save.isPending || workspaces.length === 0 || (x.recurring && workspacesChanged && scope === "this")}
+                          className="rounded bg-slate-900 px-3 py-1 text-white disabled:opacity-40">Save</button>
                   <button type="button" onClick={() => setEditing(false)} className="rounded border border-slate-300 px-3 py-1">Cancel</button>
                 </div>
               </div>
@@ -363,6 +413,9 @@ function NewActivity({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [repeat, setRepeat] = useState("");
   const [count, setCount] = useState("");
   const [privateOnly, setPrivateOnly] = useState(false);
+  const here = useCurrentWorkspaceId();
+  const mine = useMyWorkspaces();
+  const [also, setAlso] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const create = useMutation({
     mutationFn: () => {
@@ -371,6 +424,7 @@ function NewActivity({ onClose, onCreated }: { onClose: () => void; onCreated: (
       return activitiesApi.create({
         uid: crypto.randomUUID(), title, description: description || null, timezone: TZ, planned_start: d.toISOString(),
         visibility: privateOnly ? "private" : "workspace", rrule: base ? (count ? `${base};COUNT=${count}` : base) : null,
+        ...(also.length ? { workspace_ids: also } : {}),
       });
     },
     onSuccess: onCreated, onError: (e) => setError(problemText(e)) });
@@ -388,6 +442,18 @@ function NewActivity({ onClose, onCreated }: { onClose: () => void; onCreated: (
           </select>
           {repeat && <input value={count} onChange={(e) => setCount(e.target.value.replace(/\D/g, ""))} placeholder="times (∞)" className="w-24 rounded border border-slate-300 px-2 py-1.5 text-sm" />}
         </div>
+        {mine.filter((w) => w.id !== here).length > 0 && (
+          <fieldset className="space-y-1">
+            <legend className="text-xs text-slate-600">Also in</legend>
+            {mine.filter((w) => w.id !== here).map((w) => (
+              <label key={w.id} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={also.includes(w.id)}
+                       onChange={(e) => setAlso(e.target.checked ? [...also, w.id] : also.filter((x) => x !== w.id))} />
+                {w.name}
+              </label>
+            ))}
+          </fieldset>
+        )}
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={privateOnly} onChange={(e) => setPrivateOnly(e.target.checked)} /> Only for me (private)</label>
         {error && <p className="text-sm text-rose-700">{error}</p>}
         <div className="flex justify-end gap-2">
