@@ -107,4 +107,47 @@ void main() {
     expect(find.text('Capture by voice'), findsWidgets);
     expect(find.textContaining('only the text is sent to ARGUS'), findsOneWidget);
   });
+
+  testWidgets('the cockpit lists the workspace activities needing attention, with their counts', (tester) async {
+    final app = await start(tester, prepare: (s) {
+      s.serveOverview = true;
+      s.routes['GET /v1/activities'] = _json({
+        ..._page([_item('a1', 'Inspection of the linac', 'in_progress'),
+          _item('a2', 'Late check', 'planned', planned: _now.subtract(const Duration(days: 2)), overdue: true)]),
+        'counts': {'in_progress': 1, 'overdue': 1, 'today': 0, 'done_today': 3, 'total': 2},
+      });
+    }, overrides: [deviceTimezoneProvider.overrideWith((_) async => 'Europe/Rome')]);
+    await tester.pumpAndSettle();
+    final asked = _listings(app).single.queryParameters;
+    expect(asked['view'], 'attention');
+    expect(asked.containsKey('mine'), isFalse, reason: "the workspace's, not only mine");
+    expect(find.byKey(const Key('cockpit-activities'), skipOffstage: false), findsOneWidget);
+    await tester.dragUntilVisible(find.text('Late check'), find.byKey(const Key('home-cockpit')), const Offset(0, -200));
+    expect(find.textContaining('1 under way · 1 overdue · 0 today · 3 done today'), findsOneWidget);
+    expect(find.text('Inspection of the linac'), findsOneWidget);
+  });
+
+  testWidgets('an activity is put in another of my workspaces', (tester) async {
+    final app = await _open(tester);
+    app.server.routes['GET /v1/me/workspaces'] = _json([
+      {'id': 'slice-20463f', 'name': 'Slice', 'is_global': false, 'created_at': _at(_now), 'can_read': true,
+        'can_create': true, 'can_modify': true, 'can_delete': false, 'can_read_tickets': true, 'can_create_tickets': true, 'can_modify_tickets': true, 'can_delete_tickets': false,
+        'can_read_documents': true, 'can_create_documents': true, 'can_modify_documents': true,
+        'can_delete_documents': false, 'can_approve_documents': false},
+      {'id': 'ring', 'name': 'Ring', 'is_global': false, 'created_at': _at(_now), 'can_read': true,
+        'can_create': true, 'can_modify': true, 'can_delete': false, 'can_read_tickets': true, 'can_create_tickets': true, 'can_modify_tickets': true, 'can_delete_tickets': false,
+        'can_read_documents': true, 'can_create_documents': true, 'can_modify_documents': true,
+        'can_delete_documents': false, 'can_approve_documents': false},
+    ]);
+    final one = {..._item('a1', 'Inspection of the linac', 'in_progress'), 'workspace_id': 'slice-20463f',
+      'workspace_ids': ['slice-20463f']};
+    app.server.routes['GET /v1/activities/a1'] = _json(one);
+    app.server.routes['PATCH /v1/activities/a1'] = _json({...one, 'workspace_ids': ['slice-20463f', 'ring']});
+    await app.tap('activity-a1');
+    await app.tap('activity-edit');
+    await app.tap('activity-edit-ws-ring');
+    await app.tap('activity-edit-save');
+    final patch = app.server.requests.lastWhere((r) => r.method == 'PATCH');
+    expect(jsonDecode(patch.body), {'workspace_ids': ['slice-20463f', 'ring']});
+  });
 }

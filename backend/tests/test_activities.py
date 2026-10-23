@@ -419,3 +419,94 @@ def test_the_phone_views_and_paging(world):
     page = client.get("/v1/activities", headers=w["h"], params={"from": (now - timedelta(days=2)).isoformat(),
                       "to": (now + timedelta(days=10)).isoformat(), "limit": 1}).json()
     assert len(page["items"]) == 1 and page["next_offset"] == 1 and page["total"] == 2
+
+
+# --------------------------------------------------------------------------- in more than one workspace
+
+def in_ws(w, ws, start, end):
+    r = client.get("/v1/activities", headers={"X-Workspace-Id": ws},
+                   params={"from": start.isoformat(), "to": end.isoformat()})
+    assert r.status_code == 200, r.text
+    return [i["title"] for i in r.json()["items"]]
+
+
+def also_member(w, person, ws):
+    db = SessionLocal()
+    db.add(Membership(workspace_id=ws, user_id=person.id, **FULL))
+    db.commit()
+    db.close()
+
+
+def test_an_activity_in_two_workspaces_is_seen_in_both_and_may_leave_its_own(world):
+    w = world
+    also_member(w, w["ann"], w["other"])
+    as_(w["ann"])
+    at = datetime.now(timezone.utc) + timedelta(days=2)
+    a = post(w, {"title": "Shared inspection", "planned_start": at.isoformat(), "workspace_ids": [w["other"]]})
+    assert a["workspace_ids"] == [w["ws"], w["other"]]
+    span = (at - timedelta(days=1), at + timedelta(days=1))
+    assert in_ws(w, w["ws"], *span) == ["Shared inspection"]
+    as_(w["out"])                                          # only of the other workspace: sees it there
+    assert in_ws(w, w["other"], *span) == ["Shared inspection"]
+    assert client.get(f"/v1/activities/{a['id']}", headers={"X-Workspace-Id": w["other"]}).status_code == 200
+    as_(w["ann"])                                          # changed from the other: it leaves Linac
+    r = client.patch(f"/v1/activities/{a['id']}", headers={"X-Workspace-Id": w["other"]},
+                     json={"workspace_ids": [w["other"]]})
+    assert r.status_code == 200, r.text
+    assert r.json()["workspace_ids"] == [w["other"]] and r.json()["workspace_id"] == w["other"]
+    assert in_ws(w, w["ws"], *span) == []
+    assert client.get(f"/v1/activities/{a['id']}", headers=w["h"]).status_code == 404
+
+
+def test_only_ones_own_workspaces_are_added_and_links_keep_it_home(world):
+    w = world
+    as_(w["ann"])                                          # ann is not of the other workspace
+    r = client.post("/v1/activities", headers=w["h"], json={"title": "x", "workspace_ids": [w["other"]]})
+    assert r.status_code == 422 and "not a workspace of yours" in r.text
+    also_member(w, w["ann"], w["other"])
+    at = datetime.now(timezone.utc) + timedelta(days=1)
+    a = post(w, {"title": "Pump service", "planned_start": at.isoformat(), "asset_uid": w["pump"],
+                 "workspace_ids": [w["other"]]})
+    r = client.patch(f"/v1/activities/{a['id']}", headers=w["h"], json={"workspace_ids": [w["other"]]})
+    assert r.status_code == 409 and "remove that link" in r.text
+    as_(w["out"])                                          # the pump is Linac's, which out may not read
+    assert in_ws(w, w["other"], at - timedelta(days=1), at + timedelta(days=1)) == []
+
+
+def test_a_series_changes_its_workspaces_for_all_or_the_future_never_one_occurrence(world):
+    w = world
+    also_member(w, w["ann"], w["other"])
+    as_(w["ann"])
+    first = datetime(2026, 11, 2, 9, 0, tzinfo=ROME)
+    s = post(w, {"title": "Weekly round", "planned_start": first.isoformat(), "timezone": "Europe/Rome",
+                 "rrule": "FREQ=WEEKLY;BYDAY=MO"})
+    third = f"{s['series_uid']}@2026-11-16T09:00"
+    r = client.patch(f"/v1/activities/{third}", headers=w["h"], json={"workspace_ids": [w["ws"], w["other"]]})
+    assert r.status_code == 422 and "series' workspaces" in r.text
+    r = client.patch(f"/v1/activities/{third}?scope=future", headers=w["h"],
+                     json={"workspace_ids": [w["ws"], w["other"]]})
+    assert r.status_code == 200, r.text
+    month = (datetime(2026, 11, 1, tzinfo=timezone.utc), datetime(2026, 12, 1, tzinfo=timezone.utc))
+    assert len(in_ws(w, w["ws"], *month)) == 5                # all Mondays of November, still in Linac
+    r = client.get("/v1/activities", headers={"X-Workspace-Id": w["other"]},
+                   params={"from": month[0].isoformat(), "to": month[1].isoformat()})
+    assert [i["occurrence_key"] for i in r.json()["items"]] == \
+        ["2026-11-16T09:00", "2026-11-23T09:00", "2026-11-30T09:00"]
+    assert all(i["workspace_ids"] == [w["ws"], w["other"]] for i in r.json()["items"])
+
+
+def test_the_cockpit_view_under_way_overdue_today_and_done_today(world):
+    w = world
+    as_(w["ann"])
+    now = datetime.now(timezone.utc)
+    post(w, {"title": "Late check", "planned_start": (now - timedelta(days=3)).isoformat()})
+    post(w, {"title": "Under way", "status": "in_progress", "actual_start": (now - timedelta(days=90)).isoformat()})
+    post(w, {"title": "Done", "status": "completed", "actual_end": now.isoformat()})
+    post(w, {"title": "Next week", "planned_start": (now + timedelta(days=7)).isoformat()})
+    post(w, {"title": "Cancelled", "status": "cancelled", "planned_start": (now - timedelta(days=1)).isoformat()})
+    r = client.get("/v1/activities", headers=w["h"], params={"view": "attention", "tz": "UTC"})
+    assert r.status_code == 200, r.text
+    # Under way first, however long ago it started; then what is late; nothing done, cancelled or later.
+    assert [i["title"] for i in r.json()["items"]] == ["Under way", "Late check"]
+    c = r.json()["counts"]
+    assert (c["in_progress"], c["overdue"], c["done_today"], c["total"]) == (1, 1, 1, 2)

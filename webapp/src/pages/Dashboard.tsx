@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { hubApi } from "../api/client";
+import { activitiesApi, hubApi } from "../api/client";
 import type { HubOverview } from "../api/hubTypes";
 import { Card, DocumentRow, Empty, KindBadge, StatTile, TicketRow, relativeTime } from "../components/hub/ui";
 
@@ -40,6 +40,7 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="space-y-4 xl:col-span-2">
+          <ActivitiesNow />
           {o.tickets && <Hotspots o={o} />}
           {o.tickets && <MyWork o={o} />}
         </div>
@@ -126,6 +127,61 @@ function Hotspots({ o }: { o: HubOverview }) {
             </li>
           ))}
         </ul>
+      )}
+    </Card>
+  );
+}
+
+const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
+/** The workspace's activities that need attention: under way, overdue, or planned for today. */
+function ActivitiesNow() {
+  const q = useQuery({
+    queryKey: ["activities", "attention", TZ],
+    queryFn: () => activitiesApi.list({ view: "attention", tz: TZ, limit: 8 }),
+    refetchInterval: 60_000,
+  });
+  if (q.isError) return null;                                // e.g. a server without activities: no card
+  const c = q.data?.counts ?? {};
+  const items = q.data?.items ?? [];
+  const at = (v: string | null, allDay: boolean) =>
+    !v ? "" : allDay ? new Date(v).toLocaleDateString() : new Date(v).toLocaleString([], { dateStyle: "short", timeStyle: "short" });
+  return (
+    <Card title="Activities" action={
+      <span className="flex gap-3 text-xs text-slate-500">
+        <span>{c.in_progress ?? 0} under way</span>
+        <span className={c.overdue ? "font-medium text-rose-700" : ""}>{c.overdue ?? 0} overdue</span>
+        <span>{c.today ?? 0} today</span>
+        <span>{c.done_today ?? 0} done today</span>
+        <Link to="/activities" className="text-indigo-600 hover:underline">All</Link>
+      </span>
+    }>
+      {q.isLoading ? <Empty>Loading…</Empty> : items.length === 0 ? (
+        <Empty>Nothing under way, overdue or planned for today.</Empty>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {items.map((a) => (
+            <li key={a.id}>
+              <Link to={`/activities?open=${encodeURIComponent(a.id)}`}
+                    className="flex items-center justify-between gap-3 py-2 text-sm hover:bg-slate-50">
+                <span className="min-w-0 truncate text-slate-900">{a.recurring && "↻ "}{a.title}</span>
+                <span className="flex shrink-0 items-center gap-2 text-xs">
+                  {a.status === "in_progress"
+                    ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-900">Under way</span>
+                    : a.overdue
+                      ? <span className="rounded bg-rose-100 px-1.5 py-0.5 text-rose-800">Overdue</span>
+                      : <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-800">Today</span>}
+                  <span className="tabular-nums text-slate-400">
+                    {a.status === "in_progress" ? at(a.actual_start, false) : at(a.planned_start ?? a.due_at, a.all_day)}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      {q.data && q.data.total > items.length && (
+        <Link to="/activities" className="mt-1 block text-xs text-indigo-600 hover:underline">{q.data.total - items.length} more</Link>
       )}
     </Card>
   );

@@ -12,6 +12,10 @@ the boundary is in) or by their **actual** time (when the work was done, which m
 recorded); a series is expanded only over the range, at most `recurrence.MAX_EXPANSION` occurrences each, and
 an occurrence that has been stored (done, skipped, moved, edited) replaces its computed self. Counts are of the
 whole range under the same filters except status, and include only what the viewer may see.
+
+**Workspaces.** An activity is in its own workspace and in any it was added to (models/activity.py): in each it
+is seen and changed under that workspace's rules, as above. Its links stay records of its own workspace; one
+without links may leave its own workspace, and the next of its workspaces becomes its own.
 """
 from __future__ import annotations
 
@@ -23,7 +27,7 @@ from typing import Optional
 from sqlalchemy import false, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.activity import STATUSES, VISIBILITIES, Activity, ActivitySeries
+from app.models.activity import STATUSES, VISIBILITIES, Activity, ActivitySeries, ActivityWorkspace
 from app.services import recurrence
 
 MAX_ITEMS = 5000                 # a range never returns more than this, before paging (with `truncated`)
@@ -80,6 +84,7 @@ class Item:
     recurrence: Optional[str] = None
     created_at: Optional[datetime] = None
     provenance: Optional[dict] = None
+    workspace_ids: list = field(default_factory=list)     # its own first, then the others (fill_workspaces)
 
     def overdue(self, at: datetime) -> bool:
         if self.status not in ("planned", "in_progress"):
@@ -99,6 +104,7 @@ class Item:
                                               "ticket_uid", "document_uid", "note", "recurrence")}
         for k in ("planned_start", "planned_end", "due_at", "actual_start", "actual_end", "created_at"):
             out[k] = iso(getattr(self, k))
+        out["workspace_ids"] = self.workspace_ids or [self.workspace_id]
         out["recurring"] = self.series_uid is not None
         out["overdue"] = self.overdue(at or now())
         if with_provenance:
@@ -137,6 +143,101 @@ def from_occurrence(s: ActivitySeries, local: datetime, at: datetime) -> Item:
                 all_day=s.all_day, planned_start=at, planned_end=end, asset_uid=s.asset_uid, ticket_uid=s.ticket_uid,
                 document_uid=s.document_uid, recurrence=_series_text(s), created_at=s.created_at,
                 provenance=s.provenance)
+
+
+# --------------------------------------------------------------------------- workspaces
+
+def _shared_series(workspace_id: str):
+    return select(ActivityWorkspace.series_uid).where(ActivityWorkspace.workspace_id == workspace_id,
+                                                      ActivityWorkspace.series_uid.is_not(None))
+
+
+def _shared_activities(workspace_id: str):
+    return select(ActivityWorkspace.activity_uid).where(ActivityWorkspace.workspace_id == workspace_id,
+                                                        ActivityWorkspace.activity_uid.is_not(None))
+
+
+def series_in(workspace_id: str):
+    return or_(ActivitySeries.workspace_id == workspace_id, ActivitySeries.uid.in_(_shared_series(workspace_id)))
+
+
+def activities_in(workspace_id: str):
+    """Stored activities in the workspace: their own, added to it, or occurrences of a series that is."""
+    return or_(Activity.workspace_id == workspace_id, Activity.uid.in_(_shared_activities(workspace_id)),
+               Activity.series_uid.in_(_shared_series(workspace_id)))
+
+
+def workspaces_of(db: Session, target) -> list[str]:
+    """An Activity's or a series' workspaces, its own first (an occurrence: its series')."""
+    if isinstance(target, Activity) and target.series_uid:
+        target = db.get(ActivitySeries, target.series_uid) or target
+    col = ActivityWorkspace.series_uid if isinstance(target, ActivitySeries) else ActivityWorkspace.activity_uid
+    others = sorted(db.scalars(select(ActivityWorkspace.workspace_id).where(col == target.uid)))
+    return [target.workspace_id, *[w for w in others if w != target.workspace_id]]
+
+
+def fill_workspaces(db: Session, items: list[Item]) -> list[Item]:
+    """Each item's workspaces, in one query for a whole list."""
+    series = {i.series_uid for i in items if i.series_uid}
+    single = {i.uid for i in items if not i.series_uid and i.uid}
+    extra: dict[str, list[str]] = {}
+    if series or single:
+        for row in db.execute(select(ActivityWorkspace.workspace_id, ActivityWorkspace.series_uid,
+                                     ActivityWorkspace.activity_uid).where(or_(
+                ActivityWorkspace.series_uid.in_(series) if series else false(),
+                ActivityWorkspace.activity_uid.in_(single) if single else false()))):
+            extra.setdefault(row.series_uid or row.activity_uid, []).append(row.workspace_id)
+    for i in items:
+        others = sorted(extra.get(i.series_uid or i.uid or "", []))
+        i.workspace_ids = [i.workspace_id, *[w for w in others if w != i.workspace_id]]
+    return items
+
+
+def set_workspaces(db: Session, target, workspace_ids: list[str], here: str) -> None:
+    """The workspaces an activity or a series is in, as a whole. Leaving its own workspace needs it to have no
+    links (they are records of that workspace); the one it is changed from becomes its own if it stays in it,
+    otherwise the first listed."""
+    wanted = list(dict.fromkeys(w for w in workspace_ids if w))
+    if not wanted:
+        raise ActivityError("an activity is in at least one workspace")
+    if len(wanted) > 50:
+        raise ActivityError("an activity is in at most 50 workspaces")
+    if target.workspace_id not in wanted:
+        if target.asset_uid or target.ticket_uid or target.document_uid:
+            raise ActivityError("it refers to an asset, ticket or document of its own workspace: remove that link "
+                                "before taking it out of that workspace", 409)
+        target.workspace_id = here if here in wanted else wanted[0]
+        if isinstance(target, ActivitySeries):
+            for a in db.scalars(select(Activity).where(Activity.series_uid == target.uid)):
+                a.workspace_id = target.workspace_id
+    is_series = isinstance(target, ActivitySeries)
+    col = ActivityWorkspace.series_uid if is_series else ActivityWorkspace.activity_uid
+    for row in db.scalars(select(ActivityWorkspace).where(col == target.uid)):
+        db.delete(row)
+    db.flush()
+    for w in wanted:
+        if w != target.workspace_id:
+            db.add(ActivityWorkspace(workspace_id=w, **({"series_uid": target.uid} if is_series
+                                                        else {"activity_uid": target.uid})))
+    db.flush()
+
+
+def _copy_workspaces(db: Session, source: ActivitySeries, to: ActivitySeries) -> None:
+    for w in db.scalars(select(ActivityWorkspace.workspace_id).where(ActivityWorkspace.series_uid == source.uid)):
+        db.add(ActivityWorkspace(workspace_id=w, series_uid=to.uid))
+
+
+def series_belongs(db: Session, s: ActivitySeries, workspace_id: str) -> bool:
+    return s.workspace_id == workspace_id or db.scalar(select(ActivityWorkspace.id).where(
+        ActivityWorkspace.series_uid == s.uid, ActivityWorkspace.workspace_id == workspace_id)) is not None
+
+
+def _activity_belongs(db: Session, a: Activity, workspace_id: str) -> bool:
+    if a.series_uid:
+        s = db.get(ActivitySeries, a.series_uid)
+        return s is not None and series_belongs(db, s, workspace_id)
+    return a.workspace_id == workspace_id or db.scalar(select(ActivityWorkspace.id).where(
+        ActivityWorkspace.activity_uid == a.uid, ActivityWorkspace.workspace_id == workspace_id)) is not None
 
 
 # --------------------------------------------------------------------------- who sees, who changes
@@ -237,18 +338,17 @@ def in_range(db: Session, workspace_id: str, viewer: Viewer, start: datetime, en
     items: list[Item] = []
 
     series = {s.uid: s for s in db.scalars(select(ActivitySeries).where(
-        ActivitySeries.workspace_id == workspace_id, _series_clause(viewer)))}
+        series_in(workspace_id), _series_clause(viewer)))}
 
     # Stored activities and occurrences whose own times may fall in the range.
-    q = select(Activity).where(Activity.workspace_id == workspace_id)
+    q = select(Activity).where(activities_in(workspace_id))
     if basis == "planned":
         q = q.where(or_(Activity.planned_start < end, Activity.due_at < end))
     else:
         q = q.where(or_(Activity.actual_start < end, Activity.actual_end < end))
     stored = list(db.scalars(q.limit(MAX_ITEMS * 2)))
     stored_keys: dict[str, set] = {}
-    for a in db.scalars(select(Activity).where(Activity.workspace_id == workspace_id,
-                                               Activity.series_uid.in_(list(series)) if series else false())):
+    for a in db.scalars(select(Activity).where(Activity.series_uid.in_(list(series)) if series else false())):
         stored_keys.setdefault(a.series_uid, set()).add(a.occurrence_key)
     for a in stored:
         s = series.get(a.series_uid) if a.series_uid else None
@@ -284,7 +384,7 @@ def in_range(db: Session, workspace_id: str, viewer: Viewer, start: datetime, en
         w = _planned_window(i)[0] if basis == "planned" else _actual_window(i, at)[0]
         return (w or datetime.max.replace(tzinfo=timezone.utc), i.title)
     kept.sort(key=when)
-    return {"items": kept[:MAX_ITEMS], "counts": counts, "truncated": len(kept) > MAX_ITEMS}
+    return {"items": fill_workspaces(db, kept[:MAX_ITEMS]), "counts": counts, "truncated": len(kept) > MAX_ITEMS}
 
 
 # --------------------------------------------------------------------------- reading one
@@ -296,7 +396,7 @@ def resolve_id(db: Session, workspace_id: str, activity_id: str) -> tuple[Option
     if "@" in activity_id:
         series_uid, _, key = activity_id.partition("@")
         s = db.get(ActivitySeries, series_uid)
-        if s is None or s.workspace_id != workspace_id:
+        if s is None or not series_belongs(db, s, workspace_id):
             return None, None, None
         try:
             local = datetime.fromisoformat(key)
@@ -308,7 +408,7 @@ def resolve_id(db: Session, workspace_id: str, activity_id: str) -> tuple[Option
             return None, None, None
         return a, s, local
     a = db.get(Activity, activity_id)
-    if a is None or a.workspace_id != workspace_id:
+    if a is None or not _activity_belongs(db, a, workspace_id):
         return None, None, None
     s = db.get(ActivitySeries, a.series_uid) if a.series_uid else None
     return a, s, datetime.fromisoformat(a.occurrence_key) if a.occurrence_key else None
@@ -317,9 +417,9 @@ def resolve_id(db: Session, workspace_id: str, activity_id: str) -> tuple[Option
 def item_of(db: Session, workspace_id: str, activity_id: str) -> Optional[Item]:
     a, s, local = resolve_id(db, workspace_id, activity_id)
     if a is not None:
-        return from_activity(a, s)
+        return fill_workspaces(db, [from_activity(a, s)])[0]
     if s is not None and local is not None:
-        return from_occurrence(s, local, recurrence.to_utc(local, recurrence.zone(s.timezone)))
+        return fill_workspaces(db, [from_occurrence(s, local, recurrence.to_utc(local, recurrence.zone(s.timezone)))])[0]
     return None
 
 
@@ -350,9 +450,10 @@ def _check(fields: dict) -> None:
 
 
 def create(db: Session, workspace_id: str, fields: dict, *, author: Optional[str], rrule: Optional[str] = None,
-           uid: Optional[str] = None) -> Item:
+           uid: Optional[str] = None, workspace_ids: Optional[list[str]] = None) -> Item:
     """A single activity, or a series when `rrule` is given (its first start is `planned_start`, read in
-    `timezone`). A `uid` the client chose makes a retry find what it made rather than make it twice."""
+    `timezone`), in `workspace_id` and any further `workspace_ids`. A `uid` the client chose makes a retry find
+    what it made rather than make it twice."""
     if uid:
         existing = db.get(Activity, uid) or db.get(ActivitySeries, uid)
         if existing is not None:
@@ -387,7 +488,9 @@ def create(db: Session, workspace_id: str, fields: dict, *, author: Optional[str
                            created_by=author)
         db.add(s)
         db.flush()
-        return series_item(s)
+        if workspace_ids:
+            set_workspaces(db, s, [workspace_id, *workspace_ids], workspace_id)
+        return fill_workspaces(db, [series_item(s)])[0]
     _check(fields)
     a = Activity(uid=uid or str(uuid.uuid4()), workspace_id=workspace_id,
                  owner_user_id=fields.get("owner_user_id") or author, assignee_user_id=fields.get("assignee_user_id"),
@@ -399,7 +502,9 @@ def create(db: Session, workspace_id: str, fields: dict, *, author: Optional[str
                  created_by=author)
     db.add(a)
     db.flush()
-    return from_activity(a)
+    if workspace_ids:
+        set_workspaces(db, a, [workspace_id, *workspace_ids], workspace_id)
+    return fill_workspaces(db, [from_activity(a)])[0]
 
 
 def series_item(s: ActivitySeries) -> Item:
@@ -434,12 +539,17 @@ def _materialise(db: Session, s: ActivitySeries, local: datetime, author: Option
 
 
 def update(db: Session, workspace_id: str, activity_id: str, changes: dict, *, scope: str = "this",
-           author: Optional[str] = None, rrule: Optional[str] = None) -> Item:
+           author: Optional[str] = None, rrule: Optional[str] = None,
+           workspace_ids: Optional[list[str]] = None) -> Item:
     """Change an activity. For a series occurrence, `scope` says what: `this` occurrence, `future` (this one
-    and the ones after it: the series is split), or `series` (all of them: the series itself)."""
+    and the ones after it: the series is split), or `series` (all of them: the series itself). The workspaces
+    of a series' occurrence are the series': they change for the future ones or the whole series."""
     a, s, local = resolve_id(db, workspace_id, activity_id)
     if a is None and s is None:
         raise ActivityError("no such activity", 404)
+    if workspace_ids is not None and s is not None and scope == "this":
+        raise ActivityError("an occurrence is in its series' workspaces: change them for this and the future "
+                            "occurrences, or for the whole series")
     changes = {k: v for k, v in changes.items() if k in EDITABLE}
     if "visibility" in changes and changes["visibility"] not in VISIBILITIES:
         raise ActivityError("visibility is workspace or private")
@@ -450,8 +560,10 @@ def update(db: Session, workspace_id: str, activity_id: str, changes: dict, *, s
             setattr(a, k, v)
         merged = from_activity(a, s)
         _check({**{k: getattr(merged, k) for k in ("title", "status", "visibility", "timezone", *TIME_FIELDS)}})
+        if workspace_ids is not None:
+            set_workspaces(db, a, workspace_ids, workspace_id)
         db.flush()
-        return from_activity(a, s)
+        return fill_workspaces(db, [from_activity(a, s)])[0]
     if scope == "series":
         for k, v in changes.items():
             if k in SERIES_EDITABLE:
@@ -463,22 +575,24 @@ def update(db: Session, workspace_id: str, activity_id: str, changes: dict, *, s
             new_time = changes["planned_start"].astimezone(tz).time().replace(second=0, microsecond=0)
             s.first_local = datetime.combine(datetime.fromisoformat(s.first_local).date(), new_time).isoformat(
                 timespec="minutes")
+        if workspace_ids is not None:
+            set_workspaces(db, s, workspace_ids, workspace_id)
         db.flush()
-        return series_item(s)
+        return fill_workspaces(db, [series_item(s)])[0]
     if scope != "future":
         raise ActivityError("scope is this, future or series")
-    return split(db, s, local, changes, author=author, rrule=rrule)
+    return split(db, s, local, changes, author=author, rrule=rrule, workspace_ids=workspace_ids, here=workspace_id)
 
 
 def split(db: Session, s: ActivitySeries, local: datetime, changes: dict, *, author: Optional[str],
-          rrule: Optional[str] = None) -> Item:
+          rrule: Optional[str] = None, workspace_ids: Optional[list[str]] = None, here: Optional[str] = None) -> Item:
     """This occurrence and the ones after it become a new series (with the changes); the old one ends before it.
     Occurrences already stored from there on move to the new series."""
     rule = recurrence.parse(s.rrule)
     first = datetime.fromisoformat(s.first_local)
     if local == first:                                        # from the first: it is the whole series
-        return update(db, s.workspace_id, f"{s.uid}@{recurrence.occurrence_key(local)}", changes, scope="series",
-                      author=author, rrule=rrule)
+        return update(db, here or s.workspace_id, f"{s.uid}@{recurrence.occurrence_key(local)}", changes,
+                      scope="series", author=author, rrule=rrule, workspace_ids=workspace_ids)
     remaining = recurrence.remaining_after(rule, first, local)
     old = recurrence.Rule(freq=rule.freq, interval=rule.interval, byday=list(rule.byday), bymonthday=rule.bymonthday)
     if rule.count is not None:
@@ -503,6 +617,8 @@ def split(db: Session, s: ActivitySeries, local: datetime, changes: dict, *, aut
             setattr(n, k, v)
     db.add(n)
     db.flush()
+    _copy_workspaces(db, s, n)
+    db.flush()
     s.rrule = old.text()
     s.continued_by_uid = n.uid
     key = recurrence.occurrence_key(local)
@@ -513,7 +629,9 @@ def split(db: Session, s: ActivitySeries, local: datetime, changes: dict, *, aut
             a.description = a.description if a.description is not None else s.description
         a.series_uid = n.uid
     db.flush()
-    return series_item(n)
+    if workspace_ids is not None:
+        set_workspaces(db, n, workspace_ids, here or n.workspace_id)
+    return fill_workspaces(db, [series_item(n)])[0]
 
 
 def act(db: Session, workspace_id: str, activity_id: str, action: str, *, author: Optional[str],
@@ -553,7 +671,7 @@ def act(db: Session, workspace_id: str, activity_id: str, action: str, *, author
     if note is not None:
         a.note = note
     db.flush()
-    return from_activity(a, s)
+    return fill_workspaces(db, [from_activity(a, s)])[0]
 
 
 def end_series(db: Session, s: ActivitySeries, *, at: Optional[datetime] = None) -> None:

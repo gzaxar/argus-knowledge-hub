@@ -340,6 +340,22 @@
               }
             ],
             "title": "Visibility"
+          },
+          "workspace_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Ids"
           }
         },
         "title": "ActivityChange",
@@ -545,6 +561,21 @@
             ],
             "title": "Visibility",
             "type": "string"
+          },
+          "workspace_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Ids"
           }
         },
         "required": [
@@ -13998,7 +14029,7 @@
     },
     "/v1/activities": {
       "get": {
-        "description": "The activities of a range the person may see, by planned or actual time, filtered, with counts. A `view`\nsets the range: `today` (planned today, under way, or done today), `upcoming` (the next 30 days) or\n`completed` (done in the last 30 days), in the time zone `tz`. Counts are of the whole range under the same\nfilters except status, and never include what the person may not see.",
+        "description": "The activities of a range the person may see, by planned or actual time, filtered, with counts. A `view`\nsets the range: `today` (planned today, under way, or done today), `upcoming` (the next 30 days) or\n`completed` (done in the last 30 days), or `attention` (under way, overdue or planned today: the cockpit), in\nthe time zone `tz`. Counts are of the whole range under the same\nfilters except status, and never include what the person may not see.",
         "operationId": "list_activities_v1_activities_get",
         "parameters": [
           {
@@ -14059,7 +14090,8 @@
                   "enum": [
                     "today",
                     "upcoming",
-                    "completed"
+                    "completed",
+                    "attention"
                   ],
                   "type": "string"
                 },
