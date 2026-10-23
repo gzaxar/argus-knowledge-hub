@@ -121,7 +121,8 @@ void main() {
 
     final sent = app.server.sent('POST', '/v1/activities').single;
     expect(sent['status'], 'completed');
-    expect(sent['actual_end'], startsWith('2026-10-21'));
+    // The same instant as proposed — written in whatever zone the machine running the test is in.
+    expect(DateTime.parse('${sent['actual_end']}').isAtSameMomentAs(DateTime.parse('2026-10-21T00:00:00+02:00')), isTrue);
     expect(sent['all_day'], true);
     expect(sent['timezone'], 'Europe/Rome');
     expect((sent['provenance'] as Map)['transcript'], 'I replaced the filter yesterday and checked the pressure.');
