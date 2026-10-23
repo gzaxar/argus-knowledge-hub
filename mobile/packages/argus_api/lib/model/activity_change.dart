@@ -28,6 +28,7 @@ class ActivityChange {
     this.ticketUid,
     this.title,
     this.visibility,
+    this.workspaceIds = const [],
   });
 
   DateTime? actualEnd;
@@ -60,6 +61,8 @@ class ActivityChange {
 
   ActivityChangeVisibilityEnum? visibility;
 
+  List<String>? workspaceIds;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is ActivityChange &&
     other.actualEnd == actualEnd &&
@@ -76,7 +79,8 @@ class ActivityChange {
     other.rrule == rrule &&
     other.ticketUid == ticketUid &&
     other.title == title &&
-    other.visibility == visibility;
+    other.visibility == visibility &&
+    _deepEquality.equals(other.workspaceIds, workspaceIds);
 
   @override
   int get hashCode =>
@@ -95,10 +99,11 @@ class ActivityChange {
     (rrule == null ? 0 : rrule!.hashCode) +
     (ticketUid == null ? 0 : ticketUid!.hashCode) +
     (title == null ? 0 : title!.hashCode) +
-    (visibility == null ? 0 : visibility!.hashCode);
+    (visibility == null ? 0 : visibility!.hashCode) +
+    (workspaceIds == null ? 0 : workspaceIds!.hashCode);
 
   @override
-  String toString() => 'ActivityChange[actualEnd=$actualEnd, actualStart=$actualStart, allDay=$allDay, assetUid=$assetUid, assigneeUserId=$assigneeUserId, description=$description, documentUid=$documentUid, dueAt=$dueAt, note=$note, plannedEnd=$plannedEnd, plannedStart=$plannedStart, rrule=$rrule, ticketUid=$ticketUid, title=$title, visibility=$visibility]';
+  String toString() => 'ActivityChange[actualEnd=$actualEnd, actualStart=$actualStart, allDay=$allDay, assetUid=$assetUid, assigneeUserId=$assigneeUserId, description=$description, documentUid=$documentUid, dueAt=$dueAt, note=$note, plannedEnd=$plannedEnd, plannedStart=$plannedStart, rrule=$rrule, ticketUid=$ticketUid, title=$title, visibility=$visibility, workspaceIds=$workspaceIds]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -177,6 +182,11 @@ class ActivityChange {
     } else {
       json[r'visibility'] = null;
     }
+    if (this.workspaceIds != null) {
+      json[r'workspace_ids'] = this.workspaceIds;
+    } else {
+      json[r'workspace_ids'] = null;
+    }
     return json;
   }
 
@@ -214,6 +224,9 @@ class ActivityChange {
         ticketUid: mapValueOfType<String>(json, r'ticket_uid'),
         title: mapValueOfType<String>(json, r'title'),
         visibility: ActivityChangeVisibilityEnum.fromJson(json[r'visibility']),
+        workspaceIds: json[r'workspace_ids'] is Iterable
+            ? (json[r'workspace_ids'] as Iterable).cast<String>().toList(growable: false)
+            : const [],
       );
     }
     return null;

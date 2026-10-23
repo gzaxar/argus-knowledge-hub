@@ -397,7 +397,7 @@ class ActivitiesApi {
 
   /// List Activities
   ///
-  /// The activities of a range the person may see, by planned or actual time, filtered, with counts. A `view` sets the range: `today` (planned today, under way, or done today), `upcoming` (the next 30 days) or `completed` (done in the last 30 days), in the time zone `tz`. Counts are of the whole range under the same filters except status, and never include what the person may not see.
+  /// The activities of a range the person may see, by planned or actual time, filtered, with counts. A `view` sets the range: `today` (planned today, under way, or done today), `upcoming` (the next 30 days) or `completed` (done in the last 30 days), or `attention` (under way, overdue or planned today: the cockpit), in the time zone `tz`. Counts are of the whole range under the same filters except status, and never include what the person may not see.
   ///
   /// Note: This method returns the HTTP [Response].
   ///
@@ -522,7 +522,7 @@ class ActivitiesApi {
 
   /// List Activities
   ///
-  /// The activities of a range the person may see, by planned or actual time, filtered, with counts. A `view` sets the range: `today` (planned today, under way, or done today), `upcoming` (the next 30 days) or `completed` (done in the last 30 days), in the time zone `tz`. Counts are of the whole range under the same filters except status, and never include what the person may not see.
+  /// The activities of a range the person may see, by planned or actual time, filtered, with counts. A `view` sets the range: `today` (planned today, under way, or done today), `upcoming` (the next 30 days) or `completed` (done in the last 30 days), or `attention` (under way, overdue or planned today: the cockpit), in the time zone `tz`. Counts are of the whole range under the same filters except status, and never include what the person may not see.
   ///
   /// Parameters:
   ///
