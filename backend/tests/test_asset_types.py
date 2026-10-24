@@ -328,6 +328,22 @@ def test_an_enumeration_rejects_a_value_it_does_not_list(db, workspace):
                             skip_unique=True)
 
 
+def test_an_enumeration_named_by_its_option_id_is_stored_as_its_value(db, workspace):
+    """A client may name an option by its id (the assistant does, and the field app did): it is the same
+    answer, stored as the option's value — and still refused when it names no option."""
+    at.ensure_asset_types(db, workspace)
+    db.commit()
+    schema = db.get(Schema, at.type_uid(workspace, "Ion Pump"))
+    from app.models.asset import Asset
+    lifecycle = next(a for a in effective_attributes(db, schema) if a["key"] == "argus_lifecycle")
+    option = next(o for o in lifecycle["options"] if o["id"] != o["value"])
+    for given in (option["id"], option["id"].upper(), option["value"].lower()):
+        attrs = {"argus_lifecycle": given}
+        assert not check_attributes(db, schema, attrs, workspace, Asset, skip_unique=True), given
+        assert attrs["argus_lifecycle"] == option["value"]
+    assert check_attributes(db, schema, {"argus_lifecycle": "beam_degraded"}, workspace, Asset, skip_unique=True)
+
+
 # --- through the REST API, as a beamline would use it -------------------------
 
 client = TestClient(app)

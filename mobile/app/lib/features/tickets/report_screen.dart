@@ -10,15 +10,7 @@ import '../../domain/capture.dart';
 import '../../domain/models.dart';
 import '../../widgets/common.dart';
 import '../capture/proposal_tile.dart';
-
-/// Operational impact, as the base ticket type names it (backend ticket_types.IMPACT_OPTIONS).
-const impactOptions = {
-  'beam_down': 'Beam down',
-  'beam_degraded': 'Beam degraded',
-  'no_beam_impact': 'No beam impact',
-  'safety': 'Safety',
-  'unknown': 'Unknown',
-};
+import '../../widgets/photo_text.dart';
 
 /// Reporting a problem where it happens (flutter-app-design §9).
 ///
@@ -64,7 +56,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
 
   Map<String, Object?> get _attributes => {
         if (_when != null) 'occurred_from': _when!.toJson(),
-        'argus_impact': ?_impact,
+        'argus_impact': ?(_impactDef == null ? _impact : _impactDef!.choiceValue(_impact)),
       };
 
   Map<String, Object?> get _draft => {
@@ -95,6 +87,12 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     }
   }
 
+  /// Operational impact, as the chosen kind defines it (its options are the workspace's, never a list of
+  /// the app's own: a list kept here goes stale the day the type changes, and the server refuses its values).
+  AttributeDef? get _impactDef => _kind == null
+      ? null
+      : ref.read(schemaAttributesProvider(_kind!.uid)).value?.where((d) => d.key == 'argus_impact').firstOrNull;
+
   void _take(Proposal p, List<TicketKind> kinds) {
     setState(() {
       _taken.add(p.field);
@@ -106,7 +104,10 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
         case 'schema_uid':
           _kind = kinds.where((k) => k.uid == p.value).firstOrNull ?? _kind;
         case 'attributes.argus_impact':
-          if (impactOptions.containsKey(p.value)) _impact = p.value.toString();
+          // The assistant names the option by its id; what is kept is the option's value, as the type has it.
+          // Without the type (offline), the proposal is kept as it is: the server reads an id as its value.
+          final def = _impactDef;
+          _impact = def == null ? p.value?.toString() : (def.choiceValue(p.value) ?? _impact);
         case 'attributes.occurred_from':
           final w = When.fromJson(p.value);
           if (w?.nominal != null) {
@@ -227,6 +228,9 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     final theme = Theme.of(context);
     final kindList = kinds.value ?? const <TicketKind>[];
     _kind ??= kindList.where((k) => k.isIncident).firstOrNull;
+    final impact = _kind == null
+        ? null
+        : ref.watch(schemaAttributesProvider(_kind!.uid)).value?.where((d) => d.key == 'argus_impact').firstOrNull;
     final a = subject.value;
     final similarOpen = (a?.tickets ?? const <TicketSummary>[]).where((t) => t.open).toList();
     return Scaffold(
@@ -257,8 +261,10 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
             controller: _words,
             minLines: 2,
             maxLines: 5,
-            decoration: const InputDecoration(
-                hintText: 'What did you see, when, and what did you already try?', border: OutlineInputBorder()),
+            decoration: InputDecoration(
+                hintText: 'What did you see, when, and what did you already try?',
+                border: const OutlineInputBorder(),
+                suffixIcon: PhotoTextButton(key: const Key('photo-text-report-words'), controller: _words)),
           ),
         ),
         Padding(
@@ -289,7 +295,10 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
               controller: _description,
               minLines: 3,
               maxLines: 8,
-              decoration: const InputDecoration(labelText: 'Details', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: 'Details',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: PhotoTextButton(key: const Key('photo-text-report-description'), controller: _description)),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
@@ -300,13 +309,19 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
               onChanged: (v) => setState(() => _kind = kindList.where((k) => k.uid == v).firstOrNull),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              key: const Key('report-impact'),
-              initialValue: _impact,
-              decoration: const InputDecoration(labelText: 'Operational impact', border: OutlineInputBorder()),
-              items: [for (final e in impactOptions.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
-              onChanged: (v) => setState(() => _impact = v),
-            ),
+            if (impact != null && impact.options.isNotEmpty)
+              DropdownButtonFormField<String>(
+                key: Key('report-impact-${_kind?.uid}'),
+                initialValue: impact.choiceValue(_impact),
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Operational impact', border: OutlineInputBorder()),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('—')),
+                  for (final o in {for (final o in impact.options) o.value})
+                    DropdownMenuItem(value: o, child: Text(o)),
+                ],
+                onChanged: (v) => setState(() => _impact = v),
+              ),
           ]),
         ),
         SectionHeader('When it happened', trailing: (_kind?.isIncident ?? false) ? 'required' : null),

@@ -1038,11 +1038,50 @@ async function upload<T>(path: string, fields: Record<string, string | File | un
   return data as T;
 }
 
+/** A folder's files, each sent with its path in the folder (the browser's folder picker gives it), or one .zip. */
+async function uploadFolder<T>(path: string, files: File[], fields: Record<string, string> = {}): Promise<T> {
+  const session = await loadSession();
+  if (!session) throw new Error("Not signed in");
+  const form = new FormData();
+  for (const f of files) form.append("files", f, f.webkitRelativePath || f.name);
+  for (const [k, v] of Object.entries(fields)) form.append(k, v);
+  const resp = await fetch(`${session.baseUrl}${path}`, { method: "POST", headers: authHeaders(session), body: form });
+  const data = await resp.json();
+  if (!resp.ok) throw new ApiError(resp.status, data);
+  return data as T;
+}
+
+export interface WebFolderPreview {
+  files: number;
+  pages: { path: string; title: string; pictures: number; chars: number; links_to: string[] }[];
+  unused: string[];
+}
+export interface WebFolderImported {
+  documents: { uid: string; code: string; title: string; path: string; pictures: number; suggested: string[] }[];
+  attached_to_first: string[];
+  suggestions_failed: string[];
+}
+
+/** A web page saved as a folder (an HTML file and its pictures), imported as documents: one per page. */
+export const webImportApi = {
+  preview: (files: File[]) => uploadFolder<WebFolderPreview>("/v1/documents/import-web/preview", files),
+  run: (files: File[], fields: { pages: string[]; document_type_uid?: string; confidentiality: string;
+                                 authority_level: string; relate_asset?: string; suggest?: boolean }) =>
+    uploadFolder<WebFolderImported>("/v1/documents/import-web", files, {
+      pages: JSON.stringify(fields.pages), document_type_uid: fields.document_type_uid ?? "",
+      confidentiality: fields.confidentiality, authority_level: fields.authority_level,
+      relate_asset: fields.relate_asset ?? "", suggest: fields.suggest ? "true" : "false" }),
+};
+
 export const intakeApi = {
   guide: (kind: IntakeKind, draft: Record<string, unknown>) =>
     request<GuideResult>(`/v1/intake/guide/${kind}`, { method: "POST", body: json({ draft }) }),
   assist: (kind: IntakeKind, text: string, draft: Record<string, unknown>) =>
     request<AssistResult>(`/v1/intake/assist/${kind}`, { method: "POST", body: json({ text, draft }) }),
+  /** A file's whole text (PDF, Word, Excel, e-mail, text), to keep as a document's body or to rework: nothing is
+   * stored and no model reads it. */
+  extract: (file: File) =>
+    upload<{ text: string; format: string; truncated: boolean; filename: string | null }>("/v1/intake/extract", { file }),
   /** A file: a nameplate photo (assets), a datasheet, a Word or Excel file, an email. */
   assistFile: async (kind: IntakeKind, file: File, text: string, draft: Record<string, unknown>): Promise<AssistResult> =>
     upload<AssistResult>(`/v1/intake/assist/${kind}/file`, { file, text, draft: JSON.stringify(draft) }),
@@ -2147,10 +2186,30 @@ export const glpiApi = {
 };
 
 /** Places: approved locations, field observations and their review, the map (backend services/spatial). */
+export type GeoGeometry =
+  | { type: "Point"; coordinates: [number, number] }
+  | { type: "LineString"; coordinates: [number, number][] }
+  | { type: "MultiLineString"; coordinates: [number, number][][] }
+  | { type: "Polygon"; coordinates: [number, number][][] }
+  | { type: "MultiPolygon"; coordinates: [number, number][][][] };
+
+/** A location's role: a point, a line (cable, pipe, beamline) or an area (building, hall, room, zone). */
+export type PlaceRole = "position" | "route" | "outline";
+
 export interface PlacedFeature {
   uid: string;
-  latitude: number;
-  longitude: number;
+  role: PlaceRole;
+  geometry_type: string;
+  geometry: GeoGeometry;
+  /** A point's; null for a route or an outline. */
+  latitude: number | null;
+  longitude: number | null;
+  /** An outline's heights, in metres: with them it is a volume. */
+  base_m: number | null;
+  top_m: number | null;
+  length_m?: number;
+  area_m2?: number;
+  perimeter_m?: number;
   accuracy_m: number | null;
   source: string;
   valid_from: string | null;
@@ -2184,16 +2243,30 @@ export interface AssetLocationView {
   map_layer: string | null;
   hidden: boolean;
   location: PlacedFeature | null;
+  route: PlacedFeature | null;
+  outline: PlacedFeature | null;
   history: PlacedFeature[];
   observations: LocationObservation[];
+}
+
+export interface PlaceNeighbour {
+  uid: string; key: string; name: string; type: string; workspace_id: string; role: PlaceRole;
+  distance_m?: number; base_m?: number | null; top_m?: number | null;
+}
+
+/** What a record's location says about the others (backend spatial.context). */
+export interface PlaceContext {
+  uid: string; along_m: number;
+  inside: PlaceNeighbour[]; crossing: PlaceNeighbour[]; along: PlaceNeighbour[]; within: PlaceNeighbour[];
 }
 
 export interface MapFeature {
   type: "Feature";
   id: string;
-  geometry: { type: "Point"; coordinates: [number, number] };
+  geometry: GeoGeometry;
   properties: { uid: string; key: string; name: string; type: string; workspace_id: string; status: string;
-                map_layer: string | null; accuracy_m: number | null; source: string; distance_m?: number };
+                map_layer: string | null; role: PlaceRole; base_m: number | null; top_m: number | null;
+                accuracy_m: number | null; source: string; distance_m?: number };
 }
 
 export interface MapFilters {
@@ -2215,6 +2288,13 @@ export const placesApi = {
   setLocation: (uid: string, input: { latitude: number; longitude: number; accuracy_m?: number; note?: string }) =>
     request<PlacedFeature>(`/v1/assets/${uid}/location`, { method: "PUT", body: json(input) }),
   removeLocation: (uid: string) => request<void>(`/v1/assets/${uid}/location`, { method: "DELETE" }),
+  /** A route (line) or an outline (area, with heights a volume), WGS 84 GeoJSON. */
+  setShape: (uid: string, role: "route" | "outline", input: { geometry: GeoGeometry; base_m?: number | null;
+                                                             top_m?: number | null; note?: string }) =>
+    request<PlacedFeature>(`/v1/assets/${uid}/location/${role}`, { method: "PUT", body: json(input) }),
+  removeShape: (uid: string, role: "route" | "outline") =>
+    request<void>(`/v1/assets/${uid}/location/${role}`, { method: "DELETE" }),
+  context: (uid: string, alongM = 5) => request<PlaceContext>(`/v1/assets/${uid}/location/context?along_m=${alongM}`),
   reviews: (status = "pending") => request<LocationObservation[]>(`/v1/location-reviews?status=${status}`),
   decide: (id: number, accept: boolean, note?: string) =>
     request<LocationObservation>(`/v1/location-reviews/${id}/${accept ? "accept" : "reject"}`,

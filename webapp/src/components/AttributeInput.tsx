@@ -4,6 +4,7 @@ import { SchemaAttribute } from "../api/types";
 import { AssetPicker } from "./AssetPicker";
 import { IndexedStringInput } from "./IndexedStringInput";
 import { LabelInput } from "./LabelInput";
+import { findOption } from "../lib/schemaAttributes";
 import { UserPicker } from "./UserPicker";
 
 /** Which kind of record the attribute is being edited on — the vocabulary
@@ -288,12 +289,15 @@ function SingleAttributeInput({
           onChange={(e) => onChange(e.target.value)}
         />
       );
-    case "enumeration":
+    case "enumeration": {
+      // A proposed answer may name its option by id: it is shown, and saved, as the option's value.
+      const chosen = findOption(attribute.options, value);
+      const current = chosen ? chosen.value : typeof value === "string" ? value : "";
       return (
         <select
           className={base}
           disabled={disabled}
-          value={typeof value === "string" ? value : ""}
+          value={current}
           onChange={(e) => onChange(e.target.value)}
         >
           <option value="">—</option>
@@ -302,8 +306,10 @@ function SingleAttributeInput({
               {opt.value}
             </option>
           ))}
+          {current && !chosen && <option value={current}>{current} (not in the current list)</option>}
         </select>
       );
+    }
     case "reference":
       return (
         <ReferenceInput

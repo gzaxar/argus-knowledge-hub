@@ -141,7 +141,9 @@ export function ImportStatus() {
 
           {data.status === "succeeded" && (
             <p className="mt-4 text-sm text-slate-500">
-              {data.source === "confluence" || data.source === "git"
+              {data.source === "dokuwiki"
+                ? "The wiki's pages are now under Documentation, published, with their pictures; a page under another is its child."
+                : data.source === "confluence" || data.source === "git"
                 ? "Imported pages are now under Documentation, typed from their labels."
                 : data.source === "jira-issues"
                   ? "Imported tickets are now under Tickets, on the list and the board."

@@ -48,7 +48,8 @@ void main() {
     expect(created['asset_uid'], positionUid);
     expect(created['schema_uid'], 'slice-20463f:operational-incident');
     expect(created['attributes']['occurred_from']['precision'], 'instant');
-    expect(created['attributes']['argus_impact'], 'beam_down');
+    // The assistant named the option by id; what is sent is its value, as the type defines it.
+    expect(created['attributes']['argus_impact'], 'Beam down');
     final post = app.server.requests.firstWhere((r) => r.method == 'POST' && r.url.path == '/v1/issues');
     expect(post.headers['Idempotency-Key'], 'ticket:${created['uid']}');
     // The photo went up in pieces, was completed and attached to the new ticket.

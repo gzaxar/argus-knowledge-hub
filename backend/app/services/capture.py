@@ -133,8 +133,11 @@ def ticket_types(db: Session, workspace_id: str) -> list[dict]:
 
 
 def ticket_options(db: Session, workspace_id: str) -> dict:
-    from app.services.ticket_types import CATEGORY_OPTIONS, IMPACT_OPTIONS
-    return {"categories": [dict(o) for o in CATEGORY_OPTIONS], "impacts": [dict(o) for o in IMPACT_OPTIONS]}
+    """Category and impact as this workspace's base ticket type has them (a package may add options, as the
+    accelerator's beam impacts): the choices the ticket will be checked against."""
+    from app.services.ticket_types import options_in, workspace_base_attributes
+    attrs = workspace_base_attributes(db, workspace_id)
+    return {"categories": options_in(attrs, "argus_category"), "impacts": options_in(attrs, "argus_impact")}
 
 
 def similar_tickets(db: Session, workspace_id: str, text: str, asset_uid: Optional[str] = None,

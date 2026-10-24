@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { importConfigsApi, importsApi } from "../../api/client";
-import { MERGE_STRATEGIES, importSourceLabel } from "../../api/types";
+import { MERGE_STRATEGIES, importSourceLabel, type ImportConfig } from "../../api/types";
 import { IMPORT_SOURCES, importPaths } from "./paths";
 import { WorkspaceScopeBanner } from "../../components/WorkspaceScopeBanner";
 
@@ -12,6 +12,25 @@ const STATUS_STYLES: Record<string, string> = {
   succeeded: "bg-green-100 text-green-700",
   failed: "bg-red-100 text-red-700",
 };
+
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** A saved import's schedule, and when it next runs. */
+function ScheduleCell({ c }: { c: ImportConfig }) {
+  if (!c.schedule_kind || c.schedule_kind === "off") return <span className="text-slate-400">No</span>;
+  const when = c.schedule_kind === "hours" ? `Every ${c.schedule_every_hours} h`
+    : c.schedule_kind === "daily" ? `Daily at ${c.schedule_time}`
+    : `${DAYS[c.schedule_weekday ?? 0]} at ${c.schedule_time}`;
+  return (
+    <span>
+      {when}
+      {c.schedule_timezone && c.schedule_kind !== "hours" && <span className="text-xs text-slate-400"> {c.schedule_timezone}</span>}
+      {c.running_since
+        ? <span className="block text-xs text-blue-700">running now</span>
+        : c.next_run_at && <span className="block text-xs text-slate-500">next {new Date(c.next_run_at).toLocaleString()}</span>}
+    </span>
+  );
+}
 
 function SavedConfigs({ workspaceId }: { workspaceId: string }) {
   const navigate = useNavigate();
@@ -50,6 +69,7 @@ function SavedConfigs({ workspaceId }: { workspaceId: string }) {
             <th className="px-4 py-2">Name</th>
             <th className="px-4 py-2">Source</th>
             <th className="px-4 py-2">Merge strategy</th>
+            <th className="px-4 py-2">Runs by itself</th>
             <th className="px-4 py-2">Last run</th>
             <th className="px-4 py-2" />
           </tr>
@@ -62,8 +82,20 @@ function SavedConfigs({ workspaceId }: { workspaceId: string }) {
               <td className="px-4 py-2 text-slate-600">
                 {MERGE_STRATEGIES.find((s) => s.value === c.merge_strategy)?.label ?? c.merge_strategy}
               </td>
+              <td className="px-4 py-2 text-slate-600"><ScheduleCell c={c} /></td>
               <td className="px-4 py-2 text-slate-500">
                 {c.last_run_at ? new Date(c.last_run_at).toLocaleString() : "Never"}
+                {c.last_outcome && (
+                  <span className={`ml-2 rounded px-1.5 py-0.5 text-[11px] ${
+                    c.last_outcome === "succeeded" ? "bg-green-100 text-green-700"
+                      : c.last_outcome === "failed" ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-600"}`}
+                        title={c.last_message ?? undefined}>
+                    {c.last_outcome === "succeeded" ? "scheduled run ok" : c.last_outcome === "failed" ? "scheduled run failed" : "skipped"}
+                  </span>
+                )}
+                {c.last_outcome === "failed" && c.last_message && (
+                  <span className="block max-w-xs truncate text-xs text-red-600" title={c.last_message}>{c.last_message}</span>
+                )}
               </td>
               <td className="px-4 py-2 text-right">
                 <button

@@ -314,6 +314,19 @@ class AttributeDef {
   final String? referenceSchemaUid;
   final bool includeChildren;
 
+  /// The option value (what is stored) an answer names — by that value or by the option's id
+  /// ("service_degraded", as the assistant and packages call it), in any case; null if it names none.
+  /// The server reads an answer the same way (attribute_validation.choice_value).
+  String? choiceValue(Object? answer) {
+    if (answer == null) return null;
+    final text = answer.toString().trim().toLowerCase();
+    if (text.isEmpty) return null;
+    for (final o in options) {
+      if (o.value.toLowerCase() == text || o.id.toLowerCase() == text) return o.value;
+    }
+    return null;
+  }
+
   /// Kinds the field client can edit with a plain field. The rest (attachment, user, current_user,
   /// group) need pickers the web app has and the field app does not yet — shown read-only there,
   /// rather than offering a text box that silently cannot hold a valid value.

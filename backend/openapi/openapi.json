@@ -2383,6 +2383,20 @@
         "title": "Body_assist_from_file_v1_intake_assist__kind__file_post",
         "type": "object"
       },
+      "Body_extract_text_v1_intake_extract_post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_extract_text_v1_intake_extract_post",
+        "type": "object"
+      },
       "Body_identify_object_v1_ai_identify_object_post": {
         "properties": {
           "file": {
@@ -2441,6 +2455,55 @@
         "title": "Body_import_markdown_documents_v1_documents_import_post",
         "type": "object"
       },
+      "Body_import_web_folder_v1_documents_import_web_post": {
+        "properties": {
+          "authority_level": {
+            "default": "informativo",
+            "title": "Authority Level",
+            "type": "string"
+          },
+          "confidentiality": {
+            "default": "interno",
+            "title": "Confidentiality",
+            "type": "string"
+          },
+          "document_type_uid": {
+            "default": "",
+            "title": "Document Type Uid",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "format": "binary",
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "pages": {
+            "default": "",
+            "description": "JSON list of the pages' paths to import; all of them when left out",
+            "title": "Pages",
+            "type": "string"
+          },
+          "relate_asset": {
+            "default": "",
+            "title": "Relate Asset",
+            "type": "string"
+          },
+          "suggest": {
+            "default": false,
+            "description": "the assistant proposes each page's type, summary and keywords",
+            "title": "Suggest",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "Body_import_web_folder_v1_documents_import_web_post",
+        "type": "object"
+      },
       "Body_preview_v1_spreadsheet_imports_preview_post": {
         "properties": {
           "file": {
@@ -2469,6 +2532,23 @@
           "plan"
         ],
         "title": "Body_preview_v1_spreadsheet_imports_preview_post",
+        "type": "object"
+      },
+      "Body_preview_web_folder_v1_documents_import_web_preview_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "format": "binary",
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "Body_preview_web_folder_v1_documents_import_web_preview_post",
         "type": "object"
       },
       "Body_propose_for_asset_v1_intake_propose_asset__uid__post": {
@@ -4308,6 +4388,94 @@
           }
         },
         "title": "DocumentUpdate",
+        "type": "object"
+      },
+      "DokuwikiImportConfigParams": {
+        "properties": {
+          "include_children": {
+            "default": true,
+            "title": "Include Children",
+            "type": "boolean"
+          },
+          "link_assets": {
+            "default": true,
+            "title": "Link Assets",
+            "type": "boolean"
+          },
+          "page_url": {
+            "title": "Page Url",
+            "type": "string"
+          },
+          "pat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pat"
+          },
+          "source": {
+            "const": "dokuwiki",
+            "enum": [
+              "dokuwiki"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "page_url"
+        ],
+        "title": "DokuwikiImportConfigParams",
+        "type": "object"
+      },
+      "DokuwikiImportRequest": {
+        "description": "A DokuWiki page's link (wiki.infn.it) and, with `include_children`, every page under it. Read as anyone\nallowed to read the wiki reads it: no credential.",
+        "properties": {
+          "include_children": {
+            "default": true,
+            "title": "Include Children",
+            "type": "boolean"
+          },
+          "link_assets": {
+            "default": true,
+            "title": "Link Assets",
+            "type": "boolean"
+          },
+          "merge_strategy": {
+            "default": "override",
+            "enum": [
+              "override",
+              "no_override",
+              "update_if_newer"
+            ],
+            "title": "Merge Strategy",
+            "type": "string"
+          },
+          "page_url": {
+            "maxLength": 2000,
+            "minLength": 8,
+            "title": "Page Url",
+            "type": "string"
+          },
+          "source": {
+            "const": "dokuwiki",
+            "enum": [
+              "dokuwiki"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "page_url"
+        ],
+        "title": "DokuwikiImportRequest",
         "type": "object"
       },
       "DomainIn": {
@@ -6350,6 +6518,7 @@
             "discriminator": {
               "mapping": {
                 "confluence": "#/components/schemas/ConfluenceImportConfigParams",
+                "dokuwiki": "#/components/schemas/DokuwikiImportConfigParams",
                 "epik8s": "#/components/schemas/Epik8sImportConfigParams",
                 "git": "#/components/schemas/GitImportConfigParams",
                 "jira": "#/components/schemas/JiraImportConfigParams",
@@ -6366,6 +6535,9 @@
               },
               {
                 "$ref": "#/components/schemas/ConfluenceImportConfigParams"
+              },
+              {
+                "$ref": "#/components/schemas/DokuwikiImportConfigParams"
               },
               {
                 "$ref": "#/components/schemas/GitImportConfigParams"
@@ -6389,6 +6561,16 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__schemas__import_config__ScheduleIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -6416,6 +6598,28 @@
             ],
             "title": "Last Import Job Uid"
           },
+          "last_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message"
+          },
+          "last_outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Outcome"
+          },
           "last_run_at": {
             "anyOf": [
               {
@@ -6436,9 +6640,87 @@
             "title": "Name",
             "type": "string"
           },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
           "params": {
             "title": "Params",
             "type": "object"
+          },
+          "running_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Running Since"
+          },
+          "schedule_every_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Every Hours"
+          },
+          "schedule_failures": {
+            "default": 0,
+            "title": "Schedule Failures",
+            "type": "integer"
+          },
+          "schedule_kind": {
+            "default": "off",
+            "title": "Schedule Kind",
+            "type": "string"
+          },
+          "schedule_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Time"
+          },
+          "schedule_timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Timezone"
+          },
+          "schedule_weekday": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Weekday"
           },
           "source": {
             "title": "Source",
@@ -6481,6 +6763,7 @@
                 "discriminator": {
                   "mapping": {
                     "confluence": "#/components/schemas/ConfluenceImportConfigParams",
+                    "dokuwiki": "#/components/schemas/DokuwikiImportConfigParams",
                     "epik8s": "#/components/schemas/Epik8sImportConfigParams",
                     "git": "#/components/schemas/GitImportConfigParams",
                     "jira": "#/components/schemas/JiraImportConfigParams",
@@ -6497,6 +6780,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConfluenceImportConfigParams"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DokuwikiImportConfigParams"
                   },
                   {
                     "$ref": "#/components/schemas/GitImportConfigParams"
@@ -6538,6 +6824,16 @@
               }
             ],
             "title": "Name"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/app__schemas__import_config__ScheduleIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "title": "ImportConfigUpdate",
@@ -10514,41 +10810,6 @@
         "title": "ScheduleChangeIn",
         "type": "object"
       },
-      "ScheduleIn": {
-        "properties": {
-          "chain": {
-            "default": "incremental",
-            "description": "incremental: an increment on the last publication; complete: a complete export each time",
-            "title": "Chain",
-            "type": "string"
-          },
-          "confirm": {
-            "default": false,
-            "title": "Confirm",
-            "type": "boolean"
-          },
-          "every_minutes": {
-            "default": 1440,
-            "description": "at least 60, at most 31 days",
-            "title": "Every Minutes",
-            "type": "integer"
-          },
-          "export_id": {
-            "title": "Export Id",
-            "type": "string"
-          },
-          "skip_unchanged": {
-            "default": true,
-            "title": "Skip Unchanged",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "export_id"
-        ],
-        "title": "ScheduleIn",
-        "type": "object"
-      },
       "SchemaCreate": {
         "properties": {
           "applies_to": {
@@ -10970,6 +11231,77 @@
           }
         },
         "title": "SetupConfirmIn",
+        "type": "object"
+      },
+      "ShapeIn": {
+        "description": "A route (GeoJSON LineString or MultiLineString) or an outline (Polygon or MultiPolygon), WGS 84; an\noutline's `base_m` and `top_m` (the heights it spans) make it a volume.",
+        "properties": {
+          "accuracy_m": {
+            "anyOf": [
+              {
+                "maximum": 5000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy M"
+          },
+          "base_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base M"
+          },
+          "crs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crs"
+          },
+          "geometry": {
+            "title": "Geometry",
+            "type": "object"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "top_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top M"
+          }
+        },
+        "required": [
+          "geometry"
+        ],
+        "title": "ShapeIn",
         "type": "object"
       },
       "SignalIn": {
@@ -12803,6 +13135,41 @@
         "title": "ConfirmIn",
         "type": "object"
       },
+      "app__routers__portability__ScheduleIn": {
+        "properties": {
+          "chain": {
+            "default": "incremental",
+            "description": "incremental: an increment on the last publication; complete: a complete export each time",
+            "title": "Chain",
+            "type": "string"
+          },
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "every_minutes": {
+            "default": 1440,
+            "description": "at least 60, at most 31 days",
+            "title": "Every Minutes",
+            "type": "integer"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "skip_unchanged": {
+            "default": true,
+            "title": "Skip Unchanged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "export_id"
+        ],
+        "title": "ScheduleIn",
+        "type": "object"
+      },
       "app__routers__portability__TokenIn": {
         "properties": {
           "confirm": {
@@ -12975,6 +13342,74 @@
           "scopes"
         ],
         "title": "TokenIn",
+        "type": "object"
+      },
+      "app__schemas__import_config__ScheduleIn": {
+        "description": "When a saved import runs by itself (services/import_schedule.py).",
+        "properties": {
+          "every_hours": {
+            "anyOf": [
+              {
+                "maximum": 168.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Every Hours"
+          },
+          "kind": {
+            "default": "off",
+            "enum": [
+              "off",
+              "hours",
+              "daily",
+              "weekly"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "weekday": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekday"
+          }
+        },
+        "title": "ScheduleIn",
         "type": "object"
       }
     },
@@ -19651,6 +20086,114 @@
         ]
       }
     },
+    "/v1/assets/{uid}/location/context": {
+      "get": {
+        "description": "What the record's location says about the others the person may see: what lies inside its outline,\nwhich routes cross it, what lies along its route, and which outlines (halls, zones) it is in.",
+        "operationId": "location_context_v1_assets__uid__location_context_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "along_m",
+            "required": false,
+            "schema": {
+              "default": 5.0,
+              "exclusiveMinimum": 0.0,
+              "maximum": 1000.0,
+              "title": "Along M",
+              "type": "number"
+            }
+          },
+          {
+            "description": "comma-separated; the current one if left out",
+            "in": "query",
+            "name": "workspaces",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "comma-separated; the current one if left out",
+              "title": "Workspaces"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Location Context",
+        "tags": [
+          "locations"
+        ]
+      }
+    },
     "/v1/assets/{uid}/location/observations": {
       "post": {
         "description": "Where someone saw the record (a phone's GPS fix and its accuracy). It never moves the record: it\nagrees with the approved location, or it waits for a person to review it.",
@@ -19734,6 +20277,190 @@
           }
         ],
         "summary": "Observe",
+        "tags": [
+          "locations"
+        ]
+      }
+    },
+    "/v1/assets/{uid}/location/{role}": {
+      "delete": {
+        "operationId": "remove_shape_v1_assets__uid__location__role__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "route",
+                "outline"
+              ],
+              "title": "Role",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove Shape",
+        "tags": [
+          "locations"
+        ]
+      },
+      "put": {
+        "description": "Approve the record's route or outline. The shape is checked (its kind fits, WGS 84, a valid shape); the\none it had is kept in the history.",
+        "operationId": "set_shape_v1_assets__uid__location__role__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "role",
+            "required": true,
+            "schema": {
+              "enum": [
+                "route",
+                "outline"
+              ],
+              "title": "Role",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShapeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Shape",
         "tags": [
           "locations"
         ]
@@ -28100,6 +28827,164 @@
         ]
       }
     },
+    "/v1/documents/import-web": {
+      "post": {
+        "description": "One draft document per page chosen. Its body is the page as Markdown; the pictures it shows are attached\nand shown in place; its HTML is attached as the original; a link to another page imported now points to that\npage's document. The folder's files no page uses go with the first document, so nothing given is lost.",
+        "operationId": "import_web_folder_v1_documents_import_web_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_web_folder_v1_documents_import_web_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Import Web Folder",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/v1/documents/import-web/preview": {
+      "post": {
+        "description": "What the folder holds: its pages (the main one first), with their titles and pictures; nothing is kept.",
+        "operationId": "preview_web_folder_v1_documents_import_web_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_preview_web_folder_v1_documents_import_web_preview_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview Web Folder",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/v1/documents/reshape": {
       "post": {
         "description": "Save the reworked draft as a new document, at revision 1, in draft.",
@@ -36015,6 +36900,7 @@
                 "discriminator": {
                   "mapping": {
                     "confluence": "#/components/schemas/ConfluenceImportRequest",
+                    "dokuwiki": "#/components/schemas/DokuwikiImportRequest",
                     "epik8s": "#/components/schemas/Epik8sImportRequest",
                     "git": "#/components/schemas/GitImportRequest",
                     "jira": "#/components/schemas/JiraImportRequest",
@@ -36031,6 +36917,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConfluenceImportRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DokuwikiImportRequest"
                   },
                   {
                     "$ref": "#/components/schemas/Epik8sImportRequest"
@@ -36993,6 +37882,85 @@
           }
         ],
         "summary": "Assist From File",
+        "tags": [
+          "intake"
+        ]
+      }
+    },
+    "/v1/intake/extract": {
+      "post": {
+        "description": "A file's text, whole — a PDF, a Word or Excel file, an e-mail, a text file — to keep as a document's body\nor to rework with a template. Nothing is stored and no model reads it; a picture has no text here (the phone\nreads photos on the device).",
+        "operationId": "extract_text_v1_intake_extract_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_extract_text_v1_intake_extract_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Extract Text",
         "tags": [
           "intake"
         ]
@@ -51716,7 +52684,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScheduleIn"
+                "$ref": "#/components/schemas/app__routers__portability__ScheduleIn"
               }
             }
           },

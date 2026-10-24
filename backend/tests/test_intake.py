@@ -382,6 +382,29 @@ def test_a_document_file_fills_the_draft_and_the_run_records_the_page(world, mod
     assert bad.status_code == 422
 
 
+def test_a_file_is_read_whole_to_be_a_documents_body_and_nothing_is_kept(world):
+    """The new-document form keeps a file's text as the body, or reworks it: all of it, without the page markers
+    the assistant's references use; no model reads it and nothing is stored."""
+    db = SessionLocal()
+    runs_before = db.query(IntakeRun).count()
+    db.close()
+    r = client.post("/v1/intake/extract", headers=world["headers"],
+                    files={"file": ("report.pdf", tiny_pdf("Property irregularity report AHL 23AUG26"), "application/pdf")})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert "Property irregularity report" in out["text"] and "[page" not in out["text"]
+    assert (out["format"], out["filename"], out["truncated"]) == ("pdf", "report.pdf", False)
+    long = ("A line of the procedure.\n" * 2000).encode()               # 50,000 characters: more than the assistant reads
+    whole = client.post("/v1/intake/extract", headers=world["headers"], files={"file": ("notes.txt", long, "text/plain")})
+    assert len(whole.json()["text"]) > 40000
+    db = SessionLocal()
+    assert db.query(IntakeRun).count() == runs_before
+    db.close()
+    for name, data, mime in (("x.bin", b"\x00\x01", "application/octet-stream"), ("plate.jpg", b"\xff\xd8", "image/jpeg")):
+        assert client.post("/v1/intake/extract", headers=world["headers"],
+                           files={"file": (name, data, mime)}).status_code == 422
+
+
 # --- existing records -------------------------------------------------------------------------------------------------
 
 def test_the_guide_does_not_flag_a_record_as_its_own_duplicate(world):

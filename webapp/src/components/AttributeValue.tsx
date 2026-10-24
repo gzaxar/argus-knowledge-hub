@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { directoryApi } from "../api/client";
 import { Asset, MemberDirectoryEntry, SchemaAttribute } from "../api/types";
+import { findOption } from "../lib/schemaAttributes";
 import { MarkdownView } from "./MarkdownView";
 
 function GroupValue({ value }: { value: string }) {
@@ -67,9 +68,9 @@ function SingleAttributeValue({
   }
 
   if (attribute.type === "enumeration") {
-    // Values are stored as option ids ("beam_degraded"); showing the id is
-    // showing someone the database rather than the answer.
-    const option = attribute.options?.find((o) => o.id === value);
+    // An answer is stored as its option's value; one named by its id ("service_degraded") is shown by its
+    // value too — showing the id is showing someone the database rather than the answer.
+    const option = findOption(attribute.options, value);
     return (
       <span className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-slate-700">
         {option?.value ?? String(value)}

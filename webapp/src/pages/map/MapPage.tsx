@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { LatLngBounds, Map as LeafletMap } from "leaflet";
 import { useEffect, useMemo, useState } from "react";
 import { Circle, CircleMarker, MapContainer, Popup, TileLayer, useMapEvents } from "react-leaflet";
+import { GeoShape } from "../../lib/geo";
 import { Link } from "react-router-dom";
 import { MAP_TILES, placesApi, schemasApi, workspacesApi, type LocationImport, type MapFeature, type MapFilters } from "../../api/client";
 import { useShowKeys } from "../../api/displayPrefs";
@@ -11,6 +12,7 @@ import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
 
 const LAYER_COLOURS: Record<string, string> = { equipment: "#2563eb", places: "#059669" };
 const STATUSES = ["Active", "Provisional", "Retired"];
+const ORDER = { outline: 0, route: 1, position: 2 } as const;
 const RADII = [50, 200, 1000, 5000];
 // LNF, Frascati: where the map opens before it knows better.
 const START: [number, number] = [41.8217, 12.6726];
@@ -74,7 +76,7 @@ export function MapPage() {
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Map</h1>
           <p className="text-xs text-slate-500">
-            Records with an approved location. {features.data && `${features.data.features.length} in view`}
+            Records with an approved location — points, routes and outlines. {features.data && `${features.data.features.length} in view`}
             {features.data?.truncated && " (only the first 2000: zoom in)"}
           </p>
         </div>
@@ -171,18 +173,25 @@ export function MapPage() {
           <TileLayer url={MAP_TILES.url} attribution={MAP_TILES.attribution} maxZoom={20} />
           <Bounds onChange={(b) => setBbox([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()])} />
           {centre && <Circle center={centre} radius={radius} pathOptions={{ color: "#f59e0b", fillOpacity: 0.05 }} />}
-          {(features.data?.features ?? []).map((f) => (
-            <CircleMarker key={f.id} center={[f.geometry.coordinates[1], f.geometry.coordinates[0]]} radius={7}
-                          pathOptions={{ color: "#fff", weight: 2, fillOpacity: 0.9,
-                                         fillColor: LAYER_COLOURS[f.properties.map_layer ?? ""] ?? "#64748b" }}>
-              <Popup>
-                <p className="font-medium">{label(f)}</p>
-                <p className="text-xs text-slate-500">{f.properties.type} · {f.properties.status}
-                  {f.properties.accuracy_m != null && ` · ±${Math.round(f.properties.accuracy_m)} m`}</p>
-                <Link to={`/assets/${f.properties.uid}`} onClick={(e) => open(f, e)}>Open</Link>
-              </Popup>
-            </CircleMarker>
-          ))}
+          {/* Areas under lines under points, so every point stays clickable. */}
+          {[...(features.data?.features ?? [])].sort((a, b) => ORDER[a.properties.role] - ORDER[b.properties.role]).map((f) => {
+            const colour = LAYER_COLOURS[f.properties.map_layer ?? ""] ?? "#64748b";
+            const style = f.properties.role === "position"
+              ? { color: "#fff", weight: 2, fillOpacity: 0.9, fillColor: colour }
+              : { color: colour };
+            return (
+              <GeoShape key={f.id} geometry={f.geometry} style={style}>
+                <Popup>
+                  <p className="font-medium">{label(f)}</p>
+                  <p className="text-xs text-slate-500">{f.properties.type} · {f.properties.status}
+                    {f.properties.role !== "position" && ` · its ${f.properties.role}`}
+                    {f.properties.base_m != null && f.properties.top_m != null && ` · ${f.properties.base_m}–${f.properties.top_m} m`}
+                    {f.properties.accuracy_m != null && ` · ±${Math.round(f.properties.accuracy_m)} m`}</p>
+                  <Link to={`/assets/${f.properties.uid}`} onClick={(e) => open(f, e)}>Open</Link>
+                </Popup>
+              </GeoShape>
+            );
+          })}
           {(reviews.data ?? []).map((o) => (
             <CircleMarker key={`o${o.id}`} center={[o.latitude, o.longitude]} radius={6}
                           pathOptions={{ color: "#f59e0b", dashArray: "3", fillOpacity: 0.2 }}>
@@ -214,7 +223,9 @@ function LocationImportBox({ onDone }: { onDone: () => void }) {
   return (
     <div className="space-y-2 border-t border-slate-100 pt-3">
       <p className="text-xs font-semibold uppercase text-slate-500">Import locations</p>
-      <p className="text-[11px] text-slate-400">CSV (key or label, latitude, longitude, accuracy_m) or GeoJSON points, in WGS 84.</p>
+      <p className="text-[11px] text-slate-400">CSV (key or label, latitude, longitude, accuracy_m) or GeoJSON, in WGS 84: points,
+        lines (routes) and polygons (outlines, with base_m and top_m for a volume). A record&apos;s route or outline is
+        never replaced by a file.</p>
       <input type="file" accept=".csv,.json,.geojson" className="text-xs"
              onChange={(e) => { setFile(e.target.files?.[0] ?? null); setPreview(null); }} />
       <div className="flex gap-2">

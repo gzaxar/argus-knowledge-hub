@@ -516,6 +516,30 @@ export function DocumentDetail() {
             </p>
           )}
 
+          {/* Summary: what the document is, apart from the body (never instead of it). */}
+          {viewed.state === "draft" ? (
+            <div className="mt-4">
+              <label className="block text-xs font-medium uppercase tracking-wide text-slate-400">Summary</label>
+              <textarea
+                value={String(attributes.argus_summary ?? "")}
+                onChange={(e) => setAttributes((prev) => {
+                  const next = { ...prev };
+                  if (e.target.value.trim()) next.argus_summary = e.target.value;
+                  else delete next.argus_summary;
+                  return next;
+                })}
+                rows={2}
+                maxLength={1000}
+                placeholder="Two sentences on what the document is. Optional."
+                className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-sm"
+              />
+            </div>
+          ) : typeof viewed.attributes?.argus_summary === "string" && viewed.attributes.argus_summary.trim() ? (
+            <p className="mt-4 rounded border-l-4 border-indigo-200 bg-indigo-50/50 px-3 py-2 text-sm text-slate-700">
+              {viewed.attributes.argus_summary}
+            </p>
+          ) : null}
+
           {/* Body */}
           <div className="mt-4">
             <label className="block text-xs font-medium uppercase tracking-wide text-slate-400">

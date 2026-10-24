@@ -93,6 +93,7 @@ export function GuidedEntry({
   draft,
   onApply,
   onAssist,
+  onSource,
   describeHint,
 }: {
   kind: IntakeKind;
@@ -101,6 +102,8 @@ export function GuidedEntry({
   onApply: (values: Draft) => void;
   /** The latest assistant result, kept by the form to record the outcome on save. */
   onAssist?: (result: AssistResult) => void;
+  /** For a document: the file it starts from (null when removed), for the form to attach as its source. */
+  onSource?: (file: File | null) => void;
   describeHint?: string;
 }) {
   const status = useQuery({ queryKey: ["ai-status"], queryFn: aiApi.status, staleTime: 60_000 });
@@ -117,9 +120,15 @@ export function GuidedEntry({
   const [used, setUsed] = useState<Set<string>>(new Set());
   const photo = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  // A Markdown or text file given for a document: its words can be the body
-  // itself, rather than the summary the assistant writes of them.
-  const [fileText, setFileText] = useState<{ name: string; text: string; used: boolean } | null>(null);
+  // A document's file (PDF, Word, Excel, e-mail, text), read whole: its text is the body as it is, or what the
+  // template rework starts from — never replaced by the summary the assistant writes of it.
+  const [fileText, setFileText] = useState<{ name: string; text: string; truncated: boolean } | null>(null);
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [fileProblem, setFileProblem] = useState<string | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  // "Keep it as it is": the suggestions the assistant then makes go into the fields still empty.
+  const autoFill = useRef(false);
+  const isDocument = kind === "document";
 
   const debounced = useDebounced(draft, 400);
   const guide = useQuery({
@@ -129,14 +138,68 @@ export function GuidedEntry({
   });
 
   const assist = useMutation({
-    mutationFn: (file?: File) =>
-      file ? intakeApi.assistFile(kind, file, text, draft) : intakeApi.assist(kind, text, draft),
+    // A file, or — for a document kept as it is — the text read from its file (any kind the body can take).
+    mutationFn: (input?: File | { text: string }) =>
+      input instanceof File ? intakeApi.assistFile(kind, input, text, draft)
+        : intakeApi.assist(kind, input?.text ?? text, draft),
     onSuccess: (r) => {
       setResult(r);
       setUsed(new Set());
       onAssist?.(r);
+      if (autoFill.current) {
+        autoFill.current = false;
+        fillEmpty(r, Object.keys(r.fields).filter((f) => f !== "body_markdown"));
+      }
     },
   });
+
+  /** The suggestions of `r` for `fields`, into the fields still empty. */
+  const fillEmpty = (r: AssistResult, fields: string[]) => {
+    const values: Draft = {};
+    for (const f of fields) {
+      const current = valueOf(draft, f);
+      if (current !== undefined && current !== null && current !== "" && !(Array.isArray(current) && !current.length)) continue;
+      values[f] = r.fields[f].value;
+    }
+    onApply(values);
+    setUsed((prev) => new Set([...prev, ...Object.keys(values)]));
+  };
+
+  /** What the document starts from: the file's text, or what was pasted. */
+  const sourceText = () => fileText?.text ?? text;
+
+  const readFile = async (file: File) => {
+    setSourceFile(file);
+    onSource?.(file);
+    setFileText(null);
+    setFileProblem(null);
+    setExtracting(true);
+    try {
+      const out = await intakeApi.extract(file);
+      setFileText({ name: file.name, text: out.text, truncated: out.truncated });
+    } catch (e) {
+      setFileProblem(e instanceof ApiError ? String((e.body as { detail?: string })?.detail ?? e.message) : String(e));
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const keepAsIs = () => {
+    const body = sourceText().trim();
+    if (!body) return;
+    const now = String(draft.body_markdown ?? "").trim();
+    if (now && now !== body && !confirm("Replace what the body says now with this text?")) return;
+    onApply({ body_markdown: body });
+    if (canAssist) {
+      autoFill.current = true;
+      assist.mutate(fileText ? { text: fileText.text } : undefined);
+    }
+  };
+
+  const rework = () => navigate(
+    `/documents/reshape${draft.document_type_uid ? `?document_type_uid=${encodeURIComponent(String(draft.document_type_uid))}` : ""}`,
+    { state: { reshape: { text: sourceText(), kind: fileText ? "import" : "intake", filename: fileText?.name,
+                          file: sourceFile ?? undefined } } });
 
   const use = (fields: string[]) => {
     if (!result) return;
@@ -176,7 +239,93 @@ export function GuidedEntry({
             </span>
           )}
         </div>
-        {canAssist ? (
+        {isDocument ? (
+          <>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={4}
+              placeholder="Paste the document's text, or add its file (PDF, Word, Excel, e-mail, web page, text)."
+              className="mt-2 w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={!canAssist || extracting || !(text.trim() || fileText)}
+                onClick={rework}
+                className="rounded bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+                title={canAssist ? "The whole text rewritten as a draft that follows the type's template, with what to check"
+                                  : "Needs the assistant"}
+              >
+                Rework with the template
+              </button>
+              <button
+                type="button"
+                disabled={extracting || assist.isPending || !(text.trim() || fileText)}
+                onClick={keepAsIs}
+                className="rounded border border-slate-300 px-3 py-1.5 text-xs disabled:opacity-40"
+                title="The text becomes the body as it is"
+              >
+                {assist.isPending ? "Suggesting the title…" : "Keep it as it is"}
+              </button>
+              <button
+                type="button"
+                disabled={extracting}
+                onClick={() => photo.current?.click()}
+                className="rounded border border-slate-300 px-3 py-1.5 text-xs disabled:opacity-40"
+              >
+                {sourceFile ? "Another file" : "Add a file"}
+              </button>
+              <input
+                ref={photo}
+                type="file"
+                accept=".pdf,.docx,.xlsx,.xlsm,.eml,.html,.htm,.txt,.md,.markdown,.csv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void readFile(file);
+                }}
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-slate-500">
+              <b>Rework with the template</b>: a whole draft that follows the type&apos;s template, with what to check.{" "}
+              <b>Keep it as it is</b>: the text becomes the body, in Markdown with the file&apos;s headings, lists and
+              tables
+              {canAssist ? "; title, type, keywords and a summary are suggested" : ""}. A file you add is attached to
+              the document either way — the original is never lost.
+            </p>
+            {extracting && <p className="mt-2 text-xs text-slate-500">Reading {sourceFile?.name}…</p>}
+            {sourceFile && !extracting && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-indigo-200 bg-indigo-50 px-2 py-1.5 text-xs text-indigo-900">
+                <span className="min-w-0 flex-1">
+                  <b>{sourceFile.name}</b>
+                  {fileText
+                    ? ` · ${fileText.text.length.toLocaleString()} characters read${fileText.truncated ? " (only the first 60,000)" : ""}`
+                    : ""}
+                  {" "}· attached to the document when it is saved
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { setSourceFile(null); setFileText(null); setFileProblem(null); onSource?.(null); }}
+                  className="shrink-0 rounded border border-indigo-300 px-2 py-0.5 hover:bg-white"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+            {fileProblem && (
+              <p className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+                {fileProblem} The file is still attached to the document; type or paste its text to use it.
+              </p>
+            )}
+            {canAssist && profiles.isSuccess && !profile && (
+              <p className="mt-1 text-[11px] text-slate-400">
+                The model in use here has not been evaluated on the golden dataset yet: check every suggestion.
+              </p>
+            )}
+          </>
+        ) : canAssist ? (
           <>
             <textarea
               value={text}
@@ -213,27 +362,9 @@ export function GuidedEntry({
                   e.target.value = "";
                   if (!file) return;
                   setPreview(file.type.startsWith("image/") ? URL.createObjectURL(file) : null);
-                  setFileText(null);
-                  if (kind === "document" && /\.(md|markdown|txt)$/i.test(file.name)) {
-                    file.text().then((t) => setFileText({ name: file.name, text: t.replace(/\r\n/g, "\n").trim(), used: false }));
-                  }
                   assist.mutate(file);
                 }}
               />
-              {kind === "document" && (
-                <button
-                  type="button"
-                  disabled={!(text.trim() || fileText)}
-                  onClick={() => navigate(
-                    `/documents/reshape${draft.document_type_uid ? `?document_type_uid=${encodeURIComponent(String(draft.document_type_uid))}` : ""}`,
-                    { state: { reshape: { text: fileText?.text ?? text, kind: fileText ? "import" : "intake",
-                                          filename: fileText?.name } } })}
-                  className="rounded border border-slate-300 px-3 py-1.5 text-xs disabled:opacity-40"
-                  title="Rewrite this text as a whole draft that follows the type's template, with what to check"
-                >
-                  Rework with the template
-                </button>
-              )}
               <span className="text-[11px] text-slate-400">suggestions only — you decide what is saved</span>
             </div>
             {profiles.isSuccess && (
@@ -248,25 +379,6 @@ export function GuidedEntry({
           <p className="mt-1 text-xs text-slate-500">
             Fill in the form; the checklist below tells you what is missing and what already exists.
           </p>
-        )}
-        {fileText && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-indigo-200 bg-indigo-50 px-2 py-1.5 text-xs text-indigo-900">
-            <span className="min-w-0 flex-1">
-              Put the whole of <b>{fileText.name}</b> in the body, instead of a summary of it?
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                if (draft.body_markdown && String(draft.body_markdown).trim()
-                    && !confirm("Replace what the body says now with the file's text?")) return;
-                onApply({ body_markdown: fileText.text });
-                setFileText({ ...fileText, used: true });
-              }}
-              className="shrink-0 rounded bg-slate-900 px-2 py-1 font-medium text-white hover:bg-slate-800"
-            >
-              {fileText.used ? "In the body" : "Use the file as the body"}
-            </button>
-          </div>
         )}
         {assist.isError && (
           <p className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-700">

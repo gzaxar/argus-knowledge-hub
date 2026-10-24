@@ -8,6 +8,7 @@ import '../../data/activity_repository.dart';
 import '../../domain/models.dart';
 import '../../widgets/common.dart';
 import 'activities_screen.dart';
+import '../../widgets/photo_text.dart';
 
 final activityDetailProvider = FutureProvider.autoDispose.family<ActivityItem, String>((ref, id) {
   ref.watch(workspaceIdProvider);
@@ -63,7 +64,13 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
           padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.viewInsetsOf(sheet).bottom + 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             TextField(key: const Key('activity-edit-title'), controller: title, decoration: const InputDecoration(labelText: 'Title')),
-            TextField(controller: description, minLines: 2, maxLines: 5, decoration: const InputDecoration(labelText: 'Description')),
+            TextField(
+                controller: description,
+                minLines: 2,
+                maxLines: 5,
+                decoration: InputDecoration(
+                    labelText: 'Description',
+                    suffixIcon: PhotoTextButton(key: const Key('photo-text-activity-description'), controller: description))),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.event_outlined),

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { importPaths } from "./paths";
 import { ApiError, importConfigsApi, workspacesApi } from "../../api/client";
-import { MergeStrategy, MERGE_STRATEGIES } from "../../api/types";
+import { ImportSchedule, ImportSource, MergeStrategy, MERGE_STRATEGIES } from "../../api/types";
 import { WorkspaceScopeBanner } from "../../components/WorkspaceScopeBanner";
 
 export function ImportConfigForm() {
@@ -24,14 +24,19 @@ export function ImportConfigForm() {
   // Opened from a section's Import link, the form starts on that section's
   // source rather than making you pick it again.
   const requestedSource = searchParams.get("source");
-  const [source, setSource] = useState<"jira" | "jira-issues" | "confluence" | "git" | "epik8s">(
+  const [source, setSource] = useState<ImportSource>(
     requestedSource === "jira-issues" ||
     requestedSource === "confluence" ||
+    requestedSource === "dokuwiki" ||
     requestedSource === "git" ||
     requestedSource === "epik8s"
       ? requestedSource
       : "jira",
   );
+  // When it runs again by itself: off, every few hours, daily or weekly at a local time.
+  const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const [schedule, setSchedule] = useState<ImportSchedule>({ kind: "off", every_hours: 24, time: "02:00", weekday: 0,
+                                                               timezone: browserZone });
   const [mergeStrategy, setMergeStrategy] = useState<MergeStrategy>("override");
 
   const [baseUrl, setBaseUrl] = useState("");
@@ -88,6 +93,10 @@ export function ImportConfigForm() {
       setPageUrl(param("page_url"));
       setIncludeChildren(existing.data.params.include_children !== false);
       setLinkAssets(existing.data.params.link_assets !== false);
+    } else if (existing.data.source === "dokuwiki") {
+      setPageUrl(param("page_url"));
+      setIncludeChildren(existing.data.params.include_children !== false);
+      setLinkAssets(existing.data.params.link_assets !== false);
     } else if (existing.data.source === "jira-issues") {
       setBaseUrl(param("base_url"));
       setJql(param("jql"));
@@ -104,6 +113,9 @@ export function ImportConfigForm() {
       setLinkInventory(existing.data.params.link_inventory !== false);
       setAiUnrecognised(existing.data.params.ai_unrecognised === true);
     }
+    const d = existing.data;
+    setSchedule({ kind: d.schedule_kind ?? "off", every_hours: d.schedule_every_hours ?? 24, time: d.schedule_time ?? "02:00",
+                  weekday: d.schedule_weekday ?? 0, timezone: d.schedule_timezone ?? browserZone });
   }, [existing.data]);
 
   const saveMutation = useMutation({
@@ -125,6 +137,13 @@ export function ImportConfigForm() {
                 : { space_key: spaceKey || undefined, cql: cql || undefined }),
               link_assets: linkAssets,
               ...(jiraPat ? { pat: jiraPat } : {}),
+            }
+          : source === "dokuwiki"
+          ? {
+              source: "dokuwiki" as const,
+              page_url: pageUrl.trim(),
+              include_children: includeChildren,
+              link_assets: linkAssets,
             }
           : source === "jira-issues"
           ? {
@@ -156,10 +175,14 @@ export function ImportConfigForm() {
               branch,
               ...(gitPat ? { pat: gitPat } : {}),
             };
+      const when: ImportSchedule = schedule.kind === "off" ? { kind: "off" }
+        : schedule.kind === "hours" ? { kind: "hours", every_hours: schedule.every_hours }
+        : schedule.kind === "daily" ? { kind: "daily", time: schedule.time, timezone: schedule.timezone }
+        : { kind: "weekly", weekday: schedule.weekday, time: schedule.time, timezone: schedule.timezone };
       if (isEdit) {
-        return importConfigsApi.update(uid!, { name, merge_strategy: mergeStrategy, config });
+        return importConfigsApi.update(uid!, { name, merge_strategy: mergeStrategy, config, schedule: when });
       }
-      return importConfigsApi.create({ name, merge_strategy: mergeStrategy, config });
+      return importConfigsApi.create({ name, merge_strategy: mergeStrategy, config, schedule: when });
     },
     onSuccess: async (saved) => {
       queryClient.invalidateQueries({ queryKey: ["import-configs"] });
@@ -200,7 +223,7 @@ export function ImportConfigForm() {
       <WorkspaceScopeBanner action="This import writes into" />
 
       <div className="mt-6 flex gap-2">
-        {(["jira", "jira-issues", "confluence", "git", "epik8s"] as const).map((s) => (
+        {(["jira", "jira-issues", "confluence", "dokuwiki", "git", "epik8s"] as const).map((s) => (
           <button
             key={s}
             type="button"
@@ -216,6 +239,8 @@ export function ImportConfigForm() {
                 ? "Jira tickets"
                 : s === "confluence"
                   ? "Confluence"
+                  : s === "dokuwiki"
+                  ? "DokuWiki"
                   : s === "git"
                     ? "Git"
                     : "EPIK8s control"}
@@ -235,7 +260,33 @@ export function ImportConfigForm() {
           />
         </div>
 
-        {source === "jira" || source === "jira-issues" || source === "confluence" ? (
+        {source === "dokuwiki" ? (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">A wiki page&apos;s link</label>
+              <input
+                value={pageUrl}
+                onChange={(e) => setPageUrl(e.target.value)}
+                placeholder="https://wiki.infn.it/strutture/lnf/da/btf/dispositivi/stages"
+                required
+                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                A DokuWiki page (such as wiki.infn.it). Read as anyone allowed to read the wiki reads it: no token. Only
+                the wikis this installation allows can be imported.
+              </p>
+            </div>
+            <Check checked={includeChildren} onChange={setIncludeChildren} label="And every page under it"
+                   hint="Its folder (namespace) and the folders below; a page under another becomes that document's child." />
+            <Check checked={linkAssets} onChange={setLinkAssets} label="Link the equipment a page names"
+                   hint="An asset key found in a page links the document to that asset." />
+            <p className="text-xs text-slate-500">
+              Each wiki page is one document, found again on the next run: unchanged pages are skipped, a changed one
+              gets a new revision. Pictures are attached and shown in place; links between imported pages lead to their
+              documents.
+            </p>
+          </div>
+        ) : source === "jira" || source === "jira-issues" || source === "confluence" ? (
           <>
             <div>
               <label className="block text-sm font-medium text-slate-700">
@@ -538,6 +589,8 @@ export function ImportConfigForm() {
           </>
         )}
 
+        <ScheduleFields value={schedule} onChange={setSchedule} />
+
         <div>
           <label className="block text-sm font-medium text-slate-700">
             When a matching object already exists
@@ -613,5 +666,50 @@ function Check({
         <span className="block text-xs text-slate-500">{hint}</span>
       </span>
     </label>
+  );
+}
+
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/** When the import runs again by itself — the same run as the Run button, as the person who sets it. */
+function ScheduleFields({ value, onChange }: { value: ImportSchedule; onChange: (v: ImportSchedule) => void }) {
+  const set = (patch: Partial<ImportSchedule>) => onChange({ ...value, ...patch });
+  return (
+    <fieldset className="rounded border border-slate-200 p-3">
+      <legend className="px-1 text-sm font-medium text-slate-700">Run again by itself</legend>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <select value={value.kind} onChange={(e) => set({ kind: e.target.value as ImportSchedule["kind"] })}
+                className="rounded border border-slate-300 px-2 py-1.5" aria-label="Schedule">
+          <option value="off">No — only when I press Run</option>
+          <option value="hours">Every few hours</option>
+          <option value="daily">Every day</option>
+          <option value="weekly">Every week</option>
+        </select>
+        {value.kind === "hours" && (
+          <label className="flex items-center gap-1">every
+            <input type="number" min={1} max={168} value={value.every_hours ?? 24}
+                   onChange={(e) => set({ every_hours: Number(e.target.value) || 1 })}
+                   className="w-20 rounded border border-slate-300 px-2 py-1.5" /> hours</label>
+        )}
+        {value.kind === "weekly" && (
+          <select value={value.weekday ?? 0} onChange={(e) => set({ weekday: Number(e.target.value) })}
+                  className="rounded border border-slate-300 px-2 py-1.5" aria-label="Day">
+            {WEEKDAYS.map((d, i) => <option key={d} value={i}>on {d}</option>)}
+          </select>
+        )}
+        {(value.kind === "daily" || value.kind === "weekly") && (
+          <label className="flex items-center gap-1">at
+            <input type="time" value={value.time ?? "02:00"} onChange={(e) => set({ time: e.target.value })}
+                   className="rounded border border-slate-300 px-2 py-1.5" />
+            <span className="text-xs text-slate-500">({value.timezone})</span></label>
+        )}
+      </div>
+      {value.kind !== "off" && (
+        <p className="mt-2 text-xs text-slate-500">
+          It runs as you, with your permissions at the time. It does not start while its previous run is still going;
+          if it fails you are told, and after 3 failures in a row the schedule switches itself off.
+        </p>
+      )}
+    </fieldset>
   );
 }

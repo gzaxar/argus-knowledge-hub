@@ -1,9 +1,11 @@
-"""Locations: a record's approved location and its history, field observations and their review, and the
-map — the records in an area or near a point — under the same rules as lists and search (services/spatial)."""
-from typing import Optional
+"""Locations: a record's approved location — its position, route and outline — and their history, field
+observations and their review, what a shape says about the others (what is inside, what crosses, what a record
+is in), and the map — the records in an area or near a point — under the same rules as lists and search
+(services/spatial)."""
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
@@ -35,6 +37,17 @@ class ObservationIn(PointIn):
 
 
 class DecisionIn(BaseModel):
+    note: Optional[str] = None
+
+
+class ShapeIn(BaseModel):
+    """A route (GeoJSON LineString or MultiLineString) or an outline (Polygon or MultiPolygon), WGS 84; an
+    outline's `base_m` and `top_m` (the heights it spans) make it a volume."""
+    geometry: dict
+    base_m: Optional[float] = None
+    top_m: Optional[float] = None
+    accuracy_m: Optional[float] = Field(default=None, ge=0, le=5000)
+    crs: Optional[str] = None
     note: Optional[str] = None
 
 
@@ -72,8 +85,11 @@ def get_location(uid: str, workspace_id: str = Depends(require_permission("read"
         return {"uid": uid, "locatable": locatable, "map_layer": layer, "hidden": True, "location": None,
                 "history": [], "observations": []}
     approved = spatial.current(db, uid)
+    shapes = {r: spatial.current(db, uid, r) for r in ("route", "outline")}
     return {"uid": uid, "locatable": locatable, "map_layer": layer, "hidden": False,
             "location": spatial.feature_out(approved) if approved else None,
+            "route": spatial.feature_out(shapes["route"], db) if shapes["route"] else None,
+            "outline": spatial.feature_out(shapes["outline"], db) if shapes["outline"] else None,
             "history": [spatial.feature_out(f) for f in spatial.history(db, uid)],
             "observations": [spatial.observation_out(o) for o in db.scalars(
                 select(LocationObservation).where(LocationObservation.subject_uid == uid)
@@ -107,6 +123,61 @@ def remove_location(uid: str, workspace_id: str = Depends(require_permission("mo
         raise HTTPException(status_code=403, detail="Not permitted")
     spatial.remove_location(db, asset, actor_of(identity))
     db.commit()
+
+
+@router.put("/assets/{uid}/location/{role}")
+def set_shape(uid: str, role: Literal["route", "outline"], body: ShapeIn,
+              workspace_id: str = Depends(require_permission("modify")), grants=Depends(get_grants),
+              identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """Approve the record's route or outline. The shape is checked (its kind fits, WGS 84, a valid shape); the
+    one it had is kept in the history."""
+    asset = _readable_asset(db, uid, workspace_id, grants)
+    if asset.workspace_id != workspace_id or spatial.location_hidden(db, asset, grants):
+        raise HTTPException(status_code=403, detail="Not permitted")
+    try:
+        geometry = spatial.shape(db, body.geometry, role, crs=body.crs)
+        base, top = spatial.heights(body.base_m, body.top_m)
+        feature = spatial.set_location(db, asset, geometry, actor=actor_of(identity), source="manual",
+                                       accuracy_m=body.accuracy_m, note=body.note, role=role, base_m=base, top_m=top)
+    except spatial.SpatialError as e:
+        db.rollback()
+        _bad(e)
+    db.commit()
+    return spatial.feature_out(feature, db)
+
+
+@router.delete("/assets/{uid}/location/{role}", status_code=204)
+def remove_shape(uid: str, role: Literal["route", "outline"], workspace_id: str = Depends(require_permission("modify")),
+                 grants=Depends(get_grants), identity=Depends(get_identity), db: Session = Depends(get_db)):
+    asset = _readable_asset(db, uid, workspace_id, grants)
+    if asset.workspace_id != workspace_id or spatial.location_hidden(db, asset, grants):
+        raise HTTPException(status_code=403, detail="Not permitted")
+    spatial.remove_location(db, asset, actor_of(identity), role)
+    db.commit()
+
+
+@router.get("/assets/{uid}/location/context")
+def location_context(uid: str, along_m: float = Query(spatial.ALONG_M, gt=0, le=1000),
+                     workspaces: Optional[str] = Query(None, description="comma-separated; the current one if left out"),
+                     workspace_id: str = Depends(require_permission("read")), grants=Depends(get_grants),
+                     identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """What the record's location says about the others the person may see: what lies inside its outline,
+    which routes cross it, what lies along its route, and which outlines (halls, zones) it is in."""
+    asset = _readable_asset(db, uid, workspace_id, grants)
+    if spatial.location_hidden(db, asset, grants):
+        raise HTTPException(status_code=404, detail="Asset not found")
+    spaces = _workspaces(db, identity, workspaces, workspace_id)
+    cond = _scope(db, identity, spaces, None, None)
+    out = spatial.context(db, asset, cond, along_m=along_m)
+    cache: dict = {}
+    for kind, items in out.items():
+        kept = []
+        for i in items:
+            other = db.get(Asset, i["uid"])
+            if other is not None and _permitted(db, identity, other, spaces, cache):
+                kept.append(i)
+        out[kind] = kept
+    return {"uid": uid, "along_m": along_m, **out}
 
 
 @router.post("/assets/{uid}/location/observations", status_code=201)
@@ -222,10 +293,13 @@ def _feature(db: Session, asset: Asset, f, layers: dict, distance: Optional[floa
         layers[asset.schema_uid] = spatial.placement(db, asset.schema_uid)[1]
     props = {"uid": asset.uid, "key": asset.key, "name": asset.name, "type": asset.type,
              "workspace_id": asset.workspace_id, "status": asset.record_status, "map_layer": layers[asset.schema_uid],
+             "role": f.role or "position", "base_m": f.base_m, "top_m": f.top_m,
              "accuracy_m": f.accuracy_m, "source": f.source, "confirmed_at": f.confirmed_at}
     if distance is not None:
         props["distance_m"] = round(distance, 1)
-    return {"type": "Feature", "id": asset.uid, "geometry": spatial.geojson(f.geometry), "properties": props}
+    role = f.role or "position"
+    return {"type": "Feature", "id": asset.uid if role == "position" else f"{asset.uid}:{role}",
+            "geometry": spatial.geojson(f.geometry), "properties": props}
 
 
 def _permitted(db: Session, identity, asset: Asset, workspaces: list[str], cache: dict) -> bool:
