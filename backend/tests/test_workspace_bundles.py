@@ -213,7 +213,9 @@ def test_a_demo_round_trips(name, tmp_path):
             assert a[k] == b[k], k
         assert a["plans"] and a["placements"] and a["geometry"]
         if name == "medium-linac":
-            assert len(a["beam_values"]) == 23 and len(a["bindings"]) == 23
+            rows = core.read(DEMOS / name).manifest["families"]
+            assert len(a["beam_values"]) == rows["beam_model_values"]["rows"] > 0
+            assert len(a["bindings"]) == rows["beam_asset_bindings"]["rows"] == rows["beam_model_values"]["rows"]
     finally:
         _drop(first, second)
 
@@ -256,7 +258,9 @@ def test_maps_plans_and_the_tour_render_after_import(admin, tmp_path):
         graph = client.get(f"/v1/beam-paths/{main['uid']}/graph", headers=h)
         assert graph.status_code == 200
         nodes = graph.json()["nodes"]
-        assert len(nodes) == 21 and [n["s"] for n in nodes] == sorted(n["s"] for n in nodes)
+        model = core.read(DEMOS / "medium-linac").rows("beam_model_documents")[0]["document"]
+        placed = next(p for p in model["paths"] if p["id"] == "linac-line")["placements"]
+        assert len(nodes) == len(placed) and [n["s"] for n in nodes] == sorted(n["s"] for n in nodes)
         types = client.get("/v1/schemas", headers=h)
         assert types.status_code == 200, types.text           # the sidebar's type tree
         assert "Beamline Component" in {t["name"] for t in types.json()}

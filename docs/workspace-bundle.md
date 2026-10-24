@@ -147,13 +147,17 @@ and served by `GET /v1/workspaces/{id}/tour`, which the cockpit shows as **Start
   UPS, cooling, access points, VLANs, contracts, licences, purchase orders), 117 relations, 4 floor plans and
   47 placements, 52 map shapes (outlines, fibre routes), 12 tickets, 10 documents (architecture with a diagram,
   runbooks, SLA, CAB minutes, maintenance and survey reports), 10 activities and series, 4 people.
-* `medium-linac` — Valmora Linac Laboratory (fictional): 191 records across accelerator, civil, safety,
-  electrical, HVAC, vacuum, optics, plant, administration and IT; a beam model (gun → 4 accelerating structures
-  → diagnostics → main dump, with a spectrometer branch: 23 positions on 2 paths, design values in the machine's
-  own frame) bound to 23 physical units placed on the bunker plan at their beam positions; 314 relations
-  (RF chain, power, cooling, vacuum, controls, interlocks, contracts); 4 plans, 102 placements, 112 map shapes;
-  radiation, fire and access areas described without limits or settings; 10 tickets, 10 documents, 9 activities,
-  5 people.
+* `medium-linac` — Valmora Linac Laboratory (fictional): 304 records across accelerator, civil, safety,
+  electrical, HVAC, vacuum, optics, plant, hydraulic, administration and IT; a beam model (gun → 4 accelerating
+  structures → diagnostics → main dump, with a spectrometer branch: 31 positions on 2 paths — magnets,
+  correctors, monitors, a Faraday cup, sector valves — design values in the machine's own frame) bound to the
+  physical units placed on the bunker plan at their beam positions; a motion controller with motor axes for the
+  screens, the spectrometer slit and the laser mirror, and pneumatic actuators; cameras and BPM electronics;
+  PBS codes in the demo's own `ZONE-SYSTEM-FAMILY-TYPE-NNN` scheme, 12 work packages, 7 machine modules and 5
+  sections; 16 utility requirements (power, cooling water, air, compressed air, nitrogen) linked to their
+  consumers and to the services that meet them — cooling water skid, compressed air, nitrogen, low-voltage
+  distribution; 706 relations; 4 plans, 154 placements, 161 map shapes; radiation, fire and access areas
+  described without limits or settings; 13 tickets, 13 documents, 13 activities and series, 5 people.
 
 People are fictional, at `.example` domains. To change a demo, edit its workspace in an ARGUS, export it with
 `python -m app.bundle export <workspace> backend/demo_workspaces/<name> --demo <tour.json>` and commit the
