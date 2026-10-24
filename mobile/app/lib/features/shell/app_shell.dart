@@ -112,6 +112,7 @@ class AppDrawer extends ConsumerWidget {
         _Item('drawer-capture', Icons.mic_none, 'Capture by voice', () => open('/capture')),
         _Item('drawer-query', Icons.manage_search, 'Advanced query', () => open('/query')),
         if (hasMap) ...[
+          _Item('drawer-map', Icons.map_outlined, 'Map', () => open('/map')),
           _Item('drawer-nearby', Icons.near_me_outlined, 'Near me', () => open('/nearby')),
           _Item('drawer-location-reviews', Icons.edit_location_alt_outlined, 'Locations to review',
               () => open('/location-reviews')),

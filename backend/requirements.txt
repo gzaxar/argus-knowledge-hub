@@ -26,6 +26,8 @@ pillow==11.3.0
 openpyxl==3.1.5
 # Reads the text of PDF datasheets and documents for guided entry (AI Intake).
 pypdf==5.1.0
+# A PDF floor plan's first page as a picture (services/indoor.py).
+pypdfium2==4.30.0
 # Compresses the chunks of portable archives (app/portability).
 zstandard==0.23.0
 packaging==26.3

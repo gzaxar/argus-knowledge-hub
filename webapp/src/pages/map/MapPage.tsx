@@ -4,6 +4,9 @@ import type { LatLngBounds, Map as LeafletMap } from "leaflet";
 import { useEffect, useMemo, useState } from "react";
 import { Circle, CircleMarker, MapContainer, Popup, TileLayer, useMapEvents } from "react-leaflet";
 import { GeoShape } from "../../lib/geo";
+import { AffineImage } from "../../lib/affineOverlay";
+import { usePlanImage } from "../../components/PlanView";
+import { indoorApi, type FloorPlanView } from "../../api/client";
 import { Link } from "react-router-dom";
 import { MAP_TILES, placesApi, schemasApi, workspacesApi, type LocationImport, type MapFeature, type MapFilters } from "../../api/client";
 import { useShowKeys } from "../../api/displayPrefs";
@@ -50,6 +53,20 @@ export function MapPage() {
     enabled: centre !== null,
   });
   const reviews = useQuery({ queryKey: ["location-reviews", here], queryFn: () => placesApi.reviews() });
+  // Indoors: the plans placed on the map in view, by floor (every building's floor of the same order together).
+  const plans = useQuery({ queryKey: ["map-plans", bbox], queryFn: () => indoorApi.mapPlans(bbox!), enabled: bbox !== null,
+                           placeholderData: (prev) => prev });
+  const [floor, setFloor] = useState<string>("");
+  const floorOf = (p: FloorPlanView) => (p.level ? String(p.level.ordinal) : "whole");
+  const floors = useMemo(() => {
+    const seen = new Map<string, Set<string>>();
+    for (const p of plans.data ?? []) {
+      const k = floorOf(p);
+      if (!seen.has(k)) seen.set(k, new Set());
+      seen.get(k)!.add(p.level?.name ?? "plans of whole places");
+    }
+    return [...seen.entries()].sort(([a], [b]) => (a === "whole" ? 1e9 : Number(a)) - (b === "whole" ? 1e9 : Number(b)));
+  }, [plans.data]);
   const decide = useMutation({
     mutationFn: ({ id, accept }: { id: number; accept: boolean }) => placesApi.decide(id, accept),
     onSuccess: () => {
@@ -119,6 +136,20 @@ export function MapPage() {
             </label>
           ))}
         </div>
+        <div className="space-y-1 border-t border-slate-100 pt-3">
+          <p className="text-xs font-semibold uppercase text-slate-500">Indoors</p>
+          {floors.length === 0 ? (
+            <p className="text-[11px] text-slate-400">No floor plan placed on the map here.</p>
+          ) : (
+            <select value={floor} onChange={(e) => setFloor(e.target.value)} aria-label="Floor"
+                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs">
+              <option value="">Outdoors: no plan</option>
+              {floors.map(([k, names]) => (
+                <option key={k} value={k}>{k === "whole" ? "" : `Floor ${k}: `}{[...names].join(", ")}</option>
+              ))}
+            </select>
+          )}
+        </div>
         <div className="space-y-2 border-t border-slate-100 pt-3">
           <p className="text-xs font-semibold uppercase text-slate-500">Near a point</p>
           <div className="flex items-center gap-2">
@@ -173,6 +204,7 @@ export function MapPage() {
           <TileLayer url={MAP_TILES.url} attribution={MAP_TILES.attribution} maxZoom={20} />
           <Bounds onChange={(b) => setBbox([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()])} />
           {centre && <Circle center={centre} radius={radius} pathOptions={{ color: "#f59e0b", fillOpacity: 0.05 }} />}
+          {floor && (plans.data ?? []).filter((p) => floorOf(p) === floor && p.corners).map((p) => <PlanOverlay key={p.uid} plan={p} />)}
           {/* Areas under lines under points, so every point stays clickable. */}
           {[...(features.data?.features ?? [])].sort((a, b) => ORDER[a.properties.role] - ORDER[b.properties.role]).map((f) => {
             const colour = LAYER_COLOURS[f.properties.map_layer ?? ""] ?? "#64748b";
@@ -204,6 +236,13 @@ export function MapPage() {
   );
 }
 
+
+/** A floor plan laid on the map where its control points place it. */
+function PlanOverlay({ plan }: { plan: FloorPlanView }) {
+  const image = usePlanImage(plan.uid);
+  if (!image.data || !plan.corners) return null;
+  return <AffineImage url={image.data} width={plan.width_px} height={plan.height_px} corners={plan.corners} />;
+}
 
 const OUTCOMES: Record<string, string> = {
   set: "location set", consistent: "agrees with its location", to_review: "differs: to review", rejected: "refused",

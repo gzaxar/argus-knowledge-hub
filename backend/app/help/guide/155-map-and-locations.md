@@ -1,7 +1,7 @@
 ---
 title: Map and locations
 summary: Where equipment and places are: positions, routes (cables, pipes, beamlines) and outlines (buildings, halls, rooms, zones, with heights a volume) and their history, what lies inside or crosses an area, the map, searching near a point, reporting a position from the phone, reviewing what the field saw, and importing locations from a file.
-keywords: [route, line, cable route, pipe route, outline, polygon, area, footprint, building outline, hall, zone, volume, height, inside, crossing, along, draw, map, gis, location, locations, coordinates, latitude, longitude, gps, position, where is, near me, nearby, distance, radius, review, observation, import locations, csv, geojson, wgs84, layer, place]
+keywords: [indoors, indoor, floor, floors, level, storey, floor plan, plan, room, hall, building, place on the plan, control points, georeference, residual, dxf plan, pdf plan,  line, cable route, pipe route, outline, polygon, area, footprint, building outline, hall, zone, volume, height, inside, crossing, along, draw, map, gis, location, locations, coordinates, latitude, longitude, gps, position, where is, near me, nearby, distance, radius, review, observation, import locations, csv, geojson, wgs84, layer, place]
 order: 155
 ---
 
@@ -45,13 +45,40 @@ Under the small map, ARGUS lists what the record's location says about the recor
 
 Heights are shown with an outline; what is inside is decided on the map (in plan), not by height.
 
+## Indoors: floors, plans and rooms
+
+GPS is weak indoors, and most laboratory equipment is indoors: there, a record is placed by **the room it is in**
+and, when there is one, **a point on a floor plan**.
+
+On a place's page (a building, a hall, a room), **Indoors**:
+
+- **Floors** — add the place's floors: a name ("Ground floor", "-1"), their order (0 the ground floor, 1 the
+  first, -1 below) and, if known, the height they are at and their own height.
+- **Floor plans** — **Add a plan** for the whole place or one floor: an image (PNG, JPEG…), an SVG, a **PDF**
+  (its first page) or a **DXF/DWG** drawing. **show** opens it with the records placed on it.
+- **Place on the map** — click a point you can recognise on the plan (a corner, a column), then the same place
+  on the map; repeat. Two points keep the plan's shape; three or more fit it and say how far off each point is
+  (in metres): a point far off is one clicked in the wrong place — remove it and click again. Placed, the plan
+  shows on the map, for its floor.
+- **Placed here** — the records placed in this place.
+
+On any record's page, **Indoors → Place it inside**: search the place it is in (a room, a hall), optionally choose
+a plan (the place's, or that of a place it is in — a room's plan is usually its building's) and click where it is.
+A point on a plan placed on the map gives the record its **position** too (*from the plan*, as accurate as the
+plan's fit). The record then says **which is in** — its room, the hall the room is in, the building — and the
+place lists it; the record's *It is in* and the place's *Inside it* include them.
+
+A record placed indoors is not disturbed by a vague GPS fix: one less precise than 10 m is **noted**, not sent to
+review. Place it on its plan instead.
+
 ## The map
 
 **Assets → Map** shows the records with a location, coloured by layer: points, routes as lines and outlines as
 areas (under the points, so every point can be clicked). Narrow it to **types** (a type includes
 the types under it), **workspaces** you can read, and **status**. A marker opens its record (in its own
 workspace). **Near a point**: choose a distance and *of the map's centre* to list what is within it, nearest
-first — a route or an outline by its nearest part (inside an outline is 0 m). The map shows exactly what a list would show you: nothing restricted, nothing from a workspace you
+first — a route or an outline by its nearest part (inside an outline is 0 m). **Indoors** chooses a floor: the
+floor plans placed on the map in view are laid on it (the same floor of every building together). The map shows exactly what a list would show you: nothing restricted, nothing from a workspace you
 cannot open.
 
 ## Reporting a position from the phone
@@ -62,7 +89,14 @@ moves the record:
 - close to the approved location (within 15 m plus both accuracies), it is noted as **consistent**;
 - elsewhere — or when the record has no location yet — it goes to **review**, and its followers are told.
 
-**Near me** (menu) lists what has a location around the phone, within 50 m, 200 m or 1 km.
+**Near me** (menu) lists what has a location around the phone, within 50 m, 200 m or 1 km. **Map** (menu)
+shows what has a location around — positions as dots, routes as lines, outlines as areas; a tap opens the record;
+the button centres it on the phone. On an equipment page, a small map shows its position, route and outline, and
+**Open the map here**.
+
+Indoors, on an equipment page: **In Room 12, Ground floor** and the places it is in; **Show on the plan** opens
+the plan with its pin, and a tap there (asked first) places it at that point. **Place it on a plan** offers the
+plans of its room and of the places the room is in (or, with only a position, those around it).
 
 ## Review
 
@@ -85,5 +119,5 @@ found as a scan finds it, its type placed on the map — and says what each row 
 
 ## What is not here yet
 
-Coordinates other than WGS 84 (a site grid, a survey frame, a position *s* along a beamline), floors and floor
-plans, and placing equipment by room indoors are for later releases.
+Coordinates other than WGS 84 (a site grid, a survey frame, a position *s* along a beamline) are for a later
+release; heights are kept with floors and outlines, but what is inside is decided in plan.

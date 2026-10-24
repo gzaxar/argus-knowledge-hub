@@ -57,7 +57,25 @@ it), `crossing` (routes `ST_Intersects` its outline or route), `along` (position
 by geography distance), `within` (outlines containing its position, or intersecting its route or outline — not
 those inside its own outline). Heights are carried, not used: the questions are in plan.
 
+## Indoors (models/indoor.py, services/indoor.py)
+
+- `place_levels` — a place's floors: `name`, `ordinal` (0 ground), `elevation_m`, `height_m`.
+- `floor_plans` — a picture of a level or a place: PNG/JPEG kept, other images to PNG, SVG kept, a PDF's first
+  page drawn to PNG (pypdfium2), DXF/DWG to SVG (services/drawings); the file given kept beside it. Placed on the
+  map by `control_points` ({x, y, longitude, latitude}): two give a similarity (no shear, never mirrored: pixel y
+  grows downwards), three or more a least-squares affine; fitted in a local east/north plane in metres, so the
+  `residuals_m` are ground distances. `transform` maps pixels to WGS 84 (lon = a·x + b·y + c, lat = d·x + e·y + f).
+- `indoor_placements` — a record in a place (room, hall), on a level, optionally at a plan point; one confirmed per
+  record (partial unique index), superseded ones kept. A point on a placed plan sets the record's position
+  (source `plan`, accuracy the plan's residual, at least 0.5 m). A place cannot be inside what is inside it.
+- An observation of a record placed indoors with an accuracy worse than 10 m is `noted`, not `pending`.
+- API: `/v1/assets/{uid}/levels`, `/v1/levels/{uid}`, `/v1/assets/{uid}/plans`, `/v1/plans/{uid}` (`/image`,
+  `/placement`), `/v1/assets/{uid}/indoors`, `/v1/map/plans?bbox=`. The context's `inside`/`within` include the
+  indoor placements (role `indoors`).
+- The web lays a placed plan on the map by its corners with a CSS matrix (lib/affineOverlay); the phone shows a
+  plan in its own pixels and places a record by a tap.
+
 ## Limits of this release
 
-WGS 84 only; no floors, floor plans or indoor placement; no machine (s) or survey coordinates — the next steps.
+WGS 84 only; no machine (s) or survey coordinates — the next step. Containment is in plan; heights are kept.
 Which types may have a route or an outline is not narrowed by the packages yet: any type placed on the map may.

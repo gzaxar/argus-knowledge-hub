@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../core/problem.dart';
 import '../domain/capture.dart' show DocumentSeed;
@@ -13,7 +14,9 @@ import '../features/graph/graph_record_screen.dart';
 import '../features/graph/graph_screen.dart';
 import '../features/search/query_screen.dart';
 import '../features/places/location_reviews_screen.dart';
+import '../features/places/map_screen.dart';
 import '../features/places/nearby_screen.dart';
+import '../features/places/plan_screen.dart';
 import '../widgets/in_workspace.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/shell/app_shell.dart';
@@ -132,6 +135,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/replace/:uid', builder: (_, st) => ReplaceScreen(positionUid: st.pathParameters['uid']!)),
       GoRoute(path: '/reviews', builder: (_, _) => const ReviewScreen()),
       GoRoute(path: '/nearby', builder: (_, _) => const NearbyScreen()),
+      GoRoute(
+          path: '/plan/:uid',
+          builder: (_, s) => PlanScreen(planUid: s.pathParameters['uid']!, assetUid: s.uri.queryParameters['asset'])),
+      GoRoute(path: '/map', builder: (_, s) {
+        final lat = double.tryParse(s.uri.queryParameters['lat'] ?? '');
+        final lon = double.tryParse(s.uri.queryParameters['lon'] ?? '');
+        return MapScreen(center: lat == null || lon == null ? null : LatLng(lat, lon), zoom: lat == null ? null : 18);
+      }),
       GoRoute(path: '/location-reviews', builder: (_, _) => const LocationReviewsScreen()),
       GoRoute(
           path: '/query',

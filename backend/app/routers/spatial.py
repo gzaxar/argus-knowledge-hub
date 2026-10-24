@@ -169,6 +169,16 @@ def location_context(uid: str, along_m: float = Query(spatial.ALONG_M, gt=0, le=
     spaces = _workspaces(db, identity, workspaces, workspace_id)
     cond = _scope(db, identity, spaces, None, None)
     out = spatial.context(db, asset, cond, along_m=along_m)
+    # Indoors too: what is placed in it, and the places it is placed in (a room, its hall, the building).
+    from app.services import indoor
+    for a, _p in indoor.placed_in(db, asset.uid):
+        if not any(i["uid"] == a.uid for i in out["inside"]):
+            out["inside"].append({"uid": a.uid, "key": a.key, "name": a.name, "type": a.type,
+                                  "workspace_id": a.workspace_id, "role": "indoors"})
+    for c in indoor.containers(db, asset.uid):
+        if not any(i["uid"] == c.uid for i in out["within"]):
+            out["within"].append({"uid": c.uid, "key": c.key, "name": c.name, "type": c.type,
+                                  "workspace_id": c.workspace_id, "role": "indoors"})
     cache: dict = {}
     for kind, items in out.items():
         kept = []
