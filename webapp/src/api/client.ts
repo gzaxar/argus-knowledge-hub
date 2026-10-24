@@ -2283,6 +2283,76 @@ function mapQuery(filters: MapFilters): string {
   return q.toString();
 }
 
+/** Indoors: a place's floors and floor plans, a plan placed on the map, records placed inside (backend indoor). */
+export interface PlaceLevel {
+  uid: string; place_uid: string; name: string; ordinal: number; elevation_m: number | null; height_m: number | null;
+}
+export interface ControlPoint { x: number; y: number; longitude: number; latitude: number }
+export interface FloorPlanView {
+  uid: string; name: string; place: { uid: string; name: string | null }; level: PlaceLevel | null;
+  width_px: number; height_px: number; mime_type: string; source_kind: string; source_filename: string | null;
+  control_points: ControlPoint[]; transform: Record<string, number> | null; residual_m: number | null;
+  /** [longitude, latitude] of the top-left, top-right, bottom-right, bottom-left corners, once placed. */
+  corners: [number, number][] | null;
+  placed?: { uid: string; key: string; name: string; type: string; x: number; y: number; place_uid: string | null }[];
+  residuals_m?: number[]; metres_per_px?: number; rotation_deg?: number;
+}
+export interface IndoorPlacementView {
+  uid: string;
+  place: { uid: string; key: string; name: string; type: string } | null;
+  level: PlaceLevel | null;
+  plan: { uid: string; name: string; width_px: number; height_px: number } | null;
+  x: number | null; y: number | null; source: string; note: string | null; state: string;
+  valid_from: string | null; valid_until: string | null; confirmed_by: string | null;
+}
+export interface IndoorView {
+  uid: string; placement: IndoorPlacementView | null;
+  in: { uid: string; key: string; name: string; type: string }[];
+  contents: { uid: string; key: string; name: string; type: string; level_uid: string | null; plan_uid: string | null }[];
+  history: IndoorPlacementView[];
+}
+
+export const indoorApi = {
+  levels: (placeUid: string) => request<{ levels: PlaceLevel[]; plans: FloorPlanView[] }>(`/v1/assets/${placeUid}/levels`),
+  addLevel: (placeUid: string, input: { name: string; ordinal: number; elevation_m?: number | null; height_m?: number | null }) =>
+    request<PlaceLevel>(`/v1/assets/${placeUid}/levels`, { method: "POST", body: json(input) }),
+  changeLevel: (uid: string, input: { name: string; ordinal: number; elevation_m?: number | null; height_m?: number | null }) =>
+    request<PlaceLevel>(`/v1/levels/${uid}`, { method: "PATCH", body: json(input) }),
+  removeLevel: (uid: string) => request<void>(`/v1/levels/${uid}`, { method: "DELETE" }),
+  /** An image, an SVG, a PDF (its first page) or a DXF/DWG drawing. */
+  addPlan: (placeUid: string, file: File, name: string, levelUid?: string | null) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("name", name);
+    form.append("level_uid", levelUid ?? "");
+    return request<FloorPlanView>(`/v1/assets/${placeUid}/plans`, { method: "POST", body: form });
+  },
+  plan: (uid: string) => request<FloorPlanView>(`/v1/plans/${uid}`),
+  changePlan: (uid: string, input: { name?: string; level_uid?: string | null }) =>
+    request<FloorPlanView>(`/v1/plans/${uid}`, { method: "PATCH", body: json(input) }),
+  removePlan: (uid: string) => request<void>(`/v1/plans/${uid}`, { method: "DELETE" }),
+  /** The plan's picture, fetched signed in, as a URL the page can show. */
+  planImageUrl: async (uid: string): Promise<string> => {
+    const session = await loadSession();
+    if (!session) throw new Error("Not signed in");
+    const resp = await fetch(`${session.baseUrl}/v1/plans/${uid}/image`, { headers: authHeaders(session) });
+    if (!resp.ok) throw new ApiError(resp.status, await resp.text());
+    return URL.createObjectURL(await resp.blob());
+  },
+  placePlan: (uid: string, points: ControlPoint[]) =>
+    request<FloorPlanView>(`/v1/plans/${uid}/placement`, { method: "PUT", body: json({ points }) }),
+  unplacePlan: (uid: string) => request<void>(`/v1/plans/${uid}/placement`, { method: "DELETE" }),
+  indoors: (uid: string) => request<IndoorView>(`/v1/assets/${uid}/indoors`),
+  setIndoors: (uid: string, input: { place_uid?: string | null; level_uid?: string | null; plan_uid?: string | null;
+                                      x?: number | null; y?: number | null; note?: string | null }) =>
+    request<IndoorPlacementView>(`/v1/assets/${uid}/indoors`, { method: "PUT", body: json(input) }),
+  removeIndoors: (uid: string) => request<void>(`/v1/assets/${uid}/indoors`, { method: "DELETE" }),
+  mapPlans: (bbox: [number, number, number, number]) =>
+    request<FloorPlanView[]>(`/v1/map/plans?bbox=${bbox.map((n) => n.toFixed(6)).join(",")}`),
+  /** Records whose key, name, label, serial… contains this (to choose the place something is in). */
+  searchRecords: (q: string) => request<Asset[]>(`/v1/assets?q=${encodeURIComponent(q)}&sort=key&limit=20`),
+};
+
 export const placesApi = {
   location: (uid: string) => request<AssetLocationView>(`/v1/assets/${uid}/location`),
   setLocation: (uid: string, input: { latitude: number; longitude: number; accuracy_m?: number; note?: string }) =>

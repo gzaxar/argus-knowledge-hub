@@ -1,3 +1,4 @@
+import 'dart:typed_data' show Uint8List;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart' show ThemeMode;
@@ -508,6 +509,22 @@ final locationRepositoryProvider = Provider((ref) => LocationRepository(ref.watc
 final assetLocationProvider = FutureProvider.autoDispose.family<AssetLocation, String>((ref, uid) {
   ref.watch(workspaceIdProvider);
   return ref.watch(locationRepositoryProvider).get(uid);
+});
+
+/// Where a record is inside (its room, floor, point on a plan).
+final indoorProvider = FutureProvider.autoDispose.family<IndoorInfo, String>((ref, uid) {
+  ref.watch(workspaceIdProvider);
+  return ref.watch(locationRepositoryProvider).indoors(uid);
+});
+
+/// A floor plan, the records on it, and its picture.
+final planInfoProvider = FutureProvider.autoDispose.family<PlanInfo, String>((ref, uid) {
+  ref.watch(workspaceIdProvider);
+  return ref.watch(locationRepositoryProvider).plan(uid);
+});
+final planImageProvider = FutureProvider.autoDispose.family<Uint8List, String>((ref, uid) {
+  ref.watch(workspaceIdProvider);
+  return ref.watch(locationRepositoryProvider).planImage(uid);
 });
 
 /// The features of the current workspace (map, equipment, beam model…); null while unknown — everything is

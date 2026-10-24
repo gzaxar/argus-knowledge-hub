@@ -24,6 +24,7 @@ import { effectiveAttributes, inheritedKeys } from "../../lib/schemaAttributes";
 import { AssetContextPanel } from "../../components/hub/ContextPanels";
 import { SemanticRelated } from "../../components/SemanticRelated";
 import { LocationCard } from "../../components/LocationCard";
+import { IndoorCard } from "../../components/IndoorCard";
 import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
 import { ExportMenu } from "../../components/ExportMenu";
 import { FollowButton } from "../../components/FollowButton";
@@ -576,6 +577,7 @@ export function AssetDetail() {
         </SectionCard>
 
         <LocationCard uid={a.uid} editable={a.workspace_id === currentWorkspaceForLocation} />
+        <IndoorCard uid={a.uid} editable={a.workspace_id === currentWorkspaceForLocation} />
 
         <SectionCard title="Related by meaning">
           <SemanticRelated kind="asset" uid={a.uid} />

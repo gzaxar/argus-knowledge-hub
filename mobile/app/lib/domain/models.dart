@@ -2,6 +2,8 @@
 /// persistence records are mapped to these at the repository boundary (flutter-app-design §4.1).
 library;
 
+import 'package:latlong2/latlong.dart';
+
 class WorkspaceChoice {
   const WorkspaceChoice({required this.id, required this.name, required this.canCreate, required this.canReadTickets});
 
@@ -503,13 +505,137 @@ class Cockpit {
 /// from), and what the field observed (services/spatial on the server).
 class AssetLocation {
   const AssetLocation(
-      {required this.locatable, this.layer, this.hidden = false, this.current, this.observations = const []});
+      {required this.locatable,
+      this.layer,
+      this.hidden = false,
+      this.current,
+      this.observations = const [],
+      this.route,
+      this.outline});
 
   final bool locatable;
   final String? layer;
   final bool hidden; // its type restricts the location from this person
   final PlacedPoint? current;
   final List<LocationObservationItem> observations;
+  /// Its route (a cable, a pipe, a beamline) and its outline (a building, hall, room or zone), if it has them.
+  final PlaceShape? route;
+  final PlaceShape? outline;
+}
+
+/// A record's shape on the map, from its GeoJSON: a position (one point), a route (one or more lines) or an
+/// outline (one or more areas, each its outer ring and its holes). Heights, length and area as the server says.
+class PlaceShape {
+  const PlaceShape(
+      {required this.role,
+      this.points = const [],
+      this.lines = const [],
+      this.areas = const [],
+      this.base,
+      this.top,
+      this.length,
+      this.area});
+
+  final String role; // position | route | outline
+  final List<LatLng> points;
+  final List<List<LatLng>> lines;
+  final List<List<List<LatLng>>> areas; // each: its outer ring, then its holes
+  final double? base, top; // metres: with both, an outline is a volume
+  final double? length; // metres, a route's
+  final double? area; // square metres, an outline's
+
+  /// Every position, to fit a map to it.
+  List<LatLng> get all => [...points, ...lines.expand((l) => l), ...areas.expand((a) => a.expand((r) => r))];
+
+  static LatLng _ll(Object? p) {
+    final c = p as List;
+    return LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble());
+  }
+
+  static PlaceShape? fromGeoJson(String role, Object? geometry,
+      {double? base, double? top, double? length, double? area}) {
+    if (geometry is! Map) return null;
+    final c = geometry['coordinates'];
+    List<LatLng> line(Object? l) => [for (final p in l as List) _ll(p)];
+    List<List<LatLng>> poly(Object? rings) => [for (final r in rings as List) line(r)];
+    try {
+      return switch (geometry['type']) {
+        'Point' => PlaceShape(role: role, points: [_ll(c)]),
+        'LineString' => PlaceShape(role: role, lines: [line(c)], length: length),
+        'MultiLineString' => PlaceShape(role: role, lines: [for (final l in c as List) line(l)], length: length),
+        'Polygon' => PlaceShape(role: role, areas: [poly(c)], base: base, top: top, area: area),
+        'MultiPolygon' =>
+          PlaceShape(role: role, areas: [for (final p in c as List) poly(p)], base: base, top: top, area: area),
+        _ => null,
+      };
+    } on Object {
+      return null; // a geometry this app cannot draw is left off the map, not a crash
+    }
+  }
+}
+
+/// Where a record is inside: the place (a room, a hall) and the places that one is in, its floor, and its
+/// point on a plan (pixels of that plan).
+class IndoorInfo {
+  const IndoorInfo(
+      {this.placeUid,
+      this.placeName,
+      this.levelName,
+      this.plan,
+      this.x,
+      this.y,
+      this.chain = const [],
+      this.chainUids = const [],
+      this.contents = 0});
+
+  final String? placeUid;
+  final String? placeName;
+  final String? levelName;
+  final PlanRef? plan;
+  final double? x, y;
+  final List<String> chain; // the places it is in, nearest first (its room, the hall, the building)
+  final List<String> chainUids;
+  final int contents; // for a place: how many records are placed in it
+
+  bool get placed => placeUid != null || plan != null;
+}
+
+class PlanRef {
+  const PlanRef({required this.uid, required this.name, required this.width, required this.height});
+
+  final String uid;
+  final String name;
+  final double width, height;
+}
+
+/// A floor plan: its picture's size and kind, what it is a plan of, and the records placed on it.
+class PlanInfo {
+  const PlanInfo(
+      {required this.ref,
+      required this.mime,
+      this.placeUid,
+      this.placeName,
+      this.levelName,
+      this.onMap = false,
+      this.placed = const []});
+
+  final PlanRef ref;
+  final String mime; // image/png, image/jpeg or image/svg+xml
+  final String? placeUid;
+  final String? placeName;
+  final String? levelName;
+  final bool onMap; // placed on the map: a point on it gives a position too
+  final List<({String uid, String name, double x, double y})> placed;
+}
+
+/// A record on the map: what it is and its shape there.
+class MapFeatureItem {
+  const MapFeatureItem({required this.target, required this.shape, this.layer, this.status});
+
+  final LinkTarget target;
+  final PlaceShape shape;
+  final String? layer;
+  final String? status;
 }
 
 class PlacedPoint {
