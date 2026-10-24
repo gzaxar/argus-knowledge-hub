@@ -345,7 +345,14 @@ def observe(db: Session, asset: Asset, geometry: dict, *, accuracy_m: Optional[f
                               geometry=geometry, accuracy_m=accuracy_m, observed_at=observed_at or now(),
                               observed_by=actor, device_id=device_id, source=source, created_at=now())
     approved = current(db, asset.uid)
-    if approved is None:
+    from app.services import indoor
+    if indoor.current(db, asset.uid) is not None and (accuracy_m is None or accuracy_m > indoor.INDOOR_GPS_M):
+        # Placed indoors, where GPS is weak: a vague fix is kept, not sent to review.
+        obs.status = "noted"
+        obs.note = f"indoors: a fix less precise than {indoor.INDOOR_GPS_M:g} m does not move it"
+        if approved is not None:
+            obs.distance_m, obs.feature_uid = round(distance_m(db, geojson(approved.geometry), geometry), 1), approved.uid
+    elif approved is None:
         obs.status = "pending"
         obs.note = "no approved location yet"
     else:

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data' show Uint8List;
 
 import 'package:argus_api/api.dart' as api;
 import 'package:crypto/crypto.dart' show sha256;
@@ -8,7 +9,8 @@ import 'package:http_parser/http_parser.dart' show MediaType;
 import '../core/problem.dart';
 import '../domain/capture.dart';
 import '../domain/models.dart'
-    show AssetLocation, AttributeDef, CockpitItem, LinkTarget, LocationObservationItem, NearbyHit, PlacedPoint,
+    show AssetLocation, AttributeDef, CockpitItem, IndoorInfo, LinkTarget, LocationObservationItem, MapFeatureItem,
+        NearbyHit, PlaceShape, PlacedPoint, PlanInfo, PlanRef,
         QueryHit, QueryResult, RecordKind;
 import 'api_service.dart';
 
@@ -482,7 +484,116 @@ class LocationRepository {
         layer: r['map_layer']?.toString(),
         hidden: r['hidden'] == true,
         current: _point(r['location']),
-        observations: _list(r['observations']).map(_map).map(_observation).toList());
+        observations: _list(r['observations']).map(_map).map(_observation).toList(),
+        route: _shape(r['route']),
+        outline: _shape(r['outline']));
+  }
+
+  static PlaceShape? _shape(Object? raw) {
+    final m = raw is Map ? raw.map((k, v) => MapEntry(k.toString(), v)) : null;
+    if (m == null) return null;
+    return PlaceShape.fromGeoJson((m['role'] ?? 'position').toString(), m['geometry'],
+        base: _d(m['base_m']), top: _d(m['top_m']), length: _d(m['length_m']), area: _d(m['area_m2']));
+  }
+
+  static PlanRef? _planRef(Object? raw) {
+    final m = raw is Map ? raw.map((k, v) => MapEntry(k.toString(), v)) : null;
+    if (m == null) return null;
+    return PlanRef(uid: '${m['uid']}', name: '${m['name'] ?? ''}', width: _d(m['width_px']) ?? 1, height: _d(m['height_px']) ?? 1);
+  }
+
+  /// Where the record is inside: its place, floor and point on a plan, and the places that place is in.
+  Future<IndoorInfo> indoors(String uid) async {
+    final r = _map(await _api.json((c) => c.invokeAPI('/v1/assets/$uid/indoors', 'GET', [], null, {}, {}, null)));
+    final p = _map(r['placement']);
+    final place = _map(p['place']);
+    return IndoorInfo(
+        placeUid: place['uid']?.toString(),
+        placeName: place['name']?.toString(),
+        levelName: _map(p['level'])['name']?.toString(),
+        plan: _planRef(p['plan']),
+        x: _d(p['x']),
+        y: _d(p['y']),
+        chain: [for (final c in _list(r['in']).map(_map)) '${c['name']}'],
+        chainUids: [for (final c in _list(r['in']).map(_map)) '${c['uid']}'],
+        contents: _list(r['contents']).length);
+  }
+
+  /// A floor plan and the records placed on it.
+  Future<PlanInfo> plan(String uid) async {
+    final m = _map(await _api.json((c) => c.invokeAPI('/v1/plans/$uid', 'GET', [], null, {}, {}, null)));
+    return PlanInfo(
+        ref: _planRef(m)!,
+        mime: '${m['mime_type'] ?? 'image/png'}',
+        placeUid: _map(m['place'])['uid']?.toString(),
+        placeName: _map(m['place'])['name']?.toString(),
+        levelName: _map(m['level'])['name']?.toString(),
+        onMap: m['corners'] != null,
+        placed: [
+          for (final p in _list(m['placed']).map(_map))
+            (uid: '${p['uid']}', name: '${p['name'] ?? ''}', x: _d(p['x']) ?? 0, y: _d(p['y']) ?? 0),
+        ]);
+  }
+
+  /// The floor plans of these places (a room's floor plan is usually its building's), or — for a record with
+  /// only a position — those placed on the map around it.
+  Future<List<({PlanRef plan, String? level, String? place})>> plansFor(List<String> places,
+      {double? lat, double? lon}) async {
+    final out = <({PlanRef plan, String? level, String? place})>[];
+    void add(Map<String, Object?> m) {
+      final ref = _planRef(m);
+      if (ref != null && !out.any((p) => p.plan.uid == ref.uid)) {
+        out.add((plan: ref, level: _map(m['level'])['name']?.toString(), place: _map(m['place'])['name']?.toString()));
+      }
+    }
+    for (final uid in places) {
+      try {
+        final r = _map(await _api.json((c) => c.invokeAPI('/v1/assets/$uid/levels', 'GET', [], null, {}, {}, null)));
+        _list(r['plans']).map(_map).forEach(add);
+      } on Problem {
+        // a place this person may not see has no plans for them
+      }
+    }
+    if (places.isEmpty && lat != null && lon != null) {
+      const d = 0.002; // about 200 m
+      final bbox = [lon - d, lat - d, lon + d, lat + d].map((v) => v.toStringAsFixed(6)).join(',');
+      _list(await _api.json((c) => c.invokeAPI('/v1/map/plans', 'GET', [api.QueryParam('bbox', bbox)], null, {}, {}, null)))
+          .map(_map)
+          .forEach(add);
+    }
+    return out;
+  }
+
+  /// The plan's picture (PNG, JPEG or SVG).
+  Future<Uint8List> planImage(String uid) => _api.getBytes('/v1/plans/$uid/image');
+
+  /// Place the record at a point of a plan (in [placeUid], or the place it is in now, or the plan's place). A plan
+  /// placed on the map gives it its position too.
+  Future<void> placeOnPlan(String uid, {required String planUid, required double x, required double y, String? placeUid}) =>
+      _api.json((c) => c.invokeAPI('/v1/assets/$uid/indoors', 'PUT', [],
+          {'plan_uid': planUid, 'x': x, 'y': y, 'place_uid': ?placeUid}, {}, {}, 'application/json'));
+
+  /// The records with a location in an area of the map — their positions, routes and outlines — that the person
+  /// may see (the same rules as a list).
+  Future<List<MapFeatureItem>> features(
+      {required double south, required double west, required double north, required double east}) async {
+    final bbox = [west, south, east, north].map((v) => v.toStringAsFixed(6)).join(',');
+    final r = _map(await _api.json(
+        (c) => c.invokeAPI('/v1/map/features', 'GET', [api.QueryParam('bbox', bbox)], null, {}, {}, null)));
+    final out = <MapFeatureItem>[];
+    for (final f in _list(r['features']).map(_map)) {
+      final p = _map(f['properties']);
+      final shape = PlaceShape.fromGeoJson((p['role'] ?? 'position').toString(), f['geometry'],
+          base: _d(p['base_m']), top: _d(p['top_m']));
+      if (shape == null) continue;
+      out.add(MapFeatureItem(
+          target: LinkTarget(kind: RecordKind.asset, uid: p['uid'].toString(), title: p['name']?.toString(),
+              key: p['key']?.toString(), subtitle: p['type']?.toString(), workspaceId: p['workspace_id']?.toString()),
+          shape: shape,
+          layer: p['map_layer']?.toString(),
+          status: p['status']?.toString()));
+    }
+    return out;
   }
 
   /// Where the person sees the record now: it never moves it; the answer says whether it agrees with the

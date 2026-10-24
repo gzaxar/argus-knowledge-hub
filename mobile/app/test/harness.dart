@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:argus_field/widgets/place_map.dart';
 import 'package:argus_field/app/app.dart';
 import 'package:argus_field/app/providers.dart';
 import 'package:argus_field/app/router.dart';
@@ -102,6 +103,7 @@ Future<Running> start(WidgetTester tester,
       textReaderProvider.overrideWithValue(texts),
       mediaSourceProvider.overrideWithValue(media),
       phoneNotifierProvider.overrideWithValue(FakePhoneNotifier()),
+      mapTilesProvider.overrideWithValue(null), // no tile server in a test: the shapes alone
       ...overrides,
     ],
     child: const ArgusFieldApp(),
