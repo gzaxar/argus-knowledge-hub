@@ -116,6 +116,13 @@ def get_package(package_id: str, identity=Depends(get_identity)):
                         for q in p.section("queries") or []]}
 
 
+def _problem(e: "installer.PackageProblem") -> dict:
+    out = {"error": str(e), "code": "package"}
+    if isinstance(e, installer.CatalogueBehind):
+        out.update({"code": "catalogue_behind", "catalogue_workspace_id": e.catalogue, "needs": e.needs})
+    return out
+
+
 @router.post("/packages/resolve")
 def resolve_packages(body: PackagesIn, identity=Depends(get_identity)):
     """What a new workspace starting from these packages would get: each package (dependencies first) and
@@ -139,7 +146,7 @@ def preview_new_workspace(body: PackagesIn, identity: Identity = Depends(get_ide
                                   scope=body.scope)
     except installer.PackageProblem as e:
         db.rollback()
-        raise HTTPException(status_code=422, detail={"error": str(e), "code": "package"})
+        raise HTTPException(status_code=422, detail=_problem(e))
     db.rollback()
     return plan.as_dict()
 
@@ -187,7 +194,7 @@ def preview_install(workspace_id: str, body: PackagesIn, identity=Depends(get_id
                               scope=body.scope, decisions=body.decisions)
     except installer.PackageProblem as e:
         db.rollback()
-        raise HTTPException(status_code=422, detail={"error": str(e), "code": "package"})
+        raise HTTPException(status_code=422, detail=_problem(e))
     db.rollback()
     return plan.as_dict()
 
@@ -205,6 +212,6 @@ def install_packages(workspace_id: str, body: PackagesIn, identity=Depends(get_i
                                  decisions=body.decisions)
     except installer.PackageProblem as e:
         db.rollback()
-        raise HTTPException(status_code=422, detail={"error": str(e), "code": "package"})
+        raise HTTPException(status_code=422, detail=_problem(e))
     db.commit()
     return {**plan.as_dict(), "history": _history(db, workspace_id)}

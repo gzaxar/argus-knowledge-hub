@@ -35,6 +35,18 @@ class PackageProblem(ValueError):
     """Packages that cannot be installed as asked: unknown, invalid, or not installable here."""
 
 
+class CatalogueBehind(PackageProblem):
+    """A workspace hangs from a shared catalogue that does not yet have the packages (at the versions) whose
+    shared types it would stand on: the catalogue is installed or upgraded first, then this workspace."""
+
+    def __init__(self, catalogue: str, needs: list[dict]):
+        self.catalogue, self.needs = catalogue, needs
+        listed = ", ".join(f"{n['package_id']} {n['version']}" + (f" (has {n['has']})" if n["has"] else " (not installed)")
+                           for n in needs)
+        super().__init__(f"the shared catalogue {catalogue!r} must have these first: {listed}. Install or upgrade "
+                         f"them in {catalogue!r} (its Packages page), then come back here")
+
+
 @dataclass
 class Step:
     package_id: str
@@ -319,10 +331,39 @@ def _object_options(db: Session, workspace_id: str, catalogue_workspace_id: Opti
         return {"scope": asset_types.SCOPE_BEAMLINE, "catalogue_workspace_id": catalogue_workspace_id}
     if scope == asset_types.SCOPE_GLOBAL:
         return {"scope": asset_types.SCOPE_GLOBAL}
-    hangs_from = asset_types.catalogue_of(db, workspace_id)
+    # A workspace keeps the way its object packages went in: a catalogue stays a catalogue (its new
+    # dependencies are global too), a workspace hanging from one keeps hanging from it.
+    recorded = [r.options for r in installed(db, workspace_id).values() if (r.options or {}).get("scope")]
+    if scope is None and any(o["scope"] == asset_types.SCOPE_GLOBAL for o in recorded):
+        return {"scope": asset_types.SCOPE_GLOBAL}
+    hung = next((o for o in recorded if o["scope"] == asset_types.SCOPE_BEAMLINE and o.get("catalogue_workspace_id")),
+                None)
+    hangs_from = (hung or {}).get("catalogue_workspace_id") or asset_types.catalogue_of(db, workspace_id)
     if hangs_from:
         return {"scope": asset_types.SCOPE_BEAMLINE, "catalogue_workspace_id": hangs_from}
     return {"scope": asset_types.SCOPE_ALL}
+
+
+def catalogue_needs(db: Session, catalogue_workspace_id: str, packages: list[Package]) -> list[dict]:
+    """The packages a workspace hanging from this catalogue would stand on that the catalogue lacks, or has at
+    an older version: each with object types of the shared (global) scope, which live in the catalogue."""
+    from app.services import asset_types
+    from app.packages import compile as c
+    have = installed(db, catalogue_workspace_id)
+    sets = defaults.option_sets()
+    out = []
+    for p in packages:
+        if not has_objects(p):
+            continue
+        names = [t.name for t in c.object_types(p, {**sets, **(p.section("option_sets") or {})})]
+        shared = [n for n in names if n in asset_types.BY_NAME and asset_types.scope_of(n) == asset_types.SCOPE_GLOBAL]
+        if not shared:
+            continue
+        row = have.get(p.id)
+        if row is None or Version(row.version) < Version(p.version):
+            out.append({"package_id": p.id, "version": p.version, "has": row.version if row else None,
+                        "shared_types": len(shared)})
+    return out
 
 
 def _steps(db: Session, workspace_id: str, package_ids: list[str]) -> list[tuple[Package, Step]]:
@@ -355,6 +396,11 @@ def _run(db: Session, workspace_id: str, package_ids: list[str], *, catalogue_wo
     options = {}
     if any(has_objects(p) for p, _ in steps):
         options = _object_options(db, workspace_id, catalogue_workspace_id, scope)
+        if options.get("catalogue_workspace_id"):
+            needs = catalogue_needs(db, options["catalogue_workspace_id"],
+                                    [p for p, st in steps if st.action != "unchanged"])
+            if needs:
+                raise CatalogueBehind(options["catalogue_workspace_id"], needs)
     from app.services import catalogue_icons
     token = catalogue_icons.PREVIEW.set(not keep)
     savepoint = db.begin_nested()
@@ -392,6 +438,8 @@ def plan(db: Session, workspace_id: str, package_ids: list[str], *, catalogue_wo
     try:
         return _run(db, workspace_id, package_ids, catalogue_workspace_id=catalogue_workspace_id, scope=scope,
                     actor=None, keep=False, decisions=decisions)
+    except PackageProblem:
+        raise
     except (CatalogueMissing, ValueError) as e:
         raise PackageProblem(str(e)) from None
 
@@ -404,6 +452,8 @@ def install(db: Session, workspace_id: str, package_ids: list[str], *, actor: Op
     try:
         return _run(db, workspace_id, package_ids, catalogue_workspace_id=catalogue_workspace_id, scope=scope,
                     actor=actor, keep=True, decisions=decisions)
+    except PackageProblem:
+        raise
     except (CatalogueMissing, ValueError) as e:
         raise PackageProblem(str(e)) from None
 

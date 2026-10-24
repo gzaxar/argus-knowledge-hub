@@ -268,7 +268,8 @@ def test_a_preview_keeps_nothing_and_an_install_that_fails_applies_nothing(ws):
     empty = f"{ws}-empty"
     db.add(Workspace(id=empty, name=empty))
     db.commit()
-    with pytest.raises(installer.PackageProblem, match="does not hold the global types"):
+    # The installer says what the catalogue lacks before trying (it is installed there first).
+    with pytest.raises(installer.CatalogueBehind, match="must have these first"):
         installer.install(db, ws, ["accelerator"], catalogue_workspace_id=empty)
     db.rollback()
     assert _count(db, Schema, ws) == 0 and _count(db, WorkspacePackage, ws) == 0
