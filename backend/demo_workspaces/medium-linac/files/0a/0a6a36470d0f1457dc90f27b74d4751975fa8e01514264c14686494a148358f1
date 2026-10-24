@@ -17,6 +17,28 @@
 <text x="250" y="160.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">AHU-BUNKER</text>
 <rect x="245.5" y="55.5" width="9" height="9" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
 <text x="250" y="80.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">AHU-GALLERY</text>
+<rect x="175.5" y="155.5" width="9" height="9" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="180" y="180.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">PUMP-1</text>
+<rect x="175.5" y="125.5" width="9" height="9" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="180" y="150.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">PUMP-2</text>
+<rect x="215.5" y="155.5" width="9" height="9" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="220" y="180.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">HX-1</text>
+<rect x="265.5" y="165.5" width="9" height="9" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="270" y="190.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">TANK-1</text>
+<rect x="165.5" y="65.5" width="9" height="9" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="170" y="90.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">FT-1</text>
+<rect x="185.5" y="65.5" width="9" height="9" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="190" y="90.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">FT-2</text>
+<rect x="205.5" y="65.5" width="9" height="9" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="210" y="90.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">FT-3</text>
+<rect x="165.5" y="35.5" width="9" height="9" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="170" y="60.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">PT-1</text>
+<rect x="215.5" y="35.5" width="9" height="9" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="220" y="60.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">COMP-1</text>
+<rect x="245.5" y="30.5" width="9" height="9" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="250" y="55.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">AR-1</text>
+<rect x="265.5" y="105.5" width="9" height="9" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="270" y="130.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">DP-UTL</text>
 <g transform="translate(250,60)"><polygon points="0,-30 10,0 -10,0" fill="#0f172a"/><text x="0" y="22" font-family="Helvetica, Arial, sans-serif" font-size="18" text-anchor="middle">N</text></g>
 <text x="12" y="225" font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#0f172a" font-weight="bold">Utilities Building</text>
 <text x="12" y="250" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#b91c1c">Synthetic demo plan — not a real building · scale 1 m = 10 px</text>
