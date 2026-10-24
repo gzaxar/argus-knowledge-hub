@@ -35,8 +35,8 @@ On the phone you can attach a **photo**, a **video**, a **recorded note** or **w
 
 ## Work a ticket
 
-- **Service desk → All tickets** lists them; **Board** shows them in columns by state; **Search** finds them by
-  text and fields.
+- **Tickets** lists them, filtered by type, state, assignee, text and the type's fields; **Board** shows the same
+  tickets in columns by state (drag one to move it on).
 - Open a ticket to comment, attach files, link more objects or tickets, and **move it on**: the buttons show
   the moves its workflow allows from where it is, and what each needs (an assignee, a resolution, a comment).
 - **Related by meaning** lists other tickets, documents and equipment whose written knowledge is about the same
@@ -45,7 +45,7 @@ On the phone you can attach a **photo**, a **video**, a **recorded note** or **w
 
 ## Workflows
 
-**Service desk → Workflows** shows each ticket type's states (open, active, waiting, done), the moves between
+**Tickets → Tools → Workflows** (or **⚙ Workspace settings → Ticket workflows**) shows each ticket type's states (open, active, waiting, done), the moves between
 them and what a move needs. Tickets of a type with no workflow use the built-in one: *New → In Progress →
 Pending → Resolved → Closed*.
 

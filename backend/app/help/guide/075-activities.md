@@ -63,8 +63,8 @@ The **cockpit** (home page, web and phone) lists the workspace's activities that
 **under way**, those **overdue** and those **planned for today**, with how many were **done today**.
 
 On the phone, **Activities** (home page or menu): **Today**, **Upcoming** (30 days), **Completed** (the last 30
-days) — yours; start or finish one with a tap. **Workspace**, on the phone and on the web (**Service desk →
-Activities**): the activities of a range of dates, by **planned date** or by the **date the work was done**, as a
+days) — yours; start or finish one with a tap. **Workspace**, on the phone and on the web (**Activities** in the side
+bar): the activities of a range of dates, by **planned date** or by the **date the work was done**, as a
 calendar or a list, with counts (planned, under way, done, overdue…) and filters (state, owner, asset, ticket,
 recurring, private). An activity that starts before the range and runs into it is in it. Open one to see when it
 was planned, done and recorded, where it came from — the words, for a voice capture — and to change or finish it.

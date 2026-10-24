@@ -64,25 +64,34 @@ name. Signing in identifies you; it does not by itself give access to a workspac
 
 ## Finding your way around
 
-The side bar holds the main areas:
+The side bar holds the main areas, always in the same order (on a phone or a tablet, **☰** at the top left opens
+it):
 
 | Area | What it is for |
 |---|---|
-| **Cockpit** | what needs attention now: open tickets, items waiting for review, recent changes |
-| **Review queue** | facts that wait for a person: inferred values, proposals, conflicts, installations |
-| **Assets** | the equipment: browse and search, the map, advanced query, types, importing a spreadsheet; under **More tools**: labels and QR codes, global values, bulk changes, equipment classes, imports' mapping |
-| **Service desk** | tickets: list, board, search, workflows |
-| **Knowledge base** | documents: list, search, type suggestions |
+| **Cockpit** | what needs attention now: open and unassigned tickets, overdue activities, reviews and approvals |
+| **Assets** | the equipment: browse by type, search, filter by fields; the **Map** view; **Tools**: advanced query, spreadsheet import, labels and QR codes, bulk changes, imports' mapping |
+| **Tickets** | the service desk: the list and the **Board** view, by type, state and assignee; **Tools**: advanced query, workflows |
+| **Documents** | the knowledge base: by type and status; templates, **Rework from raw text**; **Tools**: advanced query, type suggestions |
+| **Activities** | planned and recurring work |
+| **Map** | records with a location, on the map |
 | **Knowledge graph** | how records are connected; what depends on what; what is about the same thing |
 | **Beam model** | the machine's beam-transport model, linked to its equipment |
 | **Ask ARGUS** | ask questions in your own words; it can also propose changes for you to apply |
-Below them, the **type tree** of the area you are in (object, ticket or document types) takes the rest of the side
-bar; its title folds it away when you need the room.
+| **Review queue** | facts that wait for a person: inferred values, proposals, conflicts, installations |
 
-At the top right: **Help** (this guide); **⚙ Workspace**, for the workspace: **Access** (who has which role),
-**Members**, **Packages**, **Keys** (how record keys are made) and **Administration** (imports, GLPI, icon
-library, transfer, migration from Jira, AI endpoint, robot tokens; and workspaces, users, settings and
-portability for administrators); your name, for **My account**, **About ARGUS** and **Sign out**.
+On the Assets, Tickets and Documents pages, the **type panel** beside the results lists the types with how many
+records each holds; choose one to see its records (and those of the types below it), **Clear** to see all again,
+and *type settings* to change the type. On a narrow screen it opens from the **Type** button above the results.
+Tick rows to act on them: the bar of actions (copy, move, delete, change type) appears with the first tick.
+**Columns** chooses what a list shows; the filters stay in the page's address, so **List**, **Board** and **Map**
+show the same records.
+
+At the top right: **Help** (this guide); **⚙ Workspace settings**: **Access** (who has which role), **Members**,
+**Packages**, the **Type catalogue**, **Global values**, **Ticket workflows**, **Equipment classes**, **Keys** (how
+record keys are made) and **Administration** (imports, GLPI, icon library, transfer, migration from Jira, AI
+endpoint, robot tokens; and workspaces, users, settings and portability for administrators); your name, for **My
+account**, **About ARGUS** and **Sign out**.
 
 **+ New** (top right) creates a ticket, an asset, a document or a beam model.
 
