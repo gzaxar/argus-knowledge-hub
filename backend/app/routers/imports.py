@@ -15,6 +15,7 @@ from app.schemas.import_job import (
     JiraImportRequest,
     JiraIssueImportRequest,
     ConfluenceImportRequest,
+    DokuwikiImportRequest,
     Epik8sImportRequest,
 )
 from app.services.git_import import run_git_import
@@ -22,13 +23,14 @@ from app.services.jira_import import run_jira_import
 from app.services.jira_issue_import import run_jira_issue_import
 from app.services.confluence_import import run_confluence_import
 from app.services.epik8s_import import run_epik8s_import
+from app.services.dokuwiki_import import run_dokuwiki_import
 
 router = APIRouter(prefix="/v1/imports", tags=["imports"])
 
 ImportRequest = Annotated[
     Union[
         JiraImportRequest, JiraIssueImportRequest, ConfluenceImportRequest,
-        Epik8sImportRequest, GitImportRequest,
+        DokuwikiImportRequest, Epik8sImportRequest, GitImportRequest,
     ],
     Field(discriminator="source"),
 ]
@@ -106,6 +108,11 @@ def create_import(
             run_confluence_import,
             job.uid, workspace_id, body.base_url, body.pat, body.space_key, body.cql,
             body.merge_strategy, body.link_assets, body.page_url, body.include_children,
+        )
+    elif isinstance(body, DokuwikiImportRequest):
+        background_tasks.add_task(
+            run_dokuwiki_import,
+            job.uid, workspace_id, body.page_url, body.include_children, body.merge_strategy, body.link_assets,
         )
     elif isinstance(body, Epik8sImportRequest):
         background_tasks.add_task(

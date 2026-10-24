@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError, documentsApi, intakeApi, schemasApi, type AssistResult } from "../../api/client";
 import { finalFor, GuidedEntry } from "../../components/GuidedEntry";
+import { WebFolderImport } from "../../components/WebFolderImport";
 import { effectiveAttributes } from "../../lib/schemaAttributes";
 import { AttributeInput } from "../../components/AttributeInput";
 import { DocumentAssistant } from "../../components/DocumentAssistant";
@@ -35,7 +36,13 @@ export function DocumentForm() {
   const [steps, setSteps] = useState<DocumentStep[]>([]);
   const [attributes, setAttributes] = useState<Record<string, unknown>>({});
   const [assisted, setAssisted] = useState<AssistResult | null>(null);
-  const draft = { title, document_type_uid: documentTypeUid, code, body_markdown: bodyMarkdown, attributes };
+  // A short summary, kept apart from the body (attributes.argus_summary): the body stays the document itself.
+  const [summary, setSummary] = useState("");
+  // The file the document starts from, attached to it when it is saved unless the person says not to.
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [attachSource, setAttachSource] = useState(true);
+  const allAttributes = { ...attributes, ...(summary.trim() ? { argus_summary: summary.trim() } : {}) };
+  const draft = { title, document_type_uid: documentTypeUid, code, body_markdown: bodyMarkdown, attributes: allAttributes };
 
   /** Values from the checklist or the assistant, by field name. */
   const apply = (values: Record<string, unknown>) => {
@@ -43,8 +50,9 @@ export function DocumentForm() {
       if (field === "title") setTitle(String(value ?? ""));
       else if (field === "document_type_uid") setDocumentTypeUid(String(value ?? ""));
       else if (field === "code") setCode(String(value ?? ""));
-      else if (field === "summary") setBodyMarkdown((b) => (b.trim() ? b : `${String(value)}\n`));
-      // The text of a Markdown file given to the assistant, chosen as the body itself.
+      // The summary has its own place; it never stands in for the body.
+      else if (field === "summary" || field === "attributes.argus_summary") setSummary(String(value ?? ""));
+      // The text given to start from (pasted, or read from a file), kept as it is.
       else if (field === "body_markdown") setBodyMarkdown(String(value ?? ""));
       else if (field.startsWith("attributes.")) {
         const k = field.slice(11);
@@ -78,7 +86,7 @@ export function DocumentForm() {
       confidentiality: confidentiality,
       body_markdown: bodyMarkdown || null,
       steps,
-      attributes,
+      attributes: allAttributes,
     });
     setCreatedUid(documentUid);
     setAssignedCode(created!.code);
@@ -112,7 +120,7 @@ export function DocumentForm() {
         await documentsApi.updateRevision(createdUid, `${createdUid}-r1`, {
           body_markdown: bodyMarkdown,
           steps,
-          attributes,
+          attributes: allAttributes,
         });
         return { uid: createdUid };
       }
@@ -125,10 +133,15 @@ export function DocumentForm() {
         confidentiality: confidentiality,
         body_markdown: bodyMarkdown || null,
         steps,
-        attributes,
+        attributes: allAttributes,
       });
     },
     onSuccess: async (doc) => {
+      if (doc && sourceFile && attachSource) {
+        // The original, kept with the first revision. A failure here leaves the document saved: the file can be
+        // added from its page.
+        await documentsApi.uploadRevisionAttachment(doc.uid, `${doc.uid}-r1`, sourceFile).catch(() => undefined);
+      }
       if (assisted && doc) {
         await intakeApi.outcome(assisted.run_id, doc.uid, finalFor(assisted, draft)).catch(() => undefined);
       }
@@ -149,8 +162,8 @@ export function DocumentForm() {
     <div className="max-w-7xl">
       <h1 className="text-2xl font-semibold text-slate-900">New document</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Describe the document or paste its text, and its title, type and keywords are suggested; the checklist
-        catches duplicates and anything that must not be stored.
+        Paste the document's text or add its file, then rework it with the type&apos;s template or keep it as it is;
+        the file is attached to the document. The checklist catches duplicates and anything that must not be stored.
       </p>
       <div className="mt-2 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
 
@@ -255,6 +268,28 @@ export function DocumentForm() {
         </label>
 
         <div>
+          <label className="block text-sm font-medium text-slate-700">Summary</label>
+          <textarea
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            rows={2}
+            maxLength={1000}
+            placeholder="Two sentences on what the document is — shown above it and found by search. Optional."
+            className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
+
+        {sourceFile && (
+          <label className="flex items-start gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={attachSource} onChange={(e) => setAttachSource(e.target.checked)} className="mt-0.5" />
+            <span>
+              Attach the original file, <b>{sourceFile.name}</b>
+              <span className="block text-xs text-slate-500">Kept with the document, as it was given.</span>
+            </span>
+          </label>
+        )}
+
+        <div>
           <label className="block text-sm font-medium text-slate-700">Body</label>
           <div className="mt-1">
             <MarkdownEditor
@@ -334,7 +369,12 @@ export function DocumentForm() {
         </button>
       </form>
       <aside className="xl:sticky xl:top-4 xl:self-start">
-        <GuidedEntry kind="document" draft={draft} onApply={apply} onAssist={setAssisted} />
+        <div className="space-y-4">
+          <GuidedEntry kind="document" draft={draft} onApply={apply} onAssist={setAssisted}
+                       onSource={(f) => { setSourceFile(f); setAttachSource(true); }} />
+          <WebFolderImport documentTypeUid={documentTypeUid} confidentiality={confidentiality}
+                           authorityLevel={authorityLevel} relateAsset={relateAsset} />
+        </div>
       </aside>
       </div>
     </div>

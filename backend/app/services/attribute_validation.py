@@ -77,6 +77,26 @@ def _is_duplicate(
     return False
 
 
+def choice_value(attr: dict, value: object) -> object:
+    """An enumeration's answer as it is stored: its option's `value`. A client may name the option by its `id`
+    (what a package or the AI drafting calls it, e.g. "service_degraded") or by its value, in any case; anything
+    else is left as given, for the check to refuse."""
+    options = attr.get("options") or []
+
+    def one(v):
+        text = str(v).strip().lower()
+        for o in options:
+            stored = o.get("value") if o.get("value") is not None else o.get("id")
+            if stored is None:
+                continue
+            if text == str(stored).lower() or (o.get("id") is not None and text == str(o["id"]).lower()):
+                return stored
+        return v
+    if isinstance(value, list):
+        return [one(v) for v in value]
+    return one(value)
+
+
 def _check_single_attribute(
     db: Session,
     attr: dict,
@@ -142,7 +162,8 @@ def _check_single_attribute(
 
     if attr_type == "enumeration":
         options = attr.get("options") or []
-        allowed_values = {str(o.get("value")).lower() for o in options if o.get("value") is not None}
+        allowed_values = {str(o.get("value") if o.get("value") is not None else o.get("id")).lower()
+                          for o in options if o.get("value") is not None or o.get("id") is not None}
         if allowed_values:
             for v in values:
                 if str(v).lower() not in allowed_values:
@@ -199,7 +220,10 @@ def check_attributes(
     column on `owner` that holds the type/schema uid — "schema_uid" for
     Asset/Issue. `skip_unique` is for owners (like Document) whose attributes
     don't live on the same row as the type/schema uid, so the built-in
-    same-table uniqueness query can't apply — callers handle it themselves."""
+    same-table uniqueness query can't apply — callers handle it themselves.
+
+    An enumeration answered by an option's id is rewritten, in `attributes`, to the option's value — what is
+    stored — so every client may send either (choice_value)."""
     if schema is None:
         return []
     violations = []
@@ -207,6 +231,8 @@ def check_attributes(
         key = attr.get("key") or attr.get("name")
         if not key:
             continue
+        if attr.get("type") == "enumeration" and attributes.get(key) not in (None, "", []):
+            attributes[key] = choice_value(attr, attributes[key])
         msg = _check_single_attribute(
             db, attr, attributes.get(key), workspace_id, owner, schema.uid, exclude_uid,
             skip_reference, schema_uid_attr, skip_unique,

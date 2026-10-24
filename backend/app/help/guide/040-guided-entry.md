@@ -31,6 +31,10 @@ Appears when the workspace's AI endpoint is set up (*AI endpoint*).
 
 For a ticket, possible causes are shown as *unresolved hypotheses*, never written as findings.
 
+For a **document**, the panel starts from the document itself: paste its text or add its file, then **Rework
+with the template** or **Keep it as it is** (see *Documents*). The file is attached to the document, and the
+summary the assistant writes goes in the document's **Summary**, never in place of its body.
+
 ## What is filtered before the AI sees it
 
 Before text is sent to the model, ARGUS replaces what looks like a secret with *[redacted]*: private keys,

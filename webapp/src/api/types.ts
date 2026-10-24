@@ -301,7 +301,7 @@ export interface GlobalValueInput {
 /** The sources an import can run against. Kept in one place: the job type
  * used to list only two of them, so any code branching on a Confluence or
  * ticket job read as unreachable. */
-export type ImportSource = "jira" | "jira-issues" | "confluence" | "git";
+export type ImportSource = "jira" | "jira-issues" | "confluence" | "git" | "epik8s" | "dokuwiki";
 
 export interface ImportJob {
   uid: string;
@@ -408,8 +408,34 @@ export interface ImportConfig {
   params: Record<string, string | boolean | null>;
   last_run_at: string | null;
   last_import_job_uid: string | null;
+  /** When it runs by itself (backend services/import_schedule.py). */
+  schedule_kind: "off" | "hours" | "daily" | "weekly";
+  schedule_every_hours: number | null;
+  schedule_time: string | null;
+  schedule_weekday: number | null;
+  schedule_timezone: string | null;
+  next_run_at: string | null;
+  running_since: string | null;
+  schedule_failures: number;
+  last_outcome: "succeeded" | "failed" | "skipped" | null;
+  last_message: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ImportSchedule {
+  kind: "off" | "hours" | "daily" | "weekly";
+  every_hours?: number | null;
+  time?: string | null;
+  weekday?: number | null;
+  timezone?: string | null;
+}
+
+export interface DokuwikiImportConfigParams {
+  source: "dokuwiki";
+  page_url: string;
+  include_children: boolean;
+  link_assets: boolean;
 }
 
 export interface JiraIssueImportConfigParams {
@@ -475,18 +501,21 @@ export type ImportConfigParams =
   | ConfluenceImportConfigParams
   | JiraIssueImportConfigParams
   | GitImportConfigParams
-  | Epik8sImportConfigParams;
+  | Epik8sImportConfigParams
+  | DokuwikiImportConfigParams;
 
 export interface ImportConfigInput {
   name: string;
   merge_strategy: MergeStrategy;
   config: ImportConfigParams;
+  schedule?: ImportSchedule;
 }
 
 export interface ImportConfigUpdateInput {
   name?: string;
   merge_strategy?: MergeStrategy;
   config?: ImportConfigParams;
+  schedule?: ImportSchedule;
 }
 
 export interface Me {
@@ -1085,6 +1114,8 @@ export function importSourceLabel(source: string): string {
   if (source === "jira") return "Jira objects";
   if (source === "jira-issues") return "Jira tickets";
   if (source === "confluence") return "Confluence";
+  if (source === "dokuwiki") return "DokuWiki";
+  if (source === "epik8s") return "EPIK8s control";
   if (source === "git") return "Git";
   if (source === "spreadsheet") return "Spreadsheet";
   return source;

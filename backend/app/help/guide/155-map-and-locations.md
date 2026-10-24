@@ -1,7 +1,7 @@
 ---
 title: Map and locations
-summary: Where equipment and places are: approved locations and their history, the map, searching an area or near a point, reporting a position from the phone, reviewing what the field saw, and importing locations from a file.
-keywords: [map, gis, location, locations, coordinates, latitude, longitude, gps, position, where is, near me, nearby, distance, radius, review, observation, import locations, csv, geojson, wgs84, layer, place]
+summary: Where equipment and places are: positions, routes (cables, pipes, beamlines) and outlines (buildings, halls, rooms, zones, with heights a volume) and their history, what lies inside or crosses an area, the map, searching near a point, reporting a position from the phone, reviewing what the field saw, and importing locations from a file.
+keywords: [route, line, cable route, pipe route, outline, polygon, area, footprint, building outline, hall, zone, volume, height, inside, crossing, along, draw, map, gis, location, locations, coordinates, latitude, longitude, gps, position, where is, near me, nearby, distance, radius, review, observation, import locations, csv, geojson, wgs84, layer, place]
 order: 155
 ---
 
@@ -13,19 +13,45 @@ knowledge graph's, and the two are kept apart.
 
 ## A record's location
 
-On an equipment page, **Location** shows its approved location on a small map, with its accuracy, where it
-came from (set by hand, from the field, imported) and who confirmed it.
+A record placed on the map can have three kinds of location, each with its own history:
 
-- **Set its location** / **Move it**: click the map, or type the coordinates, and **Save**. The previous one is
-  kept under *Earlier locations*, with the dates it was valid, and the change is in the record's History.
+- a **position** — a point: where a unit is;
+- a **route** — a line: where a cable, a pipe or a beamline runs;
+- an **outline** — an area: a building, hall, room or zone. Give it the heights it spans (bottom and top, in
+  metres, e.g. a room's floor and ceiling, a shielding block's bottom and top) and it is a **volume**.
+
+On an equipment or place page, **Location** shows them on a small map, with the position's accuracy, a route's
+length, an outline's area and heights, where each came from (set by hand, from the field, imported) and who
+confirmed it.
+
+- **Set its position** / **Move it**: click the map, or type the coordinates, and **Save**.
+- **Draw its route** / **Draw its outline**: click the map point by point (an outline closes by itself), **undo
+  last point** or **start again**, then **Save** — or paste the GeoJSON of a survey or a GIS export. A shape is
+  checked before it is kept: a line needs two different points, an area three corners, and an area whose edges
+  cross each other is refused, saying where.
+- The previous one is kept under *Earlier*, with the dates it was valid, and the change is in the record's
+  History. **remove route** / **remove outline** takes one away.
 - Who may see the record sees its location, unless its type restricts the location from them.
+
+## What a shape says about the others
+
+Under the small map, ARGUS lists what the record's location says about the records you may see:
+
+- **It is in** — the outlines its position, route or outline lies in: the hall, the building, a radiation or
+  access zone;
+- **Inside it** — for an outline, the records positioned inside it, and the outlines within it (rooms in a hall);
+- **Crossing it** — the routes that cross its outline or its route (the cables through a hall or a zone);
+- **Along its route** — for a route, the records positioned within 5 m of it, with their distance.
+
+Heights are shown with an outline; what is inside is decided on the map (in plan), not by height.
 
 ## The map
 
-**Assets → Map** shows the records with a location, coloured by layer. Narrow it to **types** (a type includes
+**Assets → Map** shows the records with a location, coloured by layer: points, routes as lines and outlines as
+areas (under the points, so every point can be clicked). Narrow it to **types** (a type includes
 the types under it), **workspaces** you can read, and **status**. A marker opens its record (in its own
 workspace). **Near a point**: choose a distance and *of the map's centre* to list what is within it, nearest
-first. The map shows exactly what a list would show you: nothing restricted, nothing from a workspace you
+first — a route or an outline by its nearest part (inside an outline is 0 m). The map shows exactly what a list would show you: nothing restricted, nothing from a workspace you
 cannot open.
 
 ## Reporting a position from the phone
@@ -47,15 +73,17 @@ recorded); **reject** leaves the location as it was. Nothing moves without a per
 ## Import locations
 
 **Map → Import locations**: a CSV with a header (`key` or `label` or `serial`, `latitude`/`lat`,
-`longitude`/`lon`, `accuracy_m`, optionally `observed_at`), or GeoJSON points whose properties name the record.
+`longitude`/`lon`, `accuracy_m`, optionally `observed_at`), or GeoJSON whose features' properties name the
+record: points (positions), lines (routes) and polygons (outlines; `base_m` and `top_m` for their heights).
 **Preview** checks every row — coordinates in range (a latitude above 90 is refused, 0, 0 too), the record
 found as a scan finds it, its type placed on the map — and says what each row would do. **Apply**:
 
 - a record with no location gets the imported one, with the file and the row it came from;
 - a record that has one is **never overwritten**: the same position is noted as consistent, a different one
-  goes to review.
+  goes to review; the same route or outline is noted as consistent, a different one is refused (change it on
+  the record).
 
 ## What is not here yet
 
-Coordinates other than WGS 84 (a site grid), routes of pipes and cables, building outlines and floor plans,
-and analysis by area are for later releases.
+Coordinates other than WGS 84 (a site grid, a survey frame, a position *s* along a beamline), floors and floor
+plans, and placing equipment by room indoors are for later releases.

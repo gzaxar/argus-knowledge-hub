@@ -178,6 +178,24 @@ async def assist_from_file(kind: str, file: UploadFile = File(...), text: str = 
                                profile_id=profile_id, file_refs=refs))
 
 
+@router.post("/extract")
+async def extract_text(file: UploadFile = File(...), identity=Depends(get_identity), db: Session = Depends(get_db),
+                       x_workspace_id: Optional[str] = Header(default=None, alias="X-Workspace-Id")):
+    """A file's text, whole — a PDF, a Word or Excel file, an e-mail, a text file — to keep as a document's body
+    or to rework with a template. Nothing is stored and no model reads it; a picture has no text here (the phone
+    reads photos on the device)."""
+    _allowed(db, identity, x_workspace_id, "create", "documents")
+    content = await _read(file)
+    if files.kind_of(file.filename or "", file.content_type) == "image":
+        raise HTTPException(status_code=422, detail="A picture's text is not read here: use a PDF, Word, Excel, "
+                                                    "e-mail or text file, or the phone's Text from a photo.")
+    try:
+        out = files.extract_document(content, file.filename or "", file.content_type)
+    except files.UnreadableFile as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {**out, "filename": file.filename}
+
+
 # Kept for the old photo button: a photograph is one kind of file.
 @router.post("/assist/asset/photo")
 async def assist_asset_photo(file: UploadFile = File(...), text: str = Form(""), draft: str = Form("{}"),

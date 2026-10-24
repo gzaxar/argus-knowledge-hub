@@ -193,6 +193,9 @@ def sources(db: Session, workspace_id: str) -> Iterator[Source]:
         steps = "\n".join(str(s.get("text") or s.get("title") or "") for s in (revision.steps or [])
                           if isinstance(s, dict))
         parts = _sections(body + ("\n\n# Steps\n" + steps if steps.strip() else ""))
+        summary = (revision.attributes or {}).get("argus_summary")
+        if isinstance(summary, str) and summary.strip():
+            parts = [("Summary", summary.strip()), *parts]       # what the document is, said in two sentences
         if parts:
             yield Source("document", doc.uid, f"{doc.code} {doc.title}", parts,
                          shared=bool(doc.is_global) and doc.confidentiality != "riservato",

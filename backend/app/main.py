@@ -176,6 +176,8 @@ app.include_router(spreadsheet_import.router)
 # Before the documents' own routes: /v1/documents/reshape is not a document's uid.
 from app.routers import document_templates as document_templates_router  # noqa: E402
 app.include_router(document_templates_router.documents_router)
+from app.routers import web_import as web_import_router  # noqa: E402
+app.include_router(web_import_router.router)            # /v1/documents/import-web, before a document's uid
 app.include_router(documents.router)
 app.include_router(document_templates_router.router)
 app.include_router(document_templates_router.ai_router)
@@ -284,6 +286,13 @@ def _recover_portability_jobs() -> None:
         portability_jobs.recover(SessionLocal)
     except Exception:  # noqa: BLE001 — a database not yet migrated must not stop the API
         logging.getLogger(__name__).warning("portability job recovery skipped", exc_info=True)
+@app.on_event("startup")
+def _import_schedule() -> None:
+    """Saved imports that run by themselves (services/import_schedule.py)."""
+    from app.services import import_schedule
+    import_schedule.start_scheduler()
+
+
 @app.on_event("startup")
 def _knowledge_schedule() -> None:
     """Keeps Ask ARGUS's index of the written knowledge up to date on each workspace's timer."""

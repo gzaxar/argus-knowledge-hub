@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 # "remove_all_before" is retired (services/import_merge.RETIRED_STRATEGIES): a new
 # import may not ask for it; a stored configuration that names it runs as override.
@@ -60,6 +60,16 @@ class ConfluenceImportRequest(ConfluencePageLink):
     # One space, or any CQL the account can run. A space is the usual case.
     space_key: Optional[str] = None
     cql: Optional[str] = None
+    link_assets: bool = True
+    merge_strategy: MergeStrategy = "override"
+
+
+class DokuwikiImportRequest(BaseModel):
+    """A DokuWiki page's link (wiki.infn.it) and, with `include_children`, every page under it. Read as anyone
+    allowed to read the wiki reads it: no credential."""
+    source: Literal["dokuwiki"]
+    page_url: str = Field(min_length=8, max_length=2000)
+    include_children: bool = True
     link_assets: bool = True
     merge_strategy: MergeStrategy = "override"
 

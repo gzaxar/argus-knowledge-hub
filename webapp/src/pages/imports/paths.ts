@@ -38,6 +38,11 @@ export const IMPORT_SOURCES = [
     blurb: "Pages and blogposts from a space, converted to Markdown with their attachments.",
   },
   {
+    source: "dokuwiki",
+    label: "DokuWiki",
+    blurb: "A wiki page (such as wiki.infn.it) and the pages under it, as documents with their pictures; a re-run updates only what changed.",
+  },
+  {
     source: "git",
     label: "Git",
     // Deliberately narrow: the Git importer reads schemas/ and assets/ from

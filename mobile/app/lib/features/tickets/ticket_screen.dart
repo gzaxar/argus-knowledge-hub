@@ -15,8 +15,8 @@ import '../../widgets/common.dart';
 import '../../widgets/related_by_meaning.dart';
 import '../../widgets/type_tree.dart';
 import '../../widgets/rich_content.dart';
-import 'report_screen.dart' show impactOptions;
 import '../../widgets/export_menu.dart';
+import '../../widgets/photo_text.dart';
 
 /// A ticket in the field (flutter-app-design §9): read it, comment, add a photo, and move it
 /// through the transitions the server's workflow allows. A closure of a safety ticket from here
@@ -188,7 +188,10 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
                 Wrap(spacing: 8, runSpacing: 6, children: [
                   StatusChip(t.state, tone: theme.colorScheme.primary),
                   if (t.priority != null) StatusChip(t.priority!),
-                  if (t.impact != null) StatusChip(impactOptions[t.impact] ?? t.impact!),
+                  if (t.impact != null)
+                    StatusChip(ref.watch(schemaAttributesProvider(t.schemaUid ?? '')).value
+                            ?.where((d) => d.key == 'argus_impact').firstOrNull?.choiceValue(t.impact) ??
+                        t.impact!),
                   if (t.occurredFrom?.nominal != null)
                     StatusChip('occurred ${formatWhenDate(t.occurredFrom!.nominal)}'),
                 ]),
@@ -218,7 +221,10 @@ class _TicketScreenState extends ConsumerState<TicketScreen> {
                     controller: _comment,
                     minLines: 1,
                     maxLines: 4,
-                    decoration: const InputDecoration(hintText: 'Add a comment', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                        hintText: 'Add a comment',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: PhotoTextButton(key: const Key('photo-text-comment'), controller: _comment)),
                   ),
                 ),
                 const SizedBox(width: 8),

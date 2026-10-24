@@ -9,6 +9,7 @@ import '../../core/problem.dart';
 import '../../domain/models.dart';
 import '../../widgets/attribute_form.dart';
 import '../../widgets/common.dart';
+import '../../widgets/photo_text.dart';
 
 /// Changing a ticket after it was reported: its title, description, priority and the attributes its type
 /// defines (typed as on a record: AttributeFields). Its state moves by the workflow's transitions on the
@@ -134,7 +135,10 @@ class _TicketEditScreenState extends ConsumerState<TicketEditScreen> {
                     controller: _description,
                     minLines: 3,
                     maxLines: 10,
-                    decoration: const InputDecoration(labelText: 'Description', helperText: 'Markdown is kept as written'),
+                    decoration: InputDecoration(
+                        labelText: 'Description',
+                        helperText: 'Markdown is kept as written',
+                        suffixIcon: PhotoTextButton(key: const Key('photo-text-ticket-description'), controller: _description!)),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(

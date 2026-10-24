@@ -1,7 +1,7 @@
 ---
 title: Importing data
-summary: Bringing equipment, tickets and documents in from EPIK8s, Jira, Confluence, Git and Markdown; re-running imports; mapping imported records.
-keywords: [confluence page link, share link, short link, prerequisite, missing package, install the catalogue, import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
+summary: Bringing equipment, tickets and documents in from EPIK8s, Jira, Confluence, DokuWiki, Git and Markdown; re-running imports, by hand or on a schedule; mapping imported records.
+keywords: [dokuwiki, wiki, wiki.infn.it, namespace, schedule, scheduled, nightly, every day, every week, run by itself, confluence page link, share link, short link, prerequisite, missing package, install the catalogue, import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
 order: 50
 ---
 
@@ -20,11 +20,13 @@ runs. **New** starts one. Choose the source:
 | **Jira objects** | Jira Insight / Assets objects |
 | **Jira tickets** | Jira issues, as tickets |
 | **Confluence** | a Confluence space's pages, a query's, or one page and the pages under it, as documents |
+| **DokuWiki** | a wiki page (such as `wiki.infn.it`) and the pages under it, as documents with their pictures |
 | **Git** | files from a Git repository |
 | **Markdown** | Markdown files, as documents |
 
-A configuration is saved with a name and can be **run again** whenever the source changes; each run
-records what it read (for Git sources, the commit).
+A configuration is saved with a name and can be **run again** whenever the source changes — by hand
+(**Run**) or by itself on a schedule (see *Run an import on a schedule*); each run records what it read (for Git
+sources, the commit).
 
 ## What a workspace needs before an import
 
@@ -80,6 +82,36 @@ open. Then say which pages:
 
 Pages become documents typed from their labels; the page tree becomes *child of* links. Running the
 configuration again adds a revision only to pages whose version changed.
+
+## Import DokuWiki pages
+
+**Imports → New → DokuWiki**. Give a wiki page's link (`https://wiki.infn.it/strutture/lnf/da/btf/dispositivi/stages`)
+and, with **And every page under it**, its folder (namespace) and the folders below — for the calorimeter page,
+also BGO, CALOBTF1 and CALOBTF2. No token: the wiki is read as anyone allowed to read it, and only the wikis this
+installation allows (by default `wiki.infn.it`) can be imported.
+
+Each wiki page becomes one **published** document (code `WIKI-…`), its text as Markdown with its tables and
+lists, its pictures attached and shown in place, its wiki link kept (*Source link*). A link to another page of
+the import leads to that page's document; a page under another (`calorimeter:bgo` under `calorimeter`) is its
+*child*; an asset key named in a page links the document to the asset. **Running it again** finds each page's
+document: a page that has not changed is skipped, one that has gets a new revision (the previous one is
+superseded). At most 500 pages per run.
+
+## Run an import on a schedule
+
+In a configuration (new, or **Edit**), **Run again by itself**: every few hours, every day at a time, or every
+week on a day at a time — a local time that stays put across the changes of daylight saving. The **Imports**
+list shows each configuration's schedule, when it runs next, and how its last scheduled run went.
+
+A scheduled run is the same as **Run**: an import of a wiki or a Confluence space checked every night adds a
+revision only where a page changed.
+
+- It runs **as the person who set the schedule**, with their permissions at the time; if they may no longer
+  import there, the run fails and says so.
+- It does not start while the configuration's previous run is still going (it tries again later).
+- A failed run notifies that person, with the run's report. After **3 failures in a row** the schedule switches
+  itself off, and the list says why.
+- Set the schedule to **No** to stop it; **Run** still works.
 
 ## After an import
 

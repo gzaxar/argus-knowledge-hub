@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { problemText, reshapeApi, schemasApi, templatesApi } from "../../api/client";
+import { documentsApi, intakeApi, problemText, reshapeApi, schemasApi, templatesApi } from "../../api/client";
 import type { ReshapeResult, ReshapeSource } from "../../api/types";
 import { MarkdownEditor } from "../../components/MarkdownEditor";
 import { WorkspaceScopeBanner } from "../../components/WorkspaceScopeBanner";
@@ -24,6 +24,8 @@ export interface ReshapeSeed {
   filename?: string;
   originalDate?: string;
   subject?: string;
+  /** The file the text was read from: attached to the saved draft, so the original is never lost. */
+  file?: File;
 }
 
 /** Rework raw text — notes, an e-mail, a transcript, an imported page — into a draft that follows the document
@@ -42,6 +44,9 @@ export function DocumentReshape() {
   const [text, setText] = useState(seed?.text ?? "");
   const [kind, setKind] = useState<ReshapeSource["kind"]>(seed?.kind ?? "paste");
   const [filename, setFilename] = useState<string | null>(seed?.filename ?? null);
+  const [original, setOriginal] = useState<File | null>(seed?.file ?? null);
+  const [attachOriginal, setAttachOriginal] = useState(true);
+  const [fileProblem, setFileProblem] = useState<string | null>(null);
   const [originalDate, setOriginalDate] = useState(seed?.originalDate ?? "");
   const [subject, setSubject] = useState(seed?.subject ?? "");
   const [sender, setSender] = useState("");
@@ -71,10 +76,29 @@ export function DocumentReshape() {
   });
 
   const loadFile = async (file: File) => {
-    setText(await file.text());
+    setFileProblem(null);
+    try {
+      // Text files as they are; a PDF, Word or Excel file or an e-mail read by the server (nothing kept there).
+      const plain = /\.(txt|md|markdown|csv|log)$/i.test(file.name);
+      setText(plain ? await file.text() : (await intakeApi.extract(file)).text);
+    } catch (e) {
+      setFileProblem(problemText(e));
+      return;
+    }
     setFilename(file.name);
+    setOriginal(file);
+    setAttachOriginal(true);
     if (/\.(eml|msg)$/i.test(file.name)) setKind("email");
     else if (kind === "paste") setKind("import");
+  };
+
+  /** Save the draft, then attach the original file to its revision (the raw text is kept by the server). */
+  const saveWithOriginal = async (body: Parameters<typeof reshapeApi.save>[0]) => {
+    const saved = await reshapeApi.save(body, intoDocument);
+    if (original && attachOriginal) {
+      await documentsApi.uploadRevisionAttachment(saved.document_uid, saved.revision_uid, original).catch(() => undefined);
+    }
+    return saved;
   };
 
   return (
@@ -96,8 +120,8 @@ export function DocumentReshape() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <label className="text-sm font-medium text-slate-700">The raw text</label>
             <label className="cursor-pointer text-xs text-indigo-600 hover:underline">
-              Open a file (.txt, .md, .eml)
-              <input type="file" accept=".txt,.md,.markdown,.eml,text/*" className="hidden"
+              Open a file (PDF, Word, Excel, e-mail, web page, text)
+              <input type="file" accept=".pdf,.docx,.xlsx,.xlsm,.html,.htm,.txt,.md,.markdown,.csv,.eml,text/*" className="hidden"
                      onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadFile(f); e.target.value = ""; }} />
             </label>
           </div>
@@ -106,6 +130,13 @@ export function DocumentReshape() {
                     className="mt-1 w-full rounded border border-slate-300 px-3 py-2 font-mono text-xs" />
           <p className="text-[11px] text-slate-400">{text.length.toLocaleString()} of 60,000 characters
             {filename ? ` · from ${filename}` : ""}. Instructions written in the text are treated as text.</p>
+          {fileProblem && <p className="text-xs text-rose-700">{fileProblem}</p>}
+          {original && (
+            <label className="mt-1 flex items-center gap-2 text-xs text-slate-700">
+              <input type="checkbox" checked={attachOriginal} onChange={(e) => setAttachOriginal(e.target.checked)} />
+              Attach the original file, <b>{original.name}</b>, to the saved draft
+            </label>
+          )}
         </div>
         <div className="space-y-3 text-sm">
           <label className="block">
@@ -185,11 +216,11 @@ export function DocumentReshape() {
 
       {result && (
         <ReshapeReview result={result} source={text} draft={draft} onDraft={setDraft} title={title} onTitle={setTitle}
-                       save={(extra) => reshapeApi.save({
+                       save={(extra) => saveWithOriginal({
                          source: sourceOf(), document_type_uid: typeUid, template: `${result.template.ref}${
                            result.template.scope === "official" ? "" : `@${result.template.version}`}`,
                          title, markdown: draft, confidentiality, dates: result.dates, extraction: result.extraction,
-                         issues: result.issues, model: result.model, ...extra }, intoDocument)}
+                         issues: result.issues, model: result.model, ...extra })}
                        onSaved={(uid) => navigate(`/documents/${uid}`)} intoDocument={!!intoDocument} />
       )}
     </div>

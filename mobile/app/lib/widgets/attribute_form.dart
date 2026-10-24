@@ -160,7 +160,8 @@ class _AttributeFieldsState extends ConsumerState<AttributeFields> {
         );
       case 'enumeration':
         final values = _c.choices[def.key]!;
-        final current = values.first;
+        // An answer naming its option by id is the same answer: shown (and kept) as the option's value.
+        final current = def.choiceValue(values.first) ?? values.first;
         // The option's label is what is stored and what the web form writes, not its id — the two commonly
         // differ ("in_service" / "In service"). Deduplicated by label, and the record's current value kept as
         // an extra item when it names no listed option: a dropdown must offer exactly one item equal to its

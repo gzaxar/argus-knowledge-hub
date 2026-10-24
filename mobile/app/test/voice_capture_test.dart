@@ -103,7 +103,7 @@ void main() {
     expect(created['schema_uid'], 'ws:argus-ticket:bug');
     expect(created['title'], 'Vacuum pump failed');
     expect(created['asset_uid'], isNull, reason: 'it works without an asset');
-    expect((created['attributes'] as Map)['argus_category'], 'fault');
+    expect((created['attributes'] as Map)['argus_category'], 'Fault', reason: 'the option value, not its id');
     expect((created['attributes'] as Map).containsKey('priority'), isFalse);
     expect(find.byKey(const Key('capture-created')), findsOneWidget);
     expect(find.byKey(const Key('capture-correct')), findsOneWidget);

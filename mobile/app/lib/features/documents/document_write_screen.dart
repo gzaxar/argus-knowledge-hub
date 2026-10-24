@@ -9,6 +9,7 @@ import '../../domain/capture.dart';
 import '../../widgets/attach_menu.dart';
 import '../../widgets/common.dart';
 import '../../widgets/rich_content.dart';
+import '../../widgets/photo_text.dart';
 
 /// Writing a document's text in Markdown, previewed as it will read. Without [documentUid] it writes a new
 /// document — its first revision, a draft — optionally describing the record [assetUid]. With it, it edits
@@ -37,6 +38,9 @@ class _DocumentWriteScreenState extends ConsumerState<DocumentWriteScreen> {
   String? _type;
   bool _preview = false;
   bool _saving = false;
+  // Photos whose text was read into the body: attached to the draft as its source, unless the person says not.
+  final _photos = <PickedPhoto>[];
+  bool _keepPhotos = true;
   String? _error;
   late final String _newUid = const Uuid().v4();
   bool _tidying = false;
@@ -70,13 +74,17 @@ class _DocumentWriteScreenState extends ConsumerState<DocumentWriteScreen> {
     }
   }
 
-  /// The recording or photo the document was written from, with its first draft.
-  Future<void> _keepOriginal(String uid) async {
-    final original = widget.seed?.original;
-    if (original == null) return;
+  /// The recording or photo the document was written from, and the photos read into it, with its draft.
+  Future<void> _keepOriginal(String uid, {String? revisionUid}) async {
+    final originals = [?widget.seed?.original, if (_keepPhotos) ..._photos];
+    if (originals.isEmpty) return;
     try {
-      final draft = (await ref.read(documentRepositoryProvider).revisions(uid)).where((r) => r.state == 'draft').firstOrNull;
-      if (draft != null) await queueAttachment(ref, AttachTarget.document(uid, draft.uid), original);
+      final draft = revisionUid ??
+          (await ref.read(documentRepositoryProvider).revisions(uid)).where((r) => r.state == 'draft').firstOrNull?.uid;
+      if (draft == null) return;
+      for (final o in originals) {
+        await queueAttachment(ref, AttachTarget.document(uid, draft), o);
+      }
     } on Problem {
       // the document is saved; its source can still be attached from its page
     }
@@ -110,6 +118,11 @@ class _DocumentWriteScreenState extends ConsumerState<DocumentWriteScreen> {
         if (mounted) context.pushReplacement('/document/$uid');
       } else {
         await repo.updateDraft(widget.documentUid!, widget.revisionUid!, body: body);
+        if (_keepPhotos && _photos.isNotEmpty) {
+          for (final p in _photos) {
+            await queueAttachment(ref, AttachTarget.document(widget.documentUid!, widget.revisionUid!), p);
+          }
+        }
         ref.invalidate(documentRevisionsProvider(widget.documentUid!));
         if (mounted) context.pop();
       }
@@ -227,6 +240,26 @@ class _DocumentWriteScreenState extends ConsumerState<DocumentWriteScreen> {
               alignLabelWithHint: true,
             ),
           ),
+        if (!_preview)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: PhotoTextButton(
+                key: const Key('photo-text-document'),
+                controller: _body!,
+                label: 'Text from a photo (camera or photos)',
+                onPhoto: (p) => setState(() => _photos.add(p)),
+                onInserted: () => setState(() {})),
+          ),
+        if (_photos.isNotEmpty)
+          CheckboxListTile(
+            key: const Key('doc-write-keep-photos'),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            value: _keepPhotos,
+            onChanged: (v) => setState(() => _keepPhotos = v ?? true),
+            title: Text(_photos.length == 1 ? 'Attach the photo the text was read from' : 'Attach the ${_photos.length} photos the text was read from'),
+            subtitle: const Text('Kept with the document, so the original is not lost.'),
+          ),
         if (widget.isNew && ref.watch(askAvailabilityProvider).value?.usable == true) ...[
           const SizedBox(height: 8),
           Align(
@@ -238,7 +271,10 @@ class _DocumentWriteScreenState extends ConsumerState<DocumentWriteScreen> {
                   : () => context.pushReplacement(
                       Uri(path: '/documents/reshape', queryParameters: {'type': ?_type}).toString(),
                       extra: DocumentSeed(
-                          title: _title.text, body: _body!.text, original: widget.seed?.original, from: widget.seed?.from)),
+                          title: _title.text,
+                          body: _body!.text,
+                          original: widget.seed?.original ?? (_keepPhotos ? _photos.firstOrNull : null),
+                          from: widget.seed?.from ?? (_photos.isEmpty ? null : 'photo'))),
               icon: const Icon(Icons.dashboard_customize_outlined),
               label: const Text("Rework with the type's template"),
             ),

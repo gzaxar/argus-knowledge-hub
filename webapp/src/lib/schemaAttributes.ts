@@ -41,3 +41,11 @@ export function inheritedKeys(
   const ownKeys = new Set((schema?.attributes ?? []).map((a) => a.key ?? a.name));
   return new Set(effective.filter((a) => !ownKeys.has(a.key ?? a.name)).map((a) => a.key ?? a.name));
 }
+
+/** The option a stored or proposed enumeration answer names: by its value (what is stored) or by its id (what
+ * the assistant and packages call it), in any case — as the server's attribute_validation.choice_value. */
+export function findOption<T extends { id: string; value: string }>(options: T[] | null | undefined, answer: unknown): T | undefined {
+  if (answer == null || answer === "") return undefined;
+  const text = String(answer).trim().toLowerCase();
+  return (options ?? []).find((o) => String(o.value).toLowerCase() === text || String(o.id).toLowerCase() === text);
+}
