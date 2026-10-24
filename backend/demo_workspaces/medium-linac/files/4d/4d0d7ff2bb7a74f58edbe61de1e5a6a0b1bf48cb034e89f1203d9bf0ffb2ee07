@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- ARGUS: a valve, as drawn in a piping diagram, with its actuator -->
+  <path d="M3 9v8l9 -4z" />
+  <path d="M21 9v8l-9 -4z" />
+  <path d="M12 13v-7" />
+  <path d="M9 6h6" />
+</svg>

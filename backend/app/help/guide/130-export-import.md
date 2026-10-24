@@ -14,6 +14,9 @@ portable copy that another ARGUS verifies before it loads anything.
 
 Exports and imports are for **administrators**: **Administration → Portability**.
 
+To copy *one* workspace into a new one — or to install the demo workspaces — use a **workspace bundle**
+instead (**Workspace bundles and demo workspaces**).
+
 ## How it works, in one picture
 
 **On the exporting ARGUS:** Export → Approve → Generate → then either **Publish to Git** or **Download

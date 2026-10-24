@@ -634,48 +634,6 @@
         "title": "AlarmIn",
         "type": "object"
       },
-      "ApplyIn": {
-        "properties": {
-          "accept": {
-            "default": [],
-            "items": {
-              "$ref": "#/components/schemas/Decision"
-            },
-            "title": "Accept",
-            "type": "array"
-          },
-          "accept_high_confidence": {
-            "default": false,
-            "title": "Accept High Confidence",
-            "type": "boolean"
-          },
-          "keep_proposals": {
-            "default": true,
-            "title": "Keep Proposals",
-            "type": "boolean"
-          },
-          "options": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SyncOptions"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "reject": {
-            "default": [],
-            "items": {
-              "$ref": "#/components/schemas/Decision"
-            },
-            "title": "Reject",
-            "type": "array"
-          }
-        },
-        "title": "ApplyIn",
-        "type": "object"
-      },
       "ApproveAction": {
         "properties": {
           "comment": {
@@ -2710,6 +2668,20 @@
           "file"
         ],
         "title": "Body_upload_attachment_v1_attachments_post",
+        "type": "object"
+      },
+      "Body_upload_bundle_v1_admin_bundles_imports_post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_bundle_v1_admin_bundles_imports_post",
         "type": "object"
       },
       "Body_upload_icon_v1_icons_post": {
@@ -5085,97 +5057,6 @@
           "reason"
         ],
         "title": "ExplainIn",
-        "type": "object"
-      },
-      "ExportIn": {
-        "properties": {
-          "artifact_store": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Artifact Store"
-          },
-          "base_export_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Export Id"
-          },
-          "classifications": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Classifications",
-            "type": "array"
-          },
-          "decisions": {
-            "title": "Decisions",
-            "type": "object"
-          },
-          "identity_profile": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Identity Profile"
-          },
-          "mode": {
-            "default": "workspace",
-            "title": "Mode",
-            "type": "string"
-          },
-          "purpose": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Purpose"
-          },
-          "recipients": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Recipients",
-            "type": "array"
-          },
-          "repository": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Repository"
-          },
-          "workspaces": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Workspaces",
-            "type": "array"
-          }
-        },
-        "title": "ExportIn",
         "type": "object"
       },
       "FeaturesOut": {
@@ -13308,6 +13189,90 @@
         "title": "SignIn",
         "type": "object"
       },
+      "app__routers__beam_model__ApplyIn": {
+        "properties": {
+          "accept": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Decision"
+            },
+            "title": "Accept",
+            "type": "array"
+          },
+          "accept_high_confidence": {
+            "default": false,
+            "title": "Accept High Confidence",
+            "type": "boolean"
+          },
+          "keep_proposals": {
+            "default": true,
+            "title": "Keep Proposals",
+            "type": "boolean"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncOptions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reject": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Decision"
+            },
+            "title": "Reject",
+            "type": "array"
+          }
+        },
+        "title": "ApplyIn",
+        "type": "object"
+      },
+      "app__routers__bundles__ApplyIn": {
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "people_access": {
+            "default": false,
+            "title": "People Access",
+            "type": "boolean"
+          },
+          "workspace_id": {
+            "maxLength": 63,
+            "minLength": 2,
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "name"
+        ],
+        "title": "ApplyIn",
+        "type": "object"
+      },
+      "app__routers__bundles__ExportIn": {
+        "properties": {
+          "workspace_id": {
+            "maxLength": 63,
+            "minLength": 1,
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id"
+        ],
+        "title": "ExportIn",
+        "type": "object"
+      },
       "app__routers__documents__RetentionIn": {
         "properties": {
           "retention_class": {
@@ -13347,6 +13312,97 @@
           }
         },
         "title": "ConfirmIn",
+        "type": "object"
+      },
+      "app__routers__portability__ExportIn": {
+        "properties": {
+          "artifact_store": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Store"
+          },
+          "base_export_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Export Id"
+          },
+          "classifications": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Classifications",
+            "type": "array"
+          },
+          "decisions": {
+            "title": "Decisions",
+            "type": "object"
+          },
+          "identity_profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Profile"
+          },
+          "mode": {
+            "default": "workspace",
+            "title": "Mode",
+            "type": "string"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose"
+          },
+          "recipients": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Recipients",
+            "type": "array"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
+          },
+          "workspaces": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Workspaces",
+            "type": "array"
+          }
+        },
+        "title": "ExportIn",
         "type": "object"
       },
       "app__routers__portability__ScheduleIn": {
@@ -15793,6 +15849,740 @@
         "summary": "Check Installation Config",
         "tags": [
           "ai"
+        ]
+      }
+    },
+    "/v1/admin/bundles": {
+      "get": {
+        "operationId": "list_bundles_v1_admin_bundles_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Bundles",
+        "tags": [
+          "workspace bundles"
+        ]
+      }
+    },
+    "/v1/admin/bundles/demos/{name}/apply": {
+      "post": {
+        "operationId": "apply_demo_v1_admin_bundles_demos__name__apply_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routers__bundles__ApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Apply Demo",
+        "tags": [
+          "workspace bundles"
+        ]
+      }
+    },
+    "/v1/admin/bundles/demos/{name}/preview": {
+      "post": {
+        "operationId": "preview_demo_v1_admin_bundles_demos__name__preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routers__bundles__ApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview Demo",
+        "tags": [
+          "workspace bundles"
+        ]
+      }
+    },
+    "/v1/admin/bundles/exports": {
+      "post": {
+        "description": "The workspace as a bundle directory and its ZIP, kept here to download.",
+        "operationId": "export_workspace_v1_admin_bundles_exports_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routers__bundles__ExportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Export Workspace",
+        "tags": [
+          "workspace bundles"
+        ]
+      }
+    },
+    "/v1/admin/bundles/exports/{bid}/download": {
+      "get": {
+        "operationId": "download_export_v1_admin_bundles_exports__bid__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bid",
+            "required": true,
+            "schema": {
+              "title": "Bid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Download Export",
+        "tags": [
+          "workspace bundles"
+        ]
+      }
+    },
+    "/v1/admin/bundles/imports": {
+      "post": {
+        "description": "A bundle ZIP, unpacked safely and checked (paths, sizes, checksums): nothing is imported yet.",
+        "operationId": "upload_bundle_v1_admin_bundles_imports_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_bundle_v1_admin_bundles_imports_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Upload Bundle",
+        "tags": [
+          "workspace bundles"
+        ]
+      }
+    },
+    "/v1/admin/bundles/imports/{bid}/apply": {
+      "post": {
+        "description": "Clone the bundle into a new workspace, all or nothing.",
+        "operationId": "apply_import_v1_admin_bundles_imports__bid__apply_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bid",
+            "required": true,
+            "schema": {
+              "title": "Bid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routers__bundles__ApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Apply Import",
+        "tags": [
+          "workspace bundles"
+        ]
+      }
+    },
+    "/v1/admin/bundles/imports/{bid}/preview": {
+      "post": {
+        "description": "What applying would do — run and rolled back: added, renamed, people, dependencies, blockers.",
+        "operationId": "preview_import_v1_admin_bundles_imports__bid__preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bid",
+            "required": true,
+            "schema": {
+              "title": "Bid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routers__bundles__ApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview Import",
+        "tags": [
+          "workspace bundles"
+        ]
+      }
+    },
+    "/v1/admin/bundles/{kind}/{bid}": {
+      "delete": {
+        "operationId": "delete_bundle_v1_admin_bundles__kind___bid__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "bid",
+            "required": true,
+            "schema": {
+              "title": "Bid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Bundle",
+        "tags": [
+          "workspace bundles"
         ]
       }
     },
@@ -24091,7 +24881,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ApplyIn"
+                "$ref": "#/components/schemas/app__routers__beam_model__ApplyIn"
               }
             }
           },
@@ -51228,7 +52018,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ExportIn"
+                "$ref": "#/components/schemas/app__routers__portability__ExportIn"
               }
             }
           },
@@ -60988,6 +61778,84 @@
         "summary": "Revoke Robot Token",
         "tags": [
           "tokens"
+        ]
+      }
+    },
+    "/v1/workspaces/{workspace_id}/tour": {
+      "get": {
+        "description": "A demo workspace's guided tour (its title, what it is, the steps to start exploring), or none.",
+        "operationId": "workspace_tour_v1_workspaces__workspace_id__tour_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Workspace Tour",
+        "tags": [
+          "workspace bundles"
         ]
       }
     }

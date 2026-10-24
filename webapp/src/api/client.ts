@@ -2549,3 +2549,85 @@ export const activitiesApi = {
   act: (id: string, action: "start" | "complete" | "skip" | "cancel" | "reopen", body: Record<string, unknown> = {}) =>
     request<Activity>(`/v1/activities/${activityPath(id)}/${action}`, { method: "POST", body: json(body) }),
 };
+
+// ------------------------------------------------------------------ workspace bundles (instance administrators)
+
+export interface BundleSummary {
+  id?: string;
+  name?: string;
+  format_version?: number;
+  created_at?: string;
+  created_by?: string;
+  source?: { instance?: string; argus_version?: string; schema_revision?: string } | null;
+  workspace?: { id: string; name: string } | null;
+  packages?: { id: string; version: string }[];
+  rows: Record<string, number>;
+  files: number;
+  bytes: number;
+  dependencies: { kind: string; detail: string }[];
+  external_config: { what: string; detail: string }[];
+  not_reproduced: { table: string; rows: number; reason: string }[];
+  missing_files: { family: string; key: string; path?: string }[];
+  demo?: WorkspaceTour | null;
+  problems?: { kind: string; path?: string; detail: string }[];
+  packages_status?: { id: string; version: string; status: string; detail: string | null }[];
+}
+
+export interface BundleReport {
+  ok: boolean;
+  blockers: { kind: string; detail: string }[];
+  warnings: { kind?: string; family?: string; key?: string; detail: string }[];
+  added: Record<string, number>;
+  updated: Record<string, number>;
+  renamed_count: number;
+  people: Record<string, number | boolean>;
+  packages: { id: string; version: string; status: string; detail: string | null }[];
+  dependencies: { kind: string; detail: string }[];
+  not_reproduced: { table: string; rows: number; reason: string }[];
+  external_config: { what: string; detail: string }[];
+  files: Record<string, number>;
+}
+
+export interface WorkspaceTour {
+  title: string;
+  organisation?: string;
+  synthetic?: boolean;
+  notice?: string;
+  description?: string;
+  steps: { title: string; text: string; link?: string }[];
+}
+
+const B = "/v1/admin/bundles";
+export interface BundleApplyBody { workspace_id: string; name: string; people_access: boolean }
+
+export const bundlesApi = {
+  list: () => request<{ exports: BundleSummary[]; imports: BundleSummary[]; demos: BundleSummary[] }>(B),
+  exportWorkspace: (workspace_id: string) =>
+    request<BundleSummary>(`${B}/exports`, { method: "POST", body: json({ workspace_id }) }),
+  /** The ZIP, fetched with the person's own credentials. */
+  download: async (id: string): Promise<Blob> => {
+    const session = await loadSession();
+    if (!session) throw new Error("Not signed in");
+    const resp = await fetch(`${session.baseUrl}${B}/exports/${encodeURIComponent(id)}/download`, {
+      headers: authHeaders(session), cache: "no-store", referrerPolicy: "no-referrer" });
+    if (!resp.ok) throw new ApiError(resp.status, await resp.json().catch(() => undefined));
+    return resp.blob();
+  },
+  remove: (kind: "exports" | "imports", id: string) =>
+    request<void>(`${B}/${kind}/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  upload: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<BundleSummary>(`${B}/imports`, { method: "POST", body: form });
+  },
+  preview: (id: string, body: BundleApplyBody) =>
+    request<BundleReport>(`${B}/imports/${encodeURIComponent(id)}/preview`, { method: "POST", body: json(body) }),
+  apply: (id: string, body: BundleApplyBody) =>
+    request<BundleReport>(`${B}/imports/${encodeURIComponent(id)}/apply`, { method: "POST", body: json(body) }),
+  previewDemo: (name: string, body: BundleApplyBody) =>
+    request<BundleReport>(`${B}/demos/${encodeURIComponent(name)}/preview`, { method: "POST", body: json(body) }),
+  applyDemo: (name: string, body: BundleApplyBody) =>
+    request<BundleReport>(`${B}/demos/${encodeURIComponent(name)}/apply`, { method: "POST", body: json(body) }),
+  tour: (workspaceId: string) =>
+    request<{ workspace_id: string; tour: WorkspaceTour | null }>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/tour`),
+};
