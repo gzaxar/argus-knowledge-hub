@@ -692,6 +692,8 @@ def _load(db: Session, b: Bundle, rep: Report, new_ws: str, name: str, actor: Op
                 values["enabled"], values["last_check_ok"] = False, False
             if fname == "import_configs":
                 values["schedule_kind"], values["schedule_failures"] = "off", 0
+            if fname == "types" and not isinstance(values.get("attributes"), list):
+                raise BundleError(f"types: {values.get('name')!r} has attributes that are not a list")
             if fname == "spatial_features" or fname == "location_observations":
                 _check_geometry(db, fname, values)
             outside = _points_outside(db, fname, values, new_ws, declared)
