@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { ApiError, packagesApi, type PackageChange, type PackagePlan } from "../../api/client";
 import { contentsLine } from "../../components/PackagePicker";
 
@@ -11,6 +11,46 @@ function problem(e: unknown): string {
     if (typeof d === "string") return d;
   }
   return "It could not be done.";
+}
+
+interface CatalogueBehindDetail {
+  code: "catalogue_behind";
+  catalogue_workspace_id: string;
+  needs: { package_id: string; version: string; has: string | null; shared_types: number }[];
+}
+
+function catalogueBehind(e: unknown): CatalogueBehindDetail | null {
+  if (!(e instanceof ApiError)) return null;
+  const d = (e.body as { detail?: { code?: string } })?.detail;
+  return d && d.code === "catalogue_behind" ? (d as CatalogueBehindDetail) : null;
+}
+
+/** This workspace hangs from a shared catalogue that lacks what it would stand on: what the catalogue needs,
+ * and a way there. The catalogue goes first, then this workspace. */
+function CatalogueFirst({ d }: { d: CatalogueBehindDetail }) {
+  return (
+    <div role="alert" className="mt-2 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+      <p>
+        This workspace takes its shared types from the catalogue <b>{d.catalogue_workspace_id}</b>, which must have
+        these packages first:
+      </p>
+      <ul className="mt-1 list-disc pl-5">
+        {d.needs.map((n) => (
+          <li key={n.package_id}>
+            <span className="font-mono">{n.package_id} {n.version}</span>{" "}
+            {n.has ? <>— it has {n.has}</> : <>— not installed there</>}
+            <span className="text-amber-800"> · {n.shared_types} shared type{n.shared_types === 1 ? "" : "s"}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2">
+        <Link to={`/workspaces/${encodeURIComponent(d.catalogue_workspace_id)}/packages`} className="font-medium text-sky-800 underline">
+          Open {d.catalogue_workspace_id}'s packages
+        </Link>{" "}
+        to preview and apply its upgrade, then come back here.
+      </p>
+    </div>
+  );
 }
 
 function how(options: Record<string, string> | null): string {
@@ -105,7 +145,9 @@ export function WorkspacePackages() {
               {preview.isPending ? "Working it out…" : "Preview"}
             </button>
           </div>
-          {preview.isError && <p className="mt-2 text-sm text-red-600">{problem(preview.error)}</p>}
+          {preview.isError && (catalogueBehind(preview.error)
+            ? <CatalogueFirst d={catalogueBehind(preview.error)!} />
+            : <p className="mt-2 text-sm text-red-600">{problem(preview.error)}</p>)}
           {plan && (
             <div className="mt-3 space-y-2 text-sm">
               {plan.steps.map((s) => {
@@ -133,7 +175,9 @@ export function WorkspacePackages() {
                       className="rounded bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
                 {install.isPending ? "Installing…" : plan.changes ? "Install" : "Nothing to install"}
               </button>
-              {install.isError && <p className="text-sm text-red-600">{problem(install.error)}</p>}
+              {install.isError && (catalogueBehind(install.error)
+                ? <CatalogueFirst d={catalogueBehind(install.error)!} />
+                : <p className="text-sm text-red-600">{problem(install.error)}</p>)}
             </div>
           )}
         </div>
