@@ -5,6 +5,7 @@ import { ledgerApi, workspacesApi } from "../api/client";
 import { signOut } from "../api/signOut";
 import { useCurrentWorkspaceId } from "../api/useCurrentWorkspaceId";
 import { CommandPalette, useCommandPaletteShortcut } from "../components/hub/CommandPalette";
+import { DemoStrip } from "../components/demo/DemoTour";
 import { SchemaTree } from "../components/SchemaTree";
 import { WorkspaceSwitcher } from "../components/WorkspaceSwitcher";
 import { NotificationBell } from "../components/hub/WorkflowPanels";
@@ -571,6 +572,7 @@ export function AppShell() {
           </div>
         </header>
         <main className="flex-1 overflow-auto p-6">
+          <div className="-mx-6 -mt-6 mb-6"><DemoStrip /></div>
           <Outlet />
         </main>
       </div>
