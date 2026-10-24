@@ -13,6 +13,7 @@ import '../../data/command_queue.dart' show PendingCommand;
 import '../../widgets/common.dart';
 import '../ask/voice.dart';
 import 'activities_screen.dart';
+import '../../widgets/photo_text.dart';
 
 const _draftPrefix = 'capture.draft.';
 
@@ -243,8 +244,9 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
           'asset_uid': widget.assetUid,
           'schema_uid': _typeUid,
           'attributes': {
-            'argus_category': ?_category,
-            'argus_impact': ?_impact,
+            // The option's value is what is stored; the proposal and the list name options by id.
+            'argus_category': ?_valueOf(_proposal?.categories, _category),
+            'argus_impact': ?_valueOf(_proposal?.impacts, _impact),
             if (_system.text.trim().isNotEmpty) 'argus_system': _system.text.trim(),
             if (_occurredAt != null) 'argus_downtime_start': withOffset(_occurredAt!),
           },
@@ -295,6 +297,12 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
 
   // ------------------------------------------------------------------ the screen
 
+  static String? _valueOf(List<Map<String, dynamic>>? options, String? id) {
+    if (id == null) return null;
+    final o = (options ?? const []).where((o) => '${o['id']}' == id).firstOrNull;
+    return o == null ? id : '${o['value'] ?? id}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -334,6 +342,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                   border: const OutlineInputBorder(),
                   labelText: _listening ? 'Listening…' : 'What happened, or what you will do',
                   hintText: '“The vacuum pump failed last night” · “I replaced the filter yesterday”',
+                  suffixIcon: PhotoTextButton(
+                      key: const Key('photo-text-capture'), controller: _text, onInserted: () => setState(() {})),
                 ),
               ),
             ),
@@ -424,7 +434,9 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             controller: _description,
             minLines: 2,
             maxLines: 6,
-            decoration: const InputDecoration(labelText: 'Description')),
+            decoration: InputDecoration(
+                labelText: 'Description',
+                suffixIcon: PhotoTextButton(key: const Key('photo-text-capture-description'), controller: _description))),
         if (_kind == 'ticket') ..._ticketFields(context, p) else ..._activityFields(context, p),
         const SizedBox(height: 16),
         FilledButton(

@@ -4,6 +4,8 @@
 <dict>
 	<key>NSCameraUsageDescription</key>
 	<string>The camera reads the label on equipment, and takes the photos and videos you attach.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>A photo you choose is read for its text, on this device, to fill in what you are writing.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>The microphone hears a question you ask the assistant, and records the notes you attach.</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>

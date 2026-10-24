@@ -9,6 +9,7 @@ import '../../domain/capture.dart';
 import '../../widgets/attach_menu.dart';
 import '../../widgets/common.dart';
 import '../../widgets/rich_content.dart';
+import '../../widgets/photo_text.dart';
 
 const _kinds = {
   'paste': 'Notes or a transcript',
@@ -58,6 +59,9 @@ class _DocumentReshapeScreenState extends ConsumerState<DocumentReshapeScreen> {
   final Set<String> _links = {};
   String? _error;
   late PickedPhoto? _original = widget.seed?.original;
+  // Photos whose text was read into the raw text: attached to the saved draft too, unless the person says not.
+  final _photos = <PickedPhoto>[];
+  bool _keepPhotos = true;
   late String? _from = widget.seed?.from;
   bool _transcribing = false;
   // A dictation's audio goes with the draft only if asked: once the reviewed text is agreed, the transcript
@@ -182,6 +186,11 @@ class _DocumentReshapeScreenState extends ConsumerState<DocumentReshapeScreen> {
       if (original != null && (_from != 'recording' || _keepRecording)) {
         await queueAttachment(ref, AttachTarget.document(saved.documentUid, saved.revisionUid), original);
       }
+      if (_keepPhotos) {
+        for (final p in _photos) {
+          await queueAttachment(ref, AttachTarget.document(saved.documentUid, saved.revisionUid), p);
+        }
+      }
       ref.invalidate(documentListProvider);
       if (widget.documentUid != null) ref.invalidate(documentRevisionsProvider(widget.documentUid!));
       if (mounted) context.pushReplacement('/document/${saved.documentUid}');
@@ -276,6 +285,24 @@ class _DocumentReshapeScreenState extends ConsumerState<DocumentReshapeScreen> {
                   : 'Dictate more'),
         ),
       ),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: PhotoTextButton(
+            key: const Key('photo-text-reshape'),
+            controller: _text,
+            label: 'Text from a photo (camera or photos)',
+            onPhoto: (p) => setState(() => _photos.add(p)),
+            onInserted: () => setState(() {})),
+      ),
+      if (_photos.isNotEmpty)
+        CheckboxListTile(
+          key: const Key('reshape-keep-photos'),
+          contentPadding: EdgeInsets.zero,
+          controlAffinity: ListTileControlAffinity.leading,
+          value: _keepPhotos,
+          onChanged: (v) => setState(() => _keepPhotos = v ?? true),
+          title: Text(_photos.length == 1 ? 'Attach the photo the text was read from' : 'Attach the ${_photos.length} photos the text was read from'),
+        ),
       if (widget.dictate && _type == null)
         const Padding(
           padding: EdgeInsets.only(top: 4),

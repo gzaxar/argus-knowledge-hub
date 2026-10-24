@@ -220,7 +220,35 @@
         "description": null,
         "is_concrete": true,
         "parent_schema_uid": null,
-        "attributes": [],
+        "attributes": [
+            {
+                "key": "argus_impact",
+                "name": "Operational impact",
+                "type": "enumeration",
+                "options": [
+                    {
+                        "id": "beam_down",
+                        "value": "Beam down"
+                    },
+                    {
+                        "id": "beam_degraded",
+                        "value": "Beam degraded"
+                    },
+                    {
+                        "id": "no_beam_impact",
+                        "value": "No beam impact"
+                    },
+                    {
+                        "id": "safety",
+                        "value": "Safety"
+                    },
+                    {
+                        "id": "unknown",
+                        "value": "Unknown"
+                    }
+                ]
+            }
+        ],
         "metadata": {},
         "version": 1,
         "icon_uid": null,

@@ -39,10 +39,12 @@ const signedIn = {
 /// A camera that always returns the same small JPEG header, 3000 bytes long.
 class FakePhotos implements PhotoSource {
   int taken = 0;
+  bool? lastFromGallery;
 
   @override
-  Future<PickedPhoto?> take() async {
+  Future<PickedPhoto?> take({bool fromGallery = false}) async {
     taken++;
+    lastFromGallery = fromGallery;
     final bytes = Uint8List(3000)..setAll(0, [0xFF, 0xD8, 0xFF, 0xE0]);
     return PickedPhoto(bytes: bytes, name: 'IMG_$taken.jpg', mimeType: 'image/jpeg');
   }

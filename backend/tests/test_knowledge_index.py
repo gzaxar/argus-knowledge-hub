@@ -232,3 +232,28 @@ def test_the_semantic_graph_through_the_api(world):
     assert g["nodes"][0]["uid"] == f"{world['ws']}-t1" and g["nodes"][0]["depth"] == 0
     assert g["edges"] and all(e["relation"] == "similar" and e["from_uid"] == f"{world['ws']}-t1" for e in g["edges"])
     assert client.get("/v1/graph/semantic", headers=headers, params={"kind": "ticket", "uid": "nope"}).status_code == 404
+
+
+def test_a_documents_summary_is_indexed_before_its_body():
+    """The summary kept apart from the body (attributes.argus_summary) is found by search, as its own passage."""
+    db = SessionLocal()
+    ws = f"kn-sum-{secrets.token_hex(4)}"
+    db.add(Workspace(id=ws, name="Summary"))
+    db.flush()
+    d = Document(uid=f"{ws}-d", workspace_id=ws, code=f"NOTE-{ws}", title="Baggage report")
+    db.add(d)
+    db.flush()
+    r = DocumentRevision(uid=f"{ws}-d-r1", document_uid=d.uid, revision_number=1, state="published",
+                         body_markdown="# Report\nThe bag arrived damaged.",
+                         attributes={"argus_summary": "A damaged bag reported at arrival."})
+    db.add(r)
+    db.flush()
+    d.current_revision_uid = r.uid
+    db.flush()
+    try:
+        [source] = [s for s in ki.sources(db, ws) if s.kind == "document"]
+        assert source.parts[0] == ("Summary", "A damaged bag reported at arrival.")
+        assert any("arrived damaged" in text for _, text in source.parts[1:])
+    finally:
+        db.rollback()
+        db.close()

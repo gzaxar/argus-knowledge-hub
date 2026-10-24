@@ -1,7 +1,9 @@
 """Where records are, on the earth: approved locations and the field observations proposing them.
 
-A **spatial feature** is a record's approved location: its geometry (a point in this release; lines and
-polygons later, in the same column), the coordinate reference it was given in, where it came from, how
+A **spatial feature** is a record's approved location, in one of three roles: its **position** (a point), its
+**route** (a line: a cable, a pipe, a beamline) or its **outline** (a polygon: a building, hall, room or zone —
+with `base_m` and `top_m`, the heights it spans, it is a volume). One approved feature per role; each has the
+coordinate reference it was given in, where it came from, how
 accurate it is, when it was observed, the period it is valid for, and who confirmed it. A newer approved
 location supersedes the old one, which stays (`valid_until`, `state`): the history is the rows.
 
@@ -54,9 +56,13 @@ class SpatialFeature(Base):
     workspace_id: Mapped[str] = mapped_column(String, ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
     subject_kind: Mapped[str] = mapped_column(String, default="asset")        # the record it locates
     subject_uid: Mapped[str] = mapped_column(String, index=True)
-    role: Mapped[str] = mapped_column(String, default="position")            # later: route, footprint, area
+    role: Mapped[str] = mapped_column(String, default="position")            # position | route | outline
     geometry: Mapped[dict] = mapped_column(Geometry)
-    geometry_type: Mapped[str] = mapped_column(String)                       # Point (LineString, Polygon later)
+    geometry_type: Mapped[str] = mapped_column(String)                       # Point, (Multi)LineString, (Multi)Polygon
+    # The heights an outline spans, in metres (a room's floor and ceiling, a shielding block's bottom and top):
+    # with them an outline is a volume.
+    base_m: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    top_m: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     crs: Mapped[str] = mapped_column(String, default="EPSG:4326")
     source: Mapped[str] = mapped_column(String)                              # manual | field | import | survey
     accuracy_m: Mapped[Optional[float]] = mapped_column(Float, nullable=True)

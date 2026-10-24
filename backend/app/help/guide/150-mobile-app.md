@@ -1,7 +1,7 @@
 ---
 title: The mobile app (ARGUS Field)
 summary: Installing ARGUS Field, signing in, finding equipment by scanning its label, registering units, tickets and documents on the phone, attaching photos, video, notes and places, notifications, working offline, and withdrawing a phone's access.
-keywords: [export, pdf, print, share, markdown, mobile, app, phone, android, ios, argus field, field, install, apk, google play, update, sign in, pkce, argus-mobile, scan, qr code, barcode, serial, ocr, read text, nameplate, register, copy from similar, label, attach, photo, video, recorded note, audio, location, where i am, notifications, news, subscribe, offline, outbox, saved copies, cache, settings, dark mode, graph, revoke device, wipe, privacy]
+keywords: [text from a photo, photo to text, gallery, export, pdf, print, share, markdown, mobile, app, phone, android, ios, argus field, field, install, apk, google play, update, sign in, pkce, argus-mobile, scan, qr code, barcode, serial, ocr, read text, nameplate, register, copy from similar, label, attach, photo, video, recorded note, audio, location, where i am, notifications, news, subscribe, offline, outbox, saved copies, cache, settings, dark mode, graph, revoke device, wipe, privacy]
 order: 150
 ---
 
@@ -61,6 +61,11 @@ their type sits in the type tree (*Equipment › Vacuum › Ion Pump*).
   digits, then long numbers) are looked up in turn, and the first record found opens. If none is found, you choose
   what to look up, or register the unit;
 - **Or type the label** when the label is damaged or there is no camera.
+
+**Text from a photo**, in the phone's text fields (a document's body, the text to rework, a ticket's details and
+description, a comment, an activity's description, what you capture by voice): **take a photo** or **choose one
+from your photos**, and the printed text in it is read **on the phone** — the photo is not sent — and put where
+the cursor is, after what you already wrote. Check it: handwriting and poor light are read badly.
 
 ARGUS looks the value up as a key, a former key, an alias, a label of any kind, a serial or an inventory number, in
 every workspace you can open (see *Equipment*, *Labels and QR codes*). A record of another workspace opens there: the

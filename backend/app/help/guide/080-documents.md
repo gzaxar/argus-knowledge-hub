@@ -11,19 +11,54 @@ drawings, notes. A document is linked to the equipment, types and other document
 ## Write a document
 
 1. **+ New → Document**.
-2. **Title**, **Type** (procedure, manual, report…) and its **Code** (proposed from the type).
-3. **Body**, written in Markdown. Attach files (a PDF, a drawing) if the content is there. A Markdown or
+2. To start from what you already have, paste its text in the side panel or **Add a file** — a PDF, a Word or
+   Excel file, an e-mail, a text file — then choose:
+   - **Rework with the template** (recommended): the whole text rewritten as a draft that follows the document
+     type's template, with what to check (see *Rework from raw text*);
+   - **Keep it as it is**: the text becomes the body in Markdown, with the file's structure — a Word file's
+     headings, lists, bold and tables; a spreadsheet's sheets as tables; a web page's headings, lists and tables;
+     an e-mail's subject, date and message; a PDF's paragraphs put back together, its bullets as lists and its
+     headings as headings. The title, type, keywords and a **summary** are suggested and go into the fields
+     still empty.
+
+   Either way **the file is attached to the document** when it is saved (untick *Attach the original file* not
+   to): the original is never lost, and the body is never replaced by a summary of it.
+3. **Title**, **Type** (procedure, manual, report…) and its **Code** (proposed from the type).
+4. **Summary**: two sentences on what the document is, apart from the body — shown above it on the document's
+   page and found by search. Optional; the assistant suggests one.
+5. **Body**, written in Markdown. Attach files (a PDF, a drawing) if the content is there. A Markdown or
    text file (`.md`, `.txt`) attached or dropped on the body asks first: **Use its text as the body** (or
-   *Insert its text here*) puts its words in the document; **Attach it as a file** keeps it as a file. The same
-   choice appears when such a file is given to *Describe it*: **Use the file as the body** instead of the
-   summary the assistant writes.
-4. **Confidentiality**: *Pubblico*, *Interno*, *Riservato*… A *riservato* document is sent to an AI only if the
+   *Insert its text here*) puts its words in the document; **Attach it as a file** keeps it as a file.
+6. **Confidentiality**: *Pubblico*, *Interno*, *Riservato*… A *riservato* document is sent to an AI only if the
    workspace allows it, and is never shared with other workspaces.
-5. **Authority level**: whether it is official (*Ufficiale*), informative, or an internal draft.
-6. Link it to where it applies (assets, types), and save.
+7. **Authority level**: whether it is official (*Ufficiale*), informative, or an internal draft.
+8. Link it to where it applies (assets, types), and save.
 
 Saving creates the document and its **revision 1, a draft**. On the phone, a document can also start from a
-recording or a photo of a page, and **Tidy with AI** writes rough text up (see *Guided and AI-assisted entry*).
+recording or a photo of a page — or take its text from photos with **Text from a photo** — and the recording
+(if you ask) or the photos are attached to it; **Tidy with AI** writes rough text up (see *Guided and AI-assisted
+entry*).
+
+## Import a web page folder
+
+An HTML page saved with its pictures — a LabVIEW or Doxygen export, a page saved by a browser — is imported from
+**New document → Import a web page folder**: **Choose a folder**, or a **.zip** of it. ARGUS lists the pages it
+holds, the main one first; tick the ones to import. **Each page becomes a draft document**, with the type,
+confidentiality and authority chosen in the form:
+
+- its text as Markdown — headings, paragraphs, lists, tables, bold, code, links;
+- **its pictures attached and shown where they were** (a picture used many times is attached once);
+- its own HTML attached as the original, and the files it links to (a PDF, a drawing) attached with it;
+- a link to another page imported at the same time leads to that page's document.
+
+Tick **Let the assistant suggest each page's type, a summary and keywords** (up to 20 pages at a time) and the
+assistant reads each page's text — not its pictures — and proposes them; the type chosen in the form wins, and a
+page's own title is kept. Each document says what was suggested: check it there.
+
+The folder's files that no page uses go with the first document: nothing given is lost. Scripts, styles and forms
+are left out, nothing is fetched from the internet, and only files inside the folder are read. At most 300 files
+and 50 MB. A page that is mostly pictures (a LabVIEW block diagram) is best kept as it is; one with text can then
+be reworked with its type's template (**+ Revision from raw text** on its page).
 
 ## Rework from raw text
 
@@ -31,7 +66,8 @@ recording or a photo of a page, and **Tidy with AI** writes rough text up (see *
 follows the template of a document type. It is also offered from **New document** ("Rework with the template",
 for the text you described or the file you added) and on a document's page (**+ Revision from raw text**).
 
-1. Paste the text, or open a `.txt`, `.md` or `.eml` file. Say what it is and, if you know it, when it was
+1. Paste the text, or open a file — a PDF, a Word or Excel file, an e-mail, a text file; the file itself is
+   attached to the saved draft (*Attach the original file*, ticked by default). Say what it is and, if you know it, when it was
    written. An e-mail's own Date / Inviato line is read first. Tick **The text was written now** only if it was.
 2. Choose the document type. The page says which template applies and why: your choice, else your own copy set
    as yours, else the workspace's variant, else the official template.
