@@ -1,208 +1,157 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { SchemaTree } from "../../components/SchemaTree";
-import { ListDate, SortHeader, useSort } from "../../components/SortableTable";
 import { Link } from "react-router-dom";
 import { assetsApi, schemasApi } from "../../api/client";
+import { useShowKeys } from "../../api/displayPrefs";
+import { has, useCapabilities } from "../../api/useCapabilities";
+import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
 import { AttributeFilterInput } from "../../components/AttributeFilterInput";
 import { activeFilterCount, defaultFilterFor, FilterState, matchesFilters } from "../../components/AttributeFilters";
+import {
+  BrowsePage, Clip, ColumnSettings, MenuButton, Pager, SearchBox, SelectAll, ToolbarSelect, ViewSwitch,
+  useBrowseParams, useColumns, usePage, useSelection,
+} from "../../components/browse/Browse";
+import { countBy, TypeExplorer, typeFamily } from "../../components/browse/TypeExplorer";
 import { BulkActionsBar } from "../../components/BulkActionsBar";
 import { OwnerBadge } from "../../components/OwnerBadge";
-import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
+import { ListDate, SortHeader, useSort } from "../../components/SortableTable";
 import { effectiveAttributes } from "../../lib/schemaAttributes";
-import { useShowKeys } from "../../api/displayPrefs";
+import { useRights } from "../../lib/permissions";
 
+const COLUMNS = [
+  { id: "name", label: "Name", required: true },
+  { id: "key", label: "Key" },
+  { id: "type", label: "Type", initial: true },
+  { id: "updated", label: "Updated", initial: true },
+  { id: "created", label: "Created" },
+];
+
+/** Assets: the type explorer, the search and filters, the list (or the map), and what can be done with a
+ * selection. The filters are in the address, so the map view and a reload keep them. */
 export function AssetSearch() {
   const showKeys = useShowKeys();
   const queryClient = useQueryClient();
-  const [q, setQ] = useState("");
-  const [schemaUid, setSchemaUid] = useState("");
-  const [owner, setOwner] = useState<"all" | "own" | "shared">("own");
-  const currentWorkspaceId = useCurrentWorkspaceId();
+  const features = useCapabilities();
+  const rights = useRights();
+  const ws = useCurrentWorkspaceId();
+  const { get, set } = useBrowseParams();
+  const q = get("q");
+  const schemaUid = get("type") || null;
+  const owner = (get("owner", "own") as "all" | "own" | "shared");
   const [filters, setFilters] = useState<FilterState>({});
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const selection = useSelection("assets");
+  const columns = useColumns("assets", COLUMNS.map((c) => (c.id === "key" ? { ...c, initial: showKeys } : c)));
 
-  const toggle = (uid: string) =>
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(uid)) next.delete(uid);
-      else next.add(uid);
-      return next;
-    });
-
-  const schemas = useQuery({ queryKey: ["schemas"], queryFn: schemasApi.list });
+  const schemas = useQuery({ queryKey: ["schemas"], queryFn: schemasApi.list, staleTime: 60_000 });
   const assets = useQuery({ queryKey: ["assets"], queryFn: () => assetsApi.list() });
+  const equipment = has(features, "equipment");
+  const noun = equipment ? "objects" : "records";
 
-  const objectSchemas = useMemo(
-    () => (schemas.data ?? []).filter((s) => s.applies_to === "objects"),
-    [schemas.data],
-  );
-  // The chosen type and every type below it: choosing "Asset" lists the objects of all its kinds.
-  const familyUids = useMemo(() => {
-    if (!schemaUid) return null;
-    const children = new Map<string, string[]>();
-    for (const s of objectSchemas) {
-      if (s.parent_schema_uid) children.set(s.parent_schema_uid, [...(children.get(s.parent_schema_uid) ?? []), s.uid]);
-    }
-    const out = new Set<string>();
-    const walk = (uid: string) => {
-      if (out.has(uid)) return;
-      out.add(uid);
-      (children.get(uid) ?? []).forEach(walk);
-    };
-    walk(schemaUid);
-    return out;
-  }, [objectSchemas, schemaUid]);
+  const objectSchemas = useMemo(() => (schemas.data ?? []).filter((s) => s.applies_to === "objects"), [schemas.data]);
+  const family = useMemo(() => typeFamily(objectSchemas, schemaUid), [objectSchemas, schemaUid]);
   const schema = objectSchemas.find((s) => s.uid === schemaUid);
   const attrDefs = effectiveAttributes(schema, schemas.data);
 
   // Beyond the key and the name: labels (QR codes, barcodes, former keys, aliases), serial, inventory number.
-  const needleText = q.trim();
+  const needle = q.trim();
   const byIdentifier = useQuery({
-    queryKey: ["asset-match", needleText],
-    queryFn: () => assetsApi.matching(needleText),
-    enabled: needleText.length >= 2,
+    queryKey: ["asset-match", needle],
+    queryFn: () => assetsApi.matching(needle),
+    enabled: needle.length >= 2,
     staleTime: 30_000,
   });
+  const inScope = useMemo(() => (assets.data ?? []).filter((a) =>
+    ws === null || owner === "all" || (owner === "own" ? a.workspace_id === ws : a.workspace_id !== ws)), [assets.data, owner, ws]);
+  const counts = useMemo(() => countBy(inScope, (a) => a.schema_uid), [inScope]);
   const matched = useMemo(() => {
-    if (!assets.data) return [];
-    const needle = q.trim().toLowerCase();
-    return assets.data.filter((a) => {
-      if (needle && !a.name.toLowerCase().includes(needle) && !a.key.toLowerCase().includes(needle)
-          && !byIdentifier.data?.has(a.uid)) {
-        return false;
-      }
-      if (familyUids && !familyUids.has(a.schema_uid)) return false;
-      if (currentWorkspaceId !== null) {
-        if (owner === "own" && a.workspace_id !== currentWorkspaceId) return false;
-        if (owner === "shared" && a.workspace_id === currentWorkspaceId) return false;
-      }
-      if (schema && Object.keys(filters).length > 0 && !matchesFilters(a.attributes, filters)) {
-        return false;
-      }
+    const n = needle.toLowerCase();
+    return inScope.filter((a) => {
+      if (n && !a.name.toLowerCase().includes(n) && !a.key.toLowerCase().includes(n) && !byIdentifier.data?.has(a.uid)) return false;
+      if (family && !family.has(a.schema_uid)) return false;
+      if (schema && Object.keys(filters).length > 0 && !matchesFilters(a.attributes, filters)) return false;
       return true;
     });
-  }, [assets.data, q, familyUids, schema, filters, owner, currentWorkspaceId, byIdentifier.data]);
-  const { sorted: results, sort, toggle: sortBy } = useSort(
+  }, [inScope, needle, family, schema, filters, byIdentifier.data]);
+  const { sorted, sort, toggle: sortBy } = useSort(
     matched,
-    {
-      name: (a) => a.name,
-      key: (a) => a.key,
-      type: (a) => a.type,
-      created: (a) => a.created_at,
-      updated: (a) => a.updated_at,
-    },
+    { name: (a) => a.name, key: (a) => a.key, type: (a) => a.type, created: (a) => a.created_at, updated: (a) => a.updated_at },
     { key: "name", dir: "asc" },
     "assets",
   );
+  const paging = usePage(sorted);
+
+  const tools = [
+    { to: "/search/advanced?entity=assets", label: "Advanced query", hint: "Combine conditions on any field" },
+    { to: "/assets/import", label: "Import a spreadsheet" },
+    ...(equipment ? [{ to: "/labels", label: "Labels & QR codes" }] : []),
+    { to: "/bulk-changes", label: "Bulk changes", hint: "Change a field on many records" },
+    ...(equipment ? [{ to: "/migration/catalogue", label: "Map imported records" }] : []),
+    ...(has(features, "control_system") ? [{ to: "/control-bindings", label: "Channels ↔ hardware" }] : []),
+  ];
 
   return (
-    <div className="flex min-h-[calc(100vh-7rem)] gap-4">
-      <aside className="flex w-72 shrink-0 flex-col rounded-lg border border-slate-200 bg-white p-3">
-        <div className="mb-2 flex items-center justify-between px-1">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Object types</p>
-          <Link to="/schemas/new" title="New object type" className="text-sm font-medium text-slate-400 hover:text-slate-700">+</Link>
-        </div>
-        <button
-          type="button"
-          onClick={() => setSchemaUid("")}
-          className={`mb-1 rounded px-2 py-1 text-left text-xs ${!schemaUid ? "bg-slate-100 font-medium text-slate-900" : "text-slate-600 hover:bg-slate-50"}`}
-        >
-          All objects
-          <span className="ml-1 text-slate-400">{assets.data?.length ?? 0}</span>
-        </button>
-        <div className="min-h-0 flex-1">
-          <SchemaTree appliesTo="objects" fill selectedUid={schemaUid || null} onSelect={(uid) => setSchemaUid(uid ?? "")} />
-        </div>
-      </aside>
-      <div className="min-w-0 flex-1">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-slate-900">Search objects</h1>
-        {/* The same affordance tickets and documents have: this is where
-            the Assets section lands, so it is where somebody expects to be
-            able to add one. */}
-        <Link
-          to="/assets/new"
-          className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-        >
-          New object
+    <BrowsePage
+      title={equipment ? "Assets" : "Records"}
+      count={assets.data ? `${matched.length}${matched.length !== inScope.length ? ` of ${inScope.length}` : ""}` : undefined}
+      storageKey="assets"
+      primary={rights.can_create && (
+        <Link to="/assets/new" className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800">
+          New {equipment ? "object" : "record"}
         </Link>
-      </div>
-
-      <div className="mt-4 flex gap-3">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by name, key, label, serial or inventory number…"
-          className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm"
-        />
-        <select
-          value={schemaUid}
-          onChange={(e) => {
-            setSchemaUid(e.target.value);
-            setFilters({});
-          }}
-          className="rounded border border-slate-300 px-3 py-2 text-sm"
-        >
-          <option value="">All types</option>
-          {objectSchemas.map((s) => (
-            <option key={s.uid} value={s.uid}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={owner}
-          onChange={(e) => setOwner(e.target.value as "all" | "own" | "shared")}
-          className="rounded border border-slate-300 px-3 py-2 text-sm"
-          aria-label="Whose objects"
-        >
-          <option value="own">This workspace only</option>
-          <option value="all">This workspace + shared</option>
-          <option value="shared">Shared from other workspaces</option>
-        </select>
-      </div>
-
+      )}
+      actions={<MenuButton label="Tools" items={tools} />}
+      explorerLabel="Type"
+      explorerSummary={schema?.name}
+      explorer={
+        <TypeExplorer appliesTo="objects" counts={counts} total={inScope.length} selected={schemaUid}
+                      onSelect={(uid) => { set({ type: uid }); setFilters({}); }} allLabel={`All ${noun}`} />
+      }
+      toolbar={
+        <>
+          <SearchBox value={q} onChange={(v) => set({ q: v })} label={`Search ${noun}`}
+                     placeholder="Name, key, label, serial or inventory number…" />
+          {ws !== null && (
+            <ToolbarSelect label="Whose records" value={owner} onChange={(v) => set({ owner: v === "own" ? null : v })}>
+              <option value="own">This workspace</option>
+              <option value="all">This workspace + shared</option>
+              <option value="shared">Shared with it</option>
+            </ToolbarSelect>
+          )}
+          <ColumnSettings columns={columns} />
+          {has(features, "map") && (
+            <ViewSwitch views={[
+              { label: "List", to: "/assets/search", current: true },
+              { label: "Map", to: `/map${schemaUid ? `?types=${encodeURIComponent(schemaUid)}` : ""}`, current: false },
+            ]} />
+          )}
+        </>
+      }
+    >
       {schema && attrDefs.length > 0 && (
-        <div className="mt-3">
-          <button
-            type="button"
-            onClick={() => setAdvancedOpen((v) => !v)}
-            className="text-sm text-slate-600 hover:text-slate-900"
-          >
-            {advancedOpen ? "▾" : "▸"} Advanced filters
+        <div>
+          <button type="button" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen((v) => !v)}
+                  className="text-sm text-slate-600 hover:text-slate-900">
+            <span aria-hidden>{advancedOpen ? "▾" : "▸"}</span> Filter by {schema.name} fields
             {activeFilterCount(filters) > 0 && (
-              <span className="ml-1 rounded-full bg-slate-900 px-1.5 py-0.5 text-[10px] text-white">
-                {activeFilterCount(filters)}
-              </span>
+              <span className="ml-1 rounded-full bg-slate-900 px-1.5 py-0.5 text-[10px] text-white">{activeFilterCount(filters)}</span>
             )}
           </button>
           {advancedOpen && (
-            <div className="mt-2 space-y-3 rounded border border-slate-200 bg-white p-3">
+            <div className="mt-2 grid gap-2 rounded-md border border-slate-200 bg-white p-3 md:grid-cols-2">
               {attrDefs.map((attr) => {
                 const key = attr.key ?? attr.name;
-                const current = filters[key] ?? defaultFilterFor(attr);
                 return (
-                  <div key={key} className="flex items-center gap-3">
-                    <label className="w-32 shrink-0 text-xs font-medium text-slate-600">
-                      {attr.name}
-                    </label>
-                    <AttributeFilterInput
-                      attribute={attr}
-                      value={current}
-                      onChange={(v) => setFilters((prev) => ({ ...prev, [key]: v }))}
-                    />
+                  <div key={key} className="flex min-w-0 items-center gap-2">
+                    <span className="w-32 shrink-0 truncate text-xs font-medium text-slate-600" title={attr.name}>{attr.name}</span>
+                    <AttributeFilterInput attribute={attr} value={filters[key] ?? defaultFilterFor(attr)}
+                                          onChange={(v) => setFilters((prev) => ({ ...prev, [key]: v }))} />
                   </div>
                 );
               })}
               {activeFilterCount(filters) > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setFilters({})}
-                  className="text-xs text-slate-500 hover:text-slate-800"
-                >
-                  Clear filters
+                <button type="button" onClick={() => setFilters({})} className="text-left text-xs text-slate-500 hover:text-slate-800">
+                  Clear field filters
                 </button>
               )}
             </div>
@@ -210,87 +159,65 @@ export function AssetSearch() {
         </div>
       )}
 
-      {assets.isLoading && <p className="mt-4 text-sm text-slate-500">Loading…</p>}
+      <BulkActionsBar
+        selected={selection.selected}
+        kind="asset_uids"
+        label={noun}
+        canTransfer={rights.can_create}
+        bulkDelete={rights.can_delete ? assetsApi.bulkDelete : undefined}
+        onStarted={() => { queryClient.invalidateQueries({ queryKey: ["assets"] }); selection.clear(); }}
+        onClear={selection.clear}
+      />
 
+      {assets.isLoading && <p className="text-sm text-slate-500">Loading…</p>}
+      {assets.isError && <p className="text-sm text-rose-700">The {noun} could not be loaded.</p>}
       {assets.data && (
-        <>
-          <BulkActionsBar
-            selected={selected}
-            kind="asset_uids"
-            label="objects"
-            onStarted={() => {
-              queryClient.invalidateQueries({ queryKey: ["assets"] });
-              setSelected(new Set());
-            }}
-            onClear={() => setSelected(new Set())}
-            bulkDelete={assetsApi.bulkDelete}
-          />
-          <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="w-8 px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={results.length > 0 && selected.size === results.length}
-                      onChange={() =>
-                        setSelected(
-                          selected.size === results.length
-                            ? new Set()
-                            : new Set(results.map((a) => a.uid)),
-                        )
-                      }
-                      aria-label="Select all objects"
-                    />
-                  </th>
-                  <SortHeader label="Name" column="name" sort={sort} onSort={sortBy} />
-                  {showKeys && <SortHeader label="Key" column="key" sort={sort} onSort={sortBy} />}
-                  <SortHeader label="Type" column="type" sort={sort} onSort={sortBy} />
-                  <SortHeader label="Created" column="created" sort={sort} onSort={sortBy} time />
-                  <SortHeader label="Updated" column="updated" sort={sort} onSort={sortBy} time />
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="w-full table-fixed text-sm">
+            <caption className="sr-only">{noun}, sorted by {sort.key}</caption>
+            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+              <tr>
+                <th className="w-10 px-3 py-2"><SelectAll rows={paging.rows.map((a) => a.uid)} selection={selection} noun={noun} /></th>
+                <SortHeader label="Name" column="name" sort={sort} onSort={sortBy} className="px-3 py-2" />
+                {columns.show("key") && <SortHeader label="Key" column="key" sort={sort} onSort={sortBy} className="hidden w-44 px-3 py-2 lg:table-cell" />}
+                {columns.show("type") && <SortHeader label="Type" column="type" sort={sort} onSort={sortBy} className="hidden w-48 px-3 py-2 sm:table-cell" />}
+                {columns.show("updated") && <SortHeader label="Updated" column="updated" sort={sort} onSort={sortBy} time className="hidden w-24 px-3 py-2 md:table-cell" />}
+                {columns.show("created") && <SortHeader label="Created" column="created" sort={sort} onSort={sortBy} time className="hidden w-28 px-3 py-2 md:table-cell" />}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {paging.rows.map((a) => (
+                <tr key={a.uid} className={selection.selected.has(a.uid) ? "bg-sky-50" : "hover:bg-slate-50"}>
+                  <td className="px-3 py-2">
+                    <input type="checkbox" checked={selection.selected.has(a.uid)} onChange={() => selection.toggle(a.uid)}
+                           aria-label={`Select ${a.name}`} />
+                  </td>
+                  <td className="min-w-0 px-3 py-2">
+                    <Link to={`/assets/${a.uid}`} className="block truncate font-medium text-slate-900 hover:underline" title={a.name}>
+                      {a.name}
+                    </Link>
+                    {/* What the hidden columns would say, on a narrow screen. */}
+                    <Clip className="text-xs text-slate-500 sm:hidden" title={`${a.type} · ${a.key}`}>{a.type} · {a.key}</Clip>
+                    {showKeys && !columns.show("key") && <Clip className="hidden font-mono text-xs text-slate-400 sm:block">{a.key}</Clip>}
+                  </td>
+                  {columns.show("key") && <td className="hidden px-3 py-2 font-mono text-xs text-slate-500 lg:table-cell"><Clip>{a.key}</Clip></td>}
+                  {columns.show("type") && (
+                    <td className="hidden px-3 py-2 text-slate-600 sm:table-cell">
+                      <span className="flex min-w-0 items-center gap-1"><Clip>{a.type}</Clip><OwnerBadge workspaceId={a.workspace_id} /></span>
+                    </td>
+                  )}
+                  {columns.show("updated") && <td className="hidden whitespace-nowrap px-3 py-2 text-slate-500 md:table-cell"><ListDate value={a.updated_at} /></td>}
+                  {columns.show("created") && <td className="hidden whitespace-nowrap px-3 py-2 text-slate-500 md:table-cell"><ListDate value={a.created_at} /></td>}
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {results.map((a) => (
-                  <tr key={a.uid} className={selected.has(a.uid) ? "bg-indigo-50/60" : "hover:bg-slate-50"}>
-                    <td className="px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(a.uid)}
-                        onChange={() => toggle(a.uid)}
-                        aria-label={`Select ${a.name}`}
-                      />
-                    </td>
-                    <td className="px-4 py-2 font-medium text-slate-900">
-                      <Link to={`/assets/${a.uid}`} className="hover:underline">
-                        {a.name}
-                      </Link>
-                    </td>
-                    {showKeys && <td className="px-4 py-2 text-slate-500">{a.key}</td>}
-                    <td className="px-4 py-2 text-slate-500">
-                      {a.type}
-                      <OwnerBadge workspaceId={a.workspace_id} />
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-2 text-slate-500"><ListDate value={a.created_at} /></td>
-                    <td className="whitespace-nowrap px-4 py-2 text-slate-500"><ListDate value={a.updated_at} /></td>
-                  </tr>
-                ))}
-                {results.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
-                      No objects match.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-2 text-xs text-slate-400">
-            Showing {results.length} of {assets.data.length}
-          </p>
-        </>
+              ))}
+              {paging.rows.length === 0 && (
+                <tr><td colSpan={1 + columns.count} className="px-4 py-8 text-center text-slate-400">No {noun} match.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
-      </div>
-    </div>
+      {assets.data && <Pager paging={paging} noun={noun} />}
+    </BrowsePage>
   );
 }

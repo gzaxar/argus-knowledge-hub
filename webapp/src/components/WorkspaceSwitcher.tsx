@@ -49,11 +49,15 @@ export function WorkspaceSwitcher() {
   return (
     <div className="relative border-b border-slate-200 px-2 py-2">
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+        aria-expanded={open}
+        aria-label={`Workspace: ${label}. Change workspace`}
+        title={label}
+        className="flex w-full items-center justify-between gap-1 rounded px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
       >
-        <span className="truncate font-medium">{label}</span>
-        <span className="text-slate-400">⌄</span>
+        <span className="min-w-0 truncate font-medium">{label}</span>
+        <span aria-hidden className="shrink-0 text-slate-400">⌄</span>
       </button>
 
       {open && (

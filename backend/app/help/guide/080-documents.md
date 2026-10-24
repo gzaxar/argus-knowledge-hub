@@ -173,7 +173,7 @@ retention runs out, only retired. A document never released (only drafts) can be
 
 ## Find what is written
 
-- **Knowledge base → Search**, or the search box at the top. On the phone: the **Docs** tab, searched, sorted
+- **Documents** (by type, status, text and the type's fields), or the search box at the top. On the phone: the **Docs** tab, searched, sorted
   and narrowed to a type.
 - **Ask ARGUS** searches documents, tickets, comments and the text of attached files (page by page) by meaning,
   in any language.

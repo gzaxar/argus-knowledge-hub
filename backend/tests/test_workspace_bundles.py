@@ -213,7 +213,9 @@ def test_a_demo_round_trips(name, tmp_path):
             assert a[k] == b[k], k
         assert a["plans"] and a["placements"] and a["geometry"]
         if name == "medium-linac":
-            assert len(a["beam_values"]) == 23 and len(a["bindings"]) == 23
+            rows = core.read(DEMOS / name).manifest["families"]
+            assert len(a["beam_values"]) == rows["beam_model_values"]["rows"] > 0
+            assert len(a["bindings"]) == rows["beam_asset_bindings"]["rows"] == rows["beam_model_values"]["rows"]
     finally:
         _drop(first, second)
 
@@ -256,7 +258,12 @@ def test_maps_plans_and_the_tour_render_after_import(admin, tmp_path):
         graph = client.get(f"/v1/beam-paths/{main['uid']}/graph", headers=h)
         assert graph.status_code == 200
         nodes = graph.json()["nodes"]
-        assert len(nodes) == 21 and [n["s"] for n in nodes] == sorted(n["s"] for n in nodes)
+        model = core.read(DEMOS / "medium-linac").rows("beam_model_documents")[0]["document"]
+        placed = next(p for p in model["paths"] if p["id"] == "linac-line")["placements"]
+        assert len(nodes) == len(placed) and [n["s"] for n in nodes] == sorted(n["s"] for n in nodes)
+        types = client.get("/v1/schemas", headers=h)
+        assert types.status_code == 200, types.text           # the sidebar's type tree
+        assert "Beamline Component" in {t["name"] for t in types.json()}
         tour = client.get(f"/v1/workspaces/{ws}/tour", headers=h).json()["tour"]
         assert tour["synthetic"] and tour["steps"][0]["link"] == "/map"
         assert site is not None
@@ -270,6 +277,37 @@ def test_maps_plans_and_the_tour_render_after_import(admin, tmp_path):
                 assert client.get(f"/v1/documents/{link.split('/')[2]}", headers=h).status_code == 200, link
     finally:
         _drop(ws)
+
+
+def test_the_it_demo_lists_its_types_and_records_after_import(admin):
+    ws = f"e2e-it-{secrets.token_hex(3)}"
+    try:
+        r = client.post("/v1/admin/bundles/demos/it-services/apply", json={"workspace_id": ws, "name": "E2E IT"})
+        assert r.status_code == 200 and r.json()["ok"], r.text
+        h = {"X-Workspace-Id": ws}
+        types = client.get("/v1/schemas", headers=h)
+        assert types.status_code == 200, types.text
+        assert "IT Service" in {t["name"] for t in types.json()}
+        for path in ("/v1/assets", "/v1/issues", "/v1/documents",
+                     "/v1/activities?from=2026-01-01T00:00:00Z&to=2027-01-01T00:00:00Z"):
+            assert client.get(path, headers=h).status_code == 200, path
+    finally:
+        _drop(ws)
+
+
+@pytest.mark.parametrize("name", ["it-services", "medium-linac"])
+def test_a_demo_type_holds_its_attributes_as_a_list(name):
+    for t in core.read(DEMOS / name).rows("types"):
+        assert isinstance(t["attributes"], list), t["name"]
+
+
+def test_a_type_with_malformed_attributes_blocks(tmp_path):
+    root = _copy("it-services", tmp_path)
+    types = _rows(root, "types")
+    types[0]["attributes"] = {}
+    _write(root, "types", types)
+    _reseal(root)
+    assert any("not a list" in b["detail"] for b in _blocked(root, tmp_path))
 
 
 # --------------------------------------------------------------------------- refused imports

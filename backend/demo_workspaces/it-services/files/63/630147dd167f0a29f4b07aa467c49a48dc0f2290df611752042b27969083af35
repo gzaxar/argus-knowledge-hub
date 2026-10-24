@@ -8,7 +8,7 @@
 <rect x="60" y="300" width="200" height="40" rx="6" fill="#f1f5f9" stroke="#334155"/><text x="160" y="325" text-anchor="middle">DIST-SW-DH (Data Hall A)</text>
 <rect x="350" y="300" width="200" height="40" rx="6" fill="#f1f5f9" stroke="#334155"/><text x="450" y="325" text-anchor="middle">ACC-SW-LIB (Library, fibre)</text>
 <rect x="640" y="300" width="200" height="40" rx="6" fill="#f1f5f9" stroke="#334155"/><text x="740" y="325" text-anchor="middle">ACC-SW-ANX (Annex, fibre)</text>
-<rect x="40" y="400" width="240" height="40" rx="6" fill="#ede9fe" stroke="#5b21b6"/><text x="160" y="425" text-anchor="middle">HV-01..04, STOR-01, NAS-01</text>
+<rect x="40" y="400" width="240" height="40" rx="6" fill="#ede9fe" stroke="#5b21b6"/><text x="160" y="418" text-anchor="middle">HV-01..04, STOR-01, NAS-01</text><text x="160" y="436" text-anchor="middle" font-size="13">GPU-01..04, LOGIN-01 (+ 200G fabric)</text>
 <rect x="350" y="400" width="200" height="40" rx="6" fill="#ede9fe" stroke="#5b21b6"/><text x="450" y="425" text-anchor="middle">4 access points (Wi-Fi 6E)</text>
 <rect x="640" y="400" width="200" height="40" rx="6" fill="#ede9fe" stroke="#5b21b6"/><text x="740" y="425" text-anchor="middle">BKP-01, TAPE-01</text>
 <g stroke="#334155" stroke-width="2"><line x1="400" y1="64" x2="330" y2="100"/><line x1="500" y1="64" x2="570" y2="100"/>

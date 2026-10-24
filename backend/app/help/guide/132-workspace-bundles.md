@@ -50,11 +50,14 @@ bundle twice gives two independent copies.
 Two fictional workspaces ship with ARGUS, under **Demo workspaces**:
 
 * **IT Services** — Northfield IT Services: a service catalogue (network, internet, Wi-Fi, mail, DNS, hosting,
-  storage, backup, monitoring, service desk, VPN), three buildings with floor plans, racks and the equipment in
-  them, dependencies, incidents, requests and changes, runbooks, contracts and SLAs.
+  storage, backup, monitoring, service desk, VPN, HPC and LLM inference), three buildings with floor plans, racks
+  and the equipment in them, a GPU cluster, user workstations, the network port to port (cables between ports,
+  ports on VLANs), dependencies, incidents, requests and changes, runbooks, contracts and SLAs.
 * **Medium Linac Facility** — the Valmora Linac Laboratory: a site map, the accelerator building with its
   bunker and klystron gallery, utilities, administration, radiation areas, a beam model from the gun to the
-  dumps bound to its physical units, RF, power, vacuum, cooling, controls, procurement, documents and issues.
+  dumps bound to its physical units, motors and actuators, PBS codes with work packages and machine modules,
+  each consumer's utility requirements and the services that meet them (cooling water, compressed air,
+  nitrogen, electrical distribution), RF, vacuum, controls, procurement, documents and issues.
 
 **Install as a new workspace…**, **Preview**, **Apply**. Their cockpit opens with **Start exploring**: a few
 steps from the map to a building, a rack or the bunker, a record, its dependencies, an issue, planned work and a

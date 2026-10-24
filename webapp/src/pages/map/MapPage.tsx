@@ -7,7 +7,8 @@ import { GeoShape } from "../../lib/geo";
 import { AffineImage } from "../../lib/affineOverlay";
 import { usePlanImage } from "../../components/PlanView";
 import { indoorApi, type FloorPlanView } from "../../api/client";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { ViewSwitch } from "../../components/browse/Browse";
 import { MAP_TILES, placesApi, schemasApi, workspacesApi, type LocationImport, type MapFeature, type MapFilters } from "../../api/client";
 import { useShowKeys } from "../../api/displayPrefs";
 import { openInWorkspace } from "../../api/session";
@@ -34,7 +35,12 @@ export function MapPage() {
   const queryClient = useQueryClient();
   const [bbox, setBbox] = useState<[number, number, number, number] | null>(null);
   const [map, setMap] = useState<LeafletMap | null>(null);
-  const [filters, setFilters] = useState<MapFilters>({});
+  // Opened from the Assets list (`?types=`): the same type filter, so List and Map show the same records.
+  const [params] = useSearchParams();
+  const [filters, setFilters] = useState<MapFilters>(() => {
+    const t = params.get("types");
+    return t ? { types: t.split(",").filter(Boolean) } : {};
+  });
   const [radius, setRadius] = useState(200);
   const [centre, setCentre] = useState<[number, number] | null>(null);
 
@@ -91,7 +97,13 @@ export function MapPage() {
     <div className="-m-6 flex h-[calc(100vh-3.5rem)] min-h-0">
       <aside className="w-80 shrink-0 space-y-4 overflow-y-auto border-r border-slate-200 bg-white p-4 text-sm">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Map</h1>
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="text-xl font-semibold text-slate-900">Map</h1>
+            <ViewSwitch views={[
+              { label: "List", to: `/assets/search${filters.types?.length === 1 ? `?type=${encodeURIComponent(filters.types[0])}` : ""}`, current: false },
+              { label: "Map", to: "/map", current: true },
+            ]} />
+          </div>
           <p className="text-xs text-slate-500">
             Records with an approved location — points, routes and outlines. {features.data && `${features.data.features.length} in view`}
             {features.data?.truncated && " (only the first 2000: zoom in)"}

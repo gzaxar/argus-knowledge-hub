@@ -11,7 +11,8 @@ a **type**, which decides its attributes.
 
 ## Find equipment
 
-- **Assets → Browse & search**: filter by type, text and attributes.
+- **Assets**: choose a type in the type panel, search by name, key, label or serial, and filter by the type's fields;
+  **Map** shows the same records on the map.
 - The **search box** at the top (Ctrl K / ⌘ K) finds assets, tickets and documents together.
 - **Ask ARGUS** answers in your own words ("which ion pumps are in the gun area?").
 - On the phone, **Scan label** reads its QR code, barcode, serial or printed nameplate; the **Assets** tab
@@ -103,7 +104,7 @@ it**: *S/N:*, *Serial No.*, *Matricola*, *Inv.*, *P/N*, or a GS1 barcode's *(21)
   the key, the other has it as a former key or alias) — then none opens: you **choose** the one in front of
   you, with each one's key, type, workspace and identifiers.
 
-The search boxes (on the web, *Browse & search* and the search at the top; on the phone, Home and Assets) find
+The search boxes (on the web, *Assets* and the search at the top; on the phone, Home and Assets) find
 equipment by the same names: key, name, former key, alias, any label, serial and inventory number.
 
 ## Change many at once
