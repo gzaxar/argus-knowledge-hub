@@ -50,8 +50,9 @@ bundle twice gives two independent copies.
 Two fictional workspaces ship with ARGUS, under **Demo workspaces**:
 
 * **IT Services** — Northfield IT Services: a service catalogue (network, internet, Wi-Fi, mail, DNS, hosting,
-  storage, backup, monitoring, service desk, VPN), three buildings with floor plans, racks and the equipment in
-  them, dependencies, incidents, requests and changes, runbooks, contracts and SLAs.
+  storage, backup, monitoring, service desk, VPN, HPC and LLM inference), three buildings with floor plans, racks
+  and the equipment in them, a GPU cluster, user workstations, the network port to port (cables between ports,
+  ports on VLANs), dependencies, incidents, requests and changes, runbooks, contracts and SLAs.
 * **Medium Linac Facility** — the Valmora Linac Laboratory: a site map, the accelerator building with its
   bunker and klystron gallery, utilities, administration, radiation areas, a beam model from the gun to the
   dumps bound to its physical units, motors and actuators, PBS codes with work packages and machine modules,
