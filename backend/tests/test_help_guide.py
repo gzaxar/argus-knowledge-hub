@@ -44,7 +44,7 @@ def test_the_guide_names_only_pages_that_exist():
     """A guide that sends people to a page the app does not have is worse than none: the side bar and
     administration labels it cites must be the app's."""
     body = "\n".join(t.body for t in guide.topics())
-    for label in ("Browse & search", "Type catalogue", "Labels & QR codes", "Bulk changes", "Channels ↔ hardware",
+    for label in ("Workspace settings", "Columns", "Type catalogue", "Labels & QR codes", "Bulk changes", "Channels ↔ hardware",
                   "Map imported records", "Review queue", "Knowledge graph", "Ask ARGUS", "AI endpoint",
                   "Administration → Portability", "Download checkpoint (.tar)", "Fetch into quarantine",
                   "Output-token limit", "Check endpoint", "Build the index", "Add a repository",

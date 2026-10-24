@@ -7,3 +7,17 @@ body,
 #root {
   height: 100%;
 }
+
+/* Keyboard focus is always visible (a mouse click does not show it). */
+@layer base {
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid #0284c7;
+    outline-offset: 2px;
+  }
+}

@@ -23,7 +23,6 @@ import { MapPage } from "./pages/map/MapPage";
 import { DocumentDetail } from "./pages/documents/Detail";
 import { DocumentForm } from "./pages/documents/Form";
 import { DocumentList } from "./pages/documents/List";
-import { DocumentSearch } from "./pages/documents/Search";
 import { DocumentSuggestions } from "./pages/documents/Suggestions";
 import { GlobalValueForm } from "./pages/globalvalues/Form";
 import { Ask } from "./pages/ai/Ask";
@@ -41,7 +40,6 @@ import { IssueBoard } from "./pages/issues/Board";
 import { IssueDetail } from "./pages/issues/Detail";
 import { IssueForm } from "./pages/issues/Form";
 import { IssueList } from "./pages/issues/List";
-import { IssueSearch } from "./pages/issues/Search";
 import { LabelList } from "./pages/labels/List";
 import { ReviewQueuePage } from "./pages/review/Queue";
 import { MigrationPage } from "./pages/migration/Domains";
@@ -108,6 +106,7 @@ export function App() {
           <Route path="/schemas/:uid/edit" element={<SchemaForm />} />
 
           <Route path="/assets/search" element={<AssetSearch />} />
+          <Route path="/assets" element={<KeepQuery to="/assets/search" />} />
           <Route path="/search/advanced" element={<AdvancedSearch />} />
           <Route path="/map" element={<MapPage />} />
           <Route path="/assets/new" element={<AssetForm />} />
@@ -118,13 +117,13 @@ export function App() {
           <Route path="/tickets" element={<IssueList />} />
           <Route path="/tickets/board" element={<IssueBoard />} />
           <Route path="/tickets/workflows" element={<WorkflowsPage />} />
-          <Route path="/tickets/search" element={<IssueSearch />} />
+          <Route path="/tickets/search" element={<KeepQuery to="/tickets" />} />
           <Route path="/tickets/new" element={<IssueForm />} />
           <Route path="/tickets/:uid" element={<IssueDetail />} />
           <Route path="/tickets/:uid/edit" element={<IssueForm />} />
 
           <Route path="/documents" element={<DocumentList />} />
-          <Route path="/documents/search" element={<DocumentSearch />} />
+          <Route path="/documents/search" element={<KeepQuery to="/documents" />} />
           <Route path="/documents/suggestions" element={<DocumentSuggestions />} />
           <Route path="/documents/new" element={<DocumentForm />} />
           <Route path="/documents/reshape" element={<DocumentReshape />} />
@@ -202,4 +201,11 @@ export function App() {
       </Routes>
     </TokenGate>
   );
+}
+
+
+/** A page that moved: the old address opens the new one, with its filters. */
+function KeepQuery({ to }: { to: string }) {
+  const { search } = useLocation();
+  return <Navigate to={`${to}${search}`} replace />;
 }

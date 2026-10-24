@@ -10,7 +10,8 @@ type Kind = "asset_uids" | "document_uids" | "issue_uids";
 
 /** A bulk action bar — "copy/move N selected to workspace…" plus, where a
  * `bulkDelete` call is given, "Delete N selected". One bar, reused on every
- * list page that supports selecting assets, documents or tickets. */
+ * list page that supports selecting assets, documents or tickets. It appears
+ * only once something is selected: an empty bar is only noise above a list. */
 export function BulkActionsBar({
   selected,
   kind,
@@ -18,6 +19,8 @@ export function BulkActionsBar({
   onStarted,
   onClear,
   bulkDelete,
+  canTransfer = true,
+  extra,
 }: {
   selected: Set<string>;
   kind: Kind;
@@ -27,6 +30,11 @@ export function BulkActionsBar({
   /** Enables the Delete button when given. Called with the selected uids;
    * onStarted() runs afterward the same way it does for copy/move. */
   bulkDelete?: (uids: string[]) => Promise<BulkDeleteResult>;
+  /** Copying or moving needs the right to create (and, to move, to delete) here; without it the bar offers
+   * neither. The server checks again. */
+  canTransfer?: boolean;
+  /** Further actions of this list (a document's "move to type"). */
+  extra?: React.ReactNode;
 }) {
   const navigate = useNavigate();
   const workspaceId = useCurrentWorkspaceId();
@@ -54,53 +62,54 @@ export function BulkActionsBar({
     onError: () => alert(`Could not delete those ${label}.`),
   });
 
+  if (selected.size === 0) return null;
   return (
-    <div className="mt-3 flex h-12 flex-wrap items-center gap-3 rounded border border-slate-200 bg-white px-3">
-      {selected.size === 0 ? (
-        <span className="text-sm text-slate-400">
-          Select {label} to copy, move or delete them.
-        </span>
-      ) : (
+    <div role="region" aria-label={`Actions on the selected ${label}`}
+         className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm shadow-sm">
+      <span className="font-medium text-slate-800" aria-live="polite">{selected.size} selected</span>
+      {extra}
+      {canTransfer && (
         <>
-          <span className="text-sm text-slate-600">{selected.size} selected</span>
+          {extra && <span aria-hidden className="text-slate-300">|</span>}
+          <label className="sr-only" htmlFor={`bulk-mode-${kind}`}>Copy or move</label>
           <select
+            id={`bulk-mode-${kind}`}
             value={mode}
             onChange={(e) => setMode(e.target.value as TransferMode)}
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
+            className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
           >
             <option value="copy">Copy</option>
             <option value="move">Move</option>
           </select>
-          <span className="text-sm text-slate-400">to</span>
+          <span className="text-slate-500">to</span>
           <WorkspaceTargetPicker excludeWorkspaceId={workspaceId} value={target} onChange={setTarget} />
           <button
+            type="button"
             onClick={() => transfer.mutate()}
             disabled={!target || transfer.isPending}
             className="rounded bg-slate-900 px-3 py-1 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
           >
             {transfer.isPending ? "Starting…" : mode === "copy" ? "Copy" : "Move"}
           </button>
-          {bulkDelete && (
-            <>
-              <span className="text-sm text-slate-300">|</span>
-              <button
-                onClick={() => {
-                  if (confirm(`Delete ${selected.size} ${label}? This cannot be undone.`)) {
-                    deleteMutation.mutate();
-                  }
-                }}
-                disabled={deleteMutation.isPending}
-                className="rounded border border-red-200 px-3 py-1 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
-              >
-                {deleteMutation.isPending ? "Deleting…" : "Delete"}
-              </button>
-            </>
-          )}
-          <button onClick={onClear} className="text-sm text-slate-500 hover:underline">
-            Clear
-          </button>
         </>
       )}
+      {bulkDelete && (
+        <button
+          type="button"
+          onClick={() => {
+            if (confirm(`Delete ${selected.size} ${label}? This cannot be undone.`)) {
+              deleteMutation.mutate();
+            }
+          }}
+          disabled={deleteMutation.isPending}
+          className="rounded border border-red-200 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+        >
+          {deleteMutation.isPending ? "Deleting…" : "Delete"}
+        </button>
+      )}
+      <button type="button" onClick={onClear} className="ml-auto text-sm text-slate-600 hover:underline">
+        Clear selection
+      </button>
     </div>
   );
 }
