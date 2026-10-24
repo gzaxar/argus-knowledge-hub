@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- ARGUS: a C-shaped dipole magnet seen along the beam: the yoke, its two poles, the beam in the gap -->
+  <path d="M20 4h-14a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h14v-5h-9v-6h9z" />
+  <path d="M16 12h.01" />
+</svg>

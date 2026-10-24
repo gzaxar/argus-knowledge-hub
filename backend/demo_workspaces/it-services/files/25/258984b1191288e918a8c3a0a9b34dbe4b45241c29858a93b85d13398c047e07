@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" width="600" height="360">
+<rect x="0" y="0" width="600" height="360" fill="#ffffff"/>
+<rect x="2" y="2" width="596" height="296" fill="#f8fafc" stroke="#0f172a" stroke-width="6"/>
+<rect x="20" y="20" width="340" height="260" fill="#e0f2fe" stroke="#334155" stroke-width="3"/>
+<text x="190" y="50" font-family="Helvetica, Arial, sans-serif" font-size="34" text-anchor="middle" fill="#0f172a" font-weight="bold">Data Hall A</text>
+<text x="190" y="84" font-family="Helvetica, Arial, sans-serif" font-size="20" text-anchor="middle" fill="#475569">H0.10</text>
+<rect x="380" y="20" width="200" height="120" fill="#e0f2fe" stroke="#334155" stroke-width="3"/>
+<text x="480" y="50" font-family="Helvetica, Arial, sans-serif" font-size="14" text-anchor="middle" fill="#0f172a" font-weight="bold">Operations Room (NOC)</text>
+<text x="480" y="64.2857" font-family="Helvetica, Arial, sans-serif" font-size="9" text-anchor="middle" fill="#475569">H0.20</text>
+<rect x="380" y="160" width="120" height="120" fill="#e0f2fe" stroke="#334155" stroke-width="3"/>
+<text x="440" y="190" font-family="Helvetica, Arial, sans-serif" font-size="14" text-anchor="middle" fill="#0f172a" font-weight="bold">Network Room (MDF)</text>
+<text x="440" y="204" font-family="Helvetica, Arial, sans-serif" font-size="8" text-anchor="middle" fill="#475569">H0.21</text>
+<rect x="510" y="160" width="70" height="120" fill="#e0f2fe" stroke="#334155" stroke-width="3"/>
+<text x="545" y="190" font-family="Helvetica, Arial, sans-serif" font-size="14" text-anchor="middle" fill="#0f172a" font-weight="bold">Power Room</text>
+<text x="545" y="204" font-family="Helvetica, Arial, sans-serif" font-size="8" text-anchor="middle" fill="#475569">H0.22</text>
+<rect x="49" y="89" width="22" height="22" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="60" y="127" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">R-A01</text>
+<rect x="99" y="89" width="22" height="22" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="110" y="127" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">R-A02</text>
+<rect x="149" y="89" width="22" height="22" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="160" y="127" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">R-A03</text>
+<rect x="199" y="89" width="22" height="22" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="210" y="127" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">R-A04</text>
+<rect x="249" y="89" width="22" height="22" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="260" y="127" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">R-A05</text>
+<rect x="299" y="89" width="22" height="22" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="310" y="127" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">R-A06</text>
+<rect x="429" y="229" width="22" height="22" fill="#e2e8f0" stroke="#1e293b" stroke-width="2"/>
+<text x="440" y="267" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">R-MDF1</text>
+<rect x="27.5" y="227.5" width="25" height="25" fill="#bae6fd" stroke="#1e293b" stroke-width="2"/>
+<text x="40" y="268.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">CRAC-01</text>
+<rect x="317.5" y="227.5" width="25" height="25" fill="#bae6fd" stroke="#1e293b" stroke-width="2"/>
+<text x="330" y="268.5" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">CRAC-02</text>
+<rect x="530" y="240" width="20" height="20" fill="#fde68a" stroke="#1e293b" stroke-width="2"/>
+<text x="540" y="276" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">UPS-01</text>
+<rect x="530" y="190" width="20" height="20" fill="#fde68a" stroke="#1e293b" stroke-width="2"/>
+<text x="540" y="226" font-family="Helvetica, Arial, sans-serif" font-size="13" text-anchor="middle" fill="#1e293b">UPS-02</text>
+<g transform="translate(550,60)"><polygon points="0,-30 10,0 -10,0" fill="#0f172a"/><text x="0" y="22" font-family="Helvetica, Arial, sans-serif" font-size="18" text-anchor="middle">N</text></g>
+<text x="12" y="325" font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#0f172a" font-weight="bold">Hub Building — ground floor</text>
+<text x="12" y="350" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#b91c1c">Synthetic demo plan — not a real building · scale 1 m = 10 px</text>
+</svg>

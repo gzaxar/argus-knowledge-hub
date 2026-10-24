@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { portabilityApi, problemText, workspacesApi } from "../../../api/client";
 import type { PortabilityConfig } from "../../../api/portabilityTypes";
+import { Bundles } from "./Bundles";
 import { SchedulesList } from "./Schedules";
 import { Setup } from "./Setup";
 import { Labels, StateBadge, when } from "./shared";
@@ -13,8 +14,10 @@ export function PortabilityPage() {
   const [params, setParams] = useSearchParams();
   const config = useQuery({ queryKey: ["portability-config"], queryFn: portabilityApi.config });
   const wanted = params.get("tab");
-  const tab = wanted === "imports" ? "imports" : wanted === "setup" && config.data?.is_admin ? "setup" : "exports";
-  const tabs = config.data?.is_admin ? (["exports", "imports", "setup"] as const) : (["exports", "imports"] as const);
+  const admin = !!config.data?.is_admin;
+  const tab = wanted === "imports" ? "imports" : wanted === "setup" && admin ? "setup"
+    : wanted === "bundles" && admin ? "bundles" : "exports";
+  const tabs = admin ? (["exports", "imports", "setup", "bundles"] as const) : (["exports", "imports"] as const);
 
   return (
     <div className="max-w-6xl space-y-4">
@@ -33,12 +36,12 @@ export function PortabilityPage() {
           <button key={t} type="button" onClick={() => setParams({ tab: t })}
                   className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${tab === t
                     ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
-            {t === "exports" ? "Exports" : t === "imports" ? "Imports" : "Set-up"}
+            {t === "exports" ? "Exports" : t === "imports" ? "Imports" : t === "setup" ? "Set-up" : "Workspace bundles"}
           </button>
         ))}
       </div>
       {config.data && (tab === "exports" ? <Exports c={config.data} /> : tab === "imports" ? <Imports c={config.data} />
-        : <Setup c={config.data} />)}
+        : tab === "bundles" ? <Bundles /> : <Setup c={config.data} />)}
     </div>
   );
 }

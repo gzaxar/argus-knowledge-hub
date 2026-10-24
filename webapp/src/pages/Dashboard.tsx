@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { activitiesApi, hubApi } from "../api/client";
 import type { HubOverview } from "../api/hubTypes";
+import { DemoTour } from "../components/demo/DemoTour";
 import { Card, DocumentRow, Empty, KindBadge, StatTile, TicketRow, relativeTime } from "../components/hub/ui";
 
 /**
@@ -19,6 +20,7 @@ export function Dashboard() {
   const o = overview.data;
   return (
     <div className="mx-auto max-w-7xl space-y-6">
+      <DemoTour />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Operations cockpit</h1>
