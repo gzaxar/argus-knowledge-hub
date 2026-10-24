@@ -1,8 +1,8 @@
 {
-  "created_at": "2026-10-24T12:06:54.196674+00:00",
+  "created_at": "2026-10-24T15:37:56.038124+00:00",
   "created_by": "ARGUS demo authors",
   "demo": {
-    "description": "A medium-sized IT organisation: a service catalogue (network, internet, Wi-Fi, mail, DNS, hosting, storage, backup, monitoring, service desk, VPN), three buildings with floors, rooms and racks, mapped and placed equipment, dependencies, incidents, requests and changes, maintenance activities, runbooks, contracts and SLAs.",
+    "description": "A medium-sized IT organisation: a service catalogue (network, internet, Wi-Fi, mail, DNS, hosting, storage, backup, monitoring, service desk, VPN, HPC, LLM inference), three buildings with floors, rooms and racks, a GPU cluster for HPC and LLM inference, user workstations, a port-to-port network map, mapped and placed equipment, dependencies, incidents, requests and changes, maintenance activities, runbooks, contracts and SLAs.",
     "notice": "Synthetic demo: Northfield IT Services, its people, suppliers, addresses and figures are fictional. Nothing here describes a real organisation or real equipment.",
     "organisation": "Northfield IT Services (fictional)",
     "steps": [
@@ -27,9 +27,19 @@
         "title": "Follow a piece of equipment"
       },
       {
+        "link": "/documents/nf-doc-port-map",
+        "text": "Every link is a cable between two ports, and each access port is on its VLAN. The port map lists them; a ticket even points at a single switch port.",
+        "title": "Follow a cable, port to port"
+      },
+      {
         "link": "/assets/nf-svc-mail",
         "text": "Email depends on Virtual Hosting, DNS and the Campus Network, and is provided by the mail server on hypervisor host 01.",
         "title": "See what a service depends on"
+      },
+      {
+        "link": "/assets/nf-svc-llm",
+        "text": "LLM Inference runs on GPU-03 and GPU-04 behind a gateway; HPC Batch on GPU-01, GPU-02, a login node and scratch storage, over a 200 Gb/s fabric.",
+        "title": "HPC and LLM services"
       },
       {
         "link": "/tickets/nf-t-001",
@@ -65,13 +75,13 @@
     },
     "activities": {
       "file": "records/activities.jsonl",
-      "rows": 7,
-      "sha256": "21e94d90c70b898f24949a566f9f0b0ca98c6d45de111c1716916dac689e6c95"
+      "rows": 8,
+      "sha256": "83285ad59ad436758b7bac27eea4fd410778e0a6dde653b1a4528b782b3def7c"
     },
     "activity_series": {
       "file": "records/activity_series.jsonl",
-      "rows": 3,
-      "sha256": "77ffcbd1a44bdb1711a6d5191869a0d281e0036ed2bd195e5eca1e88f22229d8"
+      "rows": 6,
+      "sha256": "3b5066e494f75c74c0b4c96213154f243e2306100137775bd242ac5ca8a30182"
     },
     "activity_workspaces": {
       "file": "records/activity_workspaces.jsonl",
@@ -85,18 +95,18 @@
     },
     "asset_comments": {
       "file": "records/asset_comments.jsonl",
-      "rows": 2,
-      "sha256": "ab6b1cdade02d1e25a81a1dc49a9127a9fa34cfd1ad18659bfa312fcd08fd564"
+      "rows": 3,
+      "sha256": "8e6391ab18c06701cbc85bbecf365d409123e7c412a09002e82d43ebc5ddf782"
     },
     "asset_history": {
       "file": "records/asset_history.jsonl",
-      "rows": 206,
-      "sha256": "89260bc7ac84955aef61e738d5287edb4b33bc3bf514998366f216d1dfe3960b"
+      "rows": 429,
+      "sha256": "e830ab958617d9bd3e166b780d3acca01cd791060c2582f4688c96b70cf2c77a"
     },
     "asset_labels": {
       "file": "records/asset_labels.jsonl",
       "rows": 9,
-      "sha256": "dc46ab92c49da9f27690d550f8e4af1367049b664f60b1fdb9b9b3c81c884df2"
+      "sha256": "4fde39b15cda0ef4f7504c0f71cd0769b5dbfe74ce2d08408aaa516eeb82eccc"
     },
     "asset_tickets": {
       "file": "records/asset_tickets.jsonl",
@@ -105,13 +115,13 @@
     },
     "assets": {
       "file": "records/assets.jsonl",
-      "rows": 107,
-      "sha256": "6a15ef432f72f19e250207e803c8b7db2e86951d30768060aec5de8278043872"
+      "rows": 284,
+      "sha256": "b3663f0e3069ffa8c602a19de25ffdb31febd2ca451caa9434e05c01ca0f0294"
     },
     "attachments": {
       "file": "records/attachments.jsonl",
       "rows": 2,
-      "sha256": "b7571cff3c47a5ec824490d0e28af3249806a29b36371c5c920c6583e1408ca9"
+      "sha256": "cf82fcf889fb3da7087502b4a70ea697cb41f10daead9040f962849a22e66981"
     },
     "beam_asset_bindings": {
       "file": "records/beam_asset_bindings.jsonl",
@@ -135,13 +145,13 @@
     },
     "document_relations": {
       "file": "records/document_relations.jsonl",
-      "rows": 38,
-      "sha256": "11160437300331e53fb9cf8fafba06015e6e810f90c0a08c3a8e0b9f794773ad"
+      "rows": 100,
+      "sha256": "feef6eaa3c66d77739bf9b6bdedc0753727107b054639d26f18c445dac171d59"
     },
     "document_revisions": {
       "file": "records/document_revisions.jsonl",
-      "rows": 10,
-      "sha256": "580634b601f34c48f932776dbb7f091264167f5ba74c05aad21d3d88d5cd058c"
+      "rows": 13,
+      "sha256": "97798472434a349b0260157df4af916ad32124bff53ece83ff4bf5e3b7ce8544"
     },
     "document_template_versions": {
       "file": "records/document_template_versions.jsonl",
@@ -155,8 +165,8 @@
     },
     "documents": {
       "file": "records/documents.jsonl",
-      "rows": 10,
-      "sha256": "c31b365aeb482e2d3709f07ecd3da72a6f073feef7efa12d1aeb447735d1a4d8"
+      "rows": 13,
+      "sha256": "eaae21145231cc1cb59239f093a2ec17d90236b3961fb41f1f9a8ac861b4b7ed"
     },
     "equipment_class_requests": {
       "file": "records/equipment_class_requests.jsonl",
@@ -166,12 +176,12 @@
     "floor_plans": {
       "file": "records/floor_plans.jsonl",
       "rows": 4,
-      "sha256": "f3565cc1d241aa3df9468f15f2f86926baad66bcac7e095980136a134da7405d"
+      "sha256": "d44f3da00774cfbdd670d8e1a1090ca4ac851c5184a9edf72784a496346c6aff"
     },
     "global_values": {
       "file": "records/global_values.jsonl",
       "rows": 3,
-      "sha256": "c06d65dbaa49784ce8e317d2fc3eadf9041deb6a7e7a13342565edc0436a3651"
+      "sha256": "f6c9d9f49e1b985bb98b81debff19be57194c1bb5356720c44fdc85aeff6691a"
     },
     "golden_incidents": {
       "file": "records/golden_incidents.jsonl",
@@ -181,7 +191,7 @@
     "icons": {
       "file": "records/icons.jsonl",
       "rows": 66,
-      "sha256": "54916fdd6569d2e719fa1aa4523f3b56f2ec2fe4ddad1332692661a34a8c2701"
+      "sha256": "cf434e1e9b4722fa7f1e9aa073b923b0a272557ac1a8db2091f2fa31eaf65fe0"
     },
     "import_configs": {
       "file": "records/import_configs.jsonl",
@@ -195,8 +205,8 @@
     },
     "indoor_placements": {
       "file": "records/indoor_placements.jsonl",
-      "rows": 47,
-      "sha256": "ef8c345e8a99799c768976339f99f1ac9e686d2d5e58acce9226f88cf8a4d7f0"
+      "rows": 70,
+      "sha256": "52833359b72ef652a289af65022107b35902feeb04c96ba2d9e543ad6f61ce5b"
     },
     "llm_configs": {
       "file": "records/llm_configs.jsonl",
@@ -210,8 +220,8 @@
     },
     "memberships": {
       "file": "records/memberships.jsonl",
-      "rows": 4,
-      "sha256": "54a9c7ade962c216606671cd3a9660af80c6d17bd20828916c344bd6662a1a05"
+      "rows": 5,
+      "sha256": "9f1a676273b328484696f81db6f5809e5d9489bc752ff4ba90b278d5cbe75529"
     },
     "notification_subscriptions": {
       "file": "records/notification_subscriptions.jsonl",
@@ -220,13 +230,13 @@
     },
     "people": {
       "file": "records/people.jsonl",
-      "rows": 4,
-      "sha256": "2080cca168aa73c6457d17b39f95d22a245a3123f5dc91f8957eaa8ef29b8de4"
+      "rows": 5,
+      "sha256": "03afaf6395f08fdb2a8e921bdcb48a207d8224e9b32070a900558f4c077dee5b"
     },
     "place_levels": {
       "file": "records/place_levels.jsonl",
       "rows": 4,
-      "sha256": "bf79f4b50753534816ad7b5ef11833837e70887f5c19bb2d92c4ed211130af5a"
+      "sha256": "5bf624be99f6c96e919ddad25b079efe3aee255b30dd6988b500c1a4b5834d9c"
     },
     "record_watchers": {
       "file": "records/record_watchers.jsonl",
@@ -235,8 +245,8 @@
     },
     "relations": {
       "file": "records/relations.jsonl",
-      "rows": 117,
-      "sha256": "4e5a350f8e47da46664307f7111e02742a7f156b5cee66dc1a7df65978e43332"
+      "rows": 416,
+      "sha256": "fe853d2852cc0295d651174409628e759ad1aea50e5e034fcfd8a6ec4230574d"
     },
     "review_escalations": {
       "file": "records/review_escalations.jsonl",
@@ -255,13 +265,13 @@
     },
     "spatial_features": {
       "file": "records/spatial_features.jsonl",
-      "rows": 52,
-      "sha256": "1c411221a6ad94308b65c186170636a845c79ea8f4255a13bdf2757484806f09"
+      "rows": 75,
+      "sha256": "feb2c2769e438099be3b267e55821a44ca3d569403ade0d1140cada9b46aaa17"
     },
     "ticket_comments": {
       "file": "records/ticket_comments.jsonl",
-      "rows": 3,
-      "sha256": "9dea5c82f9c0a387b8c2a38d13bf3e713d53720b7e4dd85dbd4cc6e9869c8131"
+      "rows": 5,
+      "sha256": "8ff25ecb7e918302f968a206cab83473d23ee1944a141f2cde2a8e8a17291d81"
     },
     "ticket_escalations": {
       "file": "records/ticket_escalations.jsonl",
@@ -270,8 +280,8 @@
     },
     "ticket_history": {
       "file": "records/ticket_history.jsonl",
-      "rows": 20,
-      "sha256": "15c37d5fe1bd1fa12c3ac6a6726208019517d07a25cd884b890ee8edf947f8a3"
+      "rows": 27,
+      "sha256": "613aa01b1995b14fcdb791d7db802122649f48d2f607ff83c4db93d1291c6416"
     },
     "ticket_links": {
       "file": "records/ticket_links.jsonl",
@@ -286,27 +296,27 @@
     "ticket_workflows": {
       "file": "records/ticket_workflows.jsonl",
       "rows": 4,
-      "sha256": "d0ed8349df2a2ea01b15e55b112f031f6524386d1d58f3077f515a58dd1a28ad"
+      "sha256": "059d64312162ba384013311621fbbf1e39a4ed56cabcd2ebdc77a753d26e29d1"
     },
     "tickets": {
       "file": "records/tickets.jsonl",
-      "rows": 12,
-      "sha256": "e821445476d962fe21a578bba53cbf73179d608c89963055f43fe08ced37ab67"
+      "rows": 16,
+      "sha256": "38db9b29f2bb4e1a48ae6bd75fc70f861bc7d1c54bea83de9a568c2e14b53bb3"
     },
     "types": {
       "file": "records/types.jsonl",
-      "rows": 114,
-      "sha256": "b7b33d384b922fce9feb4848e2fb591cd9bd42023ec4eedba30dcfaf9ab006f4"
+      "rows": 115,
+      "sha256": "40cab12b7316f394410e7c739f1cf905dcdc4e4e745da70c4cb6b3eb7aa4f513"
     },
     "workspace": {
       "file": "records/workspace.jsonl",
       "rows": 1,
-      "sha256": "a267e3ed607a19c0574a94abbcf33e0129b1a18087b42bec7a4aef0588c13aa8"
+      "sha256": "142724c3a79b00db0debee7b186e36a74a5bf4a562e06f65bbb6ed13c1fb1b5b"
     },
     "workspace_packages": {
       "file": "records/workspace_packages.jsonl",
       "rows": 8,
-      "sha256": "4bb0f88f9dfd2d0a1dbf2a2dcef595ec554f27fb05f934f6e4ab80209faca87d"
+      "sha256": "36b026776ff0d6a21d1c23322feb17c4c52ca1b15c1f700f093ea2e27e67ac1d"
     }
   },
   "files": [
@@ -436,19 +446,14 @@
       "size": 458
     },
     {
+      "path": "files/63/630147dd167f0a29f4b07aa467c49a48dc0f2290df611752042b27969083af35",
+      "sha256": "630147dd167f0a29f4b07aa467c49a48dc0f2290df611752042b27969083af35",
+      "size": 2704
+    },
+    {
       "path": "files/64/6420d831dfe55992360e7712b409187ea0bfc353ce9a538f6b2c632099452230",
       "sha256": "6420d831dfe55992360e7712b409187ea0bfc353ce9a538f6b2c632099452230",
       "size": 441
-    },
-    {
-      "path": "files/65/65790e00b3ee3812c2c36111c94740d57493c21a3b1a77a8f1ace756868b1fd2",
-      "sha256": "65790e00b3ee3812c2c36111c94740d57493c21a3b1a77a8f1ace756868b1fd2",
-      "size": 2603
-    },
-    {
-      "path": "files/6c/6c402ef0bcca96fe35093ce72269a64900e1410f927780eac4d4a6ba30e6f02a",
-      "sha256": "6c402ef0bcca96fe35093ce72269a64900e1410f927780eac4d4a6ba30e6f02a",
-      "size": 1970
     },
     {
       "path": "files/72/729d3e264f4e2e9670cd86f4531141baa78eb94e975198228a8167c8a1eb0572",
@@ -529,6 +534,11 @@
       "path": "files/a1/a18c2a33a20de14bacbff9df97b7896006fb166379da84eb12c304abbd803286",
       "sha256": "a18c2a33a20de14bacbff9df97b7896006fb166379da84eb12c304abbd803286",
       "size": 502
+    },
+    {
+      "path": "files/a3/a3be13169a20482a6f290df310017eb60c43204235ecceaf0613ea8ed8c53954",
+      "sha256": "a3be13169a20482a6f290df310017eb60c43204235ecceaf0613ea8ed8c53954",
+      "size": 4677
     },
     {
       "path": "files/a4/a45d86c493173f0129412077c89f6bb5d65c20fc9b02c73cd30e9f73c52f1688",
@@ -672,13 +682,13 @@
     },
     {
       "path": "records/activities.jsonl",
-      "sha256": "21e94d90c70b898f24949a566f9f0b0ca98c6d45de111c1716916dac689e6c95",
-      "size": 5057
+      "sha256": "83285ad59ad436758b7bac27eea4fd410778e0a6dde653b1a4528b782b3def7c",
+      "size": 5772
     },
     {
       "path": "records/activity_series.jsonl",
-      "sha256": "77ffcbd1a44bdb1711a6d5191869a0d281e0036ed2bd195e5eca1e88f22229d8",
-      "size": 1907
+      "sha256": "3b5066e494f75c74c0b4c96213154f243e2306100137775bd242ac5ca8a30182",
+      "size": 3753
     },
     {
       "path": "records/activity_workspaces.jsonl",
@@ -692,17 +702,17 @@
     },
     {
       "path": "records/asset_comments.jsonl",
-      "sha256": "ab6b1cdade02d1e25a81a1dc49a9127a9fa34cfd1ad18659bfa312fcd08fd564",
-      "size": 628
+      "sha256": "8e6391ab18c06701cbc85bbecf365d409123e7c412a09002e82d43ebc5ddf782",
+      "size": 968
     },
     {
       "path": "records/asset_history.jsonl",
-      "sha256": "89260bc7ac84955aef61e738d5287edb4b33bc3bf514998366f216d1dfe3960b",
-      "size": 48784
+      "sha256": "e830ab958617d9bd3e166b780d3acca01cd791060c2582f4688c96b70cf2c77a",
+      "size": 99932
     },
     {
       "path": "records/asset_labels.jsonl",
-      "sha256": "dc46ab92c49da9f27690d550f8e4af1367049b664f60b1fdb9b9b3c81c884df2",
+      "sha256": "4fde39b15cda0ef4f7504c0f71cd0769b5dbfe74ce2d08408aaa516eeb82eccc",
       "size": 2769
     },
     {
@@ -712,12 +722,12 @@
     },
     {
       "path": "records/assets.jsonl",
-      "sha256": "6a15ef432f72f19e250207e803c8b7db2e86951d30768060aec5de8278043872",
-      "size": 75030
+      "sha256": "b3663f0e3069ffa8c602a19de25ffdb31febd2ca451caa9434e05c01ca0f0294",
+      "size": 198382
     },
     {
       "path": "records/attachments.jsonl",
-      "sha256": "b7571cff3c47a5ec824490d0e28af3249806a29b36371c5c920c6583e1408ca9",
+      "sha256": "cf82fcf889fb3da7087502b4a70ea697cb41f10daead9040f962849a22e66981",
       "size": 1217
     },
     {
@@ -742,13 +752,13 @@
     },
     {
       "path": "records/document_relations.jsonl",
-      "sha256": "11160437300331e53fb9cf8fafba06015e6e810f90c0a08c3a8e0b9f794773ad",
-      "size": 8137
+      "sha256": "feef6eaa3c66d77739bf9b6bdedc0753727107b054639d26f18c445dac171d59",
+      "size": 21559
     },
     {
       "path": "records/document_revisions.jsonl",
-      "sha256": "580634b601f34c48f932776dbb7f091264167f5ba74c05aad21d3d88d5cd058c",
-      "size": 12340
+      "sha256": "97798472434a349b0260157df4af916ad32124bff53ece83ff4bf5e3b7ce8544",
+      "size": 24393
     },
     {
       "path": "records/document_template_versions.jsonl",
@@ -762,8 +772,8 @@
     },
     {
       "path": "records/documents.jsonl",
-      "sha256": "c31b365aeb482e2d3709f07ecd3da72a6f073feef7efa12d1aeb447735d1a4d8",
-      "size": 5810
+      "sha256": "eaae21145231cc1cb59239f093a2ec17d90236b3961fb41f1f9a8ac861b4b7ed",
+      "size": 7535
     },
     {
       "path": "records/equipment_class_requests.jsonl",
@@ -772,12 +782,12 @@
     },
     {
       "path": "records/floor_plans.jsonl",
-      "sha256": "f3565cc1d241aa3df9468f15f2f86926baad66bcac7e095980136a134da7405d",
+      "sha256": "d44f3da00774cfbdd670d8e1a1090ca4ac851c5184a9edf72784a496346c6aff",
       "size": 4446
     },
     {
       "path": "records/global_values.jsonl",
-      "sha256": "c06d65dbaa49784ce8e317d2fc3eadf9041deb6a7e7a13342565edc0436a3651",
+      "sha256": "f6c9d9f49e1b985bb98b81debff19be57194c1bb5356720c44fdc85aeff6691a",
       "size": 2861
     },
     {
@@ -787,7 +797,7 @@
     },
     {
       "path": "records/icons.jsonl",
-      "sha256": "54916fdd6569d2e719fa1aa4523f3b56f2ec2fe4ddad1332692661a34a8c2701",
+      "sha256": "cf434e1e9b4722fa7f1e9aa073b923b0a272557ac1a8db2091f2fa31eaf65fe0",
       "size": 29748
     },
     {
@@ -802,8 +812,8 @@
     },
     {
       "path": "records/indoor_placements.jsonl",
-      "sha256": "ef8c345e8a99799c768976339f99f1ac9e686d2d5e58acce9226f88cf8a4d7f0",
-      "size": 22785
+      "sha256": "52833359b72ef652a289af65022107b35902feeb04c96ba2d9e543ad6f61ce5b",
+      "size": 34322
     },
     {
       "path": "records/llm_configs.jsonl",
@@ -817,8 +827,8 @@
     },
     {
       "path": "records/memberships.jsonl",
-      "sha256": "54a9c7ade962c216606671cd3a9660af80c6d17bd20828916c344bd6662a1a05",
-      "size": 1855
+      "sha256": "9f1a676273b328484696f81db6f5809e5d9489bc752ff4ba90b278d5cbe75529",
+      "size": 2323
     },
     {
       "path": "records/notification_subscriptions.jsonl",
@@ -827,12 +837,12 @@
     },
     {
       "path": "records/people.jsonl",
-      "sha256": "2080cca168aa73c6457d17b39f95d22a245a3123f5dc91f8957eaa8ef29b8de4",
-      "size": 484
+      "sha256": "03afaf6395f08fdb2a8e921bdcb48a207d8224e9b32070a900558f4c077dee5b",
+      "size": 596
     },
     {
       "path": "records/place_levels.jsonl",
-      "sha256": "bf79f4b50753534816ad7b5ef11833837e70887f5c19bb2d92c4ed211130af5a",
+      "sha256": "5bf624be99f6c96e919ddad25b079efe3aee255b30dd6988b500c1a4b5834d9c",
       "size": 1065
     },
     {
@@ -842,8 +852,8 @@
     },
     {
       "path": "records/relations.jsonl",
-      "sha256": "4e5a350f8e47da46664307f7111e02742a7f156b5cee66dc1a7df65978e43332",
-      "size": 27092
+      "sha256": "fe853d2852cc0295d651174409628e759ad1aea50e5e034fcfd8a6ec4230574d",
+      "size": 98450
     },
     {
       "path": "records/review_escalations.jsonl",
@@ -862,13 +872,13 @@
     },
     {
       "path": "records/spatial_features.jsonl",
-      "sha256": "1c411221a6ad94308b65c186170636a845c79ea8f4255a13bdf2757484806f09",
-      "size": 42137
+      "sha256": "feb2c2769e438099be3b267e55821a44ca3d569403ade0d1140cada9b46aaa17",
+      "size": 60741
     },
     {
       "path": "records/ticket_comments.jsonl",
-      "sha256": "9dea5c82f9c0a387b8c2a38d13bf3e713d53720b7e4dd85dbd4cc6e9869c8131",
-      "size": 686
+      "sha256": "8ff25ecb7e918302f968a206cab83473d23ee1944a141f2cde2a8e8a17291d81",
+      "size": 1216
     },
     {
       "path": "records/ticket_escalations.jsonl",
@@ -877,8 +887,8 @@
     },
     {
       "path": "records/ticket_history.jsonl",
-      "sha256": "15c37d5fe1bd1fa12c3ac6a6726208019517d07a25cd884b890ee8edf947f8a3",
-      "size": 4935
+      "sha256": "613aa01b1995b14fcdb791d7db802122649f48d2f607ff83c4db93d1291c6416",
+      "size": 6653
     },
     {
       "path": "records/ticket_links.jsonl",
@@ -892,27 +902,27 @@
     },
     {
       "path": "records/ticket_workflows.jsonl",
-      "sha256": "d0ed8349df2a2ea01b15e55b112f031f6524386d1d58f3077f515a58dd1a28ad",
+      "sha256": "059d64312162ba384013311621fbbf1e39a4ed56cabcd2ebdc77a753d26e29d1",
       "size": 5178
     },
     {
       "path": "records/tickets.jsonl",
-      "sha256": "e821445476d962fe21a578bba53cbf73179d608c89963055f43fe08ced37ab67",
-      "size": 7439
+      "sha256": "38db9b29f2bb4e1a48ae6bd75fc70f861bc7d1c54bea83de9a568c2e14b53bb3",
+      "size": 9940
     },
     {
       "path": "records/types.jsonl",
-      "sha256": "b7b33d384b922fce9feb4848e2fb591cd9bd42023ec4eedba30dcfaf9ab006f4",
-      "size": 138839
+      "sha256": "40cab12b7316f394410e7c739f1cf905dcdc4e4e745da70c4cb6b3eb7aa4f513",
+      "size": 139592
     },
     {
       "path": "records/workspace.jsonl",
-      "sha256": "a267e3ed607a19c0574a94abbcf33e0129b1a18087b42bec7a4aef0588c13aa8",
+      "sha256": "142724c3a79b00db0debee7b186e36a74a5bf4a562e06f65bbb6ed13c1fb1b5b",
       "size": 687
     },
     {
       "path": "records/workspace_packages.jsonl",
-      "sha256": "4bb0f88f9dfd2d0a1dbf2a2dcef595ec554f27fb05f934f6e4ab80209faca87d",
+      "sha256": "36b026776ff0d6a21d1c23322feb17c4c52ca1b15c1f700f093ea2e27e67ac1d",
       "size": 1643
     }
   ],
@@ -964,7 +974,7 @@
   ],
   "source": {
     "argus_version": "dev",
-    "instance": "9246abcf-5270-48e5-aaad-647c3850cc78",
+    "instance": "e42203eb-3759-41c6-98cb-e8e2dd2136be",
     "schema_revision": "e4a6c8e0f2a3"
   },
   "workspace": {

@@ -142,11 +142,15 @@ is stored for the new workspace (`app_settings`, `demo.tour.<workspace>`, its li
 and served by `GET /v1/workspaces/{id}/tour`, which the cockpit shows as **Start exploring** and every page as a
 *synthetic demo* strip.
 
-* `it-services` — Northfield IT Services (fictional): 107 records (11 services with an `IT Service` type of the
-  workspace, buildings, rooms, 9 racks, switches, firewalls, routers, hypervisors and virtual machines, storage,
-  UPS, cooling, access points, VLANs, contracts, licences, purchase orders), 117 relations, 4 floor plans and
-  47 placements, 52 map shapes (outlines, fibre routes), 12 tickets, 10 documents (architecture with a diagram,
-  runbooks, SLA, CAB minutes, maintenance and survey reports), 10 activities and series, 4 people.
+* `it-services` — Northfield IT Services (fictional): 284 records — 13 services with an `IT Service` type of the
+  workspace (network, internet, Wi-Fi, mail, DNS and DHCP, hosting, storage, backup, monitoring, service desk,
+  VPN, HPC batch computing, LLM inference); buildings, rooms and 9 racks; switches, firewalls, routers,
+  hypervisors and virtual machines, storage, UPS, cooling; a GPU cluster (4 GPU servers of a `GPU Server` type, a
+  200 Gb/s fabric switch, login node, scheduler, scratch and model storage, rear-door coolers); 10 user
+  workstations and 2 printers; the network port to port — 49 cables between Equipment Ports, each access port on
+  its VLAN; contracts, licences, purchase orders. 416 relations, 4 floor plans, 70 placements, 75 map shapes, 16
+  tickets (one on a single switch port), 13 documents (architecture, port map, HPC and LLM design, runbooks, SLA,
+  CAB minutes, reports), 14 activities and series, 5 people.
 * `medium-linac` — Valmora Linac Laboratory (fictional): 304 records across accelerator, civil, safety,
   electrical, HVAC, vacuum, optics, plant, hydraulic, administration and IT; a beam model (gun → 4 accelerating
   structures → diagnostics → main dump, with a spectrometer branch: 31 positions on 2 paths — magnets,
