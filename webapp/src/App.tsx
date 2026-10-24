@@ -15,6 +15,8 @@ import { AdminWorkspaces } from "./pages/admin/Workspaces";
 import { ExportDetailPage } from "./pages/admin/portability/ExportDetail";
 import { ImportDetailPage } from "./pages/admin/portability/ImportDetail";
 import { PortabilityPage } from "./pages/admin/portability/Portability";
+import { TypeMigrationDetailPage } from "./pages/admin/typeMigration/TypeMigrationDetail";
+import { TypeMigrationsPage } from "./pages/admin/typeMigration/TypeMigrations";
 import { AssetDetail } from "./pages/assets/Detail";
 import { AssetForm } from "./pages/assets/Form";
 import { AssetSearch } from "./pages/assets/Search";
@@ -194,6 +196,8 @@ export function App() {
           <Route path="/admin/ai" element={<InstallationAI />} />
           <Route path="/admin/tokens" element={<AdminTokensPage />} />
           <Route path="/admin/portability" element={<PortabilityPage />} />
+          <Route path="/admin/type-migrations" element={<TypeMigrationsPage />} />
+          <Route path="/admin/type-migrations/:id" element={<TypeMigrationDetailPage />} />
           <Route path="/admin/migration" element={<MigrationPage />} />
           <Route path="/admin/portability/exports/:id" element={<ExportDetailPage />} />
           <Route path="/admin/portability/imports/:id" element={<ImportDetailPage />} />

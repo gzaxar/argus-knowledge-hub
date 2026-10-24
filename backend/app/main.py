@@ -180,6 +180,8 @@ from app.routers import web_import as web_import_router  # noqa: E402
 from app.routers import indoor as indoor_router  # noqa: E402
 from app.routers import bundles as bundles_router  # noqa: E402
 app.include_router(bundles_router.router)               # workspace bundles (instance administrators)
+from app.routers import type_migrations as type_migrations_router  # noqa: E402
+app.include_router(type_migrations_router.router)        # type migrations (instance administrators)
 app.include_router(indoor_router.router)                # floors, floor plans, records placed indoors
 app.include_router(web_import_router.router)            # /v1/documents/import-web, before a document's uid
 app.include_router(documents.router)

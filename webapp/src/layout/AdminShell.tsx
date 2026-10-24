@@ -33,6 +33,7 @@ export function AdminShell() {
     globalItems.push({ to: "/admin/ai", label: "AI" });
     globalItems.push({ to: "/admin/tokens", label: "API tokens" });
     globalItems.push({ to: "/admin/portability", label: "Portability" });
+    globalItems.push({ to: "/admin/type-migrations", label: "Type migrations" });
     globalItems.push({ to: "/admin/statistics", label: "Statistics" });
   }
 
