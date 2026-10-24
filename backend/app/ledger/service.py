@@ -268,6 +268,33 @@ def retype_many(db: Session, workspace_id: str, actor: str, uids: list, type_nam
         confirm_value(u, "type", type_name, replaces=_active(db, u, "type"), reason=reason) for u in uids])
 
 
+def retype_to(db: Session, workspace_id: str, actor: str, uids: list, schema, reason: Optional[str] = None,
+              changes: Optional[dict] = None) -> list:
+    """Records of one workspace moved to a type given by its identity (a type migration): the statement names
+    the type's uid, so the projection — and any rebuild — puts them on exactly that type, never on another
+    of the same name. `changes` are field statements made in the same batch (attr:key → value, None removes)."""
+    from app.ledger.cutover import assert_writable
+    if not uids:
+        return []
+    assert_writable(db, workspace_id, "objects")
+    value = {"name": schema.name, "schema_uid": schema.uid}
+    stream = engine.person_stream(db, workspace_id, actor)
+    claims = [ParsedClaim(f"uid:{u}", "type", value, method="manual") for u in uids]
+    batch = [confirm_value(u, "type", value, replaces=_active(db, u, "type"), reason=reason) for u in uids]
+    for u in uids:
+        current = db.get(Asset, u).attributes or {}
+        for p, v in ((changes or {}).get(u) or {}).items():
+            if p.startswith("attr:") and engine.is_multi(p):
+                c, b = _multi_attr_batch(db, u, p[5:], v, current.get(p[5:]))
+                claims += c
+                batch += b
+            else:
+                claims.append(ParsedClaim(f"uid:{u}", p, v, method="manual"))
+                batch.append(confirm_value(u, p, v, replaces=_active(db, u, p), reason=reason))
+    engine.add_manual_claims(db, stream, claims, cause=f"type migration by {actor}")
+    return engine.apply_decisions(db, workspace_id, actor, batch)
+
+
 def relate(db: Session, workspace_id: str, actor: str, from_uid: str, relation_type: str, to_uid: str,
            present: bool = True, reason: Optional[str] = None) -> list:
     """Add or remove an asserted relation. A single-valued one is set or

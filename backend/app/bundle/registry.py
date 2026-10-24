@@ -267,6 +267,9 @@ NOT_CARRIED = {
                  "portability_tags_seen", "portability_trusted_keys")},
     **{t: "instance-wide catalogue state, not one workspace's: the target installation keeps its own"
        for t in ("equipment_classes", "equipment_class_reviews", "package_snapshots")},
+    **{t: "a type migration is this installation's administrative record of moving records between types; the "
+          "records carry their result and history"
+       for t in ("type_migrations", "type_migration_items")},
     "groups": "directory groups belong to the installation's directory: role bindings to a group need it there",
     "group_members": "directory groups belong to the installation's directory",
     "alembic_version": "the database's own schema revision",

@@ -350,6 +350,11 @@ def catalogue_needs(db: Session, catalogue_workspace_id: str, packages: list[Pac
     from app.services import asset_types
     from app.packages import compile as c
     have = installed(db, catalogue_workspace_id)
+    # A catalogue seeded before packages were recorded (no install of an object package there) is checked
+    # type by type when the types are put in, as before: its packages are not known.
+    if not any(has_objects(p) for p in packages if p.id in have) and not any(
+            (r.options or {}).get("scope") == "global" for r in have.values()):
+        return []
     sets = defaults.option_sets()
     out = []
     for p in packages:

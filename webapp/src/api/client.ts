@@ -2631,3 +2631,94 @@ export const bundlesApi = {
   tour: (workspaceId: string) =>
     request<{ workspace_id: string; tour: WorkspaceTour | null }>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/tour`),
 };
+
+// ------------------------------------------------------------------ type migrations (instance administrators)
+
+export type MigrationKind = "objects" | "tickets" | "documents";
+export interface MigrationSource {
+  uid: string; name: string; workspace_id: string; is_global: boolean; parent_schema_uid: string | null;
+  custom: boolean; deprecated: boolean; records: Record<string, number>; records_below: Record<string, number>;
+}
+export interface MigrationTargetType {
+  package_id: string; package_name: string; version: string; type: string; abstract: boolean; base: boolean;
+  description: string;
+}
+export interface TargetResolution {
+  workspace_id: string; home: string; package_id: string; type: string; schema_uid: string | null;
+  installed_version: string | null; checksum: string | null; status: string; detail: string | null;
+}
+export interface AttributeRule {
+  action: "copy" | "transform" | "provenance" | "review";
+  to?: string | null; values?: Record<string, string | null>; cast?: string | null;
+  name?: string; type?: string; records_with_value?: number;
+}
+export interface TypeMigrationView {
+  id: string; kind: MigrationKind; source_schema_uid: string;
+  source: { name: string; workspace_id: string; is_global: boolean; family: { uid: string; name: string; workspace_id: string }[] };
+  include_descendants: boolean; workspaces: string[];
+  target: { package_id: string; type: string; area: string; version: string };
+  mapping: { attributes: Record<string, AttributeRule>; defaults: Record<string, unknown>;
+             states: Record<string, string | null>; records: Record<string, string> };
+  reason: string | null; status: string; verification: VerificationReport | null;
+  created_by: string | null; created_at: string; updated_at: string;
+  log?: { at: string; actor: string | null; event: string; [k: string]: unknown }[];
+}
+export interface MigrationFields {
+  source: { key: string; name: string; type: string; options: string[]; values: string[] }[];
+  target: { key: string; name: string; type: string; required: boolean; options: string[] }[];
+  target_states: { key: string; name: string }[]; source_states: string[]; target_schema_uid: string | null;
+}
+export interface MigrationPreview {
+  token: string; targets: TargetResolution[];
+  counts: Record<string, Record<string, number>>; total: Record<string, number>;
+  records: { uid: string; key: string | null; name: string; workspace_id: string; status: string; reasons: string[];
+             changes: { field: string; before: unknown; after: unknown; provenance: boolean }[];
+             state: { before: string | null; after: string | null } | null; provenance: Record<string, unknown> }[];
+  records_listed: number; records_total: number; unmapped_values: Record<string, string[]>;
+  deprecation: Deprecation;
+}
+export interface Deprecation { type: string; possible: boolean; blocking: { what: string; detail: string }[]; deprecated: boolean }
+export interface VerificationReport {
+  at: string; by: string; records: Record<string, number>;
+  exceptions: { uid: string; workspace_id: string; problem: string }[]; deprecation: Deprecation;
+}
+export interface TypeProposal {
+  ok: boolean; problems: string[]; notes: string[]; package_id: string; current_version: string; next_version: string;
+  kind: string; type: string; yaml: string; manifest: Record<string, unknown>; checklist: string[];
+}
+
+const TM = "/v1/admin/type-migrations";
+export const typeMigrationsApi = {
+  list: () => request<TypeMigrationView[]>(TM),
+  get: (id: string) => request<TypeMigrationView>(`${TM}/${encodeURIComponent(id)}`),
+  sources: (kind: MigrationKind) => request<MigrationSource[]>(`${TM}/sources?kind=${kind}`),
+  targets: (kind: MigrationKind) => request<MigrationTargetType[]>(`${TM}/targets?kind=${kind}`),
+  resolve: (kind: MigrationKind, packageId: string, type: string, workspaces: string[]) =>
+    request<TargetResolution[]>(`${TM}/targets/resolve?kind=${kind}&package_id=${encodeURIComponent(packageId)}` +
+      `&type=${encodeURIComponent(type)}&workspaces=${encodeURIComponent(workspaces.join(","))}`),
+  installPreview: (workspace_id: string, package_id: string) =>
+    request<{ workspace_id: string; ok: boolean; plan?: PackagePlan; error?: string; catalogue_workspace_id?: string;
+              needs?: { package_id: string; version: string; has: string | null }[] }>(
+      `${TM}/install-preview`, { method: "POST", body: json({ workspace_id, package_id }) }),
+  create: (body: { kind: MigrationKind; source_schema_uid: string; target: { package_id: string; type: string };
+                   workspaces: string[]; include_descendants: boolean; reason: string }) =>
+    request<TypeMigrationView>(TM, { method: "POST", body: json(body) }),
+  change: (id: string, body: Record<string, unknown>) =>
+    request<TypeMigrationView>(`${TM}/${encodeURIComponent(id)}`, { method: "PATCH", body: json(body) }),
+  fields: (id: string) => request<MigrationFields>(`${TM}/${encodeURIComponent(id)}/fields`),
+  preview: (id: string) => request<MigrationPreview>(`${TM}/${encodeURIComponent(id)}/preview`, { method: "POST" }),
+  apply: (id: string, token: string, batch_size = 100) =>
+    request<{ applied: number; failed: number; left: number; status: string }>(
+      `${TM}/${encodeURIComponent(id)}/apply`, { method: "POST", body: json({ token, batch_size }) }),
+  verify: (id: string, deprecate: boolean) =>
+    request<VerificationReport>(`${TM}/${encodeURIComponent(id)}/verify`, { method: "POST", body: json({ deprecate }) }),
+  revert: (id: string) =>
+    request<{ reverted: number; failed: number; status: string }>(`${TM}/${encodeURIComponent(id)}/revert`,
+      { method: "POST", body: json({}) }),
+  items: (id: string, status?: string) =>
+    request<{ record_uid: string; workspace_id: string; status: string; batch: number | null; error: string | null;
+              provenance: Record<string, unknown>; at: string; actor: string | null }[]>(
+      `${TM}/${encodeURIComponent(id)}/items${status ? `?status=${status}` : ""}`),
+  propose: (schema_uid: string, package_id: string, name?: string) =>
+    request<TypeProposal>("/v1/admin/type-proposals", { method: "POST", body: json({ schema_uid, package_id, name }) }),
+};

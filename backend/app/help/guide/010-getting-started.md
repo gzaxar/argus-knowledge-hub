@@ -90,7 +90,7 @@ show the same records.
 At the top right: **Help** (this guide); **⚙ Workspace settings**: **Access** (who has which role), **Members**,
 **Packages**, the **Type catalogue**, **Global values**, **Ticket workflows**, **Equipment classes**, **Keys** (how
 record keys are made) and **Administration** (imports, GLPI, icon library, transfer, migration from Jira, AI
-endpoint, robot tokens; and workspaces, users, settings and portability for administrators); your name, for **My
+endpoint, robot tokens; and workspaces, users, settings, portability and type migrations for administrators); your name, for **My
 account**, **About ARGUS** and **Sign out**.
 
 **+ New** (top right) creates a ticket, an asset, a document or a beam model.
