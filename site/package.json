@@ -1,0 +1,7 @@
+{
+  "name": "argus-knowledge-hub-site",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node build.mjs" },
+  "dependencies": { "markdown-it": "14.3.3" }
+}
