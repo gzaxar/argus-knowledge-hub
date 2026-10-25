@@ -35,6 +35,21 @@ Otherwise the preview says what is missing and where (`package_missing`, `packag
 `type_not_in_package`, `type_missing`, `abstract`), and offers the **install preview** of that workspace or catalogue
 (the installer's dry run; a workspace hanging from a catalogue that lacks the package is told the catalogue goes first).
 
+## Bringing a shared type home
+
+A workspace that hangs from a shared catalogue uses the catalogue's copy of each shared package type. With
+`target.home = "own"` (*Bring the type home* in the wizard) each owning workspace gets **its own copy** of the
+package type instead — the same package, version and type, under the uid the installer derives in that workspace —
+and the records move to it. A shared package type other workspaces use is a source only this way.
+
+- The copy is the catalogue's installed definition (its fields, choices, icon), parented where the catalogue's is,
+  with its origin recorded (`metadata.brought_home`: from, catalogue, package, version, migration, time).
+- It is made by **apply**; a preview (or the plan's proposal) makes it inside a transaction that is rolled back.
+- The package must be installed in the workspace, and its installed version must declare the type.
+- Afterwards the workspace's own copy is the target of later migrations there, what its importers use, and part of
+  the workspace's **upgrades** of that package (`upgrade.brought_home`); it no longer follows edits made in the
+  catalogue. The catalogue's copy stays, and a package type is never deprecated.
+
 ## The plan
 
 `type_migrations`: source type (and, optionally, the types below it), the owning workspaces chosen, the target, the

@@ -17391,6 +17391,16 @@
             }
           },
           {
+            "in": "query",
+            "name": "home",
+            "required": false,
+            "schema": {
+              "default": "installed",
+              "title": "Home",
+              "type": "string"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,

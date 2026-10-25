@@ -143,14 +143,24 @@ def sources(db: Session, kind: str) -> list[dict]:
     pkg = package_type_uids(db, kind)
     out = []
     for s in rows:
-        if s.uid in pkg or ":ledger:" in s.uid:   # package types, and the ledger's own system types
+        if ":ledger:" in s.uid:                    # the ledger's own system types
             continue
         own = owning_workspaces(db, kind, [s.uid])
+        if s.uid in pkg:
+            # A package type is a source only as a shared one other workspaces use: to bring it home.
+            others = {w: n for w, n in own.items() if w != s.workspace_id}
+            if kind != "objects" or not s.is_global or not others:
+                continue
+            out.append({"uid": s.uid, "name": s.name, "workspace_id": s.workspace_id, "is_global": True,
+                        "parent_schema_uid": s.parent_schema_uid, "custom": False, "package_type": True,
+                        "deprecated": False, "records": others, "records_below": {}})
+            continue
         below = owning_workspaces(db, kind, [d.uid for d in descendants(db, s.uid)])
         if not own and not below:
             continue
         out.append({"uid": s.uid, "name": s.name, "workspace_id": s.workspace_id, "is_global": s.is_global,
-                    "parent_schema_uid": s.parent_schema_uid, "custom": not (s.metadata_json or {}).get("source") == "argus",
+                    "parent_schema_uid": s.parent_schema_uid, "package_type": False,
+                    "custom": not (s.metadata_json or {}).get("source") == "argus",
                     "deprecated": bool((s.metadata_json or {}).get("deprecated")),
                     "records": own, "records_below": below})
     return out
@@ -200,6 +210,9 @@ def _home(db: Session, ws: str, kind: str, type_name: str) -> str:
         return ws
     from app.services import asset_types
     from app.packages.install import installed
+    own = db.get(Schema, asset_types.type_uid(ws, type_name))
+    if own is not None and own.workspace_id == ws and (own.metadata_json or {}).get("brought_home"):
+        return ws                            # a shared type this workspace brought home is its own now
     recorded = [r.options or {} for r in installed(db, ws).values()]
     catalogue = next((o.get("catalogue_workspace_id") for o in recorded if o.get("scope") == "beamline"
                       and o.get("catalogue_workspace_id")), None) or asset_types.catalogue_of(db, ws)
@@ -235,7 +248,7 @@ def resolve_target(db: Session, ws: str, kind: str, target: dict) -> dict:
     """The package type, in one owning workspace: its row and provenance, or why it is not there."""
     from app.packages.install import installed
     pid, name, need = target["package_id"], target["type"], target.get("version")
-    home = _home(db, ws, kind, name)
+    home = ws if target.get("home") == "own" else _home(db, ws, kind, name)
     out = {"workspace_id": ws, "home": home, "package_id": pid, "type": name, "schema_uid": None,
            "installed_version": None, "checksum": None}
     row = installed(db, home).get(pid)
@@ -261,6 +274,60 @@ def resolve_target(db: Session, ws: str, kind: str, target: dict) -> dict:
     if (_declared(sections, kind).get(name) or {}).get("abstract"):
         return {**out, "status": "abstract", "schema_uid": uid, "detail": f"{name!r} is abstract: choose a type below it"}
     return {**out, "status": "ok", "schema_uid": uid, "detail": None}
+
+
+def bring_home_status(db: Session, ws: str, kind: str, target: dict) -> dict:
+    """For a shared object type the workspace uses from its catalogue: whether it has its own copy, and if not,
+    whether one can be made — the package installed in the workspace, the version declaring the type, and the
+    catalogue's copy (the definition as installed) to copy from."""
+    from app.packages.install import installed
+    from app.services import asset_types
+    name = target["type"]
+    out = {"workspace_id": ws, "type": name, "copy_of": None, "local_uid": asset_types.type_uid(ws, name)}
+    if kind != "objects":
+        return {**out, "status": "not_needed", "detail": "ticket and document types are each workspace's own"}
+    local = db.get(Schema, out["local_uid"])
+    if local is not None:
+        return {**out, "status": "present", "detail": None}
+    shared_home = _home(db, ws, kind, name)
+    if shared_home == ws:
+        return {**out, "status": "not_shared", "detail": f"{name!r} is not a shared type for {ws!r}"}
+    shared = db.get(Schema, _derived_uid(db, shared_home, kind, name) or "")
+    if shared is None or shared.workspace_id != shared_home:
+        return {**out, "status": "no_shared_copy", "detail": f"the catalogue {shared_home!r} has no {name!r} to copy"}
+    row = installed(db, ws).get(target["package_id"])
+    if row is None:
+        return {**out, "status": "package_missing", "detail": f"{target['package_id']} is not installed in {ws!r}"}
+    sections = _installed_sections(db, row)
+    if sections is None or name not in _declared(sections, kind):
+        return {**out, "status": "type_not_in_package",
+                "detail": f"{target['package_id']} {row.version} in {ws!r} does not declare {name!r}"}
+    return {**out, "status": "will_create", "copy_of": shared.uid, "version": row.version,
+            "detail": f"{ws!r} gets its own {name!r}, a copy of {shared_home!r}'s ({target['package_id']} {row.version})"}
+
+
+def bring_home(db: Session, m: TypeMigration) -> list[dict]:
+    """Make each owning workspace's own copy of the target type where it has none (a plan that brings it home).
+    Called by preview (inside its rolled-back transaction) and by apply (kept)."""
+    if (m.target or {}).get("home") != "own" or m.kind != "objects":
+        return []
+    made = []
+    for ws in m.workspaces:
+        st = bring_home_status(db, ws, m.kind, m.target)
+        if st["status"] != "will_create":
+            continue
+        shared = db.get(Schema, st["copy_of"])
+        meta = {**(shared.metadata_json or {}), "source": "argus",
+                "brought_home": {"from": shared.uid, "catalogue": shared.workspace_id,
+                                 "package": m.target["package_id"], "version": st["version"], "migration": m.id,
+                                 "at": now().isoformat()}}
+        db.add(Schema(uid=st["local_uid"], workspace_id=ws, name=shared.name, applies_to="objects",
+                      description=shared.description, is_concrete=shared.is_concrete, is_global=False,
+                      parent_schema_uid=shared.parent_schema_uid, icon_uid=shared.icon_uid,
+                      attributes=copy.deepcopy(shared.attributes or []), metadata_json=meta))
+        made.append(st)
+    db.flush()
+    return made
 
 
 def package_type_uids(db: Session, kind: str) -> set[str]:
@@ -507,7 +574,9 @@ def evaluate(db: Session, m: TypeMigration, grants_for: Callable[[str], object])
     fam = family(db, m.source_schema_uid, m.include_descendants)
     fam_uids = [s.uid for s in fam]
     recs = _records(db, m.kind, fam_uids, m.workspaces)
-    targets = {ws: resolve_target(db, ws, m.kind, m.target) for ws in m.workspaces}
+    brought = {st["workspace_id"]: st for st in bring_home(db, m)}
+    targets = {ws: {**resolve_target(db, ws, m.kind, m.target),
+                    **({"brought_home": brought[ws]["detail"]} if ws in brought else {})} for ws in m.workspaces}
     done = {i.record_uid: i for i in db.scalars(select(TypeMigrationItem).where(
         TypeMigrationItem.migration_id == m.id))}
     target_of = {r.uid: targets.get(r.workspace_id, {}).get("schema_uid") for r in recs}
@@ -682,6 +751,9 @@ def deprecation_check(db: Session, m: TypeMigration) -> dict:
     name it. Deprecated only when nothing does; never deleted."""
     src = db.get(Schema, m.source_schema_uid)
     blocking = []
+    if (m.source or {}).get("package_type"):
+        return {"type": src.name if src else m.source_schema_uid, "possible": False, "deprecated": False,
+                "blocking": [{"what": "a package type", "detail": "it stays: the catalogue and other workspaces use it"}]}
     left = owning_workspaces(db, m.kind, [m.source_schema_uid])
     if left:
         blocking.append({"what": "records", "detail": ", ".join(f"{n} in {ws}" for ws, n in sorted(left.items()))})
@@ -920,6 +992,8 @@ def verify(db: Session, m: TypeMigration, actor: str, deprecate: bool = False) -
 
 def create(db: Session, actor: str, kind: str, source_schema_uid: str, target: dict, workspaces: Optional[list[str]],
            include_descendants: bool, reason: Optional[str]) -> TypeMigration:
+    """A plan. `target.home` "own" brings the type home: each owning workspace gets its own copy of the
+    package type instead of using its shared catalogue's."""
     if kind not in KINDS:
         raise MigrationError("kind is objects, tickets or documents")
     src = db.get(Schema, source_schema_uid)
@@ -933,24 +1007,44 @@ def create(db: Session, actor: str, kind: str, source_schema_uid: str, target: d
         raise MigrationError("the target is not a type of a package this installation ships")
     if t["abstract"]:
         raise MigrationError(f"{t['type']} is abstract: choose a type below it")
-    fam = family(db, source_schema_uid, include_descendants)
+    home = target.get("home") or "installed"
+    if home not in ("installed", "own"):
+        raise MigrationError("home is 'installed' (where the installer puts the type) or 'own'")
+    if home == "own" and kind != "objects":
+        raise MigrationError("ticket and document types are already each workspace's own")
+    is_package_type = src.uid in package_type_uids(db, kind)
+    if is_package_type and home != "own":
+        raise MigrationError("those records already use a package's type: bring it home, or choose a custom type")
+    fam = family(db, source_schema_uid, include_descendants and not is_package_type)
     found = owning_workspaces(db, kind, [s.uid for s in fam])
+    if is_package_type:
+        found.pop(src.workspace_id, None)     # the catalogue keeps its own type
     chosen = sorted(set(workspaces or found) & set(found)) if workspaces else sorted(found)
     if not chosen:
         raise MigrationError("no records of that type in the workspaces chosen")
     m = TypeMigration(id=str(uuid.uuid4()), kind=kind, source_schema_uid=src.uid,
                       source={"name": src.name, "workspace_id": src.workspace_id, "is_global": src.is_global,
                               "family": [{"uid": s.uid, "name": s.name, "workspace_id": s.workspace_id} for s in fam],
-                              "attributes": _effective(db, src)},
-                      include_descendants=include_descendants, workspaces=chosen,
+                              "attributes": _effective(db, src), "package_type": is_package_type},
+                      include_descendants=include_descendants and not is_package_type, workspaces=chosen,
                       target={"package_id": t["package_id"], "type": t["type"], "area": AREA[kind],
-                              "version": t["version"]},
+                              "version": t["version"], "home": home},
                       reason=reason.strip(), status="draft", created_by=actor, log=[])
     db.add(m)
     db.flush()
+    bring_home(db, m)                     # so the proposal sees the copies (they are kept only when applied)
     first_ok = next((r for r in (resolve_target(db, ws, kind, m.target) for ws in chosen) if r["status"] == "ok"), None)
     m.mapping = propose(db, m, db.get(Schema, first_ok["schema_uid"]) if first_ok else None)
-    _log(m, actor, "created", source=src.uid, target=m.target, workspaces=chosen)
+    mapping, log_target = m.mapping, dict(m.target)
+    # The copies made for the proposal are not kept: only applying brings a type home.
+    for st in [bring_home_status(db, ws, kind, m.target) for ws in chosen]:
+        if st["status"] == "present":
+            row = db.get(Schema, st["local_uid"])
+            if row is not None and ((row.metadata_json or {}).get("brought_home") or {}).get("migration") == m.id:
+                db.delete(row)
+    db.flush()
+    m.mapping = mapping
+    _log(m, actor, "created", source=src.uid, target=log_target, workspaces=chosen)
     db.commit()
     return m
 
@@ -1003,6 +1097,7 @@ def fields(db: Session, m: TypeMigration) -> dict:
     """What the mapping step offers: the source's fields (with values seen), the target's fields (with their
     choices), and — for tickets — the target workflow's states, from the first workspace where the target is."""
     from app.services import workflows
+    bring_home(db, m)                     # the caller rolls back: shown, not kept
     fam = family(db, m.source_schema_uid, m.include_descendants)
     recs = _records(db, m.kind, [s.uid for s in fam], m.workspaces)
     values = _source_values(db, m.kind, recs)

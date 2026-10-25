@@ -75,6 +75,9 @@ function NewMigration() {
   const [target, setTarget] = useState<MigrationTargetType | null>(null);
   const [reason, setReason] = useState("");
   const [filter, setFilter] = useState("");
+  const [homeChoice, setHome] = useState(false);
+  // A shared package type is migrated only to bring it home.
+  const home: "installed" | "own" = source?.package_type || homeChoice ? "own" : "installed";
   const sources = useQuery({ queryKey: ["tm-sources", kind], queryFn: () => typeMigrationsApi.sources(kind) });
   const targets = useQuery({ queryKey: ["tm-targets", kind], queryFn: () => typeMigrationsApi.targets(kind) });
   const counts = useMemo(() => {
@@ -84,13 +87,13 @@ function NewMigration() {
     return out;
   }, [source, below]);
   const resolve = useQuery({
-    queryKey: ["tm-resolve", kind, target?.package_id, target?.type, workspaces.join(",")],
-    queryFn: () => typeMigrationsApi.resolve(kind, target!.package_id, target!.type, workspaces),
+    queryKey: ["tm-resolve", kind, target?.package_id, target?.type, workspaces.join(","), home],
+    queryFn: () => typeMigrationsApi.resolve(kind, target!.package_id, target!.type, workspaces, home),
     enabled: !!target && workspaces.length > 0,
   });
   const create = useMutation({
     mutationFn: () => typeMigrationsApi.create({ kind, source_schema_uid: source!.uid,
-      target: { package_id: target!.package_id, type: target!.type }, workspaces, include_descendants: below, reason }),
+      target: { package_id: target!.package_id, type: target!.type, home }, workspaces, include_descendants: below, reason }),
     onSuccess: (m) => navigate(`/admin/type-migrations/${m.id}`),
   });
   const shown = (targets.data ?? []).filter((t) => !filter || `${t.type} ${t.package_id}`.toLowerCase().includes(filter.toLowerCase()));
@@ -120,7 +123,8 @@ function NewMigration() {
                     checked={source?.uid === s.uid}
                     onChange={() => { setSource(s); setWorkspaces(Object.keys({ ...s.records })); }} /></td>
                   <td className="truncate py-1.5" title={s.uid}>{s.name}
-                    {s.deprecated && <span className="ml-1 rounded bg-slate-200 px-1 text-[11px]">deprecated</span>}</td>
+                    {s.deprecated && <span className="ml-1 rounded bg-slate-200 px-1 text-[11px]">deprecated</span>}
+                    {s.package_type && <span className="ml-1 rounded bg-sky-100 px-1 text-[11px] text-sky-800" title="A shared package type: its records can be given their workspace's own copy">shared package type</span>}</td>
                   <td className="truncate py-1.5 text-xs text-slate-600">{s.workspace_id}{s.is_global && " · shared"}</td>
                   <td className="truncate py-1.5 text-xs text-slate-600">
                     {Object.entries(s.records).map(([w, n]) => `${w}: ${n}`).join(" · ") || "—"}
@@ -180,6 +184,22 @@ function NewMigration() {
               ))}
             </ul>
           </div>
+          {kind === "objects" && (
+            <label className="mt-2 flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-0.5" checked={home === "own"} disabled={!!source.package_type}
+                     onChange={(e) => setHome(e.target.checked)} />
+              <span>
+                <b>Bring the type home</b> — each owning workspace gets its own copy of the package type (the same
+                package, version and type, owned by it) instead of using its shared catalogue's.
+                <span className="block text-xs text-slate-500">
+                  {source.package_type
+                    ? "Always, for a shared package type: its records move to their workspace's own copy."
+                    : "Use it when a workspace should keep the type as its own."}
+                  {" "}The copy is made when you apply; it is upgraded with the workspace's packages and no longer follows the catalogue's edits.
+                </span>
+              </span>
+            </label>
+          )}
           {target && resolve.data && <Resolution rows={resolve.data} />}
           <ProposeInstead source={source} />
         </Section>
@@ -224,7 +244,8 @@ export function Resolution({ rows }: { rows: TargetResolution[] }) {
               <td className="truncate py-1.5">{r.home}{r.home !== r.workspace_id && <span className="text-xs text-slate-500"> (shared catalogue)</span>}</td>
               <td className="py-1.5 font-mono text-xs">{r.installed_version ?? "—"}</td>
               <td className="py-1.5">
-                {r.status === "ok" ? <span className="text-green-800">✓ available</span> : (
+                {r.status === "ok" ? <span className="text-green-800">✓ available{r.brought_home ? ` — ${r.brought_home}` : ""}</span>
+                  : r.status === "will_create" ? <span className="text-sky-800"><span aria-hidden>+ </span>{r.detail} (made when applied)</span> : (
                   <span className="flex flex-wrap items-center gap-2 text-amber-900">
                     <span><span aria-hidden>! </span>{r.detail}</span>
                     {["package_missing", "package_older", "definition_unknown"].includes(r.status) && (

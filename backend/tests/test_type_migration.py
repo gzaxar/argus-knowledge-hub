@@ -83,6 +83,8 @@ def world():
     s3 = _asset(db, w2, custom, f"S3-{t}", "srv-c", {"state": "OK", "classification": "restricted:security"})
     s4 = _asset(db, w2, custom, f"S4-{t}", "srv-d", {"state": "OK"})
     ru = _asset(db, w2, rack_unit, f"RU-{t}", "ru-1", {"server": s4.uid})
+    # A record of w1 that already uses the catalogue's package Server (the shared copy).
+    s5 = _asset(db, w1, db.get(Schema, asset_types.type_uid(cat, "Server")), f"S5-{t}", "srv-e", {"hostname": "e"})
     # s1's surroundings: a comment, a file, a relation, a map position and an indoor placement.
     building = _asset(db, w1, db.get(Schema, asset_types.type_uid(cat, "Building")), f"B-{t}", "hall", {})
     db.add(AssetComment(uid=str(uuid.uuid4()), asset_uid=s1.uid, author=ACTOR, text="note", created=tm.now(),
@@ -121,7 +123,7 @@ def world():
     doc.current_revision_uid = revs[-1].uid
     db.commit()
     w = dict(t=t, cat=cat, w1=w1, w2=w2, w3=w3, other=other, custom=custom.uid, rack_unit=rack_unit.uid,
-             s1=s1.uid, s2=s2.uid, s3=s3.uid, s4=s4.uid, ru=ru.uid, fault=fault.uid, note=note.uid, ticket=tk.uid,
+             s1=s1.uid, s2=s2.uid, s3=s3.uid, s4=s4.uid, s5=s5.uid, ru=ru.uid, fault=fault.uid, note=note.uid, ticket=tk.uid,
              doc=doc.uid, target_server=asset_types.type_uid(cat, "Server"))
     db.close()
     yield w
@@ -161,9 +163,10 @@ def test_the_target_is_the_package_type_where_the_records_live_never_a_namesake(
         assert r["installed_version"] == installer.installed(db, world["cat"])["it"].version
     # Another catalogue's package Server is not chosen for records of these workspaces.
     assert tm.resolve_target(db, world["w1"], "objects", SERVER)["schema_uid"] != asset_types.type_uid(world["other"], "Server")
-    # The custom Server is a source, the package Server is not.
-    srcs = {s["uid"] for s in tm.sources(db, "objects")}
-    assert world["custom"] in srcs and world["target_server"] not in srcs
+    # The custom Server is a source; the package Server is one only to be brought home.
+    srcs = {s["uid"]: s for s in tm.sources(db, "objects")}
+    assert world["custom"] in srcs and not srcs[world["custom"]]["package_type"]
+    assert srcs[world["target_server"]]["package_type"] is True
     db.close()
 
 
@@ -491,4 +494,56 @@ def test_a_custom_type_proposed_as_package_yaml_is_checked_and_nothing_is_writte
     assert not worse["ok"] and any("Bad Key" in p for p in worse["problems"]) and any("'A B'" in p for p in worse["problems"])
     db.rollback()
     assert (packages_dir() / "it" / "object_types.yaml").read_bytes() == shipped
+    db.close()
+
+
+# --------------------------------------------------------------------------- bringing a shared type home
+
+def test_a_shared_package_type_is_brought_home_to_the_workspaces_own_copy(world):
+    """w1 uses the catalogue's package Server; it gets its own copy — the same package type, owned by w1 —
+    and its records move to it. The catalogue's copy stays, upgrades of `it` in w1 include the copy, and a
+    later migration in w1 targets it."""
+    from app.ledger import engine
+    from app.packages import upgrade
+    db = SessionLocal()
+    shared, local_uid = world["target_server"], asset_types.type_uid(world["w1"], "Server")
+    src = {s["uid"]: s for s in tm.sources(db, "objects")}
+    assert src[shared]["package_type"] and world["w1"] in src[shared]["records"]
+    assert world["cat"] not in src[shared]["records"]                       # the catalogue keeps its own
+    with pytest.raises(tm.MigrationError, match="bring it home"):
+        _plan(db, world, source_schema_uid=shared, workspaces=[world["w1"]])
+    db.rollback()
+    m = _plan(db, world, source_schema_uid=shared, target={**SERVER, "home": "own"}, workspaces=[world["w1"]],
+              reason="w1 owns its servers")
+    assert db.get(Schema, local_uid) is None                                # a plan makes no copy
+    assert m.mapping["attributes"]["hostname"]["action"] == "copy"
+    p = tm.preview(db, m, ALL)
+    db.rollback()
+    assert db.get(Schema, local_uid) is None                                # nor a preview
+    t = p["targets"][0]
+    assert t["status"] == "ok" and t["schema_uid"] == local_uid and "own 'Server'" in t["brought_home"]
+    assert {r["uid"]: r["status"] for r in p["records"]}[world["s5"]] == "ready"
+    res = tm.apply(db, m, p["token"], ACTOR, ALL)
+    assert res["applied"] >= 1
+    db.expire_all()
+    local = db.get(Schema, local_uid)
+    assert local.workspace_id == world["w1"] and not local.is_global
+    assert local.metadata_json["brought_home"]["from"] == shared
+    assert local.parent_schema_uid == db.get(Schema, shared).parent_schema_uid
+    s5 = db.get(Asset, world["s5"])
+    assert s5.schema_uid == local_uid and s5.workspace_id == world["w1"] and s5.attributes["hostname"] == "e"
+    engine.project_subject(db, s5.uid, "test rebuild", emit=False)
+    db.flush()
+    assert db.get(Asset, s5.uid).schema_uid == local_uid
+    db.rollback()
+    assert db.get(Schema, shared) is not None                               # the catalogue's copy stays
+    assert "Server" in upgrade.brought_home(db, world["w1"], "it")           # upgraded with w1's own types
+    assert tm.resolve_target(db, world["w1"], "objects", SERVER)["schema_uid"] == local_uid
+    report = tm.verify(db, m, ACTOR)
+    assert report["exceptions"] == [] and not report["deprecation"]["possible"]
+    with pytest.raises(tm.MigrationError, match="cannot be deprecated"):
+        tm.verify(db, m, ACTOR, deprecate=True)
+    tm.revert(db, m, ACTOR)
+    db.expire_all()
+    assert db.get(Asset, world["s5"]).schema_uid == shared
     db.close()
