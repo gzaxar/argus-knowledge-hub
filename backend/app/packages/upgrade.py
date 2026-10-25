@@ -86,7 +86,17 @@ def changes(db: Session, workspace_id: str, new: Package) -> list[d.Change]:
     old = d.definitions(old_sections, new.id, sets)
     newer = d.definitions(new.sections, new.id, sets)
     found = _kept_by_extensions(db, workspace_id, new, _moved(new, d.compare(old, newer)))
-    return d.assess(db, workspace_id, found, old, _scope_names(row, old_sections, new)), old
+    scope = _scope_names(row, old_sections, new)
+    if scope is not None:
+        scope |= brought_home(db, workspace_id, new.id)
+    return d.assess(db, workspace_id, found, old, scope), old
+
+
+def brought_home(db: Session, workspace_id: str, package_id: str) -> set:
+    """Shared types this workspace has its own copy of (a type migration brought them home): upgraded here
+    like the workspace's own."""
+    return {s.name for s in db.scalars(select(Schema).where(Schema.workspace_id == workspace_id))
+            if ((s.metadata_json or {}).get("brought_home") or {}).get("package") == package_id}
 
 
 def _kept_by_extensions(db: Session, workspace_id: str, new: Package, found: list) -> list:

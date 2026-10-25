@@ -2638,6 +2638,8 @@ export type MigrationKind = "objects" | "tickets" | "documents";
 export interface MigrationSource {
   uid: string; name: string; workspace_id: string; is_global: boolean; parent_schema_uid: string | null;
   custom: boolean; deprecated: boolean; records: Record<string, number>; records_below: Record<string, number>;
+  /** A shared package type other workspaces use: a source only to be brought home. */
+  package_type: boolean;
 }
 export interface MigrationTargetType {
   package_id: string; package_name: string; version: string; type: string; abstract: boolean; base: boolean;
@@ -2646,6 +2648,7 @@ export interface MigrationTargetType {
 export interface TargetResolution {
   workspace_id: string; home: string; package_id: string; type: string; schema_uid: string | null;
   installed_version: string | null; checksum: string | null; status: string; detail: string | null;
+  brought_home?: string; copy_of?: string;
 }
 export interface AttributeRule {
   action: "copy" | "transform" | "provenance" | "review";
@@ -2656,7 +2659,7 @@ export interface TypeMigrationView {
   id: string; kind: MigrationKind; source_schema_uid: string;
   source: { name: string; workspace_id: string; is_global: boolean; family: { uid: string; name: string; workspace_id: string }[] };
   include_descendants: boolean; workspaces: string[];
-  target: { package_id: string; type: string; area: string; version: string };
+  target: { package_id: string; type: string; area: string; version: string; home?: "installed" | "own" };
   mapping: { attributes: Record<string, AttributeRule>; defaults: Record<string, unknown>;
              states: Record<string, string | null>; records: Record<string, string> };
   reason: string | null; status: string; verification: VerificationReport | null;
@@ -2693,14 +2696,15 @@ export const typeMigrationsApi = {
   get: (id: string) => request<TypeMigrationView>(`${TM}/${encodeURIComponent(id)}`),
   sources: (kind: MigrationKind) => request<MigrationSource[]>(`${TM}/sources?kind=${kind}`),
   targets: (kind: MigrationKind) => request<MigrationTargetType[]>(`${TM}/targets?kind=${kind}`),
-  resolve: (kind: MigrationKind, packageId: string, type: string, workspaces: string[]) =>
+  resolve: (kind: MigrationKind, packageId: string, type: string, workspaces: string[], home: "installed" | "own" = "installed") =>
     request<TargetResolution[]>(`${TM}/targets/resolve?kind=${kind}&package_id=${encodeURIComponent(packageId)}` +
-      `&type=${encodeURIComponent(type)}&workspaces=${encodeURIComponent(workspaces.join(","))}`),
+      `&type=${encodeURIComponent(type)}&workspaces=${encodeURIComponent(workspaces.join(","))}&home=${home}`),
   installPreview: (workspace_id: string, package_id: string) =>
     request<{ workspace_id: string; ok: boolean; plan?: PackagePlan; error?: string; catalogue_workspace_id?: string;
               needs?: { package_id: string; version: string; has: string | null }[] }>(
       `${TM}/install-preview`, { method: "POST", body: json({ workspace_id, package_id }) }),
-  create: (body: { kind: MigrationKind; source_schema_uid: string; target: { package_id: string; type: string };
+  create: (body: { kind: MigrationKind; source_schema_uid: string;
+                   target: { package_id: string; type: string; home?: "installed" | "own" };
                    workspaces: string[]; include_descendants: boolean; reason: string }) =>
     request<TypeMigrationView>(TM, { method: "POST", body: json(body) }),
   change: (id: string, body: Record<string, unknown>) =>

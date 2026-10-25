@@ -81,7 +81,7 @@ def list_targets(kind: str = "objects", identity=Depends(require_admin)):
 
 
 @router.get("/type-migrations/targets/resolve")
-def resolve_targets(kind: str, package_id: str, type: str, workspaces: str,
+def resolve_targets(kind: str, package_id: str, type: str, workspaces: str, home: str = "installed",
                     identity=Depends(require_admin), db: Session = Depends(get_db)):
     """Where the package type is (or is not) available for records of these workspaces: per workspace, the
     workspace or shared catalogue that holds it, the installed version, and what is missing."""
@@ -89,8 +89,16 @@ def resolve_targets(kind: str, package_id: str, type: str, workspaces: str,
     t = declared.get((package_id, type))
     if t is None:
         raise HTTPException(status_code=404, detail="Not a type of a shipped package")
-    target = {"package_id": package_id, "type": type, "version": t["version"]}
-    return [tm.resolve_target(db, ws, kind, target) for ws in workspaces.split(",") if ws]
+    target = {"package_id": package_id, "type": type, "version": t["version"], "home": home}
+    out = []
+    for ws in [w for w in workspaces.split(",") if w]:
+        r = tm.resolve_target(db, ws, kind, target)
+        if home == "own" and r["status"] != "ok":
+            st = tm.bring_home_status(db, ws, kind, target)
+            if st["status"] == "will_create":
+                r = {**r, "status": "will_create", "detail": st["detail"], "copy_of": st["copy_of"]}
+        out.append(r)
+    return out
 
 
 class InstallPreviewIn(BaseModel):
@@ -133,7 +141,9 @@ def get_migration(mid: str, identity=Depends(require_admin), db: Session = Depen
 @router.get("/type-migrations/{mid}/fields")
 def migration_fields(mid: str, identity=Depends(require_admin), db: Session = Depends(get_db)):
     """The fields and states the mapping step offers, for this plan."""
-    return tm.fields(db, _get(db, mid))
+    out = tm.fields(db, _get(db, mid))
+    db.rollback()                      # a copy a plan would bring home is shown, not kept
+    return out
 
 
 @router.patch("/type-migrations/{mid}")
