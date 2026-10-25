@@ -1,5 +1,7 @@
 # ARGUS Knowledge Hub
 
+Explore the [ARGUS Knowledge Hub site](https://infn-argus.github.io/argus-knowledge-hub/) for an overview, first steps and the [public manuals](https://infn-argus.github.io/argus-knowledge-hub/en/manuals/). The manuals are generated from the help chapters in this repository.
+
 Structured-knowledge backbone for **ARGUS** (*AI-based Retrieval-Grounded Understanding and
 Supervision for Accelerator Operations*, INFN CSN5).
 
