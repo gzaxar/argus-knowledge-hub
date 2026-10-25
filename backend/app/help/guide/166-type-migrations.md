@@ -30,6 +30,15 @@ positions and indoor placements. **Administration → Type migrations** (instanc
 6. **Verify**: checks every moved record against what it had before. Tick **Deprecate the old type** to mark it
    deprecated once nothing uses it (it is never deleted). **Revert** puts the records back.
 
+## Bring a shared type home
+
+A workspace that hangs from a shared catalogue uses the catalogue's types (Server, Power Supply…). To make one its
+own: choose that type as the **source** (it is marked *shared package type*), the same type as the **target**, and
+**Bring the type home** is on. Each owning workspace gets its own copy of the package type when you apply, and its
+records move to it. The copy is upgraded with the workspace's packages and no longer follows the catalogue's edits;
+the catalogue keeps its copy for the others. The option is also there for a custom type, to make the target the
+workspace's own.
+
 ## When no package has the type you need
 
 In step 2, **Propose this one as a package type** writes the custom type as package YAML and checks it (names, field

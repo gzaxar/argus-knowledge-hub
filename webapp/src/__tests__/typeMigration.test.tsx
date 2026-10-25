@@ -30,3 +30,14 @@ describe("the migration wizard's target step", () => {
     expect(screen.getByText("partially applied")).toBeInTheDocument();
   });
 });
+
+describe("bringing a shared type home", () => {
+  it("says which workspace gets its own copy, made when applied", () => {
+    renderWith(<Resolution rows={[
+      { ...base, workspace_id: "btf", home: "btf", schema_uid: null, status: "will_create",
+        detail: "'btf' gets its own 'Server', a copy of 'catalogue''s (it 1.1.0)", copy_of: "catalogue:argus-object:server" },
+    ]} />);
+    expect(screen.getByText(/'btf' gets its own 'Server'/)).toBeInTheDocument();
+    expect(screen.getByText(/made when applied/)).toBeInTheDocument();
+  });
+});
