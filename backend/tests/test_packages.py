@@ -268,6 +268,7 @@ def test_a_preview_keeps_nothing_and_an_install_that_fails_applies_nothing(ws):
     empty = f"{ws}-empty"
     db.add(Workspace(id=empty, name=empty))
     db.commit()
+    # A catalogue with no recorded packages is checked type by type, and says which are missing.
     with pytest.raises(installer.PackageProblem, match="does not hold the global types"):
         installer.install(db, ws, ["accelerator"], catalogue_workspace_id=empty)
     db.rollback()

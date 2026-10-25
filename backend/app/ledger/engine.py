@@ -1140,10 +1140,10 @@ def reference_edges(db: Session, uid: str, attrs: dict) -> set[tuple]:
     return out
 
 
-def _original_type(db: Session, record: Asset) -> str:
+def _original_type(db: Session, record: Asset) -> dict:
     """The type the record had before a type statement last took effect: the
     `before` of the first event in the latest run of statement-driven retypes
-    (a promotion in between starts a new run)."""
+    (a promotion in between starts a new run) — its name and, where recorded, its uid."""
     start = None
     for e in db.scalars(select(RecordEvent).where(RecordEvent.uid == record.uid, RecordEvent.kind == "retyped")
                         .order_by(RecordEvent.seq)):
@@ -1151,18 +1151,33 @@ def _original_type(db: Session, record: Asset) -> str:
             start = start or e
         else:
             start = None
-    return (start.before or {}).get("type", record.type) if start is not None else record.type
+    before = (start.before or {}) if start is not None else {}
+    return {"name": before.get("type", record.type), "schema_uid": before.get("schema_uid")}
+
+
+def _type_target(db: Session, record: Asset, type_fact) -> tuple[str, Optional[str]]:
+    """What a type statement names: a type's name, or (since type migrations) its identity —
+    `{"name": …, "schema_uid": …}` — which is used as such, never looked up again by name."""
+    if isinstance(type_fact, dict):
+        uid = type_fact.get("schema_uid")
+        schema = db.get(Schema, uid) if uid else None
+        # The identity is used when it is the type named (a direct promotion can leave a record's name and
+        # uid out of step: then the name, as before).
+        if schema is not None and (not type_fact.get("name") or schema.name == type_fact["name"]):
+            return schema.name, schema.uid
+        return str(type_fact.get("name") or record.type), None
+    return str(type_fact), None
 
 
 def _write_type(db: Session, record: Asset, type_fact, cause: str, emit: bool) -> None:
     """A confirmed `type` statement retypes the record in place (same uid and
     key). With none in effect (revoked), it goes back to its original type."""
-    wanted = type_fact or _original_type(db, record)
-    if wanted == record.type:
+    wanted, wanted_uid = _type_target(db, record, type_fact or _original_type(db, record))
+    if wanted == record.type and wanted_uid in (None, record.schema_uid):
         return
     before = {"type": record.type, "schema_uid": record.schema_uid}
     record.type = wanted
-    record.schema_uid = ensure_type(db, record.workspace_id, wanted).uid
+    record.schema_uid = wanted_uid or ensure_type(db, record.workspace_id, wanted).uid
     if emit:
         db.add(RecordEvent(uid=record.uid, kind="retyped", before=before,
                            after={"type": wanted, "schema_uid": record.schema_uid,
