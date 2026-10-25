@@ -111,6 +111,10 @@ A new driver is two pull requests: the support module on ibek-support-infn, then
 on ibek-templates. If the option is not offered, an administrator has not installed the GitHub credential
 (docs/ioc-engineer.md).
 
+## INFN EPICS ecosystem
+
+The [INFN EPICS site](https://infn-epics.github.io/) introduces EPIK8S and links the shared IOC image, support modules, charts and operator interfaces. Use it to find the source repository before drafting or changing a beamline IOC entry.
+
 ## When an IOC does not start
 
 Give the assistant the IOC's entry and the error from the pod log. "Template directory … not found" (exit 7)
