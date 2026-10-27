@@ -374,6 +374,76 @@ def test_a_token_fixed_to_a_workspace_and_a_robot_stay_in_theirs(world):
     assert [w["id"] for w in listed["workspaces"]] == [ids["ws"]]
 
 
+def _administrator_token(scopes: tuple = ("read", "admin")) -> str:
+    """A personal token of an administrator, fixed to no workspace: what ARGUS is given to read them all."""
+    from app.models.user import User
+    t = secrets.token_hex(4)
+    db = SessionLocal()
+    db.add(User(id=f"a-{t}", email=f"a-{t}@argus.test", name="Ada", is_admin=True))
+    db.flush()
+    raw = f"argus_pat_{secrets.token_urlsafe(16)}"
+    db.add(ApiToken(kind="personal", user_id=f"a-{t}", token_hash=hash_token(raw), scopes=list(scopes)))
+    db.commit()
+    db.close()
+    return raw
+
+
+def test_an_administrators_token_reads_every_workspace_without_a_header(world):
+    """No role anywhere, no X-Workspace-Id: the admin scope is what opens every workspace."""
+    ids, _robot = world
+    second = _second_workspace()
+    raw = _administrator_token()
+
+    assert rpc(raw, "initialize").status_code == 200
+    assert rpc(raw, "tools/list").json()["result"]["tools"]
+    listed = json.loads(rpc(raw, "tools/call", {"name": "list_workspaces"}).json()["result"]["content"][0]["text"])
+    assert listed["current"] is None
+    assert {w["id"] for w in listed["workspaces"]} >= {ids["ws"], second}
+
+    found = tool(raw, "get_object", {"uid_or_key": ids["key"], "workspace": ids["ws"]})
+    assert found["found"] is True
+    # Asked in a workspace it holds no role in, and answered (shared records may appear there).
+    assert "total" in tool(raw, "search_objects", {"workspace": second})
+
+    # With no header and no `workspace`, there is no workspace to ask in: said, not guessed.
+    body = rpc(raw, "tools/call", {"name": "search_objects", "arguments": {}}).json()["result"]
+    assert body["isError"] is True and "list_workspaces" in body["content"][0]["text"]
+
+
+def test_an_administrators_token_without_the_admin_scope_reads_only_their_own(world):
+    ids, _robot = world
+    raw = _administrator_token(scopes=("read",))
+    listed = json.loads(rpc(raw, "tools/call", {"name": "list_workspaces"}).json()["result"]["content"][0]["text"])
+    assert ids["ws"] not in {w["id"] for w in listed["workspaces"]}
+    body = rpc(raw, "tools/call", {"name": "search_objects", "arguments": {"workspace": ids["ws"]}}).json()["result"]
+    assert body["isError"] is True and "may not ask" in body["content"][0]["text"]
+
+
+def test_a_token_with_no_read_scope_is_refused_without_a_header_too(world):
+    raw = _administrator_token(scopes=("create",))
+    assert rpc(raw, "tools/list").status_code == 403
+
+
+def test_search_objects_pages_in_a_stable_order_with_attributes(world):
+    ids, raw = world
+    db = SessionLocal()
+    db.get(Asset, ids["camera"]).attributes = {"system": "cam", "pv_prefix": "BTF:CAM:FI4"}
+    db.commit()
+    db.close()
+
+    first = tool(raw, "search_objects", {"type": "Cameras", "limit": 1, "with_attributes": True})
+    second = tool(raw, "search_objects", {"type": "Cameras", "limit": 1, "offset": 1, "with_attributes": True})
+    beyond = tool(raw, "search_objects", {"type": "Cameras", "limit": 1, "offset": 2})
+
+    assert first["total"] == second["total"] == 2
+    assert {first["objects"][0]["uid"], second["objects"][0]["uid"]} == {ids["camera"], ids["rack"]}
+    assert beyond["objects"] == []
+    camera = next(o for o in first["objects"] + second["objects"] if o["uid"] == ids["camera"])
+    assert camera["attributes"] == {"system": "cam", "pv_prefix": "BTF:CAM:FI4"}
+    # Without with_attributes, the summary stays as it was.
+    assert "attributes" not in tool(raw, "search_objects", {"type": "Cameras"})["objects"][0]
+
+
 def test_a_read_only_token_reaches_mcp_but_still_writes_nothing(world):
     """MCP takes everything as a POST; that must not turn a read token into a writing one."""
     ids, _raw = world

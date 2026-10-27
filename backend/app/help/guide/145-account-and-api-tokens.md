@@ -63,7 +63,15 @@ workspace to ask in as `X-Workspace-Id` (not needed if the token is fixed to one
 A token that is not fixed to a workspace can ask in **every workspace where you hold a role**: the
 `list_workspaces` tool lists them, and every tool takes an optional `workspace` to ask in another one for
 that call. A workspace where you hold no role is refused; a robot token, or a personal token fixed to one
-workspace, stays in its own.
+workspace, stays in its own. Such a token may also leave `X-Workspace-Id` out and name the `workspace` on
+every call instead.
+
+To let the ARGUS MCP server (the control-room assistant) read **every** workspace, an administrator makes a
+personal token with the **Read** and **Administer** scopes, not fixed to a workspace, and gives it to that
+server as `KNOWLEDGE_HUB_TOKEN`. `list_workspaces` then lists all of them, including those where the
+administrator holds no role, and restricted records are visible to it — keep it where the server's other
+secrets are kept. Without the *Administer* scope, the same administrator's token reaches only their own
+workspaces.
 
 ## If an API request is refused
 
