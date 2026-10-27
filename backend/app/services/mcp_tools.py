@@ -151,10 +151,14 @@ def _mentioning(types: list[dict], word: str) -> list[dict]:
 
 def search_objects(db: Session, workspace_id: str, query: str = "",
                    type: Optional[str] = None, types: Optional[list] = None,
-                   limit: int = DEFAULT_LIMIT) -> dict:
+                   limit: int = DEFAULT_LIMIT, offset: int = 0, with_attributes: bool = False) -> dict:
     """Equipment by name, key or type. A type includes its subtypes; a word that names a type matches
     the objects of that type and of the types below it. Returns the total and the count per type, so a
-    question about how many there are is answered from all of them, not from the first page."""
+    question about how many there are is answered from all of them, not from the first page.
+
+    `offset` and `with_attributes` are for a client listing every object of a type (ARGUS reading a
+    beamline's Control Devices): page after page in a stable order, each object with the attributes
+    get_object would give it, instead of one get_object call per object."""
     needle = (query or "").strip().lower()
     catalogue = _types(db, workspace_id)
     asked = [x for x in ([type] if type else []) + list(types or []) if isinstance(x, str) and x.strip()]
@@ -191,12 +195,15 @@ def search_objects(db: Session, workspace_id: str, query: str = "",
         or a.type in by_word
     ]
     # This workspace's own first: the shared catalogue's records are there to be referenced, not to bury
-    # the answer about this beamline.
-    rows.sort(key=lambda a: a.workspace_id != workspace_id)
+    # the answer about this beamline. Then by key, so that pages of the same query never overlap or skip.
+    rows.sort(key=lambda a: (a.workspace_id != workspace_id, a.key or "", a.uid))
+    start = max(int(offset or 0), 0)
+    page = rows[start: start + min(limit or DEFAULT_LIMIT, MAX_LIMIT)]
     out = {
         "total": len(rows),
         "by_type": dict(Counter(a.type for a in rows).most_common(40)),
-        "objects": [_asset_summary(a) for a in rows[: min(limit or DEFAULT_LIMIT, MAX_LIMIT)]],
+        "objects": [{**_asset_summary(a), "attributes": redacted_attributes(db, a)} if with_attributes
+                    else _asset_summary(a) for a in page],
     }
     if unknown:
         out["unknown_types"] = unknown
@@ -554,6 +561,11 @@ TOOLS: list[dict[str, Any]] = [
                           "description": "Restrict to several object types (and their subtypes)"},
                 "limit": {"type": "integer", "description": f"Objects to return; default {DEFAULT_LIMIT}, "
                                                             f"at most {MAX_LIMIT}"},
+                "offset": {"type": "integer", "description": "Objects to skip, to page through more than "
+                                                             "one limit's worth; default 0"},
+                "with_attributes": {"type": "boolean",
+                                    "description": "Return each object's attributes too, as get_object "
+                                                   "would; default false"},
             },
         },
     },
