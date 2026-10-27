@@ -1,3 +1,9 @@
+---
+title: EuPRAXIA Document Creation Guide
+summary: Instructions for creating standardized EuPRAXIA documents using ARGUS native types and templates.
+keywords: ["eupraxia", "documentation", "templates", "how-to", "guide"]
+--- 
+
 # EuPRAXIA Documentation Organization in ARGUS
 
 ## 1. Purpose and Scope
