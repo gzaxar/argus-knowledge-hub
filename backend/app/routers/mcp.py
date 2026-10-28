@@ -13,7 +13,7 @@ import json
 import logging
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -46,7 +46,8 @@ INSTRUCTIONS = (
     "writes a new support module (asyn driver or StreamDevice, SNL sequences, simulator, ibek files) from a "
     "description of the device.\n"
     "Every tool works in one workspace: the request's own (its X-Workspace-Id, or the one the token is "
-    "fixed to) unless you pass `workspace`. list_workspaces says which ones you may ask in; to answer "
+    "fixed to) unless you pass `workspace`. A personal token fixed to no workspace may send no header and "
+    "name the workspace on every call. list_workspaces says which ones you may ask in; to answer "
     "across workspaces, call a tool once per workspace.\n"
     "Records come with a `url`, the page of that record in ARGUS, and a `link`, the same as a ready "
     "Markdown link: when you cite a record, write its `link` as given, so the reader can open it.\n"
@@ -88,7 +89,27 @@ def _may_read(db: Session, identity: Identity, workspace_id: str) -> bool:
     return resolve_permission(db, identity.user, workspace_id, "read", "objects")
 
 
-def _workspaces(db: Session, identity: Identity, current: str) -> dict:
+def request_workspace(
+    identity: Identity = Depends(get_identity),
+    db: Session = Depends(get_db),
+    x_workspace_id: Optional[str] = Header(default=None, alias="X-Workspace-Id"),
+) -> Optional[str]:
+    """The request's own workspace, checked the way require_permission("read") checks it — or None for a
+    person (or their personal token) who sent no X-Workspace-Id and whose token is fixed to none.
+
+    Every tool here takes `workspace`, so such a caller names it per call and needs no header at all. That
+    is what lets an administrator's token, which may read every workspace, start from list_workspaces
+    instead of first having to know one workspace id to put in the header.
+    """
+    fixed = isinstance(identity, PatIdentity) or (identity.token is not None and identity.token.workspace_id)
+    if x_workspace_id or fixed:
+        return require_permission("read")(identity=identity, db=db, x_workspace_id=x_workspace_id)
+    if identity.token is not None and not identity.token.may("read", "objects"):
+        raise HTTPException(status_code=403, detail="This token may not read objects")
+    return None
+
+
+def _workspaces(db: Session, identity: Identity, current: Optional[str]) -> dict:
     # A staging import is nobody's yet; read-only evidence can be asked.
     rows = db.scalars(select(Workspace).where(Workspace.import_state.is_distinct_from("staging"))
                       .order_by(Workspace.name))
@@ -120,7 +141,7 @@ def no_server_stream() -> Response:
 @router.post("/")
 async def rpc(
     request: Request,
-    workspace_id: str = Depends(require_permission("read")),
+    workspace_id: Optional[str] = Depends(request_workspace),
     identity: Identity = Depends(get_identity),
     db: Session = Depends(get_db),
 ) -> Response:
@@ -165,6 +186,12 @@ async def rpc(
                 "isError": False,
             })
         target = arguments.pop("workspace", None) or workspace_id
+        if target is None:
+            return _result(request_id, {
+                "content": [{"type": "text", "text": "No workspace: pass `workspace` (list_workspaces says "
+                                                     "which ones you may ask in) or send X-Workspace-Id."}],
+                "isError": True,
+            })
         if target != workspace_id:
             # Another workspace for this one call: the same read check the
             # header gets, and that workspace's restricted-field grants.
