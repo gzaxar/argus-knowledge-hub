@@ -69,6 +69,8 @@ file it belongs in — the fork's device type or `argus-catalogue`'s entry — f
   specifications are not yet verified, listed in `VERIFICATION.md`; and `it-classification`, the ARGUS side of
   the eight NetBox device types. Records whose identity is not a clear manufacturer designation (25:
   pump-and-controller combinations, product families, site-made or unclear names) are left for a person.
+- **`argus-catalogue` v0.2.0** (`c0121da`, pinned in ARGUS 1.35.60): every collection names its domain, the
+  packages whose workspaces its models are offered to (docs/system-catalogue.md, C4); no entry changed.
 - **The format** gains `classifications`: ARGUS's metadata (device class, instance type, EOL, spares,
   relations) for a model another source defines, by the same id. When ARGUS reads its sources, a NetBox model
   with no classification, a classification with no model, and a classification of a model the Argus-native
