@@ -1,12 +1,12 @@
 # The catalogue's sources, pinned (docs/catalogue-collections.md §A, app/catalogue/sources.py).
 # ARGUS reads each repository at exactly `commit`; a release tag must still point at it. Changing a pin is a
-# reviewed pull request: preview the new release on the Catalogue collections page before installing it.
+# reviewed pull request: preview the new release on Administration › Catalogue before installing it.
 sources:
   - id: argus
     kind: argus-collections
     repo: https://github.com/infn-argus/argus-catalogue.git
-    ref: v0.1.0
-    commit: 63a81dded8c09c500ee8ffb7cffa69f5a705f75f
+    ref: v0.2.0
+    commit: c0121da62ac81f019e5e7e187d2da8bc0ff6295a
 
   - id: netbox
     kind: netbox-devicetype-library
