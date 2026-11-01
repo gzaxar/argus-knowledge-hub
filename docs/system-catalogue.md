@@ -119,6 +119,30 @@ are set in argus-catalogue (accelerator-diagnostics, accelerator-power, accelera
 accelerator; motion: accelerator and optics-alignment; vacuum: vacuum-cryo; it-classification: it), released as
 v0.2.0 after this ARGUS release, then pinned here.
 
+### C6 — Not a workspace to the people using it
+
+After C1–C4 an administrator could still switch into the catalogue and meet it as a workspace named
+"Acceleratori-INFN". Now: it is listed in no one's switcher (only while it is the current one); a record is
+edited in its own workspace (`assetsApi.update(…, workspaceId)` sends the record's workspace, so a maintainer
+edits a catalogue model from anywhere, its permission checked in the catalogue); *Administration › Catalogue*
+renames it (the id and keys stay), names any record that does not belong in it (`status.other_record_list`), and
+offers administrators "open the catalogue as a workspace" for cleaning those up.
+
+The 144 shared types it holds are the whole shared object type tree (locations, IT, vacuum, cryogenics, safety,
+optics and lasers, RF, cables, control items, and Catalog Item with Vendor and Product Model), not accelerator
+types: the beamlines' own types (magnets, monitors) are in each beamline.
+
+### C7 — One type tree, with where each type comes from
+
+The type tree beside the lists split the workspace's own types from the "Shared by other workspaces" ones, so a
+beamline's own types (magnets, monitors) sat detached from their parents in the catalogue, and a self-contained
+workspace saw its own copy of a package type and the catalogue's apart. Now it is one tree of every type the
+workspace can use; a type of the same name kept in two places (the workspace's copy of a package type and the
+catalogue's) is one node, its records counted and filtered together (`typeFamily` follows same-name types). Every
+type says where it comes from (`origin` on the type list and a type's page, app/packages/origin.py): the
+package and the version its workspace has, an import (its source), or made in a workspace — shown on hover,
+when selected, and on the type's page; imported and other workspaces' own types carry a small mark.
+
 ### C5 — Production
 
 1. Deploy C1 (the migration only adds the setting and marks one workspace); run `python -m app.catalogue

@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { directoryApi, rolesApi, systemCatalogueApi, workspacesApi } from "../../api/client";
+import { directoryApi, rolesApi, systemCatalogueApi, workspacesApi, type SystemCatalogueStatus } from "../../api/client";
+import { getActiveProfileId, updateProfile } from "../../api/session";
 import { CatalogueCollectionsPage } from "../catalogue/CatalogueCollections";
 import { problem } from "../catalogue/catalogueText";
 import { GlpiMatches } from "../catalogue/ProductCatalogue";
@@ -53,17 +54,56 @@ function Status({ admin }: { admin: boolean }) {
     );
   }
 
+  return <Designated s={s} admin={admin} />;
+}
+
+/** The catalogue: its name (administrators rename it), what it holds and what depends on it, any record that
+ *  does not belong there, and — for administrators — a way into it as a workspace, to clean such a record up. */
+function Designated({ s, admin }: { s: SystemCatalogueStatus; admin: boolean }) {
+  const queryClient = useQueryClient();
+  const [naming, setNaming] = useState<string | null>(null);
+  const rename = useMutation({
+    mutationFn: (name: string) => workspacesApi.update(s.designated!, { name }),
+    onSuccess: () => {
+      setNaming(null);
+      queryClient.invalidateQueries({ queryKey: ["system-catalogue"] });
+      queryClient.invalidateQueries({ queryKey: ["my-workspaces"] });
+    },
+  });
+  function openAsWorkspace() {
+    const profile = getActiveProfileId();
+    if (!profile) return;
+    updateProfile(profile, { activeWorkspaceId: s.designated! });
+    window.location.assign("/");
+  }
   const units = Object.entries(s.units ?? {});
   const hanging = Object.entries(s.hanging ?? {});
   const others = Object.entries(s.other_records ?? {});
   return (
     <section aria-label="Catalogue workspace" className="rounded border border-slate-200 bg-white p-4 text-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-semibold text-slate-900">
-          {s.name} <span className="font-mono text-xs font-normal text-slate-400">{s.designated}</span>
-        </h2>
+        {naming === null ? (
+          <h2 className="font-semibold text-slate-900">
+            {s.name} <span className="font-mono text-xs font-normal text-slate-400">{s.designated}</span>
+            {admin && (
+              <button type="button" onClick={() => setNaming(s.name ?? "")}
+                      className="ml-2 text-xs font-normal text-sky-800 hover:underline">Rename</button>
+            )}
+          </h2>
+        ) : (
+          <form className="flex flex-wrap items-center gap-2"
+                onSubmit={(e) => { e.preventDefault(); if (naming.trim()) rename.mutate(naming.trim()); }}>
+            <input aria-label="Catalogue name" value={naming} onChange={(e) => setNaming(e.target.value)}
+                   className="w-64 rounded border border-slate-300 px-2 py-1 text-sm" />
+            <button type="submit" disabled={!naming.trim() || rename.isPending}
+                    className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-50">Save</button>
+            <button type="button" onClick={() => setNaming(null)} className="text-xs text-slate-500">Cancel</button>
+            <span className="text-xs text-slate-500">The id and the record keys stay: they are printed on labels.</span>
+          </form>
+        )}
         <Link to="/catalogue/models" className="text-xs text-sky-800 underline">Browse the models</Link>
       </div>
+      {rename.isError && <p className="text-red-700">{problem(rename.error)}</p>}
       <dl className="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-2">
         <div><dt className="inline text-slate-500">Holds </dt>
           <dd className="inline">{count(s.records?.["Product Model"], "Product Model")}, {count(s.records?.Vendor, "Vendor")}</dd></div>
@@ -79,14 +119,27 @@ function Status({ admin }: { admin: boolean }) {
       </dl>
       {(others.length > 0 || (s.not_shared ?? 0) > 0) && (
         <p role="alert" className="mt-2 text-amber-800">
-          {others.length > 0 && <>It also holds {others.map(([t, n]) => `${n} ${t}`).join(", ")}: these belong in a workspace. </>}
+          {others.length > 0 && <>It also holds {others.map(([t, n]) => `${n} ${t}`).join(", ")}
+            {(s.other_record_list ?? []).length > 0 && <> ({(s.other_record_list ?? []).map((r) => `${r.key} “${r.name}”`).join(", ")})</>}
+            : these belong in a workspace. Copy each to the workspace it belongs in and delete it here
+            {admin ? <>, from the catalogue opened as a workspace (below)</> : <>; an administrator can</>}. </>}
           {(s.not_shared ?? 0) > 0 && <>{count(s.not_shared, "record")} not shared with the other workspaces.</>}
         </p>
       )}
       <p className="mt-2 text-xs text-slate-500">
         Protected: it holds Vendors and Product Models only, and cannot be deleted, transferred, exported as a
-        workspace bundle or made to hang from another workspace.
+        workspace bundle or made to hang from another workspace. Its models are edited from any workspace (the
+        edit is made here, by its maintainers); its shared types are upgraded on Administration › Packages.
       </p>
+      {admin && (
+        <p className="mt-1 text-xs text-slate-500">
+          Rarely needed:{" "}
+          <button type="button" onClick={openAsWorkspace} className="text-sky-800 hover:underline">
+            open the catalogue as a workspace
+          </button>{" "}
+          (its record pages, access and imports), to clean up what does not belong in it.
+        </p>
+      )}
     </section>
   );
 }

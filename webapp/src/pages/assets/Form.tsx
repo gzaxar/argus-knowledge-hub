@@ -96,7 +96,8 @@ export function AssetForm() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (isEditing) {
-        return assetsApi.update(uid!, { name, attributes, schema_uid: schemaUid, is_global: isGlobal });
+        return assetsApi.update(uid!, { name, attributes, schema_uid: schemaUid, is_global: isGlobal },
+                                existing.data?.workspace_id);
       }
       return assetsApi.create({
         uid: crypto.randomUUID(),

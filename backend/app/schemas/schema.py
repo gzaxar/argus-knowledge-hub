@@ -54,3 +54,6 @@ class SchemaOut(BaseModel):
     applies_to: str
     created_at: datetime
     updated_at: datetime
+    # Where it comes from (app/packages/origin.py): a package at a version, an import, or made here. Given by
+    # the type list and a type's page.
+    origin: Optional[dict] = None

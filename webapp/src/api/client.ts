@@ -287,8 +287,11 @@ export const assetsApi = {
   get: (uid: string) => request<Asset>(`/v1/assets/${uid}`),
   create: (input: AssetInput) =>
     request<Asset>("/v1/assets", { method: "POST", body: json(input) }),
-  update: (uid: string, input: Partial<AssetInput>) =>
-    request<Asset>(`/v1/assets/${uid}`, { method: "PUT", body: json(input) }),
+  /** `workspaceId`: the record's own workspace, when it is not the current one (a shared record, such as the
+   *  catalogue's models): the edit is made, and its permission checked, there. */
+  update: (uid: string, input: Partial<AssetInput>, workspaceId?: string) =>
+    request<Asset>(`/v1/assets/${uid}`, { method: "PUT", body: json(input),
+                                          ...(workspaceId ? { headers: { "X-Workspace-Id": workspaceId } } : {}) }),
   /** The key a new record of this type would get; nothing is reserved. */
   nextKey: (schemaUid?: string) =>
     request<{ key: string; pattern: string }>(
@@ -2995,6 +2998,7 @@ export interface SystemCatalogueStatus {
   name?: string;
   records?: Record<string, number>;
   other_records?: Record<string, number>;
+  other_record_list?: { uid: string; key: string; name: string; type: string }[];
   not_shared?: number;
   shared_types?: number;
   own_types?: number;

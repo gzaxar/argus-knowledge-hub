@@ -22,6 +22,41 @@ function subtreeCounts(roots: TreeNode[], direct: Map<string, number>): Map<stri
   return out;
 }
 
+/** Where a type comes from, in words: its package and the version its workspace has, an import, or where it
+ *  was made. Where it is stored (this workspace, or the shared catalogue) is not the point. */
+export function originText(s: AppSchema, ws: string | null, nameOf: (id: string) => string = (x) => x): string {
+  const o = s.origin;
+  if (o?.kind === "package") return `${o.package_name} ${o.version} (package ${o.package})`;
+  if (o?.kind === "import") return `imported from ${o.source === "jira" ? "Jira" : o.source}`;
+  return ws === null || s.workspace_id === ws ? "made in this workspace" : `made in ${nameOf(s.workspace_id)}, shared`;
+}
+
+/** A small mark for a type that is not from a package: imported, or made in another workspace. */
+function marker(s: AppSchema, ws: string | null): string | null {
+  if (s.origin?.kind === "import") return s.origin.source === "jira" ? "Jira" : s.origin.source;
+  if (s.origin?.kind !== "package" && ws !== null && s.workspace_id !== ws) return "shared";
+  return null;
+}
+
+/** One tree of every type the workspace can use, wherever each is stored. A type of the same name stored in two
+ *  places (a workspace's own copy of a package type, and the shared catalogue's) is one node: the workspace's
+ *  own; the other is folded into it (`alias`: its uid -> the node's), its records counted and selected with it. */
+export function unifiedTypes(list: AppSchema[], ws: string | null): { types: AppSchema[]; alias: Map<string, string> } {
+  const sorted = [...list].sort((a, b) => Number(b.workspace_id === ws) - Number(a.workspace_id === ws));
+  const byName = new Map<string, string>();
+  const alias = new Map<string, string>();
+  const kept: AppSchema[] = [];
+  for (const s of sorted) {
+    const k = `${s.applies_to ?? "objects"}|${s.name}`;
+    const first = byName.get(k);
+    if (first) alias.set(s.uid, first);
+    else { byName.set(k, s.uid); kept.push(s); }
+  }
+  const types = kept.map((s) => (s.parent_schema_uid && alias.has(s.parent_schema_uid)
+    ? { ...s, parent_schema_uid: alias.get(s.parent_schema_uid)! } : s));
+  return { types, alias };
+}
+
 interface Row {
   node: TreeNode;
   level: number;
@@ -41,13 +76,15 @@ function visibleRows(roots: TreeNode[], open: Set<string>, all: boolean): Row[] 
 
 /** One hierarchy as an accessible tree (WAI-ARIA tree view): arrow keys move, Right and Left open and close,
  * Enter or Space selects, Home and End jump. Only open branches are rendered. */
-function TypeTree({ roots, label, counts, selected, onSelect, searching }: {
+function TypeTree({ roots, label, counts, selected, onSelect, searching, ws, nameOf }: {
   roots: TreeNode[];
   label: string;
   counts: Map<string, number>;
   selected: string | null;
   onSelect: (uid: string) => void;
   searching: boolean;
+  ws: string | null;
+  nameOf: (id: string) => string;
 }) {
   const [open, setOpen] = useState<Set<string>>(() => new Set(roots.map((r) => r.schema.uid)));
   const rows = useMemo(() => visibleRows(roots, open, searching), [roots, open, searching]);
@@ -129,7 +166,7 @@ function TypeTree({ roots, label, counts, selected, onSelect, searching }: {
             onKeyDown={(e) => onKey(e, row, i)}
             onFocus={() => setFocus(uid)}
             onClick={() => onSelect(uid)}
-            title={row.node.schema.name}
+            title={`${row.node.schema.name} · ${originText(row.node.schema, ws, nameOf)}`}
             className={`flex cursor-pointer items-center gap-1 rounded py-1 pr-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
               isSelected ? "bg-slate-900 font-medium text-white" : "text-slate-700 hover:bg-slate-100"
             }`}
@@ -149,6 +186,11 @@ function TypeTree({ roots, label, counts, selected, onSelect, searching }: {
               <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-sm bg-slate-200" />
             )}
             <span className="min-w-0 flex-1 truncate">{row.node.schema.name}</span>
+            {marker(row.node.schema, ws) && (
+              <span className={`shrink-0 text-[10px] ${isSelected ? "text-slate-300" : "text-slate-400"}`}>
+                {marker(row.node.schema, ws)}
+              </span>
+            )}
             {count > 0 && (
               <span className={`shrink-0 tabular-nums ${isSelected ? "text-slate-300" : "text-slate-400"}`}
                     aria-label={`${count} records`}>{count}</span>
@@ -166,8 +208,9 @@ const WORDS: Record<AppliesTo, { title: string; all: string; newType: string; se
   documents: { title: "Document types", all: "All documents", newType: "/schemas/new?applies_to=documents", search: "Filter types" },
 };
 
-/** The type filter of a browse page: the workspace's types as a tree with how many records each holds (its
- * own and below), the types other workspaces share apart, a search, and links to manage the catalogue. */
+/** The type filter of a browse page: every type the workspace can use as one tree — its own and those of the
+ * shared catalogue together — with how many records each holds (its own and below), where each comes from (a
+ * package and its version, an import), a search, and links to manage the catalogue. */
 export function TypeExplorer({ appliesTo, counts, total, selected, onSelect, title, allLabel }: {
   appliesTo: AppliesTo;
   /** Records of each type itself (not counting the types below it). */
@@ -185,28 +228,21 @@ export function TypeExplorer({ appliesTo, counts, total, selected, onSelect, tit
   const nameOf = useWorkspaceNames();
   const schemas = useQuery({ queryKey: ["schemas"], queryFn: schemasApi.list, staleTime: 60_000 });
 
-  const { own, shared } = useMemo(() => {
-    const mine: AppSchema[] = [];
-    const others = new Map<string, AppSchema[]>();
-    for (const s of schemas.data ?? []) {
-      if ((s.applies_to ?? "objects") !== appliesTo) continue;
-      if (ws === null || s.workspace_id === ws) mine.push(s);
-      else others.set(s.workspace_id, [...(others.get(s.workspace_id) ?? []), s]);
-    }
-    return {
-      own: buildTree(mine),
-      shared: [...others.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([owner, list]) => ({ owner, tree: buildTree(list) })),
-    };
+  const { roots, alias } = useMemo(() => {
+    const list = (schemas.data ?? []).filter((s) => (s.applies_to ?? "objects") === appliesTo);
+    const { types, alias } = unifiedTypes(list, ws);
+    return { roots: buildTree(types), alias };
   }, [schemas.data, appliesTo, ws]);
-  const allCounts = useMemo(() => subtreeCounts([...own, ...shared.flatMap((g) => g.tree)], counts), [own, shared, counts]);
-  const visibleOwn = useMemo(() => filterTree(own, query.trim()), [own, query]);
-  const visibleShared = useMemo(
-    () => shared.map((g) => ({ ...g, tree: filterTree(g.tree, query.trim()) })).filter((g) => g.tree.length > 0),
-    [shared, query],
-  );
-  const [sharedOpen, setSharedOpen] = useState(false);
+  const merged = useMemo(() => {
+    const m = new Map(counts);
+    for (const [from, to] of alias) m.set(to, (m.get(to) ?? 0) + (counts.get(from) ?? 0));
+    return m;
+  }, [counts, alias]);
+  const allCounts = useMemo(() => subtreeCounts(roots, merged), [roots, merged]);
+  const visible = useMemo(() => filterTree(roots, query.trim()), [roots, query]);
   const searching = query.trim().length > 0;
-  const selectedName = (schemas.data ?? []).find((s) => s.uid === selected)?.name;
+  const selectedSchema = (schemas.data ?? []).find((s) => s.uid === selected);
+  const selectedName = selectedSchema?.name;
   const pick = (uid: string) => onSelect(uid === selected ? null : uid);
 
   return (
@@ -238,33 +274,17 @@ export function TypeExplorer({ appliesTo, counts, total, selected, onSelect, tit
         <Link to={`/schemas/${encodeURIComponent(selected)}`} className="truncate px-2 text-xs text-sky-700 hover:underline"
               title={`Fields, icon and permissions of ${selectedName}`}>
           {selectedName}: type settings ›
+          <span className="block truncate text-[11px] text-slate-400">{originText(selectedSchema!, ws, nameOf)}</span>
         </Link>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
         {schemas.isLoading && <p className="px-2 py-1 text-xs text-slate-400">Loading types…</p>}
-        {visibleOwn.length > 0 && (
-          <TypeTree key={searching ? "s" : "t"} roots={visibleOwn} label={title ?? words.title} counts={allCounts}
-                    selected={selected} onSelect={pick} searching={searching} />
+        {visible.length > 0 && (
+          <TypeTree key={searching ? "s" : "t"} roots={visible} label={title ?? words.title} counts={allCounts}
+                    selected={selected} onSelect={pick} searching={searching} ws={ws} nameOf={nameOf} />
         )}
-        {searching && visibleOwn.length === 0 && visibleShared.length === 0 && (
+        {searching && visible.length === 0 && (
           <p className="px-2 py-1 text-xs text-slate-400">No type matches “{query.trim()}”.</p>
-        )}
-        {visibleShared.length > 0 && (
-          <div className="mt-2 border-t border-slate-100 pt-2">
-            <button type="button" aria-expanded={sharedOpen || searching} onClick={() => setSharedOpen((v) => !v)}
-                    className="flex w-full items-center gap-1 rounded px-1.5 py-1 text-left text-xs font-medium text-sky-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-                    title="Types other workspaces share with this one; their records can be changed only where they live.">
-              <span aria-hidden className="w-3 text-slate-400">{sharedOpen || searching ? "▾" : "▸"}</span>
-              Shared by other workspaces
-            </button>
-            {(sharedOpen || searching) && visibleShared.map((g) => (
-              <div key={g.owner} className="mt-1">
-                <p className="truncate px-1.5 text-[11px] uppercase tracking-wide text-slate-400" title={nameOf(g.owner)}>{nameOf(g.owner)}</p>
-                <TypeTree roots={g.tree} label={`Types shared by ${nameOf(g.owner)}`} counts={allCounts}
-                          selected={selected} onSelect={pick} searching={searching} />
-              </div>
-            ))}
-          </div>
         )}
       </div>
     </section>
@@ -278,8 +298,21 @@ export function typeFamily(schemas: AppSchema[] | undefined, uid: string | null)
   for (const s of schemas ?? []) {
     if (s.parent_schema_uid) children.set(s.parent_schema_uid, [...(children.get(s.parent_schema_uid) ?? []), s.uid]);
   }
+  // A type of the same name stored elsewhere (the shared catalogue's copy of a package type) is the same type.
+  const sameName = new Map<string, string[]>();
+  for (const s of schemas ?? []) {
+    const k = `${s.applies_to ?? "objects"}|${s.name}`;
+    sameName.set(k, [...(sameName.get(k) ?? []), s.uid]);
+  }
+  const byUid = new Map((schemas ?? []).map((s) => [s.uid, s]));
   const out = new Set<string>();
-  const walk = (u: string) => { if (out.has(u)) return; out.add(u); (children.get(u) ?? []).forEach(walk); };
+  const walk = (u: string) => {
+    if (out.has(u)) return;
+    out.add(u);
+    (children.get(u) ?? []).forEach(walk);
+    const s = byUid.get(u);
+    if (s) (sameName.get(`${s.applies_to ?? "objects"}|${s.name}`) ?? []).forEach(walk);
+  };
   walk(uid);
   return out;
 }

@@ -53,7 +53,14 @@ export interface AppSchema {
   applies_to: "objects" | "tickets" | "documents";
   created_at: string;
   updated_at: string;
+  /** Where it comes from: a package at the version its workspace has, an import, or made in its workspace. */
+  origin?: SchemaOrigin | null;
 }
+
+export type SchemaOrigin =
+  | { kind: "package"; package: string; version: string; package_name: string }
+  | { kind: "import"; source: string }
+  | { kind: "local" };
 
 export interface SchemaInput {
   uid?: string;
