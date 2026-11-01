@@ -114,6 +114,8 @@ def status(db: Session) -> dict:
     out["records"] = {t: n for t, n in db.execute(
         select(Asset.type, func.count()).where(Asset.workspace_id == ws).group_by(Asset.type))}
     out["other_records"] = dict(_other_records(db, ws))
+    out["other_record_list"] = [{"uid": a.uid, "key": a.key, "name": a.name, "type": a.type} for a in db.scalars(
+        select(Asset).where(Asset.workspace_id == ws, Asset.type.notin_(RECORD_TYPES)).order_by(Asset.key).limit(25))]
     out["not_shared"] = db.scalar(select(func.count()).select_from(Asset).where(
         Asset.workspace_id == ws, Asset.type.in_(RECORD_TYPES), Asset.is_global.is_(False)))
     out["shared_types"] = db.scalar(select(func.count()).select_from(Schema).where(

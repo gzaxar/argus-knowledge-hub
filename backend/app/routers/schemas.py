@@ -23,11 +23,14 @@ ATTACHMENTS_DIR = os.environ.get("ATTACHMENTS_DIR", "/data/attachments")
 def list_schemas(
     workspace_id: str = Depends(require_permission("read")), db: Session = Depends(get_db)
 ):
-    return db.scalars(
+    from app.packages.origin import origins
+    rows = db.scalars(
         select(Schema).where(
             or_(Schema.workspace_id == workspace_id, Schema.is_global.is_(True))
         )
     ).all()
+    found = origins(db, rows)
+    return [SchemaOut.model_validate(s).model_copy(update={"origin": found.get(s.uid)}) for s in rows]
 
 
 @router.post("", response_model=SchemaOut, status_code=201)
@@ -72,7 +75,9 @@ def _get_visible_schema(uid: str, workspace_id: str, db: Session) -> Schema:
 def get_schema(
     uid: str, workspace_id: str = Depends(require_permission("read")), db: Session = Depends(get_db)
 ):
-    return _get_visible_schema(uid, workspace_id, db)
+    from app.packages.origin import origins
+    s = _get_visible_schema(uid, workspace_id, db)
+    return SchemaOut.model_validate(s).model_copy(update={"origin": origins(db, [s]).get(s.uid)})
 
 
 def _cascade_global_to_children(db: Session, schema: Schema) -> list[str]:

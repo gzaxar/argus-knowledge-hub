@@ -28,8 +28,12 @@ Neither ever holds site data: no serial numbers, installed units, locations, sel
   review, the corrections for Git, the history, and matching GLPI's devices (for the workspace you choose).
   The old *Catalogue collections* address leads there.
 
-The catalogue workspace itself is in the workspace switcher only for those who can change it; everyone else
-reads its models from their own workspace.
+The catalogue is not a workspace to work in: it is not in the workspace switcher. Everyone reads its models from
+their own workspace, and a maintainer edits a model from there too (*Open the record › Edit*: the edit is made,
+and its permission checked, in the catalogue). Its shared types are upgraded on *Administration › Packages*. An
+administrator renames it on *Administration › Catalogue* (its id and record keys stay, being printed on labels),
+and, rarely, opens it as a workspace from there — to clean up a record that does not belong in it, which the page
+names.
 
 ## Which models a workspace is offered
 

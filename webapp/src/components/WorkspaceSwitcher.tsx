@@ -36,10 +36,9 @@ export function WorkspaceSwitcher() {
     window.location.reload();
   };
 
-  // The installation's catalogue is for those who maintain it: everyone else reads its models from their own
-  // workspace, so it is not offered to them.
-  const shown = (myWorkspaces ?? []).filter((ws) => ws.role !== "catalogue" || ws.can_modify ||
-                                                     ws.id === active?.activeWorkspaceId);
+  // The installation's catalogue is not a workspace to work in: it is managed from Administration › Catalogue,
+  // and its models are read and edited from every workspace. It is listed only while it is the current one.
+  const shown = (myWorkspaces ?? []).filter((ws) => ws.role !== "catalogue" || ws.id === active?.activeWorkspaceId);
 
   const activeWorkspaceName =
     active?.authType === "oidc"

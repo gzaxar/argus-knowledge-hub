@@ -15,6 +15,9 @@ import {
   useConfigurableColumns,
 } from "../../components/ConfigurableTable";
 import { TransferItemAction } from "../../components/TransferItemAction";
+import { originText } from "../../components/browse/TypeExplorer";
+import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
+import { useWorkspaceNames } from "../../api/useWorkspaceNames";
 import { effectiveAttributes, inheritedKeys } from "../../lib/schemaAttributes";
 
 function resolveUserLabel(members: MemberDirectoryEntry[] | undefined, value: unknown): string {
@@ -33,6 +36,8 @@ const ISSUE_STATE_STYLES: Record<string, string> = {
 
 export function SchemaDetail() {
   const { uid } = useParams<{ uid: string }>();
+  const currentWs = useCurrentWorkspaceId();
+  const nameOf = useWorkspaceNames();
   const [tab, setTab] = useState<"items" | "attributes">("items");
   const [search, setSearch] = useState("");
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
@@ -413,6 +418,7 @@ export function SchemaDetail() {
               )}
             </h1>
             <p className="text-sm text-slate-500">{schema.description ?? "No description"}</p>
+            <p className="text-xs text-slate-400">Origin: {originText(schema, currentWs, nameOf)}</p>
           </div>
         </div>
         <div className="space-x-2">

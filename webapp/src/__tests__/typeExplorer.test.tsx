@@ -58,10 +58,33 @@ describe("the type explorer", () => {
     expect(screen.queryByRole("treeitem", { name: /Incident/ })).toBeNull();
   });
 
-  it("keeps other workspaces' types apart, folded", () => {
+  it("shows every type in one tree, marking a type made in another workspace", () => {
     setup();
-    expect(screen.getByRole("button", { name: /Shared by other workspaces/ })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("treeitem", { name: /Their type/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Shared by other workspaces/ })).toBeNull();
+    const theirs = screen.getByRole("treeitem", { name: /Their type/ });
+    expect(theirs).toHaveTextContent("shared");
+    expect(theirs).toHaveAttribute("title", "Their type · made in elsewhere, shared");
+  });
+
+  it("is one type when the catalogue and the workspace both hold a package's type, with its version", () => {
+    const pkg = { kind: "package", package: "core-objects", version: "2.1.0", package_name: "Core objects" };
+    const schemas = [
+      { ...s("own-pump", "Vacuum Pump", null), applies_to: "objects", origin: { ...pkg, version: "2.0.0" } },
+      { ...s("cat-pump", "Vacuum Pump", null, "catalogue"), applies_to: "objects", origin: pkg },
+      { ...s("cat-turbo", "Turbo Pump", "cat-pump", "catalogue"), applies_to: "objects", origin: pkg },
+      { ...s("jira", "Motors", null), applies_to: "objects", origin: { kind: "import", source: "jira" } },
+    ];
+    const onSelect = vi.fn();
+    renderWith(<TypeExplorer appliesTo="objects" counts={new Map([["own-pump", 1], ["cat-pump", 2], ["cat-turbo", 4]])}
+                             total={7} selected={null} onSelect={onSelect} />,
+               { cache: { ...cache, '["schemas"]': schemas } });
+    const pumps = screen.getAllByRole("treeitem", { name: /Vacuum Pump/ });
+    expect(pumps).toHaveLength(1);                                           // one node, the workspace's own
+    expect(pumps[0]).toHaveAttribute("title", "Vacuum Pump · Core objects 2.0.0 (package core-objects)");
+    expect(within(pumps[0]).getByLabelText("7 records")).toBeInTheDocument();   // its own, the catalogue's, below
+    expect(screen.getByRole("treeitem", { name: /Turbo Pump/ })).toHaveAttribute("aria-level", "2");
+    expect(screen.getByRole("treeitem", { name: /Motors/ })).toHaveTextContent("Jira");
+    expect([...typeFamily(schemas as never, "own-pump")!].sort()).toEqual(["cat-pump", "cat-turbo", "own-pump"]);
   });
 
   it("filters by a type and every type below it", () => {

@@ -84,8 +84,14 @@ A relation that a source or an installation maintains is marked as such: change 
 ## Types and the catalogue
 
 **Assets → Type catalogue** shows every type you can use: where it sits in the tree, what it means, its
-attributes (own and inherited), the names imports know it by, and how many records it has. Types are shared
-between workspaces through a catalogue workspace; a workspace's own types sit under them.
+attributes (own and inherited), the names imports know it by, and how many records it has.
+
+The type tree beside every list (assets, tickets, documents) is **one tree** of every type the workspace can
+use, wherever ARGUS keeps it. Most types come from a **package**: hover a type, or select it, to see which and at
+which version (*Core objects 2.1.0*); packages are upgraded on the Packages page. A type **imported** (from Jira,
+for example) is marked with its source, and one made in another workspace and shared is marked *shared*. A type
+held both by the workspace and by the shared catalogue — the same package type, kept in two places — is one
+entry, its records counted and filtered together.
 
 ## Labels and QR codes
 

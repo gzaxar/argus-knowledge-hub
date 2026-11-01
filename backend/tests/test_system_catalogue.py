@@ -248,3 +248,40 @@ def test_a_workspace_is_offered_the_models_of_its_domains(w):
             "domain: [accelerator, optics-alignment]\ncontents: []\n")
         c = load(root)
         assert c.domains == ["accelerator", "optics-alignment"] and c.domain == "accelerator, optics-alignment"
+
+
+def test_a_model_is_edited_from_any_workspace_by_a_maintainer_and_stray_records_are_named(w):
+    from datetime import datetime, timezone
+
+    from app.models.role import RoleBinding
+    from app.services.roles import ensure_system_roles
+    db = w["db"]
+    stray = Asset(uid=str(uuid.uuid4()), workspace_id=w["cat"], schema_uid=w["other"].uid,
+                  key=f"S-{uuid.uuid4().hex[:6]}", name="an area", type=w["other"].name, attributes={})
+    db.add(stray)
+    db.commit()                                    # made before the catalogue was designated
+    db.get(Workspace, w["cat"]).role = system.ROLE
+    ensure_system_roles(db)
+    model = Asset(uid=str(uuid.uuid4()), workspace_id=w["cat"], schema_uid=w["model"].uid, key=f"M-{uuid.uuid4().hex[:6]}",
+                  name="Hi Scroll 6", type="Product Model", attributes={}, is_global=True)
+    db.add(model)
+    db.commit()
+    assert system.status(db)["other_record_list"] == [{"uid": stray.uid, "key": stray.key, "name": "an area",
+                                                        "type": w["other"].name}]
+
+    # From another workspace, with the catalogue's header: a reader may not, a curator may.
+    plain = w["plain"]
+    db.add(RoleBinding(workspace_id=w["units"], subject_type="user", subject_id=plain.id, role_id="curator",
+                       created_at=datetime.now(timezone.utc)))
+    db.commit()
+    body = {"name": "HiScroll 6", "attributes": {}, "schema_uid": w["model"].uid, "is_global": True}
+    client = as_user(plain)
+    assert client.put(f"/v1/assets/{model.uid}", json=body, headers={"X-Workspace-Id": w["units"]}).status_code == 404
+    assert client.put(f"/v1/assets/{model.uid}", json=body, headers={"X-Workspace-Id": w["cat"]}).status_code == 403
+    db.add(RoleBinding(workspace_id=w["cat"], subject_type="user", subject_id=plain.id, role_id="curator",
+                       created_at=datetime.now(timezone.utc)))
+    db.commit()
+    r = client.put(f"/v1/assets/{model.uid}", json=body, headers={"X-Workspace-Id": w["cat"]})
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    assert db.get(Asset, model.uid).name == "HiScroll 6"

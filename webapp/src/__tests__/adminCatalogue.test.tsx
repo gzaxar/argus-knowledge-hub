@@ -94,4 +94,26 @@ describe("Administration › Catalogue", () => {
     fireEvent.click(within(section).getByRole("button", { name: "Remove Paola" }));
     await waitFor(() => expect(del).toHaveBeenCalledWith("acc", 7));
   });
+
+  it("administrators rename the catalogue and see the records that do not belong in it", async () => {
+    vi.spyOn(systemCatalogueApi, "status").mockResolvedValue({ designated: "accelerator-infn", candidates: [],
+      name: "Acceleratori-INFN", records: { Area: 1, "Product Model": 131, Vendor: 41 }, other_records: { Area: 1 },
+      other_record_list: [{ uid: "a1", key: "ACC-1", name: "Hall", type: "Area" }],
+      not_shared: 0, units: {}, hanging: {}, collections: {} });
+    collections();
+    me(true);
+    vi.spyOn(workspacesApi, "listMine").mockResolvedValue([]);
+    vi.spyOn(rolesApi, "listBindings").mockResolvedValue([]);
+    vi.spyOn(workspacesApi, "listUsers").mockResolvedValue([]);
+    vi.spyOn(directoryApi, "groups").mockResolvedValue([]);
+    const update = vi.spyOn(workspacesApi, "update").mockResolvedValue({} as never);
+    renderWith(<AdminCataloguePage />);
+
+    expect(await screen.findByText(/ACC-1 “Hall”/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "open the catalogue as a workspace" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    fireEvent.change(screen.getByLabelText("Catalogue name"), { target: { value: "ARGUS catalogue" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(update).toHaveBeenCalledWith("accelerator-infn", { name: "ARGUS catalogue" }));
+  });
 });

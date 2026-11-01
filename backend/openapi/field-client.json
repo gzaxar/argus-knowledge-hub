@@ -4501,6 +4501,17 @@
             "title": "Name",
             "type": "string"
           },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin"
+          },
           "parent_schema_uid": {
             "anyOf": [
               {
