@@ -170,3 +170,17 @@ def test_a_rejected_match_does_not_come_back(w):
     w["db"].expire_all()
     assert proposals(w)[u.uid][2] == "rejected"                               # stated again, still rejected
     assert "product_model" not in w["db"].get(Asset, u.uid).attributes
+
+
+def test_the_same_proposals_in_another_order_are_unchanged(w, monkeypatch):
+    v = record(w, w["vendor"], "Moxa")
+    record(w, w["model"], "Moxa NPort 5450", vendor="Moxa", vendor_ref=v.uid, model_code="NPort 5450")
+    record(w, w["model"], "Moxa NPort 5410", vendor="Moxa", vendor_ref=v.uid, model_code="NPort 5410")
+    unit(w, "Moxa", "NPort 5450")
+    unit(w, "Moxa", "NPort 5410")
+    unit(w, "Moxa", "NPort 5450")
+    assert glpi.match(w["db"], w["it"], w["cat"])["status"] == "ran"
+    w["db"].commit()
+    ordered = glpi.units_to_match
+    monkeypatch.setattr(glpi, "units_to_match", lambda db, ws: list(reversed(ordered(db, ws))))
+    assert glpi.match(w["db"], w["it"], w["cat"])["status"] == "unchanged"

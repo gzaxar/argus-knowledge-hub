@@ -79,7 +79,8 @@ def _score(model: dict, manufacturer: str, glpi_model: str) -> Optional[tuple[st
 def units_to_match(db: Session, workspace_id: str) -> list[Asset]:
     """The workspace's units from GLPI with a manufacturer and a model."""
     return [u for u in db.scalars(select(Asset).where(Asset.workspace_id == workspace_id, Asset.deleted_at.is_(None),
-                                                      Asset.attributes["argus_source"].astext == "GLPI"))
+                                                      Asset.attributes["argus_source"].astext == "GLPI")
+                                                .order_by(Asset.uid))
             if (u.attributes or {}).get("manufacturer") and (u.attributes or {}).get("model")]
 
 
@@ -116,6 +117,8 @@ def match(db: Session, workspace_id: str, catalogue_ws: str) -> dict:
               "ambiguous": [{"manufacturer": k[0], "model": k[1], "candidates": v} for k, v in sorted(ambiguous.items())],
               "unmatched": [{"manufacturer": k[0], "model": k[1], "units": len(v)}
                             for k, v in sorted(unmatched.items(), key=lambda kv: (-len(kv[1]), kv[0]))]}
+    # In a fixed order: the same proposals are the same run, however the database returns the units.
+    proposals.sort(key=lambda p: p["source_ref"])
     digest = hashlib.sha256(canonical(proposals).encode()).hexdigest()
     last = db.scalar(select(JobRun).where(JobRun.stage == "catalogue-match", JobRun.scope == workspace_id)
                      .order_by(JobRun.id.desc()).limit(1))
