@@ -248,6 +248,8 @@ app.include_router(catalogue_mapping.router)
 app.include_router(catalogue_collections.router)
 app.include_router(catalogue_collections.glpi_router)
 app.include_router(catalogue_collections.system_router)
+from app.routers import sites as sites_router  # noqa: E402
+app.include_router(sites_router.router)
 app.include_router(catalogue.types_router)
 for _r in beam_model.ROUTERS:
     app.include_router(_r)

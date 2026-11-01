@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   catalogueCollectionsApi, type CatalogueCollection, type CataloguePlan, type CataloguePlanItem, type CatalogueRecord,
 } from "../api/client";
-import { CatalogueCollectionsPage, stillOpen } from "../pages/catalogue/CatalogueCollections";
+import { CatalogueCollectionsPage, linkAllVendors, openVendorLinks, stillOpen } from "../pages/catalogue/CatalogueCollections";
 import { CatalogueModelPage } from "../pages/catalogue/CatalogueModel";
 import { renderWith } from "../test/render";
 
@@ -88,6 +88,52 @@ describe("catalogue collections", () => {
     expect(preview).toHaveBeenCalledWith(["it-network"], {}, "workspace: cat\nlinks: {}\n");
     fireEvent.click(screen.getByRole("button", { name: "Install" }));
     await waitFor(() => expect(install).toHaveBeenCalledWith(["it-network"], {}, "workspace: cat\nlinks: {}\n"));
+  });
+});
+
+describe("linking every matching vendor at once", () => {
+  const vendor = (id: string, name: string, fields = [{ field: "name", record: name, release: id, action: null }]) =>
+    ({ ...link, catalogue_id: id, kind: "vendor" as const, collection: "vendors", record_uid: `u-${id}`,
+       record_name: name, fields: fields as CataloguePlanItem["fields"] });
+  const vendorsPlan: CataloguePlan = {
+    ...plan, undecided: ["agilent", "pfeiffer-vacuum", "moxa", "moxa/nport-5450"],
+    releases: [{ ...plan.releases[0], collection: "vendors",
+                 items: [vendor("agilent", "Agilent Technologies"), vendor("pfeiffer-vacuum", "Pfeiffer Vacuum", []),
+                         vendor("moxa", "MOXA"), link] }],
+  };
+
+  it("takes the vendors still waiting, and links each keeping this record's differing fields", () => {
+    const open = openVendorLinks(vendorsPlan, { moxa: { action: "create" } }, false);
+    expect(open.map((i) => i.catalogue_id)).toEqual(["agilent", "pfeiffer-vacuum"]);   // not decided, not a model
+    expect(linkAllVendors(open)).toEqual({
+      agilent: { action: "link", fields: { name: "local" } },
+      "pfeiffer-vacuum": { action: "link", fields: {} },
+    });
+    expect(openVendorLinks(vendorsPlan, {}, true).map((i) => i.catalogue_id)).toEqual(["agilent", "pfeiffer-vacuum", "moxa"]);
+    expect(openVendorLinks({ ...vendorsPlan, undecided: ["moxa/nport-5450"] }, {}, true)).toEqual([]);  // the manifest decided
+  });
+
+  it("is a button in the preview; a choice made by hand stays, and models wait for a person", async () => {
+    vi.spyOn(catalogueCollectionsApi, "list").mockResolvedValue({
+      workspace_id: "cat", history: [], sources: [], collections: [collection("vendors")] });
+    vi.spyOn(catalogueCollectionsApi, "review").mockResolvedValue([]);
+    vi.spyOn(catalogueCollectionsApi, "preview").mockResolvedValue(vendorsPlan);
+    const install = vi.spyOn(catalogueCollectionsApi, "install").mockResolvedValue({ ...vendorsPlan, undecided: [] });
+    renderWith(<CatalogueCollectionsPage />);
+    fireEvent.click(await screen.findByLabelText("Choose vendors"));
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+    fireEvent.click((await screen.findAllByLabelText(/create a separate one/))[2]);       // MOXA: by hand
+    fireEvent.click(screen.getByRole("button", { name: "Link all matching vendors (2)" }));
+    expect(screen.queryByRole("button", { name: /Link all matching vendors/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Install" })).toBeDisabled();              // the model still waits
+    fireEvent.click(screen.getAllByLabelText(/create a separate one/)[3]);               // the NPort: by hand
+    fireEvent.click(screen.getByRole("button", { name: "Install" }));
+    await waitFor(() => expect(install).toHaveBeenCalledWith(["vendors"], {
+      agilent: { action: "link", fields: { name: "local" } },
+      "pfeiffer-vacuum": { action: "link", fields: {} },
+      moxa: { action: "create" },
+      "moxa/nport-5450": { action: "create" },
+    }, undefined));
   });
 });
 

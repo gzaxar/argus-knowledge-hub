@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { directoryApi, rolesApi, systemCatalogueApi, workspacesApi, type SystemCatalogueStatus } from "../../api/client";
-import { getActiveProfileId, updateProfile } from "../../api/session";
+import { getActiveProfile, updateProfile } from "../../api/session";
 import { CatalogueCollectionsPage } from "../catalogue/CatalogueCollections";
 import { problem } from "../catalogue/catalogueText";
 import { GlpiMatches } from "../catalogue/ProductCatalogue";
@@ -71,9 +71,10 @@ function Designated({ s, admin }: { s: SystemCatalogueStatus; admin: boolean }) 
     },
   });
   function openAsWorkspace() {
-    const profile = getActiveProfileId();
+    // The profile in use (with one sign-in, no profile is marked active: the first is the one).
+    const profile = getActiveProfile();
     if (!profile) return;
-    updateProfile(profile, { activeWorkspaceId: s.designated! });
+    updateProfile(profile.id, { activeWorkspaceId: s.designated! });
     window.location.assign("/");
   }
   const units = Object.entries(s.units ?? {});

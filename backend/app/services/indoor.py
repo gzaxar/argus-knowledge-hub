@@ -314,7 +314,7 @@ def place(db: Session, asset: Asset, *, place_uid: Optional[str] = None, level_u
     """Place a record inside: in a place, on a level, at a point of a plan (what is known). A point on a plan
     placed on the map gives the record its position too."""
     plan = db.get(FloorPlan, plan_uid) if plan_uid else None
-    if plan_uid and (plan is None or plan.workspace_id != asset.workspace_id):
+    if plan_uid and (plan is None or not _reachable_place(db, plan.place_uid, asset.workspace_id)):
         raise IndoorError("no such plan here")
     px, py = _number(x, "x", 0, 1e7), _number(y, "y", 0, 1e7)
     if (px is None) != (py is None):
@@ -330,11 +330,12 @@ def place(db: Session, asset: Asset, *, place_uid: Optional[str] = None, level_u
     if place_uid == asset.uid:
         raise IndoorError("a record is not inside itself")
     place_rec = db.get(Asset, place_uid) if place_uid else None
-    if place_uid and (place_rec is None or place_rec.deleted_at is not None or place_rec.workspace_id != asset.workspace_id):
+    if place_uid and (place_rec is None or place_rec.deleted_at is not None
+                      or not _reachable_place(db, place_uid, asset.workspace_id)):
         raise IndoorError("no such place here")
     level_uid = level_uid or (plan.level_uid if plan else None)
     level = db.get(PlaceLevel, level_uid) if level_uid else None
-    if level_uid and (level is None or level.workspace_id != asset.workspace_id):
+    if level_uid and (level is None or not _reachable_place(db, level.place_uid, asset.workspace_id)):
         raise IndoorError("no such floor here")
     if place_rec is not None and _inside_chain(db, place_rec.uid, asset.uid):
         raise IndoorError(f"{place_rec.name} is inside {asset.name}: a record cannot be inside what is inside it")
@@ -349,6 +350,7 @@ def place(db: Session, asset: Asset, *, place_uid: Optional[str] = None, level_u
                              confirmed_by=actor, created_at=at)
     db.add(placed)
     db.flush()
+    _site_changed(db, asset, actor)
     words = [f"in {place_rec.name}" if place_rec else None, f"on {level.name}" if level else None,
              f"at {px:.0f}, {py:.0f} of the plan {plan.name}" if px is not None else None]
     _history(db, asset, "Placed indoors: " + ", ".join(w for w in words if w), actor, at)
@@ -364,6 +366,14 @@ def place(db: Session, asset: Asset, *, place_uid: Optional[str] = None, level_u
     return placed
 
 
+def _reachable_place(db: Session, place_uid: Optional[str], workspace_id: str) -> bool:
+    """A place (and so its floors and plans) a record of `workspace_id` may be placed in: its own workspace's, a
+    global one, or one its site shares with it (docs/sites.md)."""
+    from app.services.visibility import reachable_in
+    place = db.get(Asset, place_uid) if place_uid else None
+    return place is not None and place.deleted_at is None and reachable_in(place, workspace_id)
+
+
 def remove(db: Session, asset: Asset, actor: Optional[str]) -> bool:
     previous = current(db, asset.uid)
     if previous is None:
@@ -372,7 +382,15 @@ def remove(db: Session, asset: Asset, actor: Optional[str]) -> bool:
     previous.state, previous.valid_until = "removed", at
     _history(db, asset, "No longer placed indoors", actor, at)
     db.flush()
+    _site_changed(db, asset, actor)
     return True
+
+
+def _site_changed(db: Session, asset: Asset, actor: Optional[str]) -> None:
+    """A site's place moved inside another (or out): what its facilities may see can change (services/sites)."""
+    from app.services import sites
+    if sites.is_site(db, asset.workspace_id) and asset.schema_uid in sites.place_types(db):
+        sites.refresh(db, asset.workspace_id, actor=actor, reason=f"{asset.name} moved inside a place not shared")
 
 
 def _history(db: Session, asset: Asset, details: str, actor: Optional[str], at) -> None:

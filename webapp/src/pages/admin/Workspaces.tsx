@@ -1,7 +1,66 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ApiError, workspacesApi } from "../../api/client";
+import { ApiError, sitesApi, workspacesApi, type PlacementEnding } from "../../api/client";
+import type { MyWorkspace } from "../../api/types";
+import { problem } from "../catalogue/catalogueText";
+
+/** A workspace's place in a site: a site (whose places its facilities use), the catalogue, or at a site. Leaving
+ *  a site first shows the placements on its places that would end. */
+function SiteCell({ ws, all }: { ws: MyWorkspace; all: MyWorkspace[] }) {
+  const queryClient = useQueryClient();
+  const [ending, setEnding] = useState<{ siteId: string | null; list: PlacementEnding[] } | null>(null);
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["me-workspaces"] });
+  const role = useMutation({ mutationFn: (site: boolean) => sitesApi.setRole(ws.id, site), onSuccess: refresh });
+  const site = useMutation({
+    mutationFn: (v: { siteId: string | null; confirm: boolean }) => sitesApi.setSite(ws.id, v.siteId, v.confirm),
+    onSuccess: (r, v) => {
+      if (r.preview) setEnding({ siteId: v.siteId, list: r.would_end ?? [] });
+      else { setEnding(null); refresh(); }
+    },
+  });
+  const error = role.error ?? site.error;
+  const sites = all.filter((w) => w.role === "site" && w.id !== ws.id);
+  const facilities = all.filter((w) => w.site_id === ws.id).length;
+  if (ws.role === "catalogue") return <span className="text-xs text-slate-500">the catalogue</span>;
+  return (
+    <div className="space-y-1 text-xs">
+      {ws.role === "site" ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded bg-sky-50 px-1.5 py-0.5 font-medium text-sky-800">Site</span>
+          <span className="text-slate-500">{facilities} facilit{facilities === 1 ? "y" : "ies"}</span>
+          <button type="button" disabled={role.isPending || facilities > 0} onClick={() => role.mutate(false)}
+                  title={facilities > 0 ? "Its facilities must be at another site, or none, first" : undefined}
+                  className="text-slate-500 hover:underline disabled:opacity-50">Stop being a site</button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <select aria-label={`Site of ${ws.name}`} value={ws.site_id ?? ""} disabled={site.isPending}
+                  onChange={(e) => site.mutate({ siteId: e.target.value || null, confirm: false })}
+                  className="rounded border border-slate-300 px-1.5 py-0.5">
+            <option value="">At no site</option>
+            {sites.map((s) => <option key={s.id} value={s.id}>at {s.name}</option>)}
+          </select>
+          {!ws.site_id && (
+            <button type="button" disabled={role.isPending} onClick={() => role.mutate(true)}
+                    className="text-sky-800 hover:underline">Make it a site</button>
+          )}
+        </div>
+      )}
+      {ending && (
+        <div role="alert" className="rounded border border-amber-300 bg-amber-50 p-2 text-amber-950">
+          <p>Leaving its site ends {ending.list.length} placement{ending.list.length === 1 ? "" : "s"} of its
+            records on the site's places: {ending.list.slice(0, 5).map((x) => x.record.name).join(", ")}
+            {ending.list.length > 5 ? "…" : ""}. They keep their position on the map.</p>
+          <button type="button" onClick={() => site.mutate({ siteId: ending.siteId, confirm: true })}
+                  className="mt-1 rounded bg-slate-900 px-2 py-0.5 font-medium text-white">Leave the site</button>
+          <button type="button" onClick={() => setEnding(null)} className="ml-2 text-slate-600">Cancel</button>
+        </div>
+      )}
+      {error && <p className="text-red-600">{problem(error)}</p>}
+    </div>
+  );
+}
 
 export function AdminWorkspaces() {
   const queryClient = useQueryClient();
@@ -72,6 +131,7 @@ export function AdminWorkspaces() {
                 <th className="px-4 py-2">Id</th>
                 <th className="px-4 py-2">Name</th>
                 <th className="px-4 py-2">Global</th>
+                <th className="px-4 py-2">Site</th>
                 <th className="px-4 py-2">Created</th>
                 <th className="px-4 py-2" />
               </tr>
@@ -119,6 +179,7 @@ export function AdminWorkspaces() {
                       Global
                     </label>
                   </td>
+                  <td className="px-4 py-2"><SiteCell ws={ws} all={workspaces.data} /></td>
                   <td className="px-4 py-2 text-slate-500">
                     {new Date(ws.created_at).toLocaleDateString()}
                   </td>
@@ -198,7 +259,7 @@ export function AdminWorkspaces() {
               ))}
               {workspaces.data.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
                     No workspaces yet.
                   </td>
                 </tr>

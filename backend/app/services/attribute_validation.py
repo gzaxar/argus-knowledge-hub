@@ -55,7 +55,9 @@ def effective_attributes(db: Session, schema: Schema) -> list[dict]:
 
 
 def _is_reference_visible(db: Session, target: Asset, workspace_id: str) -> bool:
-    return target.workspace_id == workspace_id or bool(target.is_global)
+    """Own, global, or a place of the site the workspace is at (services/visibility.reachable_in)."""
+    from app.services.visibility import reachable_in
+    return reachable_in(target, workspace_id)
 
 
 def _is_duplicate(

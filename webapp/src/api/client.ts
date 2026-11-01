@@ -641,7 +641,31 @@ export const transfersApi = {
   get: (uid: string) => request<TransferJob>(`/v1/transfers/${uid}`),
   create: (input: TransferRequest) =>
     request<TransferJob>("/v1/transfers", { method: "POST", body: json(input) }),
+  /** The reconciliation report of a transfer, before it runs: nothing changes (docs/sites.md, rule 5). */
+  preview: (input: TransferRequest) =>
+    request<TransferPreview>("/v1/transfers/preview", { method: "POST", body: json(input) }),
 };
+
+export interface TransferPreview {
+  source: string;
+  target: string;
+  mode: "copy" | "move";
+  records: { uid: string; key: string; name: string; type: string; is_global: boolean; site_shared_after: boolean }[];
+  indoors: {
+    levels: { uid: string; place_uid: string; name: string }[];
+    plans: { uid: string; place_uid: string; name: string; files_present: boolean; placed_on_map: boolean; residual_m: number | null }[];
+  };
+  placements: { record: string; name: string; place_uid: string | null; plan_uid: string | null; eligible: boolean; why: string | null }[];
+  placed_inside: { record: { uid: string; key: string; name: string; workspace_id: string }; keeps_placement: boolean; why: string | null }[];
+  references: {
+    kind: "relation" | "attribute"; relation_type?: string; attributes?: string[]; to?: string;
+    from: { uid: string; key: string; name: string; workspace_id: string } | null;
+    resolves_after: boolean; resolves_if_not_global?: boolean; why: string | null;
+  }[];
+  labels_carried: number;
+  problems: string[];
+  clean: boolean;
+}
 
 export const importConfigsApi = {
   list: () => request<ImportConfig[]>("/v1/import-configs"),
@@ -2990,6 +3014,43 @@ export const glpiMatchesApi = {
   run: (workspaceId?: string) => request<GlpiMatchReport>("/v1/catalogue/glpi-matches",
     { method: "POST", ...(workspaceId ? { headers: { "X-Workspace-Id": workspaceId } } : {}) }),
 };
+
+/** A facility record's placement that a change of sharing would end (docs/sites.md). */
+export interface PlacementEnding {
+  workspace_id: string;
+  record: { uid: string; key: string; name: string };
+  place_uid: string | null;
+  plan_uid: string | null;
+}
+
+/** Sites: laboratories whose places their facility workspaces use (administrators). */
+export const sitesApi = {
+  list: () => request<{ id: string; name: string; facilities: string[]; shared_places: number; withheld: number }[]>(
+    "/v1/admin/sites"),
+  setRole: (workspaceId: string, site: boolean) =>
+    request<{ workspace_id: string; role: string | null; ended: string[] }>(
+      `/v1/admin/sites/${encodeURIComponent(workspaceId)}/role`, { method: "PUT", body: json({ site }) }),
+  /** Without `confirm`, leaving a site answers with the placements that would end, and changes nothing. */
+  setSite: (workspaceId: string, siteId: string | null, confirm = false) =>
+    request<{ workspace_id: string; site_id: string | null; preview?: boolean; would_end?: PlacementEnding[]; ended?: string[] }>(
+      `/v1/admin/sites/${encodeURIComponent(workspaceId)}/site`, { method: "PUT", body: json({ site_id: siteId, confirm }) }),
+  /** A site's place: shared with the facilities, or withheld (with what is inside it). */
+  sharing: (assetUid: string) =>
+    request<PlaceSharing>(`/v1/assets/${encodeURIComponent(assetUid)}/site-sharing`),
+  setSharing: (assetUid: string, shared: boolean, confirm = false) =>
+    request<PlaceSharing & { preview?: boolean; would_withhold?: number; would_end?: PlacementEnding[]; ended?: string[] }>(
+      `/v1/assets/${encodeURIComponent(assetUid)}/site-sharing`, { method: "PUT", body: json({ shared, confirm }) }),
+};
+
+export interface PlaceSharing {
+  uid: string;
+  site: string;
+  facilities: string[];
+  shared: boolean;
+  withheld: boolean;
+  withheld_by: { uid: string; key: string; name: string } | null;
+  inside: number;
+}
 
 /** GET /v1/admin/catalogue: the installation's catalogue workspace and what depends on it. */
 export interface SystemCatalogueStatus {
