@@ -188,6 +188,7 @@ class ApiService {
   api.WorkspacesApi workspaces(api.ApiClient c) => api.WorkspacesApi(c);
   api.FieldClientApi field(api.ApiClient c) => api.FieldClientApi(c);
   api.HubApi hub(api.ApiClient c) => api.HubApi(c);
+  api.CatalogueApi catalogue(api.ApiClient c) => api.CatalogueApi(c);
   api.AssetsApi assets(api.ApiClient c) => api.AssetsApi(c);
   api.InstallationsApi installations(api.ApiClient c) => api.InstallationsApi(c);
   api.IssuesApi issues(api.ApiClient c) => api.IssuesApi(c);

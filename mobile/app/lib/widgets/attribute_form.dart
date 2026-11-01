@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/providers.dart';
+import '../core/problem.dart';
+import '../data/model_repository.dart';
 import '../domain/models.dart';
 
 /// The values being edited for a record's type-defined attributes, one slot per value: kept by the screen
@@ -196,6 +200,21 @@ class _AttributeFieldsState extends ConsumerState<AttributeFields> {
   /// among, instead of a free-text uid the person could never type correctly — the web's ReferenceInput.
   Widget _referencePicker(AttributeDef def, String label) {
     final values = _c.choices[def.key]!;
+    if (def.isProductModel) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          for (final (i, uid) in values.indexed)
+            ModelSearchField(
+              key: Key('attr-${def.key}-$i'),
+              label: i == 0 ? label : null,
+              value: uid,
+              schemaUid: def.referenceSchemaUid!,
+              onChanged: (v) => setState(() => values[i] = v),
+            ),
+        ]),
+      );
+    }
     final candidatesAsync = ref.watch(referenceCandidatesProvider((def.referenceSchemaUid!, def.includeChildren)));
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -395,5 +414,158 @@ class _ReferenceFieldState extends State<ReferenceField> {
         ),
       ),
     );
+  }
+}
+
+
+/// A unit's product model, typed as on its label and searched: the catalogue's models first, then its sources'
+/// library (the NetBox Device Type Library among them) — a library model is added to the catalogue when it is
+/// chosen. Only this workspace's domains unless "every model". Offline, it falls back to the catalogue's models
+/// already known here (the web's ModelPicker).
+class ModelSearchField extends ConsumerStatefulWidget {
+  const ModelSearchField({super.key, required this.value, required this.onChanged, required this.schemaUid, this.label});
+
+  final String? value;
+  final ValueChanged<String?> onChanged;
+  final String schemaUid;
+  final String? label;
+
+  @override
+  ConsumerState<ModelSearchField> createState() => _ModelSearchFieldState();
+}
+
+class _ModelSearchFieldState extends ConsumerState<ModelSearchField> {
+  final _controller = TextEditingController();
+  Timer? _debounce;
+  ModelSearchResult? _result;
+  bool _every = false;
+  bool _busy = false;
+  bool _offline = false;
+  String? _message;
+  Map<String, Object?>? _lookAlike;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _typed(String text) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () => _search(text.trim()));
+  }
+
+  Future<void> _search(String q) async {
+    if (q.length < 2) {
+      setState(() => _result = null);
+      return;
+    }
+    try {
+      final r = await ref.read(modelRepositoryProvider).search(q, every: _every);
+      if (mounted) setState(() { _result = r; _offline = false; });
+    } on Problem catch (p) {
+      if (!mounted) return;
+      setState(() {
+        _offline = p.code == ProblemCode.offline;
+        _message = _offline ? null : p.message;
+      });
+    }
+  }
+
+  void _pick(String uid) {
+    _controller.clear();
+    setState(() { _result = null; _lookAlike = null; _message = null; });
+    widget.onChanged(uid);
+  }
+
+  Future<void> _install(ModelHit m) async {
+    setState(() { _busy = true; _lookAlike = null; _message = null; });
+    try {
+      _pick(await ref.read(modelRepositoryProvider).installOne(m.catalogueId!));
+    } on Problem catch (p) {
+      if (!mounted) return;
+      setState(() {
+        _lookAlike = p.candidates.isNotEmpty ? p.candidates.first : null;
+        _message = p.message;
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_offline) {
+      final candidates = ref.watch(referenceCandidatesProvider((widget.schemaUid, false)));
+      return candidates.when(
+        loading: () => const LinearProgressIndicator(),
+        error: (e, _) => Text('Could not load choices: $e'),
+        data: (list) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ReferenceField(label: widget.label, candidates: list, value: widget.value, onChanged: widget.onChanged),
+          const Text('Offline: only the models already in the catalogue.', style: TextStyle(fontSize: 12)),
+        ]),
+      );
+    }
+    final current = widget.value == null ? null : ref.watch(assetBriefProvider(widget.value!));
+    final r = _result;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (widget.value != null)
+        Row(children: [
+          Expanded(child: Text(current?.asData?.value?.label ?? widget.value!, key: const Key('model-current'))),
+          IconButton(icon: const Icon(Icons.clear), tooltip: 'Clear', onPressed: () => widget.onChanged(null)),
+        ]),
+      TextField(
+        key: const Key('model-search'),
+        controller: _controller,
+        onChanged: _typed,
+        decoration: InputDecoration(
+          labelText: widget.value == null ? widget.label : null,
+          hintText: 'The model code, as on its label',
+          prefixIcon: const Icon(Icons.search),
+        ),
+      ),
+      if (_busy) const LinearProgressIndicator(),
+      if (r != null) ...[
+        for (final m in r.installed)
+          ListTile(
+            key: Key('model-hit-${m.uid}'),
+            dense: true,
+            title: Text(m.name),
+            subtitle: m.code == null ? null : Text(m.code!),
+            trailing: const Text('in the catalogue', style: TextStyle(fontSize: 12)),
+            onTap: () => _pick(m.uid!),
+          ),
+        for (final m in r.library)
+          ListTile(
+            key: Key('model-lib-${m.catalogueId}'),
+            dense: true,
+            title: Text(m.name),
+            subtitle: m.code == null ? null : Text(m.code!),
+            trailing: Text(m.source == 'netbox' ? 'NetBox · add' : 'add', style: const TextStyle(fontSize: 12)),
+            onTap: _busy ? null : () => _install(m),
+          ),
+        if (r.installed.isEmpty && r.library.isEmpty) const ListTile(dense: true, title: Text('No model matches.')),
+        if (r.more) const ListTile(dense: true, title: Text('More match: type more of the code.')),
+      ],
+      CheckboxListTile(
+        key: const Key('model-every'),
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        value: _every,
+        title: const Text('Every model, not only this workspace\'s domains'),
+        onChanged: (v) {
+          setState(() => _every = v ?? false);
+          _search(_controller.text.trim());
+        },
+      ),
+      if (_lookAlike != null)
+        TextButton(
+          key: const Key('model-look-alike'),
+          onPressed: () => _pick(_lookAlike!['uid'].toString()),
+          child: Text('Use ${_lookAlike!['name']}'),
+        ),
+      if (_message != null) Text(_message!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12)),
+    ]);
   }
 }

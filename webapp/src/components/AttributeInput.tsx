@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { assetsApi, attributeValuesApi, catalogueCollectionsApi, directoryApi, membersApi, schemasApi } from "../api/client";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { ApiError, assetsApi, attributeValuesApi, catalogueCollectionsApi, directoryApi, membersApi, schemasApi } from "../api/client";
 import { SchemaAttribute } from "../api/types";
 import { AssetPicker } from "./AssetPicker";
 import { IndexedStringInput } from "./IndexedStringInput";
@@ -129,20 +129,22 @@ function ReferenceInput({
     queryFn: schemasApi.list,
     enabled: !!attribute.includeChildren,
   });
+  // A product model is searched (installed models, then the library) rather than listed: there may be thousands.
+  const isModel = attribute.referenceType === "Product Model" || attribute.key === "product_model";
   const targets = useQuery({
     queryKey: ["assets", attribute.referenceSchemaUid],
     queryFn: () => assetsApi.list(attribute.referenceSchemaUid),
-    enabled: !!attribute.referenceSchemaUid && !attribute.includeChildren,
+    enabled: !!attribute.referenceSchemaUid && !attribute.includeChildren && !isModel,
   });
   const allAssets = useQuery({
     queryKey: ["assets"],
     queryFn: () => assetsApi.list(),
     enabled: !!attribute.referenceSchemaUid && !!attribute.includeChildren,
   });
-  const isModel = attribute.referenceType === "Product Model" || attribute.key === "product_model";
-  const offered = useQuery({ queryKey: ["catalogue-offered"], queryFn: catalogueCollectionsApi.offered,
-                             enabled: isModel, retry: false, staleTime: 5 * 60_000 });
-  const [everyModel, setEveryModel] = useState(false);
+
+  if (isModel && attribute.referenceSchemaUid) {
+    return <ModelPicker value={typeof value === "string" ? value : null} onChange={onChange} disabled={disabled} base={base} />;
+  }
 
   if (!attribute.referenceSchemaUid) {
     // Legacy attribute with only a display label, no linked schema — fall
@@ -164,17 +166,11 @@ function ReferenceInput({
     allowed.add(attribute.referenceSchemaUid);
     options = allAssets.data.filter((a) => allowed.has(a.schema_uid));
   }
-  // A product model: the catalogue's models for this workspace's domains first; the rest on request. The model
-  // a unit already points at is always there.
-  const hidden = new Set(isModel && !everyModel ? offered.data?.hidden ?? [] : []);
-  const more = isModel ? (options ?? []).filter((a) => (offered.data?.hidden ?? []).includes(a.uid) && a.uid !== value).length : 0;
-  if (hidden.size) options = (options ?? []).filter((a) => !hidden.has(a.uid) || a.uid === value);
-
   const isLoading = attribute.includeChildren
     ? allSchemas.isLoading || allAssets.isLoading
     : targets.isLoading;
 
-  const picker = (
+  return (
     <AssetPicker
       options={options ?? []}
       value={typeof value === "string" ? value : null}
@@ -183,14 +179,89 @@ function ReferenceInput({
       placeholder={isLoading ? "Loading…" : "Search assets…"}
     />
   );
-  if (!isModel || (!more && !everyModel)) return picker;
+}
+
+/** A unit's product model: typed, searched — the catalogue's models first, then the library of its sources (the
+ *  NetBox Device Type Library among them) — and a library model installed in the catalogue when it is chosen.
+ *  The models of this workspace's domains, unless every model is asked for. */
+export function ModelPicker({ value, onChange, disabled, base }: {
+  value: string | null; onChange: (value: unknown) => void; disabled: boolean; base: string;
+}) {
+  const [q, setQ] = useState("");
+  const [typed, setTyped] = useState("");
+  const [every, setEvery] = useState(false);
+  const [lookAlike, setLookAlike] = useState<{ uid: string; name: string; message: string } | null>(null);
+  useEffect(() => {
+    const t = setTimeout(() => setQ(typed.trim()), 250);
+    return () => clearTimeout(t);
+  }, [typed]);
+  const current = useQuery({ queryKey: ["assets", value], queryFn: () => assetsApi.get(value!), enabled: !!value });
+  const found = useQuery({ queryKey: ["model-search", q, every], queryFn: () => catalogueCollectionsApi.searchModels(q, every),
+                           enabled: q.length >= 2, placeholderData: (previous) => previous });
+  const install = useMutation({
+    mutationFn: (catalogueId: string) => catalogueCollectionsApi.installOne(catalogueId),
+    onSuccess: (r) => { setLookAlike(null); setTyped(""); onChange(r.uid); },
+    onError: (e) => {
+      const d = (e instanceof ApiError ? (e.body as { detail?: { candidate?: { uid: string; name: string }; error?: string } })?.detail : null);
+      if (d?.candidate) setLookAlike({ ...d.candidate, message: d.error ?? "" });
+    },
+  });
+  const pick = (uid: string) => { setLookAlike(null); setTyped(""); onChange(uid); };
+  const results = q.length >= 2 ? found.data : undefined;
   return (
-    <div>
-      {picker}
-      <button type="button" onClick={() => setEveryModel(!everyModel)}
-              className="mt-1 text-xs text-sky-800 hover:underline">
-        {everyModel ? "Only the models for this workspace's domains" : `Show every model (${more} more)`}
-      </button>
+    <div className="space-y-1">
+      {value && (
+        <p className="text-sm">
+          <span className="font-medium">{current.data?.name ?? value}</span>
+          {current.data?.key && <span className="ml-1 font-mono text-xs text-slate-400">{current.data.key}</span>}
+          {!disabled && <button type="button" onClick={() => onChange(null)} className="ml-2 text-xs text-slate-500 underline">clear</button>}
+        </p>
+      )}
+      {!disabled && (
+        <>
+          <input className={base} value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Search a product model"
+                 placeholder={value ? "Search another model: its code, as on the label…" : "Search a model: its code, as on the label…"} />
+          {results && (
+            <ul role="listbox" aria-label="Product models" className="max-h-64 overflow-y-auto rounded border border-slate-200 bg-white text-sm">
+              {results.installed.map((m) => (
+                <li key={m.uid}>
+                  <button type="button" role="option" aria-selected={m.uid === value} onClick={() => pick(m.uid)}
+                          className="flex w-full items-baseline justify-between gap-2 px-2 py-1 text-left hover:bg-slate-50">
+                    <span>{m.name}{m.model_code && <span className="ml-1 font-mono text-xs text-slate-500">{m.model_code}</span>}</span>
+                    <span className="shrink-0 text-xs text-slate-400">in the catalogue</span>
+                  </button>
+                </li>
+              ))}
+              {results.library.map((m) => (
+                <li key={m.catalogue_id}>
+                  <button type="button" role="option" aria-selected={false} disabled={install.isPending}
+                          onClick={() => install.mutate(m.catalogue_id)}
+                          className="flex w-full items-baseline justify-between gap-2 px-2 py-1 text-left hover:bg-slate-50 disabled:opacity-50">
+                    <span>{m.name}{m.part_number && <span className="ml-1 font-mono text-xs text-slate-500">{m.part_number}</span>}</span>
+                    <span className="shrink-0 text-xs text-sky-700">{m.source === "netbox" ? "NetBox" : "collection"} · add</span>
+                  </button>
+                </li>
+              ))}
+              {results.installed.length === 0 && results.library.length === 0 && (
+                <li className="px-2 py-1 text-slate-500">No model matches “{q}”.</li>
+              )}
+              {results.more && <li className="px-2 py-1 text-xs text-slate-400">More match: type more of the code.</li>}
+            </ul>
+          )}
+          <label className="flex items-center gap-1 text-xs text-slate-500">
+            <input type="checkbox" checked={every} onChange={(e) => setEvery(e.target.checked)} />
+            every model, not only this workspace's domains
+          </label>
+          {install.isPending && <p className="text-xs text-slate-500">Adding it to the catalogue…</p>}
+          {lookAlike && (
+            <p role="alert" className="text-xs text-amber-800">
+              {lookAlike.message}{" "}
+              <button type="button" onClick={() => pick(lookAlike.uid)} className="font-medium underline">Use {lookAlike.name}</button>
+            </p>
+          )}
+          {install.isError && !lookAlike && <p className="text-xs text-red-600">It could not be added to the catalogue.</p>}
+        </>
+      )}
     </div>
   );
 }

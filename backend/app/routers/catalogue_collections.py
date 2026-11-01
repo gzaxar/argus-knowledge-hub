@@ -200,6 +200,46 @@ def browse_models(q: Optional[str] = None, device_class: Optional[str] = None, v
                   domain=domain)
 
 
+@router.get("/models/search")
+def search_models(q: str = "", every: bool = False, limit: int = 30,
+                  workspace_id: str = Depends(require_permission("read")), db: Session = Depends(get_db)):
+    """Models for a picker: those installed in the catalogue first, then the pinned sources' not yet installed
+    (the NetBox library among them), best first — the model code exactly, at its start, inside it, then the name.
+    The models of this workspace's domains, unless `every`."""
+    from app.catalogue.library import search
+    from app.catalogue.sources import SourceProblem
+    try:
+        return search(db, q, workspace_id=workspace_id, every=every, limit=max(1, min(limit, 100)))
+    except SourceProblem as e:
+        raise HTTPException(status_code=503, detail={"error": f"the catalogue's sources cannot be read: {e}",
+                                                     "code": "catalogue_sources"})
+
+
+class InstallOneIn(BaseModel):
+    catalogue_id: str
+
+
+@router.post("/models/install-one")
+def install_one_model(body: InstallOneIn, identity: Identity = Depends(get_identity),
+                      workspace_id: str = Depends(require_permission("create")), db: Session = Depends(get_db)):
+    """Install one model of the pinned sources (and its vendor, when the catalogue has none) — what a person
+    picks for a unit they are creating. An existing record that looks like it is never overwritten: the answer is
+    409 with that record, to choose instead. Recorded in the catalogue's history as a partial installation."""
+    from app.catalogue.library import LibraryProblem, install_one
+    try:
+        out = install_one(db, body.catalogue_id, actor=_actor(identity))
+    except LibraryProblem as e:
+        db.rollback()
+        raise HTTPException(status_code=409 if e.candidate else 422,
+                            detail={"error": str(e), "code": "catalogue_install_one", "candidate": e.candidate,
+                                    "candidates": [e.candidate] if e.candidate else []})
+    except installer.CatalogueProblem as e:
+        db.rollback()
+        raise HTTPException(status_code=422, detail={"error": str(e), "code": "catalogue_install_one"})
+    db.commit()
+    return out
+
+
 @router.get("/records/{uid}")
 def record_provenance(uid: str, identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
     """A catalogue record's values, each with its source (the collection, edited here, local, a correction

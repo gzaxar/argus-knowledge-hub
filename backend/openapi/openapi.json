@@ -7307,6 +7307,19 @@
         "title": "IndoorIn",
         "type": "object"
       },
+      "InstallOneIn": {
+        "properties": {
+          "catalogue_id": {
+            "title": "Catalogue Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "catalogue_id"
+        ],
+        "title": "InstallOneIn",
+        "type": "object"
+      },
       "InstallPreviewIn": {
         "properties": {
           "package_id": {
@@ -31002,6 +31015,184 @@
           }
         ],
         "summary": "Browse Models",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
+    "/v1/catalogue/collections/models/install-one": {
+      "post": {
+        "description": "Install one model of the pinned sources (and its vendor, when the catalogue has none) — what a person\npicks for a unit they are creating. An existing record that looks like it is never overwritten: the answer is\n409 with that record, to choose instead. Recorded in the catalogue's history as a partial installation.",
+        "operationId": "install_one_model_v1_catalogue_collections_models_install_one_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallOneIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Install One Model",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
+    "/v1/catalogue/collections/models/search": {
+      "get": {
+        "description": "Models for a picker: those installed in the catalogue first, then the pinned sources' not yet installed\n(the NetBox library among them), best first — the model code exactly, at its start, inside it, then the name.\nThe models of this workspace's domains, unless `every`.",
+        "operationId": "search_models_v1_catalogue_collections_models_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "every",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Every",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Search Models",
         "tags": [
           "catalogue"
         ]

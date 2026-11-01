@@ -280,6 +280,8 @@ class ApiClient {
           return GuideIn.fromJson(value);
         case 'HTTPValidationError':
           return HTTPValidationError.fromJson(value);
+        case 'InstallOneIn':
+          return InstallOneIn.fromJson(value);
         case 'IssueCommentCreate':
           return IssueCommentCreate.fromJson(value);
         case 'IssueCommentOut':

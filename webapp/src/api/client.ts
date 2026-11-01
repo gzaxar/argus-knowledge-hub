@@ -2934,6 +2934,13 @@ export interface CatalogueModelRow {
   domains?: string[];
 }
 
+export interface ModelSearch {
+  installed: { uid: string; key: string; name: string; vendor: string | null; model_code: string | null; catalogue_id: string | null }[];
+  library: { catalogue_id: string; name: string; vendor: string; model_code: string; part_number: string | null;
+             collection: string; source: "netbox" | "argus" }[];
+  more: boolean;
+}
+
 /** One domain of the model navigator, with its device classes and their vendors, counted. */
 export interface CatalogueDomainNode {
   domain: string;
@@ -3094,6 +3101,13 @@ export const catalogueCollectionsApi = {
     return request<CatalogueBrowse>(`${CC}/models${qs ? `?${qs}` : ""}`);
   },
   record: (uid: string) => request<CatalogueRecord>(`${CC}/records/${encodeURIComponent(uid)}`),
+  /** A picker's search: installed models first, then the pinned sources' (the NetBox library among them). */
+  searchModels: (q: string, every = false) =>
+    request<ModelSearch>(`${CC}/models/search?${new URLSearchParams({ q, ...(every ? { every: "true" } : {}) })}`),
+  /** Install one model of the sources (and its vendor): 409 names an existing record to choose instead. */
+  installOne: (catalogueId: string) =>
+    request<{ uid: string; key: string; name: string; installed: boolean }>(`${CC}/models/install-one`,
+      { method: "POST", body: json({ catalogue_id: catalogueId }) }),
   /** The catalogue's models this workspace is not offered by default: collections for domains it has no package of. */
   offered: () => request<{ workspace_id: string; packages: string[]; hidden: string[];
                            collections: Record<string, { domains: string[] | null; offered: boolean }> }>(`${CC}/offered`),

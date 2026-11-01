@@ -195,7 +195,9 @@ def load_tree(root: Path | str | None = None) -> dict[str, Collection]:
         if (child / MANIFEST).is_file():
             c = load(child)
             out[c.id] = c
-    if fixed:
+    # Kept only while small: the whole NetBox library is about 220 MB loaded, and is read whole only to preview
+    # or install a collection (searching it uses the compact index, app/catalogue/library.py).
+    if fixed and sum(len(c.models) for c in out.values()) <= 2000:
         _MATERIALIZED[str(base)] = out
         return dict(out)
     return out

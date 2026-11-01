@@ -214,6 +214,8 @@ class FakeArgus {
     if (m == 'GET' && revFiles != null) return _json([]);
     if (m == 'POST') {
       switch (p) {
+        case '/v1/catalogue/collections/models/install-one':
+          return _json({'uid': 'pm-c9200', 'key': 'PM-C9200', 'name': 'Cisco C9200-24T', 'installed': true});
         case '/v1/devices':
           return _json(fixture('device'));
         case '/v1/intake/assist/ticket':
@@ -422,6 +424,24 @@ class FakeArgus {
       }
       if (p == '/v1/assets' && q['schema_uid'] == 'slice-20463f:argus-object:product-model') {
         return _json(fixture('product_models'));
+      }
+      // The product model picker: the catalogue's models (the fixture), then the library's (one NetBox model).
+      if (p == '/v1/catalogue/collections/models/search') {
+        final text = (q['q'] ?? '').toLowerCase();
+        final rows = (fixtureJson('product_models') as List).cast<Map<String, dynamic>>();
+        return _json({
+          'installed': [
+            for (final r in rows)
+              if ((r['name'] as String).toLowerCase().contains(text) || (r['key'] as String).toLowerCase().contains(text))
+                {'uid': r['uid'], 'key': r['key'], 'name': r['name'], 'vendor': null, 'model_code': null, 'catalogue_id': null},
+          ],
+          'library': [
+            if ('cisco c9200-24t'.contains(text))
+              {'catalogue_id': 'cisco/c9200-24t', 'name': 'Cisco C9200-24T', 'vendor': 'Cisco', 'model_code': 'C9200-24T',
+               'part_number': 'C9200-24T-E', 'collection': 'it-devices', 'source': 'netbox'},
+          ],
+          'more': false,
+        });
       }
       final productModel = RegExp(r'^/v1/assets/(pm-[^/]+)$').firstMatch(p);
       if (productModel != null) {

@@ -71,6 +71,27 @@ Measured on the local copy, from an empty cache, against GitHub:
 The first row matters today: the production pod already fetches the whole fork (841 MB into its temporary
 storage) on its first catalogue read; this release ends that.
 
+## Revised: N2b installs a model the first time it is chosen (2026-11-01)
+
+Installing all 12,760 models was replaced by installing each the first time someone chooses it for a unit: the
+catalogue grows with what INFN owns, and a NetBox upgrade touches only those.
+
+*As built.* `app/catalogue/library.py`: a compact index of every model of the pinned sources (catalogue id, vendor,
+model code, name, part number, collection, domains), saved beside the materialized tree as JSON — the whole library
+loads in 0.06 s and holds 7.9 MB (the YAML would be a 224 MB peak to parse); `search` (installed models first,
+then the library's not installed, by model code exactly, at its start, inside it, then by name; a library model
+that is a record already here is not offered twice; a workspace's domains unless `every`); `install_one` through
+the collection installer's own entry, its vendor first (a vendor record by the same name linked, keeping its
+values), a look-alike model never overwritten (409, naming it), the collection recorded as partly installed —
+which `install.installed` does not count, so a later full install still runs. `GET …/models/search` (read) and
+`POST …/models/install-one` (anyone who may create records), both in the field contract. The web's Product model
+picker and the phone's search as one types; the phone falls back to the catalogue's models offline. A tree of more
+than 2,000 models is not kept in the process (the full NetBox library is about 220 MB loaded). Searches of the
+whole library: 35–55 ms.
+
+*Not yet.* GLPI matching against the library (a match would install its model when accepted): it needs a proposal
+whose value is a model not yet installed, applied on acceptance.
+
 ## Stages
 
 - **N2a** — vendors from NetBox manufacturers; the batched read; `exclude:`. Tests; the local copy reads all

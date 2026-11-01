@@ -90,6 +90,8 @@ Class | Method | HTTP request | Description
 *AssetsApi* | [**updateAsset**](doc//AssetsApi.md#updateasset) | **PUT** /v1/assets/{uid} | Update Asset
 *AttachmentsApi* | [**downloadAttachment**](doc//AttachmentsApi.md#downloadattachment) | **GET** /v1/attachments/{uid} | Download Attachment
 *AttachmentsApi* | [**listAttachments**](doc//AttachmentsApi.md#listattachments) | **GET** /v1/attachments | List Attachments
+*CatalogueApi* | [**installOneModel**](doc//CatalogueApi.md#installonemodel) | **POST** /v1/catalogue/collections/models/install-one | Install One Model
+*CatalogueApi* | [**searchModels**](doc//CatalogueApi.md#searchmodels) | **GET** /v1/catalogue/collections/models/search | Search Models
 *DocumentTemplatesApi* | [**resolveTemplate**](doc//DocumentTemplatesApi.md#resolvetemplate) | **GET** /v1/document-templates/resolve | Resolve Template
 *DocumentsApi* | [**approveRevision**](doc//DocumentsApi.md#approverevision) | **POST** /v1/documents/{uid}/revisions/{rev_uid}/approve | Approve Revision
 *DocumentsApi* | [**createDocument**](doc//DocumentsApi.md#createdocument) | **POST** /v1/documents | Create Document
@@ -228,6 +230,7 @@ Class | Method | HTTP request | Description
  - [GraphOut](doc//GraphOut.md)
  - [GuideIn](doc//GuideIn.md)
  - [HTTPValidationError](doc//HTTPValidationError.md)
+ - [InstallOneIn](doc//InstallOneIn.md)
  - [IssueCommentCreate](doc//IssueCommentCreate.md)
  - [IssueCommentOut](doc//IssueCommentOut.md)
  - [IssueCreate](doc//IssueCreate.md)

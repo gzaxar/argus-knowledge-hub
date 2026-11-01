@@ -37,6 +37,17 @@ administrator renames it on *Administration › Catalogue* (its id and record ke
 and, rarely, opens it as a workspace from there — to clean up a record that does not belong in it, which the page
 names.
 
+## Choosing a unit's model
+
+A unit's **Product model** is typed as on its label — the model code, or part of it — on the web and on the
+phone. The models already in the catalogue come first; then the **library** of the catalogue's sources: every
+model of the pinned collections not yet installed, among them the NetBox Device Type Library's (marked
+*NetBox · add*). Choosing a library model adds it to the catalogue there and then — with its manufacturer, when
+the catalogue does not have it — and the unit points at it; the next person finds it already there. A record
+already here that looks like it (the same vendor and model code) is never overwritten: it is offered instead.
+Its part number and specifications stay with the collection (shown on the model's page) until the Product Model
+type has fields for them. Offline, the phone offers the models already in the catalogue.
+
 ## Which models a workspace is offered
 
 Each collection names its **domain**: the packages whose workspaces its models are for (the IT devices for

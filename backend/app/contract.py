@@ -143,6 +143,10 @@ FIELD_OPERATIONS = [
     ("patch", "/v1/activities/{activity_id}"),
     ("post", "/v1/activities/{activity_id}/{action}"),
     ("post", "/v1/capture/classify"),
+    # The product model picker (docs/netbox-whole-library.md, N2b): search the catalogue and its sources, and
+    # install the one chosen.
+    ("get", "/v1/catalogue/collections/models/search"),
+    ("post", "/v1/catalogue/collections/models/install-one"),
 ]
 
 

@@ -122,10 +122,13 @@ def catalogue_workspace(db: Session) -> Optional[str]:
 
 
 def installed(db: Session, workspace_id: str) -> dict[str, CatalogueInstallation]:
-    """The release of each collection this workspace has: the latest installation row."""
+    """The release of each collection this workspace has: the latest installation row. A collection only partly
+    installed (models installed one at a time, app/catalogue/library.py) is not installed."""
     out: dict[str, CatalogueInstallation] = {}
     for row in db.scalars(select(CatalogueInstallation).where(CatalogueInstallation.workspace_id == workspace_id)
                           .order_by(CatalogueInstallation.id)):
+        if (row.result or {}).get("partial"):
+            continue
         out[row.collection_id] = row
     return out
 

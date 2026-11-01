@@ -14,6 +14,7 @@ class MeOut {
   /// Returns a new [MeOut] instance.
   MeOut({
     required this.authType,
+    this.catalogueMaintainer = false,
     this.email,
     this.isAdmin = false,
     this.name,
@@ -22,6 +23,8 @@ class MeOut {
   });
 
   MeOutAuthTypeEnum authType;
+
+  bool catalogueMaintainer;
 
   String? email;
 
@@ -36,6 +39,7 @@ class MeOut {
   @override
   bool operator ==(Object other) => identical(this, other) || other is MeOut &&
     other.authType == authType &&
+    other.catalogueMaintainer == catalogueMaintainer &&
     other.email == email &&
     other.isAdmin == isAdmin &&
     other.name == name &&
@@ -46,6 +50,7 @@ class MeOut {
   int get hashCode =>
     // ignore: unnecessary_parenthesis
     (authType.hashCode) +
+    (catalogueMaintainer.hashCode) +
     (email == null ? 0 : email!.hashCode) +
     (isAdmin.hashCode) +
     (name == null ? 0 : name!.hashCode) +
@@ -53,11 +58,12 @@ class MeOut {
     (workspaceId == null ? 0 : workspaceId!.hashCode);
 
   @override
-  String toString() => 'MeOut[authType=$authType, email=$email, isAdmin=$isAdmin, name=$name, userId=$userId, workspaceId=$workspaceId]';
+  String toString() => 'MeOut[authType=$authType, catalogueMaintainer=$catalogueMaintainer, email=$email, isAdmin=$isAdmin, name=$name, userId=$userId, workspaceId=$workspaceId]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'auth_type'] = this.authType;
+      json[r'catalogue_maintainer'] = this.catalogueMaintainer;
     if (this.email != null) {
       json[r'email'] = this.email;
     } else {
@@ -102,6 +108,7 @@ class MeOut {
 
       return MeOut(
         authType: MeOutAuthTypeEnum.fromJson(json[r'auth_type'])!,
+        catalogueMaintainer: mapValueOfType<bool>(json, r'catalogue_maintainer') ?? false,
         email: mapValueOfType<String>(json, r'email'),
         isAdmin: mapValueOfType<bool>(json, r'is_admin') ?? false,
         name: mapValueOfType<String>(json, r'name'),
