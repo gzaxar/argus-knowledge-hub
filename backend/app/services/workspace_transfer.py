@@ -273,6 +273,14 @@ def _move(
         for att in db.scalars(select(Attachment).where(or_(*conditions))).all():
             att.workspace_id = target
 
+    # Indoors: the places' floors and plans go with them; placements are kept where still reachable
+    # (services/indoor_transfer.py).
+    from app.services import indoor_transfer
+    inside = indoor_transfer.carry_move(db, source, target, set(asset_uids))
+    counts.update({f"indoor_{k}": v for k, v in inside.items()})
+    if inside["placements_ended"]:
+        warnings.append(f"Ended {inside['placements_ended']} indoor placement(s) no longer reachable after the move.")
+
     if counts["relations_dropped"]:
         warnings.append(f"Dropped {counts['relations_dropped']} relation(s) crossing the workspace boundary.")
     if counts["links_dropped"]:
@@ -593,6 +601,17 @@ def _copy(
         old_asset = db.get(Asset, old_uid)
         if old_asset.avatar_icon_uid and old_asset.avatar_icon_uid in attachment_map:
             db.get(Asset, new_uid).avatar_icon_uid = attachment_map[old_asset.avatar_icon_uid]
+
+    # Indoors: copies of the places' floors and plans, and the copied records' placements
+    # (services/indoor_transfer.py).
+    from app.services import indoor_transfer
+    inside = indoor_transfer.carry_copy(db, target, {o: n for o, n in asset_map.items() if o not in overridden_assets})
+    counts.update({f"indoor_{k}": v for k, v in inside.items()})
+    if inside["placements_not_carried"]:
+        warnings.append(f"{inside['placements_not_carried']} indoor placement(s) not carried: their place is not "
+                        f"reachable from the target.")
+    if inside["plan_files_missing"]:
+        warnings.append(f"{inside['plan_files_missing']} floor plan(s) not copied: their file is missing.")
 
     if asset_map:
         existing_relations = {
