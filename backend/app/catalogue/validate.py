@@ -233,8 +233,11 @@ def validate_collection(c: Collection, tree: dict[str, Collection]) -> list[Prob
             r.add(e.file, where, "needs a name")
         if not str(d.get("model_code") or "").strip():
             r.add(e.file, where, "needs a model_code: the manufacturer's designation, which is how a duplicate is found")
+        # A NetBox device type carries its identity and physical definition; ARGUS's device class comes from a
+        # classification, given to the models people use (docs/netbox-whole-library.md): not required of it.
         if not d.get("device_class"):
-            r.add(e.file, where, "needs a device_class")
+            if c.origin != "netbox":
+                r.add(e.file, where, "needs a device_class")
         elif d["device_class"] not in DEVICE_CLASSES:
             r.add(e.file, f"{where} › device_class", f"{d['device_class']!r} is not one of: {', '.join(sorted(DEVICE_CLASSES))}")
         if len(str(d.get("description") or "")) > DESCRIPTION_MAX:

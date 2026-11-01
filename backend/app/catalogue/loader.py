@@ -85,7 +85,7 @@ def catalogue_dir() -> Path:
 
 def _read(path: Path, cid: str, problems: list[Problem]) -> Optional[dict]:
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        data = yaml.load(path.read_text(encoding="utf-8"), Loader=getattr(yaml, "CSafeLoader", yaml.SafeLoader))
     except yaml.YAMLError as e:
         mark = getattr(e, "problem_mark", None)
         where = f"line {mark.line + 1}, column {mark.column + 1}" if mark else ""
@@ -170,6 +170,12 @@ def load(path: Path | str) -> Collection:
         moved=found["moved"], classifications=found["classifications"], read_problems=problems)
 
 
+# Trees read from the pinned sources, by folder: such a folder is named after its lock's checksum and never
+# changes, so it is read once per process (the whole NetBox library takes seconds to read). Collections are
+# read-only once loaded.
+_MATERIALIZED: dict[str, dict] = {}
+
+
 def load_tree(root: Path | str | None = None) -> dict[str, Collection]:
     """id -> collection, for every collection directory under `root`. By default, this installation's: the
     sources its lock file pins (app/catalogue/sources.py), read at their commits, or else the collection
@@ -179,6 +185,9 @@ def load_tree(root: Path | str | None = None) -> dict[str, Collection]:
         from app.catalogue.sources import lock_path, materialize
         if lock_path(base).is_file():
             base = materialize(lock_path(base))
+    fixed = (base / ".complete").is_file()
+    if fixed and str(base) in _MATERIALIZED:
+        return dict(_MATERIALIZED[str(base)])
     out: dict[str, Collection] = {}
     if not base.is_dir():
         return out
@@ -186,4 +195,7 @@ def load_tree(root: Path | str | None = None) -> dict[str, Collection]:
         if (child / MANIFEST).is_file():
             c = load(child)
             out[c.id] = c
+    if fixed:
+        _MATERIALIZED[str(base)] = out
+        return dict(out)
     return out
