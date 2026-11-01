@@ -76,6 +76,25 @@ export function stillOpen(item: CataloguePlanItem, d: CatalogueDecision | undefi
   return item.fields.some((f) => f.action === null && !d.fields?.[f.field]);
 }
 
+/** The vendors waiting for a person — an existing record that looks like the collection's — that nobody has
+ *  decided yet. With a manifest, only those it left undecided. */
+export function openVendorLinks(plan: CataloguePlan, decisions: Record<string, CatalogueDecision>,
+                                manifest: boolean): CataloguePlanItem[] {
+  const undecided = new Set(plan.undecided);
+  return plan.releases.flatMap((r) => r.items).filter((i) =>
+    i.kind === "vendor" && i.category === "link" && (!manifest || undecided.has(i.catalogue_id)) &&
+    !decisions[i.catalogue_id]?.action);
+}
+
+/** Link every such vendor, keeping this record's value of each field that differs (its name, usually): nothing
+ *  already in ARGUS is overwritten, and each choice can still be changed one by one. */
+export function linkAllVendors(items: CataloguePlanItem[]): Record<string, CatalogueDecision> {
+  return Object.fromEntries(items.map((i) => [i.catalogue_id, {
+    action: "link" as const,
+    fields: Object.fromEntries(i.fields.filter((f) => f.action === null).map((f) => [f.field, "local" as const])),
+  }]));
+}
+
 /** A record that may already be the entry: link it (deciding the fields that differ) or create a separate one. */
 function LinkDecision({ item, d, onChange }: {
   item: CataloguePlanItem; d: CatalogueDecision | undefined; onChange: (d: CatalogueDecision) => void;
@@ -114,13 +133,27 @@ function LinkDecision({ item, d, onChange }: {
   );
 }
 
-function PlanView({ plan, decisions, setDecision, manifest }: {
+function PlanView({ plan, decisions, setDecision, setMany, manifest }: {
   plan: CataloguePlan; decisions: Record<string, CatalogueDecision>;
-  setDecision: (id: string, d: CatalogueDecision) => void; manifest: boolean;
+  setDecision: (id: string, d: CatalogueDecision) => void;
+  setMany: (many: Record<string, CatalogueDecision>) => void; manifest: boolean;
 }) {
   const undecided = new Set(plan.undecided);
+  const vendors = openVendorLinks(plan, decisions, manifest);
   return (
     <div className="space-y-3">
+      {vendors.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded border border-amber-200 bg-amber-50/50 p-2 text-xs">
+          <button type="button" onClick={() => setMany(linkAllVendors(vendors))}
+                  className="rounded border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-50">
+            Link all matching vendors ({vendors.length})
+          </button>
+          <span className="text-slate-600">
+            Links each vendor still waiting to the record that matches it, keeping this record's value of any field
+            that differs. Each can still be changed below.
+          </span>
+        </div>
+      )}
       {plan.releases.map((r) => (
         <div key={r.collection} className="rounded border border-slate-200 p-3">
           <h3 className="text-sm font-semibold text-slate-900">
@@ -303,7 +336,8 @@ export function CatalogueCollectionsPage({ embedded = false }: { embedded?: bool
         {plan && (
           <div className="mt-3 space-y-3">
             <PlanView plan={plan} decisions={decisions} manifest={!!manifest}
-                      setDecision={(id, d) => setDecisions({ ...decisions, [id]: d })} />
+                      setDecision={(id, d) => setDecisions({ ...decisions, [id]: d })}
+                      setMany={(many) => setDecisions({ ...decisions, ...many })} />
             {plan.trial && plan.trial !== "ok" && (
               <p className="text-sm text-red-700">A trial installation failed: {plan.trial.replace(/^failed: /, "")}</p>
             )}
