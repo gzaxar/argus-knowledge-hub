@@ -1,7 +1,7 @@
 ---
 title: Map and locations
 summary: Where equipment and places are: positions, routes (cables, pipes, beamlines) and outlines (buildings, halls, rooms, zones, with heights a volume) and their history, what lies inside or crosses an area, the map, searching near a point, reporting a position from the phone, reviewing what the field saw, and importing locations from a file.
-keywords: [indoors, indoor, floor, floors, level, storey, floor plan, plan, room, hall, building, place on the plan, control points, georeference, residual, dxf plan, pdf plan,  line, cable route, pipe route, outline, polygon, area, footprint, building outline, hall, zone, volume, height, inside, crossing, along, draw, map, gis, location, locations, coordinates, latitude, longitude, gps, position, where is, near me, nearby, distance, radius, review, observation, import locations, csv, geojson, wgs84, layer, place]
+keywords: [site, sites, laboratory, facility, facilities, LNF, shared places, not shared with the facilities, withhold, transfer preview, reconciliation, indoors, indoor, floor, floors, level, storey, floor plan, plan, room, hall, building, place on the plan, control points, georeference, residual, dxf plan, pdf plan,  line, cable route, pipe route, outline, polygon, area, footprint, building outline, hall, zone, volume, height, inside, crossing, along, draw, map, gis, location, locations, coordinates, latitude, longitude, gps, position, where is, near me, nearby, distance, radius, review, observation, import locations, csv, geojson, wgs84, layer, place]
 order: 155
 ---
 
@@ -70,6 +70,40 @@ place lists it; the record's *It is in* and the place's *Inside it* include them
 
 A record placed indoors is not disturbed by a vague GPS fix: one less precise than 10 m is **noted**, not sent to
 review. Place it on its plan instead.
+
+## A laboratory's places, shared with its facilities (sites)
+
+A laboratory such as LNF hosts several facilities (SPARC, BTF, DAΦNE…), each with its own workspace. The places —
+buildings, halls, rooms, their floors and plans — are the laboratory's, drawn and kept once. Its workspace is a
+**site**, and each facility's workspace is **at** it.
+
+**Setting it up (administrators).** On *Administration › Workspaces*, the **Site** column: *Make it a site* on the
+laboratory's workspace, then choose *at LNF* on each facility's. A site is at no site, the catalogue is neither,
+and a site cannot stop being one while facilities are at it. Taking a facility away from its site first lists
+the placements of its equipment on the site's places that would end.
+
+**What a facility gets.** From SPARC's workspace, LNF's places — every record of type Location or below it
+(Building, Area, Rack…) — appear in lists, search, the map and the *Place it inside* search, with their floors,
+plans and their position on the map; nothing else of LNF's does, and nothing of BTF's. SPARC places **its own**
+equipment in an LNF room and on an LNF plan: the equipment stays SPARC's, the place and the plan stay LNF's —
+only LNF's people change them.
+
+**Who sees what on a shared plan.** A plan shows each record placed on it only to those who could see that record:
+SPARC's people see SPARC's equipment (and LNF's places), not BTF's, unless they may also read BTF; a restricted
+record stays hidden from those not given its class.
+
+**Not shared with the facilities.** On a site's place, **Indoors › Shared with the facilities** says who sees it.
+*Stop sharing it* withholds the place **and every place inside it**, with their floors and plans — first listing,
+facility by facility, the equipment placed there. Those placements end: each record keeps the position the plan
+gave it on the map, and its history says why. *Share it again* brings the places back; the placements are made
+again by hand.
+
+**Moving a place to the laboratory.** A record's *Copy/Move…* is previewed first: the report lists the records
+going, their floors and plans (whether their files are there and their fit kept), the placements carried or
+ending, the equipment of other workspaces placed in them, and every record naming them — whether it would still
+reach them, and whether it would if they stopped being global. A **move** keeps the records' ids and keys, so
+references to them hold; it drops a relation to a record left behind (the report names it). A **copy** makes new
+records with copies of the floors and plans, placed where the originals were.
 
 ## The map
 

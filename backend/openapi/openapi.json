@@ -62379,6 +62379,85 @@
         ]
       }
     },
+    "/v1/transfers/preview": {
+      "post": {
+        "description": "The reconciliation report of a transfer, before it runs: the records, their floors and plans (files\npresent, fit kept), the placements carried or ended, the placements of other records in them, and every\nreference to the records — relations, reference attributes — with whether it still resolves afterwards,\nfrom the referencing record's workspace. Nothing is changed.",
+        "operationId": "preview_transfer_v1_transfers_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview Transfer",
+        "tags": [
+          "transfers"
+        ]
+      }
+    },
     "/v1/transfers/{uid}": {
       "get": {
         "operationId": "get_transfer_v1_transfers__uid__get",

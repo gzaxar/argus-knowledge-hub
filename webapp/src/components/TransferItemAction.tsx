@@ -1,7 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { transfersApi } from "../api/client";
+import { transfersApi, type TransferPreview } from "../api/client";
+import { problem } from "../pages/catalogue/catalogueText";
+import { TransferReport } from "./TransferReport";
 import { useCurrentWorkspaceId } from "../api/useCurrentWorkspaceId";
 import type { TransferMode } from "../api/types";
 import { WorkspaceTargetPicker } from "./WorkspaceTargetPicker";
@@ -40,17 +42,25 @@ export function TransferItemAction({
   const navigate = useNavigate();
   const workspaceId = useCurrentWorkspaceId();
 
+  const body = () => ({
+    target_workspace_id: target,
+    mode,
+    [FIELD[kind]]: [uid],
+    ...(kind === "type"
+      ? { include_instances: includeInstances, include_descendant_types: includeDescendantTypes }
+      : {}),
+    ...(kind === "type" && mode === "copy" ? { force } : {}),
+  });
+  // A record's transfer is previewed first: its reconciliation report, for the target and mode chosen.
+  const [report, setReport] = useState<{ key: string; data: TransferPreview } | null>(null);
+  const key = `${mode}:${target}`;
+  const preview = useMutation({
+    mutationFn: () => transfersApi.preview(body()),
+    onSuccess: (data) => setReport({ key, data }),
+  });
+  const previewed = kind !== "asset" || report?.key === key;
   const transfer = useMutation({
-    mutationFn: () =>
-      transfersApi.create({
-        target_workspace_id: target,
-        mode,
-        [FIELD[kind]]: [uid],
-        ...(kind === "type"
-          ? { include_instances: includeInstances, include_descendant_types: includeDescendantTypes }
-          : {}),
-        ...(kind === "type" && mode === "copy" ? { force } : {}),
-      }),
+    mutationFn: () => transfersApi.create(body()),
     onSuccess: (job) => {
       setOpen(false);
       if (workspaceId) navigate(`/workspaces/${workspaceId}/transfers/${job.uid}`);
@@ -70,7 +80,8 @@ export function TransferItemAction({
         Copy/Move…
       </button>
       {open && (
-        <div className="absolute right-0 z-10 mt-2 w-72 rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+        <div className={`absolute right-0 z-10 mt-2 rounded-lg border border-slate-200 bg-white p-3 shadow-lg ${
+          report ? "w-[min(32rem,90vw)]" : "w-72"}`}>
           <div className="flex items-center gap-2">
             <select
               value={mode}
@@ -116,6 +127,8 @@ export function TransferItemAction({
               )}
             </div>
           )}
+          {report?.key === key && <div className="mt-3 max-h-80 overflow-y-auto"><TransferReport report={report.data} /></div>}
+          {preview.isError && <p className="mt-2 text-xs text-red-600">{problem(preview.error)}</p>}
           <div className="mt-3 flex justify-end gap-2">
             <button
               type="button"
@@ -124,10 +137,21 @@ export function TransferItemAction({
             >
               Cancel
             </button>
+            {kind === "asset" && (
+              <button
+                type="button"
+                onClick={() => preview.mutate()}
+                disabled={!target || preview.isPending}
+                className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+              >
+                {preview.isPending ? "Checking…" : "Preview"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => transfer.mutate()}
-              disabled={!target || transfer.isPending}
+              disabled={!target || !previewed || transfer.isPending}
+              title={previewed ? undefined : "Preview the transfer first"}
               className="rounded bg-slate-900 px-3 py-1 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
             >
               {transfer.isPending ? "Starting…" : mode === "copy" ? "Copy" : "Move"}

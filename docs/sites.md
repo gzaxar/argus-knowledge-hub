@@ -120,9 +120,22 @@ unless `confirm`) or shares it again. Tests: tests/test_sites.py.
 reconciliation report; records that are not Vendors or Product Models may move out of the catalogue. Tests:
 transfer integrity (files, fits, placements; copy and move), the report on a place referenced from elsewhere.
 
+*As built (S3).* `services/indoor_transfer.py`: `preview` (the reconciliation report — records, floors, plans
+and their files and fit, placements carried or ending, other workspaces' records placed in them, relations and
+reference attributes naming them with whether each resolves afterwards and whether it would without `is_global`,
+labels, problems) and `carry_move` / `carry_copy`, called by `workspace_transfer._move` / `_copy`;
+`POST /v1/transfers/preview` runs the same checks as a transfer; a move out of the catalogue is allowed for
+records that are not Vendors or Product Models. Tests: tests/test_site_transfer.py.
+
 **S4 — Web and documentation.** Administration › Workspaces (role and site), a place's *Not shared with the
 facilities* with its preview, room and plan choosers listing the site's places, the transfer preview report;
 the administrator setup and the user workflow in the guide.
+
+*As built (S4).* Administration › Workspaces: the Site column (make a site, put a facility at one, leaving
+previewed). A site's place: Indoors › Shared with the facilities (withholding previewed by facility). A record's
+Copy/Move…: Preview first, with the report (`TransferReport`), before Copy or Move is offered. The room and plan
+choosers list the site's places through the visibility rule. The guide: Map and locations › A laboratory's
+places, shared with its facilities. Tests: webapp/src/__tests__/sites.test.tsx.
 
 **S5 — Production (after review).** Nothing in production changes before this stage, and then only on approval:
 make LNF a site and set its facilities; run the Edificio 2 transfer preview, review the report; then move it.

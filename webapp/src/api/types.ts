@@ -553,8 +553,10 @@ export interface MyWorkspace {
   name: string;
   is_global: boolean;
   created_at: string;
-  /** "catalogue" for the installation's catalogue workspace. */
+  /** "catalogue" for the installation's catalogue workspace, "site" for a laboratory whose places its facilities use. */
   role?: string | null;
+  /** The site a facility workspace is at. */
+  site_id?: string | null;
   can_read: boolean;
   can_create: boolean;
   can_modify: boolean;

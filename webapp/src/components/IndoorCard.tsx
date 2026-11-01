@@ -3,9 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMapEvents } from "react-leaflet";
 import { Link } from "react-router-dom";
-import {
-  ApiError, MAP_TILES, indoorApi, placesApi, type ControlPoint, type FloorPlanView, type IndoorView, type PlaceLevel,
-} from "../api/client";
+import { ApiError, MAP_TILES, indoorApi, placesApi, type ControlPoint, type FloorPlanView, type IndoorView, type PlaceLevel, sitesApi, type PlacementEnding } from "../api/client";
 import type { Asset } from "../api/types";
 import { AffineImage } from "../lib/affineOverlay";
 import { FitTo, pointsOf, type LatLng } from "../lib/geo";
@@ -85,7 +83,75 @@ export function IndoorCard({ uid, editable }: { uid: string; editable: boolean }
         <FloorsAndPlans placeUid={uid} levels={floors.data.levels} plans={floors.data.plans} contents={v.contents}
                         editable={editable} onChanged={refresh} />
       )}
+      {isPlace && editable && <SiteSharing uid={uid} />}
     </section>
+  );
+}
+
+/** A site's place (docs/sites.md): shared with the facilities at the site — they see it, its floors and plans,
+ *  and place their own equipment in it — or withheld, with every place inside it. Withholding is previewed: the
+ *  facilities' placements there end (their records keep the position the plan gave them). */
+export function SiteSharing({ uid }: { uid: string }) {
+  const queryClient = useQueryClient();
+  const sharing = useQuery({ queryKey: ["site-sharing", uid], queryFn: () => sitesApi.sharing(uid), retry: false });
+  const [preview, setPreview] = useState<{ withhold: number; ending: PlacementEnding[] } | null>(null);
+  const set = useMutation({
+    mutationFn: (v: { shared: boolean; confirm: boolean }) => sitesApi.setSharing(uid, v.shared, v.confirm),
+    onSuccess: (r) => {
+      if (r.preview) { setPreview({ withhold: r.would_withhold ?? 0, ending: r.would_end ?? [] }); return; }
+      setPreview(null);
+      for (const k of ["site-sharing", "asset-indoors", "asset-levels"]) queryClient.invalidateQueries({ queryKey: [k] });
+    },
+  });
+  const s = sharing.data;
+  if (!s) return null;                                   // not a site's place
+  const byWorkspace = (preview?.ending ?? []).reduce<Record<string, string[]>>((m, x) => {
+    (m[x.workspace_id] ??= []).push(x.record.name);
+    return m;
+  }, {});
+  return (
+    <div aria-label="Shared with the facilities" role="group" className="border-t border-slate-100 pt-3 text-sm">
+      <p className="text-xs font-semibold uppercase text-slate-500">Shared with the facilities</p>
+      {s.facilities.length === 0 ? (
+        <p className="text-xs text-slate-500">No facility is at this site yet.</p>
+      ) : s.withheld_by ? (
+        <p className="text-xs text-slate-600">Not shared: it is inside <Link to={`/assets/${s.withheld_by.uid}`}
+           className="text-indigo-700 hover:underline">{s.withheld_by.name}</Link>, which is withheld.</p>
+      ) : s.shared ? (
+        <p className="text-xs text-slate-600">
+          {s.facilities.join(", ")} see it{s.inside > 0 && <> and the {s.inside} place{s.inside === 1 ? "" : "s"} inside it</>},
+          its floors and plans, and place their own equipment in it.{" "}
+          <button type="button" disabled={set.isPending} onClick={() => set.mutate({ shared: false, confirm: false })}
+                  className="text-red-700 underline">Stop sharing it</button>
+        </p>
+      ) : (
+        <p className="text-xs text-slate-600">
+          Withheld from {s.facilities.join(", ")}{s.inside > 0 && <>, with the {s.inside} place{s.inside === 1 ? "" : "s"} inside it</>}.{" "}
+          <button type="button" disabled={set.isPending} onClick={() => set.mutate({ shared: true, confirm: false })}
+                  className="text-indigo-700 underline">Share it again</button>
+        </p>
+      )}
+      {preview && (
+        <div role="alert" className="mt-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-950">
+          <p>Stops sharing {preview.withhold} place{preview.withhold === 1 ? "" : "s"} (this one and those inside it), their
+            floors and plans.</p>
+          {preview.ending.length === 0 ? <p>No facility has equipment placed there.</p> : (
+            <>
+              <p className="mt-1">These placements end — the records keep the position their plan gave them:</p>
+              <ul className="ml-4 list-disc">
+                {Object.entries(byWorkspace).map(([w, names]) => (
+                  <li key={w}><b>{w}</b>: {names.slice(0, 8).join(", ")}{names.length > 8 ? ` and ${names.length - 8} more` : ""}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          <button type="button" onClick={() => set.mutate({ shared: false, confirm: true })}
+                  className="mt-1 rounded bg-slate-900 px-2 py-0.5 font-medium text-white">Stop sharing</button>
+          <button type="button" onClick={() => setPreview(null)} className="ml-2 text-slate-600">Cancel</button>
+        </div>
+      )}
+      {set.isError && <p className="text-xs text-red-600">{problem(set.error)}</p>}
+    </div>
   );
 }
 
