@@ -285,3 +285,35 @@ def test_a_model_is_edited_from_any_workspace_by_a_maintainer_and_stray_records_
     assert r.status_code == 200, r.text
     db.expire_all()
     assert db.get(Asset, model.uid).name == "HiScroll 6"
+
+
+def test_the_navigator_counts_models_by_domain_class_and_vendor(w):
+    from app.catalogue.views import browse
+    from app.models.catalogue_entry import CatalogueEntry, CatalogueInstallation
+    db = w["db"]
+
+    def model(name, cls, vendor):
+        a = Asset(uid=str(uuid.uuid4()), workspace_id=w["cat"], schema_uid=w["model"].uid, key=f"M-{uuid.uuid4().hex[:6]}",
+                  name=name, type="Product Model", attributes={"device_class": cls, "vendor": vendor}, is_global=True)
+        db.add(a)
+        db.flush()
+        return a
+    gauge, stage, switch = model("PKR 251", "vacuum gauge", "Pfeiffer"), model("M-110", "motor", "PI"), \
+        model("NPort 5450", "serial server", "Moxa")
+    model("Made here", "camera", "Acme")
+    for cid, domains in (("vacuum", ["vacuum-cryo"]), ("motion", ["accelerator", "optics-alignment"]), ("it-devices", ["it"])):
+        db.add(CatalogueInstallation(workspace_id=w["cat"], collection_id=cid, version="0.1.0", checksum="x",
+                                     result={}, installed_by="t", domains=domains))
+    for rec, cid in ((gauge, "vacuum"), (stage, "motion"), (switch, "it-devices")):
+        db.add(CatalogueEntry(catalogue_id=f"{cid}/{rec.name}", record_uid=rec.uid, workspace_id=w["cat"], kind="model",
+                              collection_id=cid, collection_version="0.1.0", collection_checksum="x"))
+    db.commit()
+    out = browse(db, w["cat"])
+    nav = {n["domain"]: n for n in out["navigator"]}
+    assert nav["vacuum-cryo"]["count"] == 1 and nav["it"]["count"] == 1 and nav["local"]["count"] == 1
+    assert nav["accelerator"]["count"] == 1 and nav["optics-alignment"]["count"] == 1     # in both of its domains
+    assert nav["it"]["classes"] == [{"device_class": "serial server", "count": 1, "vendors": [{"vendor": "Moxa", "count": 1}]}]
+    assert out["navigator"][-1]["domain"] == "local"                                       # local last
+    assert [m["name"] for m in browse(db, w["cat"], domain="accelerator")["models"]] == ["M-110"]
+    assert [m["name"] for m in browse(db, w["cat"], domain="it", device_class="serial server", vendor="Moxa")["models"]] == ["NPort 5450"]
+    assert browse(db, w["cat"], domain="it")["navigator"] == out["navigator"]               # the tree ignores the pick

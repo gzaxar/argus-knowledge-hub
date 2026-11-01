@@ -30,6 +30,8 @@ class MyWorkspaceOut {
     required this.id,
     required this.isGlobal,
     required this.name,
+    this.role,
+    this.siteId,
   });
 
   bool canApproveDocuments;
@@ -66,6 +68,10 @@ class MyWorkspaceOut {
 
   String name;
 
+  String? role;
+
+  String? siteId;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is MyWorkspaceOut &&
     other.canApproveDocuments == canApproveDocuments &&
@@ -84,7 +90,9 @@ class MyWorkspaceOut {
     other.createdAt == createdAt &&
     other.id == id &&
     other.isGlobal == isGlobal &&
-    other.name == name;
+    other.name == name &&
+    other.role == role &&
+    other.siteId == siteId;
 
   @override
   int get hashCode =>
@@ -105,10 +113,12 @@ class MyWorkspaceOut {
     (createdAt.hashCode) +
     (id.hashCode) +
     (isGlobal.hashCode) +
-    (name.hashCode);
+    (name.hashCode) +
+    (role == null ? 0 : role!.hashCode) +
+    (siteId == null ? 0 : siteId!.hashCode);
 
   @override
-  String toString() => 'MyWorkspaceOut[canApproveDocuments=$canApproveDocuments, canCreate=$canCreate, canCreateDocuments=$canCreateDocuments, canCreateTickets=$canCreateTickets, canDelete=$canDelete, canDeleteDocuments=$canDeleteDocuments, canDeleteTickets=$canDeleteTickets, canModify=$canModify, canModifyDocuments=$canModifyDocuments, canModifyTickets=$canModifyTickets, canRead=$canRead, canReadDocuments=$canReadDocuments, canReadTickets=$canReadTickets, createdAt=$createdAt, id=$id, isGlobal=$isGlobal, name=$name]';
+  String toString() => 'MyWorkspaceOut[canApproveDocuments=$canApproveDocuments, canCreate=$canCreate, canCreateDocuments=$canCreateDocuments, canCreateTickets=$canCreateTickets, canDelete=$canDelete, canDeleteDocuments=$canDeleteDocuments, canDeleteTickets=$canDeleteTickets, canModify=$canModify, canModifyDocuments=$canModifyDocuments, canModifyTickets=$canModifyTickets, canRead=$canRead, canReadDocuments=$canReadDocuments, canReadTickets=$canReadTickets, createdAt=$createdAt, id=$id, isGlobal=$isGlobal, name=$name, role=$role, siteId=$siteId]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -129,6 +139,16 @@ class MyWorkspaceOut {
       json[r'id'] = this.id;
       json[r'is_global'] = this.isGlobal;
       json[r'name'] = this.name;
+    if (this.role != null) {
+      json[r'role'] = this.role;
+    } else {
+      json[r'role'] = null;
+    }
+    if (this.siteId != null) {
+      json[r'site_id'] = this.siteId;
+    } else {
+      json[r'site_id'] = null;
+    }
     return json;
   }
 
@@ -168,6 +188,8 @@ class MyWorkspaceOut {
         id: mapValueOfType<String>(json, r'id')!,
         isGlobal: mapValueOfType<bool>(json, r'is_global')!,
         name: mapValueOfType<String>(json, r'name')!,
+        role: mapValueOfType<String>(json, r'role'),
+        siteId: mapValueOfType<String>(json, r'site_id'),
       );
     }
     return null;

@@ -10,6 +10,7 @@ lib/api/ai_api.dart
 lib/api/asset_subresources_api.dart
 lib/api/assets_api.dart
 lib/api/attachments_api.dart
+lib/api/catalogue_api.dart
 lib/api/document_templates_api.dart
 lib/api/documents_api.dart
 lib/api/field_client_api.dart
@@ -87,6 +88,7 @@ lib/model/graph_node_out.dart
 lib/model/graph_out.dart
 lib/model/guide_in.dart
 lib/model/http_validation_error.dart
+lib/model/install_one_in.dart
 lib/model/issue_comment_create.dart
 lib/model/issue_comment_out.dart
 lib/model/issue_create.dart

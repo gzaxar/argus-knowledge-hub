@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../core/blob_store.dart';
 import '../core/file_cache_store.dart';
 import '../core/local_store.dart';
+import '../data/model_repository.dart';
 import '../data/caching_client.dart';
 
 import '../core/config.dart';
@@ -291,6 +292,7 @@ final apiServiceProvider = Provider<ApiService>((ref) {
 final workspaceRepositoryProvider = Provider((ref) => WorkspaceRepository(ref.watch(apiServiceProvider)));
 final lookupRepositoryProvider = Provider((ref) => LookupRepository(ref.watch(apiServiceProvider)));
 final assetRepositoryProvider = Provider((ref) => AssetRepository(ref.watch(apiServiceProvider)));
+final modelRepositoryProvider = Provider((ref) => ModelRepository(ref.watch(apiServiceProvider)));
 final ticketRepositoryProvider = Provider((ref) => TicketRepository(ref.watch(apiServiceProvider)));
 final documentRepositoryProvider = Provider((ref) => DocumentRepository(ref.watch(apiServiceProvider)));
 

@@ -36,17 +36,41 @@ def _units_by_model(db: Session) -> dict[str, int]:
                            .group_by(pm)).all())
 
 
+LOCAL, UNSPECIFIED = "local", "unspecified"
+
+
+def collection_domains(db: Session, workspace_id: str) -> dict[str, list[str]]:
+    """collection -> the domains its latest installation here recorded (docs/system-catalogue.md C4); a
+    collection installed before domains were kept says `unspecified`."""
+    out: dict[str, list[str]] = {}
+    for row in db.scalars(select(CatalogueInstallation).where(CatalogueInstallation.workspace_id == workspace_id)
+                          .order_by(CatalogueInstallation.id)):
+        out[row.collection_id] = list(row.domains or [UNSPECIFIED])
+    return out
+
+
+def domain_names() -> dict[str, str]:
+    """A domain's name: its package's, `local` for models made here, `unspecified` for the rest."""
+    from app.packages.loader import available
+    return {**{pid: p.name for pid, p in available().items()}, LOCAL: "Made here (local)",
+            UNSPECIFIED: "Collection without a domain", "catalogue": "Every domain"}
+
+
 def browse(db: Session, workspace_id: str, *, q: Optional[str] = None, device_class: Optional[str] = None,
            vendor: Optional[str] = None, status: Optional[str] = None, collection: Optional[str] = None,
-           limit: int = 500) -> dict:
-    """The catalogue's Product Models, with their catalogue id and collection or `local`, and the facets."""
+           domain: Optional[str] = None, limit: int = 500) -> dict:
+    """The catalogue's Product Models, with their catalogue id and collection or `local`, their domains, the
+    facets, and the navigator's tree: domain › device class › vendor, counted, over the models the search,
+    status and collection leave (a model of several domains counts in each)."""
     model_schema, _ = catalogue_types(db, workspace_id)
     rows = list(db.scalars(select(Asset).where(
         Asset.schema_uid == model_schema.uid, Asset.workspace_id == workspace_id, Asset.deleted_at.is_(None),
         Asset.record_status.notin_(("Merged",))).order_by(Asset.name)))
     by_record = {e.record_uid: e for e in entries(db, workspace_id).values()}
     units = _units_by_model(db)
-    out, facets = [], {"device_class": {}, "vendor": {}, "collection": {}, "status": {}}
+    domains_of = collection_domains(db, workspace_id)
+    out, facets = [], {"device_class": {}, "vendor": {}, "collection": {}, "status": {}, "domain": {}}
+    tree: dict = {}
     needle = (q or "").strip().lower()
     for r in rows:
         a = r.attributes or {}
@@ -57,13 +81,26 @@ def browse(db: Session, workspace_id: str, *, q: Optional[str] = None, device_cl
                 "vendor_ref": a.get("vendor_ref"), "model_code": a.get("model_code"),
                 "device_class": a.get("device_class"), "catalogue_id": e.catalogue_id if e else None,
                 "collection": e.collection_id if e else None, "version": e.collection_version if e else None,
-                "status": st, "review": bool(e and (e.conflicts or e.corrections)), "units": units.get(r.uid, 0)}
+                "status": st, "review": bool(e and (e.conflicts or e.corrections)), "units": units.get(r.uid, 0),
+                "domains": domains_of.get(e.collection_id, [UNSPECIFIED]) if e else [LOCAL]}
         if needle and not any(needle in str(item.get(k) or "").lower()
                               for k in ("name", "key", "model_code", "vendor", "catalogue_id")):
             continue
         for facet in ("device_class", "vendor", "collection", "status"):
             value = item[facet] or "—"
             facets[facet][value] = facets[facet].get(value, 0) + 1
+        if status and status != "all" and item["status"] != status or collection and item["collection"] != collection:
+            continue
+        for d in item["domains"]:
+            facets["domain"][d] = facets["domain"].get(d, 0) + 1
+            node = tree.setdefault(d, {"count": 0, "classes": {}})
+            node["count"] += 1
+            cls = node["classes"].setdefault(item["device_class"] or "—", {"count": 0, "vendors": {}})
+            cls["count"] += 1
+            v = item["vendor"] or "—"
+            cls["vendors"][v] = cls["vendors"].get(v, 0) + 1
+        if domain and domain not in item["domains"]:
+            continue
         if device_class and item["device_class"] != device_class:
             continue
         if vendor and item["vendor"] != vendor:
@@ -73,7 +110,14 @@ def browse(db: Session, workspace_id: str, *, q: Optional[str] = None, device_cl
         if collection and item["collection"] != collection:
             continue
         out.append(item)
-    return {"workspace_id": workspace_id, "total": len(out), "models": out[:limit], "facets": facets}
+    names = domain_names()
+    navigator = [{"domain": d, "name": names.get(d, d), "count": n["count"],
+                  "classes": [{"device_class": c, "count": cn["count"],
+                               "vendors": [{"vendor": v, "count": vn} for v, vn in sorted(cn["vendors"].items())]}
+                              for c, cn in sorted(n["classes"].items())]}
+                 for d, n in sorted(tree.items(), key=lambda kv: (kv[0] in (LOCAL, UNSPECIFIED), names.get(kv[0], kv[0])))]
+    return {"workspace_id": workspace_id, "total": len(out), "models": out[:limit], "facets": facets,
+            "navigator": navigator, "domain_names": names}
 
 
 def _entry_in_tree(tree: dict[str, Collection], catalogue_id: str, collection_id: str):

@@ -22,7 +22,9 @@ Neither ever holds site data: no serial numbers, installed units, locations, sel
 ## Where to find it
 
 - **Settings › Product catalogue** — everyone: browse and search the models, from a collection (with their
-  catalogue id), local (made here), or retired, and how many units are of each.
+  catalogue id), local (made here), or retired, and how many units are of each. The **Domains** navigator beside
+  the list browses them by domain (IT, accelerator, vacuum…, and the models made here) › device class › vendor,
+  with how many at each step; choosing one filters the list (the *Domain* filter does the same).
 - **Administration › Catalogue** — administrators: which workspace is the catalogue and what depends on it, the
   pinned sources, the collections and the version installed, preview and install, the entries waiting for
   review, the corrections for Git, the history, and matching GLPI's devices (for the workspace you choose).
@@ -34,6 +36,17 @@ and its permission checked, in the catalogue). Its shared types are upgraded on 
 administrator renames it on *Administration › Catalogue* (its id and record keys stay, being printed on labels),
 and, rarely, opens it as a workspace from there — to clean up a record that does not belong in it, which the page
 names.
+
+## Choosing a unit's model
+
+A unit's **Product model** is typed as on its label — the model code, or part of it — on the web and on the
+phone. The models already in the catalogue come first; then the **library** of the catalogue's sources: every
+model of the pinned collections not yet installed, among them the NetBox Device Type Library's (marked
+*NetBox · add*). Choosing a library model adds it to the catalogue there and then — with its manufacturer, when
+the catalogue does not have it — and the unit points at it; the next person finds it already there. A record
+already here that looks like it (the same vendor and model code) is never overwritten: it is offered instead.
+Its part number and specifications stay with the collection (shown on the model's page) until the Product Model
+type has fields for them. Offline, the phone offers the models already in the catalogue.
 
 ## Which models a workspace is offered
 

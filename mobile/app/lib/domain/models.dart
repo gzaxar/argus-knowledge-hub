@@ -315,6 +315,7 @@ class AttributeDef {
     this.description,
     this.referenceSchemaUid,
     this.includeChildren = false,
+    this.referenceType,
   });
 
   final String key;
@@ -330,6 +331,13 @@ class AttributeDef {
   final String? description;
   final String? referenceSchemaUid;
   final bool includeChildren;
+
+  /// The name of the type a reference points at ("Product Model").
+  final String? referenceType;
+
+  /// A unit's product model: searched — the catalogue's models, then its sources' library — rather than listed,
+  /// since there may be thousands (docs/netbox-whole-library.md, N2b).
+  bool get isProductModel => type == 'reference' && (referenceType == 'Product Model' || key == 'product_model');
 
   /// The option value (what is stored) an answer names — by that value or by the option's id
   /// ("service_degraded", as the assistant and packages call it), in any case; null if it names none.

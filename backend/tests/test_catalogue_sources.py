@@ -138,20 +138,53 @@ def test_a_model_is_defined_once_across_both_sources(tmp_path):
     assert "classifications › moxa/nport-5450: vacuum defines this model itself" in found
 
 
-def test_a_netbox_model_needs_its_classification_and_a_classification_its_model(tmp_path):
+def test_a_netbox_model_may_be_unclassified_and_a_classification_needs_its_model(tmp_path):
     a = repo_with(tmp_path / "argus", argus_files(classifications=[
         {"id": "moxa/nport-5450", "device_class": "converter"},
         {"id": "moxa/nport-9999", "device_class": "converter"}]))
     root = materialize(lock(tmp_path, a, netbox(tmp_path)), cache=tmp_path / "cache")
     found = "\n".join(problems(root))
-    assert "cisco/c9200-24t: needs a device_class" in found                    # selected, never classified
+    assert "cisco/c9200-24t" not in found                                       # selected, not classified: fine
     assert "classifications › moxa/nport-9999: no model with this id in any source" in found
+    switch = next(m for m in load_tree(root)["it-devices"].models if m.id == "cisco/c9200-24t")
+    assert "device_class" not in switch.data
 
 
-def test_an_unknown_manufacturer_stops_the_import(tmp_path):
+def test_an_unknown_manufacturer_becomes_a_vendor_of_the_collection(tmp_path):
     a = repo_with(tmp_path / "argus", argus_files(vendors=[{"id": "moxa", "name": "Moxa"}]))
-    with pytest.raises(SourceProblem, match="no vendor named 'Cisco'"):
-        materialize(lock(tmp_path, a, netbox(tmp_path)), cache=tmp_path / "cache")
+    n = netbox(tmp_path)
+    root = materialize(lock(tmp_path, a, n, select=("*",)), cache=tmp_path / "cache")
+    tree = load_tree(root)
+    made = {v.id: v.data for v in tree["it-devices"].vendors}
+    assert set(made) == {"cisco", "other"}                                      # Moxa is ARGUS's already
+    assert made["cisco"]["name"] == "Cisco" and made["cisco"]["sources"] == [
+        {"kind": "netbox-devicetype-library", "ref": "device-types/Cisco", "revision": n[:12]}]
+    models = {m.id: m.data for m in tree["it-devices"].models}
+    assert models["cisco/c9200-24t"]["vendor"] == "cisco" and models["moxa/nport-5450"]["vendor"] == "moxa"
+    assert set(models) == {"moxa/nport-5450", "cisco/c9200-24t", "other/t"}     # "*": every device type
+    assert problems(root) == []
+
+
+def test_exclude_leaves_out_what_select_takes(tmp_path):
+    a, n = repo_with(tmp_path / "argus", argus_files()), netbox(tmp_path)
+    lk = lock(tmp_path, a, n, select=("*",))
+    data = yaml.safe_load(lk.read_text())
+    data["sources"][1]["exclude"] = ["Other/*", "Cisco/C9200-*"]
+    lk.write_text(yaml.safe_dump(data))
+    models = {m.id for m in load_tree(materialize(lk, cache=tmp_path / "cache"))["it-devices"].models}
+    assert models == {"moxa/nport-5450"}
+    data["sources"][1]["exclude"] = "Other/*"
+    lk.write_text(yaml.safe_dump(data))
+    with pytest.raises(SourceProblem, match="`exclude` is a list of patterns"):
+        materialize(lk, cache=tmp_path / "cache2")
+
+
+def test_a_made_vendor_never_takes_an_id_already_used(tmp_path):
+    a = repo_with(tmp_path / "argus", argus_files(vendors=[{"id": "other", "name": "Other Industries AG"},
+                                                           {"id": "moxa", "name": "Moxa"}, {"id": "cisco", "name": "Cisco"}]))
+    root = materialize(lock(tmp_path, a, netbox(tmp_path), select=("*",)), cache=tmp_path / "cache")
+    made = {v.id: v.data["name"] for v in load_tree(root)["it-devices"].vendors}
+    assert made == {"other-2": "Other"}                                         # "other" is another company's id
 
 
 def test_a_moved_release_tag_is_refused(tmp_path):

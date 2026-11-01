@@ -184,6 +184,7 @@ class SchemaRepository {
       readOnly: m['readOnly'] == true || m['read_only'] == true,
       description: m['description']?.toString(),
       referenceSchemaUid: (m['referenceSchemaUid'] ?? m['reference_schema_uid'])?.toString(),
+      referenceType: (m['referenceType'] ?? m['reference_type'])?.toString(),
       includeChildren: m['includeChildren'] == true || m['include_children'] == true,
     );
   }

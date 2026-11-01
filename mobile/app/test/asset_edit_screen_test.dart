@@ -50,7 +50,7 @@ void main() {
     expect(find.byKey(const Key('asset-edit-save')), findsNothing, reason: 'saving returns to the record, not stays on the form');
   });
 
-  testWidgets('a reference attribute offers a search among records of its target type, not a raw uid '
+  testWidgets('a product model is searched as on its label, the catalogue\'s models first, not a raw uid '
       'text field', (tester) async {
     final r = await start(tester);
     await r.go('/asset/$ionPumpUid');
@@ -58,18 +58,15 @@ void main() {
     await tester.drag(find.byKey(const Key('asset-edit-list')), const Offset(0, -2000));
     await tester.pumpAndSettle();
 
-    // The record's current reference is shown by name, not as a bare uid.
+    // The record's current model is shown by name, not as a bare uid.
     expect(find.text('PM-ACE2 · Ace 2 a2A1920-51gmBAS'), findsOneWidget);
+    expect(r.server.requests.where((q) => q.url.queryParameters['schema_uid']?.endsWith('product-model') ?? false),
+        isEmpty, reason: 'the models are searched, not all downloaded to the phone');
 
-    // Focusing it shows every candidate right away, not just the ones matching its own already-picked
-    // display text (which nothing else would match) — the field must not look unusable until cleared.
-    await tester.tap(find.byKey(const Key('attr-product_model-0')));
+    await tester.enterText(find.byKey(const Key('model-search')), 'turbo');
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
-    expect(find.text('PM-TURBO350 · TURBO350'), findsOneWidget);
-
-    await tester.enterText(find.byKey(const Key('attr-product_model-0')), 'turbo');
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('PM-TURBO350 · TURBO350').last);
+    await tester.tap(find.byKey(const Key('model-hit-pm-turbo350')));
     await tester.pumpAndSettle();
 
     await tester.drag(find.byKey(const Key('asset-edit-list')), const Offset(0, -500));
@@ -79,6 +76,29 @@ void main() {
     final put = r.server.requests.lastWhere((q) => q.method == 'PUT' && q.url.path == '/v1/assets/$ionPumpUid');
     final sent = jsonDecode(put.body)['attributes'] as Map;
     expect(sent['product_model'], 'pm-turbo350');
+  });
+
+  testWidgets('a library model (NetBox) is added to the catalogue when it is chosen', (tester) async {
+    final r = await start(tester);
+    await r.go('/asset/$ionPumpUid');
+    await r.tap('asset-edit');
+    await tester.drag(find.byKey(const Key('asset-edit-list')), const Offset(0, -2000));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('model-search')), 'c9200');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(find.text('NetBox · add'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('model-lib-cisco/c9200-24t')));
+    await tester.pumpAndSettle();
+    final install = r.server.requests.lastWhere((q) => q.url.path == '/v1/catalogue/collections/models/install-one');
+    expect(jsonDecode(install.body), {'catalogue_id': 'cisco/c9200-24t'});
+
+    await tester.drag(find.byKey(const Key('asset-edit-list')), const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await r.tap('asset-edit-save');
+    final put = r.server.requests.lastWhere((q) => q.method == 'PUT' && q.url.path == '/v1/assets/$ionPumpUid');
+    expect((jsonDecode(put.body)['attributes'] as Map)['product_model'], 'pm-c9200');
   });
 
   testWidgets('a field kind the field app cannot yet edit (its type needs the web\'s picker) is named, not '

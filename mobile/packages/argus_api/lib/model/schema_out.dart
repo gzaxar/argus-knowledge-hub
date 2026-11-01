@@ -22,6 +22,7 @@ class SchemaOut {
     required this.isGlobal,
     required this.metadata,
     required this.name,
+    this.origin,
     this.parentSchemaUid,
     required this.uid,
     required this.updatedAt,
@@ -47,6 +48,8 @@ class SchemaOut {
 
   String name;
 
+  Object? origin;
+
   String? parentSchemaUid;
 
   String uid;
@@ -68,6 +71,7 @@ class SchemaOut {
     other.isGlobal == isGlobal &&
     other.metadata == metadata &&
     other.name == name &&
+    other.origin == origin &&
     other.parentSchemaUid == parentSchemaUid &&
     other.uid == uid &&
     other.updatedAt == updatedAt &&
@@ -86,6 +90,7 @@ class SchemaOut {
     (isGlobal.hashCode) +
     (metadata.hashCode) +
     (name.hashCode) +
+    (origin == null ? 0 : origin!.hashCode) +
     (parentSchemaUid == null ? 0 : parentSchemaUid!.hashCode) +
     (uid.hashCode) +
     (updatedAt.hashCode) +
@@ -93,7 +98,7 @@ class SchemaOut {
     (workspaceId.hashCode);
 
   @override
-  String toString() => 'SchemaOut[appliesTo=$appliesTo, attributes=$attributes, createdAt=$createdAt, description=$description, iconUid=$iconUid, isConcrete=$isConcrete, isGlobal=$isGlobal, metadata=$metadata, name=$name, parentSchemaUid=$parentSchemaUid, uid=$uid, updatedAt=$updatedAt, version=$version, workspaceId=$workspaceId]';
+  String toString() => 'SchemaOut[appliesTo=$appliesTo, attributes=$attributes, createdAt=$createdAt, description=$description, iconUid=$iconUid, isConcrete=$isConcrete, isGlobal=$isGlobal, metadata=$metadata, name=$name, origin=$origin, parentSchemaUid=$parentSchemaUid, uid=$uid, updatedAt=$updatedAt, version=$version, workspaceId=$workspaceId]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -118,6 +123,11 @@ class SchemaOut {
       json[r'is_global'] = this.isGlobal;
       json[r'metadata'] = this.metadata;
       json[r'name'] = this.name;
+    if (this.origin != null) {
+      json[r'origin'] = this.origin;
+    } else {
+      json[r'origin'] = null;
+    }
     if (this.parentSchemaUid != null) {
       json[r'parent_schema_uid'] = this.parentSchemaUid;
     } else {
@@ -158,6 +168,7 @@ class SchemaOut {
         isGlobal: mapValueOfType<bool>(json, r'is_global')!,
         metadata: mapValueOfType<Object>(json, r'metadata')!,
         name: mapValueOfType<String>(json, r'name')!,
+        origin: mapValueOfType<Object>(json, r'origin'),
         parentSchemaUid: mapValueOfType<String>(json, r'parent_schema_uid'),
         uid: mapValueOfType<String>(json, r'uid')!,
         updatedAt: mapDateTime(json, r'updated_at', r'')!,

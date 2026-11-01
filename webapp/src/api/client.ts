@@ -2930,13 +2930,32 @@ export interface CatalogueModelRow {
   status: "catalogue" | "local" | "retired";
   review: boolean;
   units: number;
+  /** The domains of its collection (packages), `local` for a model made here, `unspecified` otherwise. */
+  domains?: string[];
+}
+
+export interface ModelSearch {
+  installed: { uid: string; key: string; name: string; vendor: string | null; model_code: string | null; catalogue_id: string | null }[];
+  library: { catalogue_id: string; name: string; vendor: string; model_code: string; part_number: string | null;
+             collection: string; source: "netbox" | "argus" }[];
+  more: boolean;
+}
+
+/** One domain of the model navigator, with its device classes and their vendors, counted. */
+export interface CatalogueDomainNode {
+  domain: string;
+  name: string;
+  count: number;
+  classes: { device_class: string; count: number; vendors: { vendor: string; count: number }[] }[];
 }
 
 export interface CatalogueBrowse {
   workspace_id: string;
   total: number;
   models: CatalogueModelRow[];
-  facets: Record<"device_class" | "vendor" | "collection" | "status", Record<string, number>>;
+  facets: Record<"device_class" | "vendor" | "collection" | "status" | "domain", Record<string, number>>;
+  navigator?: CatalogueDomainNode[];
+  domain_names?: Record<string, string>;
 }
 
 export type CatalogueValueSource = "collection" | "edited" | "local" | "correction" | "record";
@@ -3077,11 +3096,18 @@ export const systemCatalogueApi = {
 export const catalogueCollectionsApi = {
   list: () => request<{ workspace_id: string; sources: CatalogueSourcePin[]; collections: CatalogueCollection[];
                          history: CatalogueHistoryRow[] }>(CC),
-  models: (params: { q?: string; device_class?: string; vendor?: string; status?: string; collection?: string }) => {
+  models: (params: { q?: string; device_class?: string; vendor?: string; status?: string; collection?: string; domain?: string }) => {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
     return request<CatalogueBrowse>(`${CC}/models${qs ? `?${qs}` : ""}`);
   },
   record: (uid: string) => request<CatalogueRecord>(`${CC}/records/${encodeURIComponent(uid)}`),
+  /** A picker's search: installed models first, then the pinned sources' (the NetBox library among them). */
+  searchModels: (q: string, every = false) =>
+    request<ModelSearch>(`${CC}/models/search?${new URLSearchParams({ q, ...(every ? { every: "true" } : {}) })}`),
+  /** Install one model of the sources (and its vendor): 409 names an existing record to choose instead. */
+  installOne: (catalogueId: string) =>
+    request<{ uid: string; key: string; name: string; installed: boolean }>(`${CC}/models/install-one`,
+      { method: "POST", body: json({ catalogue_id: catalogueId }) }),
   /** The catalogue's models this workspace is not offered by default: collections for domains it has no package of. */
   offered: () => request<{ workspace_id: string; packages: string[]; hidden: string[];
                            collections: Record<string, { domains: string[] | null; offered: boolean }> }>(`${CC}/offered`),
