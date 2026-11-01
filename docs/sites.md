@@ -105,6 +105,17 @@ records on site places; plan contents, place contents and containers filtered pe
 with its preview and the withdrawal of placements. Tests: SPARC and BTF on one LNF plan, each seeing only its own
 equipment (and LNF's if it may); a withheld building and its rooms and plans; placements ended on withdrawal.
 
+*As built (S1, S2).* `services/sites.py` (`set_role`, `set_site`, `refresh`, `withdraw_placements`,
+`affected_by_withdrawal`, `inside`, a flush guard for records created, retyped or moved into a site);
+`visibility.reachable_in` / `site_clause` in the central rule, reference validation and `routers/field.py`;
+`/v1/admin/sites` (list, role, site — leaving a site previews the placements that end unless `confirm`).
+Indoors: `_level` / `_plan` read where the place is seen and change only in its workspace; `indoor.place`
+accepts a place, floor and plan the record's workspace reaches; `_viewer` filters a plan's records, a place's
+contents and a record's containers per record (reachable from the viewer's workspace with its grants, or in the
+record's own workspace if the person may read it, with that workspace's grants); `/map/plans` lists the plans of
+every place seen; `GET/PUT /v1/assets/{uid}/site-sharing` withholds a place and what is inside it (preview
+unless `confirm`) or shares it again. Tests: tests/test_sites.py.
+
 **S3 — Transfers carry indoors, with a preview.** Floors, plans, files, fits, eligible placements; the
 reconciliation report; records that are not Vendors or Product Models may move out of the catalogue. Tests:
 transfer integrity (files, fits, placements; copy and move), the report on a place referenced from elsewhere.

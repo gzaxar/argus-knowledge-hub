@@ -167,3 +167,189 @@ def test_administrators_set_sites_through_the_api(lab):
         db.get(Workspace, ids["other"]).site_id = None
         db.delete(db.get(User, plain.id))
         db.commit()
+
+
+# --------------------------------------------------------------------------- S2: indoors across workspaces
+
+def _png(w=100, h=80) -> bytes:
+    import io
+
+    from PIL import Image
+    out = io.BytesIO()
+    Image.new("RGB", (w, h), "white").save(out, "PNG")
+    return out.getvalue()
+
+
+def _person(db, *grants) -> User:
+    """A person with these (workspace, role) grants and nothing else."""
+    from datetime import datetime, timezone
+
+    from app.models.role import RoleBinding
+    from app.services.roles import ensure_system_roles
+    ensure_system_roles(db)
+    u = User(id=str(uuid.uuid4()), email=f"p-{secrets.token_hex(3)}@argus.test", is_admin=False)
+    db.add(u)
+    db.flush()
+    for ws, role in grants:
+        db.add(RoleBinding(workspace_id=ws, subject_type="user", subject_id=u.id, role_id=role,
+                           created_at=datetime.now(timezone.utc)))
+    db.commit()
+    db.refresh(u)
+    db.expunge(u)
+    return u
+
+
+class _As:
+    """A client signed in as one person on every request (the identity override is shared, so it is set again
+    before each call rather than once)."""
+
+    def __init__(self, user):
+        self.user, self.client = user, TestClient(app)
+
+    def __getattr__(self, method):
+        call = getattr(self.client, method)
+
+        def signed_in(*a, **k):
+            app.dependency_overrides[get_identity] = lambda: OidcIdentity(user=self.user)
+            return call(*a, **k)
+        return signed_in
+
+
+def _as(user):
+    return _As(user)
+
+
+@pytest.fixture()
+def plan(lab):
+    """LNF's Edificio 2 with a ground floor and its plan (placed on the map); Hall 3 inside it; a SPARC and a
+    BTF person; a person who reads both; and an outsider."""
+    db, ids, r = lab["db"], lab["ids"], lab["rec"]
+    indoor.place(db, r["hall"], place_uid=r["building"].uid, actor="t")
+    level = indoor.save_level(db, r["building"], name="Ground floor", ordinal=0, actor="t")
+    p = indoor.add_plan(db, r["building"], "ground.png", _png(), name="Ground floor", level=level, actor="t")
+    indoor.georeference(db, p, [{"x": 0, "y": 0, "longitude": 12.6800, "latitude": 41.8200},
+                                {"x": 100, "y": 80, "longitude": 12.6810, "latitude": 41.8195}])
+    db.commit()
+    people = {"sparc": _person(db, (ids["sparc"], "contributor")), "btf": _person(db, (ids["btf"], "contributor")),
+              "both": _person(db, (ids["sparc"], "viewer"), (ids["btf"], "viewer")),
+              "other": _person(db, (ids["other"], "contributor"))}
+    yield {**lab, "plan": p, "level": level, "people": people}
+    app.dependency_overrides.pop(get_identity, None)
+    for u in people.values():
+        db.delete(db.get(User, u.id))
+    db.commit()
+
+
+def _place_on(client, ws, record, plan_uid, place_uid, x, y):
+    return client.put(f"/v1/assets/{record}/indoors", headers={"X-Workspace-Id": ws},
+                      json={"place_uid": place_uid, "plan_uid": plan_uid, "x": x, "y": y})
+
+
+def test_sparc_and_btf_share_one_lnf_plan_without_seeing_each_others_equipment(plan):
+    db, ids, r, people, p = plan["db"], plan["ids"], plan["rec"], plan["people"], plan["plan"]
+    sparc = _as(people["sparc"])
+    assert _place_on(sparc, ids["sparc"], r["sparc_pump"].uid, p.uid, r["hall"].uid, 10, 10).status_code == 200
+    btf = _as(people["btf"])
+    assert _place_on(btf, ids["btf"], r["btf_pump"].uid, p.uid, r["hall"].uid, 20, 20).status_code == 200
+    secret = make(db, ids["sparc"], "Vacuum Pump", "SPARC costed pump", classification="restricted:costs")
+    indoor.place(db, secret, place_uid=r["hall"].uid, plan_uid=p.uid, x=30, y=30, actor="t")
+    indoor.place(db, r["lnf_pump"], place_uid=r["hall"].uid, plan_uid=p.uid, x=40, y=40, actor="t")
+    db.commit()
+
+    def seen(user, ws):
+        got = _as(user).get(f"/v1/plans/{p.uid}", headers={"X-Workspace-Id": ws})
+        assert got.status_code == 200, got.text
+        return {x["name"] for x in got.json()["placed"]}
+    assert seen(people["sparc"], ids["sparc"]) == {"SPARC pump"}           # not BTF's, not restricted, not LNF's
+    assert seen(people["btf"], ids["btf"]) == {"BTF pump"}
+    assert seen(people["both"], ids["sparc"]) == {"SPARC pump", "BTF pump"}  # may read both: sees both
+    assert seen(lab_admin(plan), ids["sparc"]) == {"SPARC pump", "BTF pump", "SPARC costed pump", "LNF's own pump"}
+
+    # The facility reads the site's floor, plan and image; the record's containers and the hall's contents.
+    assert sparc.get(f"/v1/assets/{r['building'].uid}/levels", headers={"X-Workspace-Id": ids["sparc"]}).json()["plans"][0]["uid"] == p.uid
+    assert sparc.get(f"/v1/plans/{p.uid}/image", headers={"X-Workspace-Id": ids["sparc"]}).status_code == 200
+    where = sparc.get(f"/v1/assets/{r['sparc_pump'].uid}/indoors", headers={"X-Workspace-Id": ids["sparc"]}).json()
+    assert [c["name"] for c in where["in"]] == ["Hall 3", "Edificio 2"]
+    hall = sparc.get(f"/v1/assets/{r['hall'].uid}/indoors", headers={"X-Workspace-Id": ids["sparc"]}).json()
+    assert {c["name"] for c in hall["contents"]} == {"SPARC pump"}
+    # On the map: the site's plan, in view from the facility, not from an outsider.
+    box = "12.67,41.81,12.69,41.83"
+    assert [x["uid"] for x in sparc.get(f"/v1/map/plans?bbox={box}", headers={"X-Workspace-Id": ids["sparc"]}).json()] == [p.uid]
+    outsider = _as(people["other"])
+    assert outsider.get(f"/v1/map/plans?bbox={box}", headers={"X-Workspace-Id": ids["other"]}).json() == []
+
+
+def lab_admin(plan):
+    return plan["admin"]
+
+
+def test_only_the_site_changes_its_places_floors_and_plans(plan):
+    ids, r, people, p, level = plan["ids"], plan["rec"], plan["people"], plan["plan"], plan["level"]
+    sparc, h = _as(people["sparc"]), {"X-Workspace-Id": ids["sparc"]}
+    assert sparc.patch(f"/v1/plans/{p.uid}", headers=h, json={"name": "mine"}).status_code == 404
+    assert sparc.put(f"/v1/plans/{p.uid}/placement", headers=h, json={"points": [
+        {"x": 0, "y": 0, "longitude": 1, "latitude": 1}, {"x": 9, "y": 9, "longitude": 2, "latitude": 2}]}).status_code == 404
+    assert sparc.delete(f"/v1/plans/{p.uid}", headers=h).status_code == 404
+    assert sparc.patch(f"/v1/levels/{level.uid}", headers=h, json={"name": "x"}).status_code == 404
+    assert sparc.post(f"/v1/assets/{r['building'].uid}/levels", headers=h, json={"name": "Roof"}).status_code == 403
+    assert sparc.put(f"/v1/assets/{r['building'].uid}", headers=h,
+                     json={"name": "renamed", "attributes": {}, "schema_uid": r["building"].schema_uid}).status_code == 404
+    # A workspace not at the site neither sees the plan nor places on it.
+    outsider, ho = _as(people["other"]), {"X-Workspace-Id": ids["other"]}
+    assert outsider.get(f"/v1/plans/{p.uid}", headers=ho).status_code == 404
+    mine = make(plan["db"], ids["other"], "Vacuum Pump", "Outsider pump")
+    plan["db"].commit()
+    assert _place_on(outsider, ids["other"], mine.uid, p.uid, r["hall"].uid, 5, 5).status_code == 404
+
+
+def test_withholding_a_building_previews_then_ends_facility_placements(plan):
+    from app.models.indoor import IndoorPlacement
+    from app.services import spatial
+    db, ids, r, people, p = plan["db"], plan["ids"], plan["rec"], plan["people"], plan["plan"]
+    sparc = _as(people["sparc"])
+    _place_on(sparc, ids["sparc"], r["sparc_pump"].uid, p.uid, r["hall"].uid, 10, 10)
+    _place_on(_as(people["btf"]), ids["btf"], r["btf_pump"].uid, p.uid, r["hall"].uid, 20, 20)
+    indoor.place(db, r["lnf_pump"], place_uid=r["hall"].uid, actor="t")
+    db.commit()
+    admin, hl = _as(plan["admin"]), {"X-Workspace-Id": ids["lnf"]}
+    preview = admin.put(f"/v1/assets/{r['building'].uid}/site-sharing", headers=hl, json={"shared": False}).json()
+    assert preview["preview"] and preview["would_withhold"] == 2                    # the building and its hall
+    assert {(x["workspace_id"], x["record"]["name"]) for x in preview["would_end"]} == {
+        (ids["sparc"], "SPARC pump"), (ids["btf"], "BTF pump")}                     # LNF's own stays
+    db.expire_all()
+    assert db.get(Asset, r["building"].uid).site_shared                            # nothing changed yet
+
+    done = admin.put(f"/v1/assets/{r['building'].uid}/site-sharing", headers=hl,
+                     json={"shared": False, "confirm": True}).json()
+    assert len(done["ended"]) == 2 and done["withheld"]
+    db.expire_all()
+    assert indoor.current(db, r["sparc_pump"].uid) is None
+    ended = db.scalar(select(IndoorPlacement).where(IndoorPlacement.asset_uid == r["sparc_pump"].uid))
+    assert ended.state == "withdrawn" and ended.valid_until is not None
+    assert spatial.current(db, r["sparc_pump"].uid) is not None                    # keeps the plan's position
+    assert indoor.current(db, r["lnf_pump"].uid) is not None                       # the site's own placement stays
+    assert sparc.get(f"/v1/plans/{p.uid}", headers={"X-Workspace-Id": ids["sparc"]}).status_code == 404
+    assert r["hall"].uid not in seen_from(db, ids["sparc"])                        # the hall inside goes too
+    from app.models.asset_subresources import AssetHistory
+    lines = [h.details for h in db.scalars(select(AssetHistory).where(AssetHistory.asset_uid == r["sparc_pump"].uid))]
+    assert any(d.startswith("No longer placed in Hall 3") and "no longer shared" in d for d in lines), lines
+
+    # Shared again: the places come back, the placements do not.
+    admin.put(f"/v1/assets/{r['building'].uid}/site-sharing", headers=hl, json={"shared": True})
+    db.expire_all()
+    assert sparc.get(f"/v1/plans/{p.uid}", headers={"X-Workspace-Id": ids["sparc"]}).status_code == 200
+    assert indoor.current(db, r["sparc_pump"].uid) is None
+
+
+def test_a_facility_leaving_its_site_previews_then_loses_its_placements(plan):
+    db, ids, r, people, p = plan["db"], plan["ids"], plan["rec"], plan["people"], plan["plan"]
+    _place_on(_as(people["sparc"]), ids["sparc"], r["sparc_pump"].uid, p.uid, r["hall"].uid, 10, 10)
+    _place_on(_as(people["btf"]), ids["btf"], r["btf_pump"].uid, p.uid, r["hall"].uid, 20, 20)
+    admin = _as(plan["admin"])
+    preview = admin.put(f"/v1/admin/sites/{ids['sparc']}/site", json={"site_id": None}).json()
+    assert preview["preview"] and [x["record"]["name"] for x in preview["would_end"]] == ["SPARC pump"]
+    done = admin.put(f"/v1/admin/sites/{ids['sparc']}/site", json={"site_id": None, "confirm": True}).json()
+    assert len(done["ended"]) == 1
+    db.expire_all()
+    assert indoor.current(db, r["sparc_pump"].uid) is None and indoor.current(db, r["btf_pump"].uid) is not None
+    assert r["building"].uid not in seen_from(db, ids["sparc"])
