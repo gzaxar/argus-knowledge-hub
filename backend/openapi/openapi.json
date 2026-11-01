@@ -30844,7 +30844,7 @@
     },
     "/v1/catalogue/collections/models": {
       "get": {
-        "description": "The catalogue's Product Models — from a collection, local, or retired — with search and facets.",
+        "description": "The catalogue's Product Models — from a collection, local, or retired — with search, facets (domain among\nthem) and the navigator: domain › device class › vendor, counted.",
         "operationId": "browse_models_v1_catalogue_collections_models_get",
         "parameters": [
           {
@@ -30925,6 +30925,22 @@
                 }
               ],
               "title": "Collection"
+            }
+          },
+          {
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Domain"
             }
           },
           {

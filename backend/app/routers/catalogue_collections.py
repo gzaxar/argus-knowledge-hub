@@ -189,13 +189,15 @@ def _readable(db: Session, identity: Identity) -> set[str]:
 
 @router.get("/models")
 def browse_models(q: Optional[str] = None, device_class: Optional[str] = None, vendor: Optional[str] = None,
-                  status: Optional[str] = None, collection: Optional[str] = None,
+                  status: Optional[str] = None, collection: Optional[str] = None, domain: Optional[str] = None,
                   identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
-    """The catalogue's Product Models — from a collection, local, or retired — with search and facets."""
+    """The catalogue's Product Models — from a collection, local, or retired — with search, facets (domain among
+    them) and the navigator: domain › device class › vendor, counted."""
     from app.catalogue.views import browse
     ws = _workspace(db)
     _may_read(db, identity, ws)
-    return browse(db, ws, q=q, device_class=device_class, vendor=vendor, status=status, collection=collection)
+    return browse(db, ws, q=q, device_class=device_class, vendor=vendor, status=status, collection=collection,
+                  domain=domain)
 
 
 @router.get("/records/{uid}")

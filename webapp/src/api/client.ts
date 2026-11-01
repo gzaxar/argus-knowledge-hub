@@ -2930,13 +2930,25 @@ export interface CatalogueModelRow {
   status: "catalogue" | "local" | "retired";
   review: boolean;
   units: number;
+  /** The domains of its collection (packages), `local` for a model made here, `unspecified` otherwise. */
+  domains?: string[];
+}
+
+/** One domain of the model navigator, with its device classes and their vendors, counted. */
+export interface CatalogueDomainNode {
+  domain: string;
+  name: string;
+  count: number;
+  classes: { device_class: string; count: number; vendors: { vendor: string; count: number }[] }[];
 }
 
 export interface CatalogueBrowse {
   workspace_id: string;
   total: number;
   models: CatalogueModelRow[];
-  facets: Record<"device_class" | "vendor" | "collection" | "status", Record<string, number>>;
+  facets: Record<"device_class" | "vendor" | "collection" | "status" | "domain", Record<string, number>>;
+  navigator?: CatalogueDomainNode[];
+  domain_names?: Record<string, string>;
 }
 
 export type CatalogueValueSource = "collection" | "edited" | "local" | "correction" | "record";
@@ -3077,7 +3089,7 @@ export const systemCatalogueApi = {
 export const catalogueCollectionsApi = {
   list: () => request<{ workspace_id: string; sources: CatalogueSourcePin[]; collections: CatalogueCollection[];
                          history: CatalogueHistoryRow[] }>(CC),
-  models: (params: { q?: string; device_class?: string; vendor?: string; status?: string; collection?: string }) => {
+  models: (params: { q?: string; device_class?: string; vendor?: string; status?: string; collection?: string; domain?: string }) => {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
     return request<CatalogueBrowse>(`${CC}/models${qs ? `?${qs}` : ""}`);
   },

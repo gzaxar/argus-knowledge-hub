@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { catalogueCollectionsApi, glpiMatchesApi, workspacesApi, type GlpiMatchReport } from "../../api/client";
+import { catalogueCollectionsApi, glpiMatchesApi, workspacesApi, type CatalogueDomainNode, type GlpiMatchReport } from "../../api/client";
 import { problem } from "./catalogueText";
 
 const STATUS: Record<string, string> = { catalogue: "From a collection", local: "Local", retired: "Retired" };
@@ -72,6 +72,68 @@ export function GlpiMatches({ workspaceId }: { workspaceId?: string } = {}) {
   );
 }
 
+/** Browse the models by domain › device class › vendor, with counts; choosing a node filters the list. */
+export function ModelNavigator({ nodes, domain, deviceClass, vendor, onPick }: {
+  nodes: CatalogueDomainNode[]; domain: string; deviceClass: string; vendor: string;
+  onPick: (pick: { domain: string; deviceClass: string; vendor: string }) => void;
+}) {
+  const [open, setOpen] = useState<Set<string>>(new Set(domain ? [domain] : []));
+  const toggle = (k: string) => setOpen((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const row = (active: boolean) =>
+    `flex w-full items-center justify-between gap-2 rounded px-1.5 py-0.5 text-left text-xs ${
+      active ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`;
+  return (
+    <nav aria-label="Models by domain" className="rounded border border-slate-200 bg-white p-2">
+      <p className="mb-1 px-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Domains</p>
+      <button type="button" onClick={() => onPick({ domain: "", deviceClass: "", vendor: "" })}
+              className={row(!domain && !deviceClass && !vendor)}>
+        <span>Every model</span>
+      </button>
+      <ul className="mt-0.5 space-y-px">
+        {nodes.map((d) => {
+          const isOpen = open.has(d.domain) || (domain === d.domain);
+          return (
+            <li key={d.domain}>
+              <div className="flex items-center">
+                <button type="button" aria-label={`${isOpen ? "Close" : "Open"} ${d.name}`} onClick={() => toggle(d.domain)}
+                        className="w-4 shrink-0 text-xs text-slate-400">{isOpen ? "▾" : "▸"}</button>
+                <button type="button" onClick={() => { onPick({ domain: d.domain, deviceClass: "", vendor: "" }); setOpen((s) => new Set(s).add(d.domain)); }}
+                        className={row(domain === d.domain && !deviceClass && !vendor)}>
+                  <span className="truncate">{d.name}</span><span className="tabular-nums opacity-70">{d.count}</span>
+                </button>
+              </div>
+              {isOpen && (
+                <ul className="ml-4 space-y-px">
+                  {d.classes.map((c) => (
+                    <li key={c.device_class}>
+                      <button type="button" onClick={() => onPick({ domain: d.domain, deviceClass: c.device_class === "—" ? "" : c.device_class, vendor: "" })}
+                              className={row(domain === d.domain && deviceClass === c.device_class && !vendor)}>
+                        <span className="truncate">{c.device_class}</span><span className="tabular-nums opacity-70">{c.count}</span>
+                      </button>
+                      {domain === d.domain && deviceClass === c.device_class && (
+                        <ul className="ml-3 space-y-px">
+                          {c.vendors.map((v) => (
+                            <li key={v.vendor}>
+                              <button type="button" onClick={() => onPick({ domain: d.domain, deviceClass: c.device_class, vendor: v.vendor === "—" ? "" : v.vendor })}
+                                      className={row(vendor === v.vendor)}>
+                                <span className="truncate">{v.vendor}</span><span className="tabular-nums opacity-70">{v.count}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
 /** The shared Product Models: from a collection (with its catalogue id), made here, or retired. */
 export function ProductCataloguePage() {
   const [q, setQ] = useState("");
@@ -79,8 +141,11 @@ export function ProductCataloguePage() {
   const [vendor, setVendor] = useState("");
   const [status, setStatus] = useState("");
   const [collection, setCollection] = useState("");
-  const params = { q, device_class: deviceClass, vendor, status, collection };
-  const found = useQuery({ queryKey: ["catalogue-models", params], queryFn: () => catalogueCollectionsApi.models(params) });
+  const [domain, setDomain] = useState("");
+  const params = { q, device_class: deviceClass, vendor, status, collection, domain };
+  // The previous answer stays while the next loads: the navigator and the list do not blink at each choice.
+  const found = useQuery({ queryKey: ["catalogue-models", params], queryFn: () => catalogueCollectionsApi.models(params),
+                           placeholderData: (previous) => previous });
   const me = useQuery({ queryKey: ["me"], queryFn: workspacesApi.me });
 
   return (
@@ -108,13 +173,21 @@ export function ProductCataloguePage() {
         <Facet label="Vendor" value={vendor} onChange={setVendor} counts={found.data?.facets.vendor} />
         <Facet label="Source" value={status} onChange={setStatus} counts={found.data?.facets.status} names={STATUS} />
         <Facet label="Collection" value={collection} onChange={setCollection} counts={found.data?.facets.collection} />
+        <Facet label="Domain" value={domain} onChange={setDomain} counts={found.data?.facets.domain}
+               names={found.data?.domain_names} />
       </div>
 
       {found.isError && <p className="whitespace-pre-line text-sm text-red-600">{problem(found.error)}</p>}
       {found.isLoading && <p className="text-sm text-slate-500">Loading…</p>}
       {found.data && (
-        <>
+        <div className="grid gap-4 md:grid-cols-[14rem_minmax(0,1fr)]">
+          <div className="md:sticky md:top-2 md:self-start">
+            <ModelNavigator nodes={found.data.navigator ?? []} domain={domain} deviceClass={deviceClass} vendor={vendor}
+                            onPick={(p) => { setDomain(p.domain); setDeviceClass(p.deviceClass); setVendor(p.vendor); }} />
+          </div>
+          <div className="min-w-0 space-y-2">
           <p className="text-xs text-slate-500">{found.data.total} model{found.data.total === 1 ? "" : "s"}</p>
+          <div className="overflow-x-auto">
           <table className="w-full rounded border border-slate-200 bg-white text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
               <tr><th className="px-3 py-2">Model</th><th className="px-3 py-2">Vendor</th>
@@ -147,7 +220,9 @@ export function ProductCataloguePage() {
               ))}
             </tbody>
           </table>
-        </>
+          </div>
+          </div>
+        </div>
       )}
     </div>
   );

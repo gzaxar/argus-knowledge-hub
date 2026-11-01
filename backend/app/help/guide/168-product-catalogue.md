@@ -22,7 +22,9 @@ Neither ever holds site data: no serial numbers, installed units, locations, sel
 ## Where to find it
 
 - **Settings › Product catalogue** — everyone: browse and search the models, from a collection (with their
-  catalogue id), local (made here), or retired, and how many units are of each.
+  catalogue id), local (made here), or retired, and how many units are of each. The **Domains** navigator beside
+  the list browses them by domain (IT, accelerator, vacuum…, and the models made here) › device class › vendor,
+  with how many at each step; choosing one filters the list (the *Domain* filter does the same).
 - **Administration › Catalogue** — administrators: which workspace is the catalogue and what depends on it, the
   pinned sources, the collections and the version installed, preview and install, the entries waiting for
   review, the corrections for Git, the history, and matching GLPI's devices (for the workspace you choose).
