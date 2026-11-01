@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -29,6 +29,10 @@ class Workspace(Base):
     # `catalogue` for the one workspace that is the installation's catalogue of Vendors and Product Models
     # (docs/system-catalogue.md); null for every other.
     role: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # A facility workspace's site: the laboratory whose places it uses (docs/sites.md); that workspace has
+    # role `site`. One level: a site is at no site.
+    site_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("workspaces.id", ondelete="SET NULL"),
+                                                   nullable=True, index=True)
 
     # Fallback rights for any authenticated user with no explicit Membership
     # row in this workspace. All unchecked by default — a workspace stays

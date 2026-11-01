@@ -3924,6 +3924,17 @@
               }
             ],
             "title": "Role"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
           }
         },
         "required": [

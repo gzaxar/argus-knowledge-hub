@@ -349,6 +349,7 @@ def place(db: Session, asset: Asset, *, place_uid: Optional[str] = None, level_u
                              confirmed_by=actor, created_at=at)
     db.add(placed)
     db.flush()
+    _site_changed(db, asset, actor)
     words = [f"in {place_rec.name}" if place_rec else None, f"on {level.name}" if level else None,
              f"at {px:.0f}, {py:.0f} of the plan {plan.name}" if px is not None else None]
     _history(db, asset, "Placed indoors: " + ", ".join(w for w in words if w), actor, at)
@@ -372,7 +373,15 @@ def remove(db: Session, asset: Asset, actor: Optional[str]) -> bool:
     previous.state, previous.valid_until = "removed", at
     _history(db, asset, "No longer placed indoors", actor, at)
     db.flush()
+    _site_changed(db, asset, actor)
     return True
+
+
+def _site_changed(db: Session, asset: Asset, actor: Optional[str]) -> None:
+    """A site's place moved inside another (or out): what its facilities may see can change (services/sites)."""
+    from app.services import sites
+    if sites.is_site(db, asset.workspace_id) and asset.schema_uid in sites.place_types(db):
+        sites.refresh(db, asset.workspace_id, actor=actor, reason=f"{asset.name} moved inside a place not shared")
 
 
 def _history(db: Session, asset: Asset, details: str, actor: Optional[str], at) -> None:

@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.services.visibility import reachable_in
 from app.auth import PatIdentity, get_grants, get_identity
 from app.db import get_db
 from app.models.asset import Asset
@@ -162,7 +163,7 @@ def resolve_link(path: str = Query(..., description="e.g. /asset/<uid> or https:
     ws = workspace_id if workspace_id in readable else (readable[0] if len(readable) == 1 else workspace_id)
     if kind in ("asset", "position"):
         a = db.get(Asset, ident)
-        if a is None or a.workspace_id not in readable and not a.is_global:
+        if a is None or not any(reachable_in(a, w) for w in readable):
             _not_found()
         return _asset_link(db, ident, a.workspace_id if a.workspace_id in readable else (ws or ""), grants, kind)
     if kind == "installation":
@@ -269,7 +270,7 @@ def _visible_holders(db: Session, stmt, readable: list[str], grants) -> list[Ass
         a = _survivor(db, a) if a.merged_into_uid else a
         if a is None or a.uid in seen or a.deleted_at is not None or a.record_status in INACTIVE:
             continue
-        if (a.workspace_id in readable or a.is_global) and can_see(a, grants):
+        if any(reachable_in(a, w) for w in readable) and can_see(a, grants):
             seen.add(a.uid)
             out.append(a)
     return out

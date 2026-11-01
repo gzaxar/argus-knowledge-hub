@@ -30,8 +30,11 @@ class WorkspaceOut(BaseModel):
     name: str
     is_global: bool
     created_at: datetime
-    # `catalogue` for the installation's catalogue workspace (docs/system-catalogue.md)
+    # `catalogue` for the installation's catalogue workspace (docs/system-catalogue.md), `site` for a laboratory
+    # whose places its facilities use (docs/sites.md)
     role: Optional[str] = None
+    # the site a facility workspace is at
+    site_id: Optional[str] = None
 
 
 class MyWorkspaceOut(WorkspaceOut):

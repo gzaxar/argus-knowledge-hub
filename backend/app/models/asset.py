@@ -30,6 +30,10 @@ class Asset(Base, WorkspaceScopedMixin, TimestampMixin):
     # Retired, Merged); separate from argus_lifecycle, the equipment's state.
     record_status: Mapped[str] = mapped_column(String, default="Active", server_default="Active")
     merged_into_uid: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # A site's place visible from the site's facilities (docs/sites.md, kept by services/sites.refresh), and a
+    # place a site withholds from them, with what is inside it.
+    site_shared: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    site_withheld: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
 class Relation(Base, WorkspaceScopedMixin):

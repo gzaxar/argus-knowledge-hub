@@ -15,6 +15,12 @@ inventory document — is flagged; a beamline's own cameras and pumps are not, a
 stay in the beamline that has them. Anything created in a global workspace is
 flagged when it is made, the way its types and documents already are.
 
+Sites (docs/sites.md)
+---------------------
+A third way, between the two: a site's places (`site_shared`, kept by services/sites.py) are visible from the
+workspaces at that site — LNF's buildings and rooms from SPARC and BTF — and from no other. It is the place
+that is shared, never what the site or another facility keeps in it.
+
 Restricted classes (asset-model-revision §4.3, I-ACL-1)
 --------------------------------------------------------
 A record (object or ticket) whose `classification` attribute is
@@ -100,12 +106,38 @@ def _restriction_clause(model, grants: Optional[Grants]):
     return or_(*allowed)
 
 
+def _site_of(asset: Asset, workspace_id: str) -> Optional[str]:
+    from sqlalchemy.orm import object_session
+
+    from app.models.workspace import Workspace
+    db = object_session(asset)
+    if db is None:
+        return None
+    with db.no_autoflush:
+        return db.scalar(select(Workspace.site_id).where(Workspace.id == workspace_id))
+
+
+def reachable_in(asset: Asset, workspace_id: str) -> bool:
+    """Whether a record is reachable from a workspace — its own, global, or a place of the site the workspace is
+    at — before restricted classes are applied."""
+    if asset.workspace_id == workspace_id or bool(asset.is_global):
+        return True
+    return bool(getattr(asset, "site_shared", False)) and _site_of(asset, workspace_id) == asset.workspace_id
+
+
 def asset_visible_in(asset: Asset, workspace_id: str, grants: Optional[Grants] = None) -> bool:
-    return (asset.workspace_id == workspace_id or bool(asset.is_global)) and can_see(asset, grants)
+    return reachable_in(asset, workspace_id) and can_see(asset, grants)
+
+
+def site_clause(workspace_id: str):
+    """The places of the site this workspace is at (none when it is at no site)."""
+    from app.models.workspace import Workspace
+    site = select(Workspace.site_id).where(Workspace.id == workspace_id).scalar_subquery()
+    return and_(Asset.site_shared.is_(True), Asset.workspace_id == site)
 
 
 def visible_assets_clause(workspace_id: str, grants: Optional[Grants] = None):
-    base = or_(Asset.workspace_id == workspace_id, Asset.is_global.is_(True))
+    base = or_(Asset.workspace_id == workspace_id, Asset.is_global.is_(True), site_clause(workspace_id))
     extra = _restriction_clause(Asset, grants)
     return base if extra is None else and_(base, extra)
 
