@@ -82,7 +82,8 @@ laboratory's workspace, then choose *at LNF* on each facility's. A site is at no
 and a site cannot stop being one while facilities are at it. Taking a facility away from its site first lists
 the placements of its equipment on the site's places that would end.
 
-**What a facility gets.** From SPARC's workspace, LNF's places — every record of type Location or below it
+**What a facility gets.** From SPARC's workspace — its asset list shows *This workspace + LNF's places* by
+default — LNF's places — every record of type Location or below it
 (Building, Area, Rack…) — appear in lists, search, the map and the *Place it inside* search, with their floors,
 plans and their position on the map; nothing else of LNF's does, and nothing of BTF's. SPARC places **its own**
 equipment in an LNF room and on an LNF plan: the equipment stays SPARC's, the place and the plan stay LNF's —
@@ -102,7 +103,10 @@ again by hand.
 going, their floors and plans (whether their files are there and their fit kept), the placements carried or
 ending, the equipment of other workspaces placed in them, and every record naming them — whether it would still
 reach them, and whether it would if they stopped being global. A **move** keeps the records' ids and keys, so
-references to them hold; it drops a relation to a record left behind (the report names it). A **copy** makes new
+references to them hold; it drops a relation to a record left behind (the report names it). A record whose type
+is its old workspace's own takes the new workspace's type of the same name (the report says which); with none,
+the transfer is refused — transfer the type too. A record moved before this rule, whose type the workspace
+cannot use, has its type chosen again on **Edit** (the same-named type is suggested). A **copy** makes new
 records with copies of the floors and plans, placed where the originals were.
 
 ## The map

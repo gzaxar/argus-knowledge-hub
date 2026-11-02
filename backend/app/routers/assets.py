@@ -381,8 +381,11 @@ def update_asset(
     new_attrs = patch.pop("attributes", None)
     new_name = patch.pop("name", None)
     patch.pop("type", None)                # a record's type follows its schema, not a free edit
+    new_schema = patch.pop("schema_uid", None)
     for field, value in patch.items():
         setattr(asset, field, value)
+    if new_schema and new_schema != asset.schema_uid:
+        _give_usable_type(db, asset, new_schema, workspace_id, _actor(identity))
     schema = db.get(Schema, asset.schema_uid) if asset.schema_uid else None
     changes: dict = {}
     if new_attrs is not None:
@@ -415,6 +418,44 @@ def update_asset(
     out = asset_out(db, asset)
     out.version = versions.asset_version(db, uid)
     return out
+
+
+def usable_type(schema: Optional[Schema], workspace_id: str) -> bool:
+    return schema is not None and schema.applies_to == "objects" and (schema.workspace_id == workspace_id or schema.is_global)
+
+
+def _give_usable_type(db: Session, asset: Asset, schema_uid: str, workspace_id: str, actor: str) -> None:
+    """A record whose type cannot be used in its workspace (a type private to the workspace it was moved from)
+    is given one of this workspace's, through the ledger (an author, a reason; a rebuild keeps it). Any other
+    change of type is a type migration, which moves the field values with it."""
+    current = db.get(Schema, asset.schema_uid) if asset.schema_uid else None
+    if usable_type(current, workspace_id):
+        raise HTTPException(status_code=422, detail={
+            "error": "a record's type is changed by a type migration (Administration › Type migrations), which moves "
+                     "its values with it", "code": "type_change"})
+    target = db.get(Schema, schema_uid)
+    if not usable_type(target, workspace_id):
+        raise HTTPException(status_code=422, detail="Unknown object type for this workspace")
+    from app.catalogue.system import CatalogueProtected, check_record
+    try:
+        check_record(db, workspace_id, target.name)
+    except CatalogueProtected as exc:
+        raise HTTPException(status_code=422, detail={"error": str(exc), "code": "catalogue_workspace"})
+    was = current.name if current else asset.type
+    try:
+        ledger_service.retype_to(db, workspace_id, actor, [asset.uid], target,
+                                 reason=f"its type {was!r} belongs to another workspace: given this workspace's")
+    except LedgerError as exc:
+        _ledger_failed(db, exc)
+    db.flush()
+    db.refresh(asset)
+    if asset.schema_uid != target.uid:
+        raise HTTPException(status_code=500, detail="the ledger did not put the record on the new type")
+    from datetime import datetime, timezone
+
+    from app.models.asset_subresources import AssetHistory
+    db.add(AssetHistory(uid=str(uuid.uuid4()), asset_uid=asset.uid, type="type_changed", author=actor,
+                        details=f"type {was} (of another workspace) → {target.name}", timestamp=datetime.now(timezone.utc)))
 
 
 @router.delete("/{uid}", status_code=204)

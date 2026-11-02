@@ -21,6 +21,7 @@ to drift out of sync.
 import os
 import shutil
 import uuid
+from typing import Optional
 from datetime import datetime, timezone
 
 from sqlalchemy import or_, select
@@ -188,12 +189,27 @@ def _move(
         counts["types"] += 1
     counts["icons_dropped"] += _move_schema_icons(db, source, target, schema_uids)
 
+    missing = records_without_a_type(db, target, asset_uids, schema_uids)
+    if missing:
+        raise ValueError(f"the target has no type for {', '.join(missing[:5])}: move or copy the type too")
+    retype: dict = {}
     for uid in asset_uids:
         asset = db.get(Asset, uid)
         if asset is None or asset.workspace_id != source:
             continue
+        ok, other = type_in_target(db, asset.schema_uid, target, schema_uids)
+        if not ok:
+            retype.setdefault(other.uid, []).append(uid)
         asset.workspace_id = target
         counts["assets"] += 1
+    db.flush()
+    # A record whose type was private to the source takes the target's type of the same name, through the
+    # ledger (a rebuild keeps it): it would otherwise be of a type the target cannot use, nor edit.
+    from app.ledger import service as ledger_service
+    for schema_uid, uids in retype.items():
+        ledger_service.retype_to(db, target, "transfer", uids, db.get(Schema, schema_uid),
+                                 reason=f"moved from {source}: its type there is {source}'s own")
+    counts["assets_retyped"] = sum(len(v) for v in retype.values())
 
     for uid in document_uids:
         doc = db.get(Document, uid)
@@ -290,6 +306,33 @@ def _move(
             f"Unlinked {counts['icons_dropped']} icon(s) still used by a type left behind in the source workspace."
         )
     return counts, warnings
+
+
+def type_in_target(db: Session, schema_uid: str, target: str, moving_types=()) -> tuple[bool, Optional[Schema]]:
+    """The type a record of `schema_uid` has in `target`: its own when the target can use it (the target's, a
+    global one, or one moving with it) — (True, None) — else the target's type of the same name, its own first,
+    then a global one — (False, that type) — or (False, None) when it has none."""
+    schema = db.get(Schema, schema_uid) if schema_uid else None
+    if schema is None or schema.workspace_id == target or schema.is_global or schema.uid in set(moving_types):
+        return True, None
+    same = list(db.scalars(select(Schema).where(Schema.name == schema.name, Schema.applies_to == schema.applies_to,
+                                                or_(Schema.workspace_id == target, Schema.is_global.is_(True)))))
+    same.sort(key=lambda s: (s.workspace_id != target, s.uid))
+    return False, (same[0] if same else None)
+
+
+def records_without_a_type(db: Session, target: str, asset_uids, moving_types=()) -> list[str]:
+    """The records that would have no usable type in the target: theirs is private to their workspace, and the
+    target has none of that name."""
+    out = []
+    for uid in asset_uids:
+        a = db.get(Asset, uid)
+        if a is None:
+            continue
+        ok, other = type_in_target(db, a.schema_uid, target, moving_types)
+        if not ok and other is None:
+            out.append(f"{a.name} ({a.type})")
+    return out
 
 
 def _block_on_type_name_conflicts(db: Session, target: str, schema_uids: list[str]) -> None:
@@ -562,10 +605,17 @@ def _copy(
             continue
         new_uid = str(uuid.uuid4())
         new_key = _unique_asset_key(db, asset.key, used_keys)
+        new_schema, new_type = schema_map.get(asset.schema_uid, asset.schema_uid), asset.type
+        if asset.schema_uid not in schema_map:
+            ok, other = type_in_target(db, asset.schema_uid, target)
+            if not ok:
+                if other is None:
+                    raise ValueError(f"the target has no type {asset.type!r} for {asset.name}: copy the type too")
+                new_schema, new_type = other.uid, other.name
         db.add(Asset(
             uid=new_uid, workspace_id=target,
-            schema_uid=schema_map.get(asset.schema_uid, asset.schema_uid),
-            key=new_key, name=asset.name, type=asset.type, avatar_icon_uid=None,
+            schema_uid=new_schema,
+            key=new_key, name=asset.name, type=new_type, avatar_icon_uid=None,
             attributes={**dict(asset.attributes or {}), "_copy_source_uid": uid},
             inbound_relations=[], outbound_relations=[],
             deleted_at=None, is_global=asset.is_global,

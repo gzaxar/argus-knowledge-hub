@@ -90,6 +90,15 @@ def _checked(db: Session, identity: Identity, body: TransferRequest, x_workspace
     if not resources:
         raise HTTPException(status_code=422, detail="Nothing selected to transfer")
 
+    # A record whose type is private to its workspace takes the target's type of the same name; without one it
+    # would be of a type the target can neither use nor edit — refused, before anything moves.
+    from app.services.workspace_transfer import records_without_a_type
+    missing = records_without_a_type(db, body.target_workspace_id, body.asset_uids, body.type_uids)
+    if missing:
+        raise HTTPException(status_code=422, detail={
+            "error": f"{body.target_workspace_id} has no type for {', '.join(missing[:5])}: transfer the type too",
+            "code": "transfer_type"})
+
     source_action = "read" if body.mode == "copy" else "modify"
     for resource in resources:
         if not resolve_permission(db, identity.user, workspace_id, source_action, resource):

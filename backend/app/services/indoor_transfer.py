@@ -58,7 +58,14 @@ def preview(db: Session, source: str, target: str, mode: str, asset_uids: set[st
     shared_after = {a.uid: _would_share(db, a, target) for a in moving}
     after_ws = target if mode == "move" else None          # a copy leaves the originals where they are
 
+    from app.services.workspace_transfer import type_in_target
+
+    def type_after(a):
+        ok, other = type_in_target(db, a.schema_uid, target)
+        return {"keeps": ok, "becomes": other.name if other is not None else None}
+    types = {a.uid: type_after(a) for a in moving}
     records = [{"uid": a.uid, "key": a.key, "name": a.name, "type": a.type, "is_global": a.is_global,
+                "type_after": types[a.uid],
                 "site_shared_after": shared_after[a.uid] if mode == "move" else False} for a in moving]
 
     levels = list(db.scalars(select(PlaceLevel).where(PlaceLevel.place_uid.in_(ids)))) if ids else []
@@ -139,7 +146,9 @@ def preview(db: Session, source: str, target: str, mode: str, asset_uids: set[st
     labels = db.scalar(select(func.count()).select_from(AssetLabel).where(
         AssetLabel.asset_uid.in_(ids))) if ids else 0
 
-    problems = ([f"{c['name']}: its placement would end ({c['why']})" for c in carried if not c["eligible"]] +
+    problems = ([f"{a.name}: its type {a.type!r} is {a.workspace_id}'s own and {target} has none of that name — move "
+                 f"or copy the type too" for a in moving if not types[a.uid]["keeps"] and types[a.uid]["becomes"] is None] +
+                [f"{c['name']}: its placement would end ({c['why']})" for c in carried if not c["eligible"]] +
                 [f"{x['record']['name']} ({x['record']['workspace_id']}) would lose its placement: {x['why']}"
                  for x in placed_inside if not x["keeps_placement"]] +
                 [f"{r['from']['name'] if r['from'] else '?'} ({r['from']['workspace_id'] if r['from'] else '?'}): "

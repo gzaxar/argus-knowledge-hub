@@ -1535,6 +1535,17 @@
             ],
             "title": "Outbound Relations"
           },
+          "schema_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Uid"
+          },
           "type": {
             "anyOf": [
               {

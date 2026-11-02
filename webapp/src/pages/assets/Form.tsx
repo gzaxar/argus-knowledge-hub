@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { assetsApi, intakeApi, schemasApi, type AssistResult } from "../../api/client";
 import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
@@ -74,6 +74,18 @@ export function AssetForm() {
   }, [existing.data]);
 
   const objectSchemas = (schemas.data ?? []).filter((s) => (s.applies_to ?? "objects") === "objects");
+  // A record moved here with a type of the workspace it came from: that type cannot be used here, so its type is
+  // chosen again (the same-named one here, suggested) — the one case an edit changes a type.
+  const strayType = isEditing && !!existing.data && !!schemas.data &&
+    !objectSchemas.some((s) => s.uid === existing.data!.schema_uid);
+  const suggested = useRef(false);
+  useEffect(() => {
+    if (strayType && !suggested.current) {
+      suggested.current = true;
+      const same = objectSchemas.find((s) => s.name === existing.data!.type && s.is_concrete !== false);
+      setSchemaUid(same?.uid ?? "");
+    }
+  }, [strayType]);  // eslint-disable-line react-hooks/exhaustive-deps
   const schema = schemas.data?.find((s) => s.uid === schemaUid);
   const attrDefs = effectiveAttributes(schema, schemas.data);
   // What a blank key becomes, from the workspace's key pattern.
@@ -96,7 +108,8 @@ export function AssetForm() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (isEditing) {
-        return assetsApi.update(uid!, { name, attributes, schema_uid: schemaUid, is_global: isGlobal },
+        return assetsApi.update(uid!, { name, attributes, is_global: isGlobal,
+                                        ...(strayType && schemaUid ? { schema_uid: schemaUid } : {}) },
                                 existing.data?.workspace_id);
       }
       return assetsApi.create({
@@ -173,12 +186,19 @@ export function AssetForm() {
               selectable={(s) => s.is_concrete !== false}
               placeholder="Type to search, e.g. ion pump, power supply…"
               inputClassName="w-full rounded border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
-              disabled={isEditing}
+              disabled={isEditing && !strayType}
             />
           </div>
-          <p className="mt-1 text-xs text-slate-500">
-            What kind of thing it is. The type decides the attributes below.
-          </p>
+          {strayType ? (
+            <p role="status" className="mt-1 text-xs text-amber-800">
+              Its type, {existing.data?.type}, belongs to the workspace it came from and cannot be used here: choose
+              this workspace&apos;s{objectSchemas.some((s) => s.name === existing.data?.type) ? " (the same type here is suggested)" : ""}.
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-slate-500">
+              What kind of thing it is. The type decides the attributes below.
+            </p>
+          )}
           {browsing && (
             <SchemaBrowser
               schemas={objectSchemas}
