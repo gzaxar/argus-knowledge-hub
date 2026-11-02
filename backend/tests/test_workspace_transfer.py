@@ -39,10 +39,14 @@ def _workspaces(db, suffix):
     return source, target
 
 
-def _two_linked_assets(db, source, suffix):
-    """schema + two assets in `source`, related to each other."""
+def _two_linked_assets(db, source, suffix, target_type=True):
+    """schema + two assets in `source`, related to each other (and, unless told otherwise, a Camera type of the
+    target's own for them to take there)."""
     schema_uid = f"sch-{suffix}"
     db.add(Schema(uid=schema_uid, workspace_id=source, name="Camera"))
+    # The target has a Camera of its own: a record moved or copied there takes it (its source's is private).
+    if target_type:
+        db.add(Schema(uid=f"{schema_uid}-dst", workspace_id=source.replace("src-", "dst-", 1), name="Camera"))
     db.flush()
     a_uid, b_uid = f"a-{suffix}", f"b-{suffix}"
     db.add(Asset(uid=a_uid, workspace_id=source, schema_uid=schema_uid, key=f"KEY-A-{suffix}", name="A", type="Camera"))
@@ -280,7 +284,7 @@ def test_copy_type_only_does_not_copy_instances():
     suffix = secrets.token_hex(4)
     db = SessionLocal()
     source, target = _workspaces(db, suffix)
-    schema_uid, a_uid, b_uid = _two_linked_assets(db, source, suffix)
+    schema_uid, a_uid, b_uid = _two_linked_assets(db, source, suffix, target_type=False)
     job_uid = f"job-{suffix}"
     db.add(TransferJob(uid=job_uid, workspace_id=source, target_workspace_id=target, mode="copy"))
     db.commit()

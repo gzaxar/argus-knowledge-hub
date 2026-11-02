@@ -47,6 +47,9 @@ class AssetCreate(BaseModel):
 class AssetUpdate(BaseModel):
     name: Optional[str] = None
     type: Optional[str] = None
+    # A record whose type cannot be used in its workspace (a type of the workspace it was moved from) is given
+    # one of this workspace's here; any other change of type is a type migration.
+    schema_uid: Optional[str] = None
     avatar_icon_uid: Optional[str] = None
     attributes: Optional[dict] = None
     inbound_relations: Optional[list[str]] = None

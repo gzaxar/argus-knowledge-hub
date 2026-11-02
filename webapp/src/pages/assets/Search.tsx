@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { assetsApi, schemasApi } from "../../api/client";
+import { assetsApi, schemasApi, workspacesApi } from "../../api/client";
 import { useShowKeys } from "../../api/displayPrefs";
 import { has, useCapabilities } from "../../api/useCapabilities";
 import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
@@ -37,7 +37,12 @@ export function AssetSearch() {
   const { get, set } = useBrowseParams();
   const q = get("q");
   const schemaUid = get("type") || null;
-  const owner = (get("owner", "own") as "all" | "own" | "shared");
+  // A workspace at a site (docs/sites.md) sees its site's places with its own records by default.
+  const mine = useQuery({ queryKey: ["my-workspaces"], queryFn: workspacesApi.listMine, staleTime: 60_000 });
+  const here = (mine.data ?? []).find((w) => w.id === ws);
+  const siteId = here?.site_id ?? null;
+  const siteName = (mine.data ?? []).find((w) => w.id === siteId)?.name ?? siteId;
+  const owner = (get("owner", siteId ? "site" : "own") as "all" | "own" | "shared" | "site");
   const [filters, setFilters] = useState<FilterState>({});
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const selection = useSelection("assets");
@@ -62,7 +67,9 @@ export function AssetSearch() {
     staleTime: 30_000,
   });
   const inScope = useMemo(() => (assets.data ?? []).filter((a) =>
-    ws === null || owner === "all" || (owner === "own" ? a.workspace_id === ws : a.workspace_id !== ws)), [assets.data, owner, ws]);
+    ws === null || owner === "all" || (owner === "own" ? a.workspace_id === ws
+      : owner === "site" ? a.workspace_id === ws || (!!siteId && a.workspace_id === siteId)
+      : a.workspace_id !== ws)), [assets.data, owner, ws, siteId]);
   const counts = useMemo(() => countBy(inScope, (a) => a.schema_uid), [inScope]);
   const matched = useMemo(() => {
     const n = needle.toLowerCase();
@@ -112,7 +119,9 @@ export function AssetSearch() {
           <SearchBox value={q} onChange={(v) => set({ q: v })} label={`Search ${noun}`}
                      placeholder="Name, key, label, serial or inventory number…" />
           {ws !== null && (
-            <ToolbarSelect label="Whose records" value={owner} onChange={(v) => set({ owner: v === "own" ? null : v })}>
+            <ToolbarSelect label="Whose records" value={owner}
+                           onChange={(v) => set({ owner: v === (siteId ? "site" : "own") ? null : v })}>
+              {siteId && <option value="site">This workspace + {siteName}&apos;s places</option>}
               <option value="own">This workspace</option>
               <option value="all">This workspace + shared</option>
               <option value="shared">Shared with it</option>

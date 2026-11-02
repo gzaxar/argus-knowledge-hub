@@ -20,6 +20,7 @@ class AssetUpdate {
     this.isGlobal,
     this.name,
     this.outboundRelations = const [],
+    this.schemaUid,
     this.type,
   });
 
@@ -37,6 +38,8 @@ class AssetUpdate {
 
   List<String>? outboundRelations;
 
+  String? schemaUid;
+
   String? type;
 
   @override
@@ -48,6 +51,7 @@ class AssetUpdate {
     other.isGlobal == isGlobal &&
     other.name == name &&
     _deepEquality.equals(other.outboundRelations, outboundRelations) &&
+    other.schemaUid == schemaUid &&
     other.type == type;
 
   @override
@@ -60,10 +64,11 @@ class AssetUpdate {
     (isGlobal == null ? 0 : isGlobal!.hashCode) +
     (name == null ? 0 : name!.hashCode) +
     (outboundRelations == null ? 0 : outboundRelations!.hashCode) +
+    (schemaUid == null ? 0 : schemaUid!.hashCode) +
     (type == null ? 0 : type!.hashCode);
 
   @override
-  String toString() => 'AssetUpdate[attributes=$attributes, avatarIconUid=$avatarIconUid, deletedAt=$deletedAt, inboundRelations=$inboundRelations, isGlobal=$isGlobal, name=$name, outboundRelations=$outboundRelations, type=$type]';
+  String toString() => 'AssetUpdate[attributes=$attributes, avatarIconUid=$avatarIconUid, deletedAt=$deletedAt, inboundRelations=$inboundRelations, isGlobal=$isGlobal, name=$name, outboundRelations=$outboundRelations, schemaUid=$schemaUid, type=$type]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -101,6 +106,11 @@ class AssetUpdate {
       json[r'outbound_relations'] = this.outboundRelations;
     } else {
       json[r'outbound_relations'] = null;
+    }
+    if (this.schemaUid != null) {
+      json[r'schema_uid'] = this.schemaUid;
+    } else {
+      json[r'schema_uid'] = null;
     }
     if (this.type != null) {
       json[r'type'] = this.type;
@@ -140,6 +150,7 @@ class AssetUpdate {
         outboundRelations: json[r'outbound_relations'] is Iterable
             ? (json[r'outbound_relations'] as Iterable).cast<String>().toList(growable: false)
             : const [],
+        schemaUid: mapValueOfType<String>(json, r'schema_uid'),
         type: mapValueOfType<String>(json, r'type'),
       );
     }
