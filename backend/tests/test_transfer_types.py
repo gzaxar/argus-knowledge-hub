@@ -106,3 +106,44 @@ def test_an_edit_gives_a_stray_record_a_usable_type_and_changes_no_other(w):
     other = make(db, dst, asset_types.type_uid(src, "Area"), "Area", "Edificio 6c")
     bad = client.put(f"/v1/assets/{other.uid}", headers=h, json={**body, "schema_uid": f"{src}:odd"})
     assert bad.status_code == 422
+
+
+def test_a_record_made_through_the_ledger_is_edited_where_it_was_moved(w):
+    """Its decisions stay in the ledger of the workspace they were made in (never edited); a later decision
+    about the record, made where it now is, replaces them."""
+    from app.ledger import service as ledger
+    db, src, dst = w["db"], w["src"], w["dst"]
+    uid = str(uuid.uuid4())
+    ledger.create_record(db, src, "someone", uid=uid, schema_uid=asset_types.type_uid(src, "Area"),
+                         key=f"K-{uuid.uuid4().hex[:8]}", name="Edificio 6b", type_name="Area",
+                         attributes={"facility": "SPARC"})
+    db.commit()
+    job = TransferJob(uid=str(uuid.uuid4()), workspace_id=src, target_workspace_id=dst, mode="move")
+    db.add(job)
+    db.commit()
+    workspace_transfer.run_transfer(job.uid, src, dst, "move", [], False, [uid], [], [])
+    db.expire_all()
+    assert db.get(TransferJob, job.uid).status == "succeeded", db.get(TransferJob, job.uid).error
+    moved = db.get(Asset, uid)
+    assert moved.workspace_id == dst and moved.schema_uid == asset_types.type_uid(dst, "Area")
+    r = TestClient(app).put(f"/v1/assets/{uid}", headers={"X-Workspace-Id": dst},
+                            json={"name": "Edificio 6b (LNF)", "attributes": {"facility": "LNF"}})
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    assert db.get(Asset, uid).name == "Edificio 6b (LNF)" and db.get(Asset, uid).attributes["facility"] == "LNF"
+
+
+def test_a_stray_record_made_through_the_ledger_has_its_type_fixed(w):
+    from app.ledger import service as ledger
+    db, src, dst = w["db"], w["src"], w["dst"]
+    uid = str(uuid.uuid4())
+    ledger.create_record(db, src, "someone", uid=uid, schema_uid=asset_types.type_uid(src, "Area"),
+                         key=f"K-{uuid.uuid4().hex[:8]}", name="Edificio 6a", type_name="Area", attributes={})
+    db.commit()
+    db.get(Asset, uid).workspace_id = dst          # moved by a release before types were remapped
+    db.commit()
+    r = TestClient(app).put(f"/v1/assets/{uid}", headers={"X-Workspace-Id": dst},
+                            json={"name": "Edificio 6a", "attributes": {}, "schema_uid": asset_types.type_uid(dst, "Area")})
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    assert db.get(Asset, uid).schema_uid == asset_types.type_uid(dst, "Area")
