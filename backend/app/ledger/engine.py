@@ -755,6 +755,16 @@ def _active_decisions(db: Session, uid: str, predicate: str, member: Optional[st
 
 
 @ledger_writer
+def _follows_its_record(db: Session, decision: "Decision", workspace_id: str) -> bool:
+    """A decision about a record made in the workspace the record was in, before a transfer moved it here: it
+    stays in that ledger, never edited, and a later decision about the record — made here, where it now is —
+    may replace it."""
+    if not decision.subject_uid:
+        return False
+    record = db.get(Asset, decision.subject_uid)
+    return record is not None and record.workspace_id == workspace_id
+
+
 def apply_decisions(db: Session, workspace_id: str, actor: str, batch: list[dict], *,
                     defer_derive: bool = False) -> list[Decision]:
     """Apply a batch of decisions atomically (§7.4). The caller commits; on
@@ -787,7 +797,7 @@ def apply_decisions(db: Session, workspace_id: str, actor: str, batch: list[dict
             raise LedgerError(f"{kind} must name decisions")
         for did in (item.get("supersedes") or []) + (target.get("decisions") or []):
             old = db.scalar(select(Decision).where(Decision.decision_id == did))
-            if old is None or old.workspace_id != workspace_id:
+            if old is None or (old.workspace_id != workspace_id and not _follows_its_record(db, old, workspace_id)):
                 raise LedgerError(f"decision {did} is not in this workspace")
             if old.subject_uid:
                 subjects.add(old.subject_uid)
