@@ -172,8 +172,10 @@ export function SiteSharing({ uid }: { uid: string }) {
   );
 }
 
-function HerePlan({ plan, x, y, uid }: { plan: { uid: string; width_px: number; height_px: number }; x: number; y: number; uid: string }) {
+function HerePlan({ plan, x, y, uid }: { plan: { uid: string; width_px: number; height_px: number; north_deg?: number | null };
+                    x: number; y: number; uid: string }) {
   return <PlanView planUid={plan.uid} width={plan.width_px} height={plan.height_px} className={useTall("h-56")}
+                   northDeg={plan.north_deg}
                    pins={[{ id: uid, x, y, label: "here", colour: "#dc2626" }]} />;
 }
 
@@ -242,7 +244,7 @@ function PlacementEditor({ uid, current, onDone, onCancel }: {
             <>
               <p className="mt-1 text-xs text-slate-500">Click the plan where it is{plan.corners ? "; the plan is placed on the map, so this gives it its position too" : ""}.</p>
               <PlanView planUid={plan.uid} width={plan.width_px} height={plan.height_px} pick={point}
-                        onPick={(x, y) => setPoint({ x, y })} className={`mt-1 ${tall}`} />
+                        onPick={(x, y) => setPoint({ x, y })} className={`mt-1 ${tall}`} northDeg={plan.north_deg} />
             </>
           )}
         </div>
@@ -387,7 +389,7 @@ function OpenPlan({ uid }: { uid: string }) {
 }
 
 function PlacedOnPlan({ plan: p }: { plan: FloorPlanView }) {
-  return <PlanView planUid={p.uid} width={p.width_px} height={p.height_px} className={useTall("h-96")}
+  return <PlanView planUid={p.uid} width={p.width_px} height={p.height_px} className={useTall("h-96")} northDeg={p.north_deg}
                    pins={(p.placed ?? []).map((r) => ({ id: r.uid, x: r.x, y: r.y, label: r.name }))} />;
 }
 
@@ -416,6 +418,7 @@ function PlanPlacer({ plan, onDone }: { plan: FloorPlanView; onDone: () => void 
       </p>
       <div className="grid gap-2 lg:grid-cols-2">
         <PlanView planUid={plan.uid} width={plan.width_px} height={plan.height_px} className={tall} pick={pixel}
+                  northDeg={shown.north_deg}
                   pins={points.map((p, i) => ({ id: String(i), x: p.x, y: p.y, label: `point ${i + 1}`, colour: "#7c3aed" }))}
                   onPick={(x, y) => setPixel({ x, y })} />
         <div className={`${tall} overflow-hidden rounded border border-slate-200`}>

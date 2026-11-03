@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'dart:math' as math;
+
+import 'package:argus_field/features/places/compass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -77,5 +80,48 @@ void main() {
     expect(find.text('Building B · Ground floor'), findsOneWidget);
     await app.tap('plan-choice-p1');
     expect(find.text('Tap where it is to place it there.'), findsOneWidget);
+  });
+
+  testWidgets('a plan placed on the map shows its north and the way the phone faces, and turns with it',
+      (tester) async {
+    final app = await start(tester, overrides: [
+      headingSourceProvider.overrideWithValue(({double? lat, double? lon}) => Stream.value(const Heading(30, 5))),
+    ]);
+    _plans(app);
+    // Drawn with east at its top: north is to the left on the picture (270° clockwise from the top).
+    app.server.routes['GET /v1/plans/p1'] = _json({..._plan, 'mime_type': 'image/png', 'corners': [[1, 2]],
+      'north_deg': 270, 'centre': {'latitude': 41.82, 'longitude': 12.67},
+      'place': {'uid': 'bld-b', 'name': 'Building B'}, 'level': {'uid': 'l0', 'name': 'Ground floor', 'ordinal': 0},
+      'placed': []});
+    await app.go('/plan/p1');
+    double angle(String key) {
+      final m = tester.widget<Transform>(find.byKey(Key(key))).transform.storage;
+      return ((math.atan2(m[1], m[0]) * 180 / math.pi) % 360 + 360) % 360;
+    }
+    expect(angle('plan-north'), closeTo(270, 0.01));
+    expect(angle('plan-facing'), closeTo(300, 0.01), reason: 'facing 30° east of north: 270 + 30 on the picture');
+    expect(find.text('Compass ±5°'), findsOneWidget);
+
+    await app.tap('plan-turn');
+    expect(angle('plan-turned'), closeTo(60, 0.01), reason: 'the plan turned back by 300°, so the way ahead is up');
+    expect(angle('plan-facing'), closeTo(0, 0.01));
+    expect(angle('plan-north'), closeTo(330, 0.01));
+  });
+
+  testWidgets('an unsure compass asks to be calibrated; a plan not on the map has no north', (tester) async {
+    final app = await start(tester, overrides: [
+      headingSourceProvider.overrideWithValue(({double? lat, double? lon}) => Stream.value(const Heading(10, 45))),
+    ]);
+    _plans(app);
+    app.server.routes['GET /v1/plans/p1'] = _json({..._plan, 'mime_type': 'image/png', 'corners': [[1, 2]],
+      'north_deg': 0, 'centre': {'latitude': 41.82, 'longitude': 12.67}, 'placed': []});
+    await app.go('/plan/p1');
+    expect(find.textContaining('wave the phone in a figure of eight'), findsOneWidget);
+
+    app.server.routes['GET /v1/plans/p1'] = _json({..._plan, 'mime_type': 'image/png', 'corners': null, 'placed': []});
+    await app.go('/asset/$ionPumpUid');
+    await app.go('/plan/p1');
+    expect(find.byKey(const Key('plan-north')), findsNothing);
+    expect(find.textContaining('it has no north'), findsOneWidget);
   });
 }

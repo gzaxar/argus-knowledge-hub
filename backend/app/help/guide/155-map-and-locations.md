@@ -1,7 +1,7 @@
 ---
 title: Map and locations
 summary: Where equipment and places are: positions, routes (cables, pipes, beamlines) and outlines (buildings, halls, rooms, zones, with heights a volume) and their history, what lies inside or crosses an area, the map, searching near a point, reporting a position from the phone, reviewing what the field saw, and importing locations from a file.
-keywords: [site, sites, laboratory, facility, facilities, LNF, shared places, not shared with the facilities, withhold, transfer preview, reconciliation, indoors, indoor, floor, floors, level, storey, floor plan, plan, room, hall, building, place on the plan, control points, georeference, residual, dxf plan, pdf plan,  line, cable route, pipe route, outline, polygon, area, footprint, building outline, hall, zone, volume, height, inside, crossing, along, draw, map, gis, location, locations, coordinates, latitude, longitude, gps, position, where is, near me, nearby, distance, radius, review, observation, import locations, csv, geojson, wgs84, layer, place]
+keywords: [north, north arrow, compass, heading, facing, orientation, turn with me, calibrate, declination, site, sites, laboratory, facility, facilities, LNF, shared places, not shared with the facilities, withhold, transfer preview, reconciliation, indoors, indoor, floor, floors, level, storey, floor plan, plan, room, hall, building, place on the plan, control points, georeference, residual, dxf plan, pdf plan,  line, cable route, pipe route, outline, polygon, area, footprint, building outline, hall, zone, volume, height, inside, crossing, along, draw, map, gis, location, locations, coordinates, latitude, longitude, gps, position, where is, near me, nearby, distance, radius, review, observation, import locations, csv, geojson, wgs84, layer, place]
 order: 155
 ---
 
@@ -59,7 +59,8 @@ On a place's page (a building, a hall, a room), **Indoors**:
 - **Place on the map** — click a point you can recognise on the plan (a corner, a column), then the same place
   on the map; repeat. Two points keep the plan's shape; three or more fit it and say how far off each point is
   (in metres): a point far off is one clicked in the wrong place — remove it and click again. Placed, the plan
-  shows on the map, for its floor.
+  shows on the map, for its floor, and has a **north**: an arrow on the plan shows where true north is on the
+  drawing (a check that the plan was placed the right way round).
 - **Placed here** — the records placed in this place.
 
 On any record's page, **Indoors → Place it inside**: search the place it is in (a room, a hall), optionally choose
@@ -67,6 +68,16 @@ a plan (the place's, or that of a place it is in — a room's plan is usually it
 A point on a plan placed on the map gives the record its **position** too (*from the plan*, as accurate as the
 plan's fit). The record then says **which is in** — its room, the hall the room is in, the building — and the
 place lists it; the record's *It is in* and the place's *Inside it* include them.
+
+### Which way am I facing (the phone)
+
+On the phone, a plan placed on the map shows a **dial**: the red arrow is true north on the drawing, the blue one
+the way the top of the phone points, by its compass. **Turn with me** turns the plan so the way you face is up, as
+a car's navigator does. Below the plan the compass says how sure it is (*±5°*); when it is unsure it asks to be
+calibrated — wave the phone in a figure of eight. Near magnets, power supplies, cable trays and steel a phone's
+compass can be off by tens of degrees: trust the plan and the labels around you over the arrow there. The phone
+corrects magnetic north to true north itself (about 3–4° in Italy). Where you are on the plan is not known yet:
+the dial says which way you face, not the way to a unit.
 
 A record placed indoors is not disturbed by a vague GPS fix: one less precise than 10 m is **noted**, not sent to
 review. Place it on its plan instead.

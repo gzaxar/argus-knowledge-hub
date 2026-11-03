@@ -530,6 +530,9 @@ class LocationRepository {
         placeName: _map(m['place'])['name']?.toString(),
         levelName: _map(m['level'])['name']?.toString(),
         onMap: m['corners'] != null,
+        northDeg: _d(m['north_deg']),
+        centreLat: _d(_map(m['centre'])['latitude']),
+        centreLon: _d(_map(m['centre'])['longitude']),
         placed: [
           for (final p in _list(m['placed']).map(_map))
             (uid: '${p['uid']}', name: '${p['name'] ?? ''}', x: _d(p['x']) ?? 0, y: _d(p['y']) ?? 0),
