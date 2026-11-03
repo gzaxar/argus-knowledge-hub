@@ -2412,6 +2412,10 @@ export interface FloorPlanView {
   control_points: ControlPoint[]; transform: Record<string, number> | null; residual_m: number | null;
   /** [longitude, latitude] of the top-left, top-right, bottom-right, bottom-left corners, once placed. */
   corners: [number, number][] | null;
+  /** Where true north points on the picture, degrees clockwise from its top; null: not placed on the map. */
+  north_deg?: number | null;
+  /** The plan's centre on the map, once placed. */
+  centre?: { longitude: number; latitude: number } | null;
   placed?: { uid: string; key: string; name: string; type: string; x: number; y: number; place_uid: string | null }[];
   residuals_m?: number[]; metres_per_px?: number; rotation_deg?: number;
 }
@@ -2419,7 +2423,7 @@ export interface IndoorPlacementView {
   uid: string;
   place: { uid: string; key: string; name: string; type: string } | null;
   level: PlaceLevel | null;
-  plan: { uid: string; name: string; width_px: number; height_px: number } | null;
+  plan: { uid: string; name: string; width_px: number; height_px: number; north_deg?: number | null } | null;
   x: number | null; y: number | null; source: string; note: string | null; state: string;
   valid_from: string | null; valid_until: string | null; confirmed_by: string | null;
 }

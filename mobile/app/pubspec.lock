@@ -261,6 +261,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "12.1.0"
+  flutter_compass:
+    dependency: "direct main"
+    description:
+      name: flutter_compass
+      sha256: "1b4d7e6c95a675ec8482b5c9c9ccf1ebf0ced3dbec59dce28ad609da953de850"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.1"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -492,6 +500,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.2.5"
+  geomag:
+    dependency: "direct main"
+    description:
+      name: geomag
+      sha256: "016ee0cda540fdca6ad26ee8ab598f24959b59f1cc0e1f9ab1bae0bac3594d45"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.0"
   go_router:
     dependency: "direct main"
     description:

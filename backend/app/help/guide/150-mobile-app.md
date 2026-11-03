@@ -97,6 +97,13 @@ A unit is never created from a scan alone: you check the values and register.
 - **Export** (**⇪** at the top of each of them): **Open as PDF** (in the phone's PDF viewer), **Print**, **Send
   PDF** or **Send Markdown** to mail, Drive, Files or any other app. The same files as Export on the web.
 
+## Floor plans and the compass
+
+A floor plan opened on the phone (from a record's **Indoors**, or a place's plans) zooms and moves with two
+fingers. A plan placed on the map has a **dial**: true north on the drawing, and the way the phone faces by its
+compass. **Turn with me** keeps the way you face at the top. If the compass is unsure it asks to be calibrated
+(a figure of eight); near magnets and steel trust the plan over the arrow. See *Maps and locations*.
+
 ## Attach a photo, video, note or place
 
 **Attach** on a ticket, on equipment, or on a document's draft (**Attach to the draft**) offers:

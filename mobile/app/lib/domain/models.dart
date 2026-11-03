@@ -640,6 +640,9 @@ class PlanInfo {
       this.placeName,
       this.levelName,
       this.onMap = false,
+      this.northDeg,
+      this.centreLat,
+      this.centreLon,
       this.placed = const []});
 
   final PlanRef ref;
@@ -648,6 +651,8 @@ class PlanInfo {
   final String? placeName;
   final String? levelName;
   final bool onMap; // placed on the map: a point on it gives a position too
+  final double? northDeg; // where true north points on the picture, clockwise from its top (placed on the map)
+  final double? centreLat, centreLon; // its centre on the map: where the compass's declination is taken
   final List<({String uid, String name, double x, double y})> placed;
 }
 
