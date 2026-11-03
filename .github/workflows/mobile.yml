@@ -31,7 +31,15 @@ env:
   # As the launch configurations build it today. "production" hides the developer-token sign-in.
   ARGUS_ENV: development
   ARGUS_API_BASE: https://argus-hub-api.90.147.174.30.myip.cloud.infn.it
-  OIDC_ISSUER: https://keycloak.90.147.174.30.myip.cloud.infn.it/realms/argus
+  # Two ways to sign in, as on the web: INFN login (INFN AAI; its ID token, addressed to argus-knowledge-hub) and,
+  # beside it, ARGUS's Keycloak (Google, and ARGUS's own accounts), each renewing its own sessions.
+  OIDC_ISSUER: https://idp-test.app.infn.it/auth/realms/aai
+  OIDC_CLIENT_ID: argus-knowledge-hub
+  OIDC_LABEL: INFN login
+  OIDC_TOKEN: id
+  OIDC_ALT_ISSUER: https://keycloak.90.147.174.30.myip.cloud.infn.it/realms/argus
+  OIDC_ALT_CLIENT_ID: argus-mobile
+  OIDC_ALT_LABEL: Google or ARGUS account
   ARGUS_LINK_HOST: argus-hub.90.147.174.30.myip.cloud.infn.it
 
 jobs:
@@ -96,6 +104,12 @@ jobs:
             --dart-define=ARGUS_ENV="$ARGUS_ENV" \
             --dart-define=ARGUS_API_BASE="$ARGUS_API_BASE" \
             --dart-define=OIDC_ISSUER="$OIDC_ISSUER" \
+            --dart-define=OIDC_CLIENT_ID="$OIDC_CLIENT_ID" \
+            --dart-define=OIDC_LABEL="$OIDC_LABEL" \
+            --dart-define=OIDC_TOKEN="$OIDC_TOKEN" \
+            --dart-define=OIDC_ALT_ISSUER="$OIDC_ALT_ISSUER" \
+            --dart-define=OIDC_ALT_CLIENT_ID="$OIDC_ALT_CLIENT_ID" \
+            --dart-define=OIDC_ALT_LABEL="$OIDC_ALT_LABEL" \
             --dart-define=ARGUS_LINK_HOST="$ARGUS_LINK_HOST" \
             --dart-define=ARGUS_APP_VERSION="${{ steps.version.outputs.name }}" \
             --dart-define=ARGUS_DISTRIBUTION=github
@@ -126,6 +140,12 @@ jobs:
             --dart-define=ARGUS_ENV="$ARGUS_ENV" \
             --dart-define=ARGUS_API_BASE="$ARGUS_API_BASE" \
             --dart-define=OIDC_ISSUER="$OIDC_ISSUER" \
+            --dart-define=OIDC_CLIENT_ID="$OIDC_CLIENT_ID" \
+            --dart-define=OIDC_LABEL="$OIDC_LABEL" \
+            --dart-define=OIDC_TOKEN="$OIDC_TOKEN" \
+            --dart-define=OIDC_ALT_ISSUER="$OIDC_ALT_ISSUER" \
+            --dart-define=OIDC_ALT_CLIENT_ID="$OIDC_ALT_CLIENT_ID" \
+            --dart-define=OIDC_ALT_LABEL="$OIDC_ALT_LABEL" \
             --dart-define=ARGUS_LINK_HOST="$ARGUS_LINK_HOST" \
             --dart-define=ARGUS_APP_VERSION="${{ steps.version.outputs.name }}" \
             --dart-define=ARGUS_DISTRIBUTION=play

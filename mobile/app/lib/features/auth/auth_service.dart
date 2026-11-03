@@ -10,7 +10,8 @@ import '../../core/session.dart';
 /// token is accepted only in non-production builds, for development and the web build.
 abstract class Authenticator {
   bool get supportsOidc;
-  Future<Session> signInWithOidc();
+  /// Sign in with one of the build's providers ([AppConfig.providers]; by default the main one).
+  Future<Session> signInWithOidc([String provider = 'main']);
   Future<Session?> refresh(Session s);
   Future<void> endSession(Session s);
 }
@@ -26,15 +27,16 @@ class AppAuthAuthenticator implements Authenticator {
   bool get supportsOidc => !kIsWeb;
 
   @override
-  Future<Session> signInWithOidc() async {
+  Future<Session> signInWithOidc([String provider = 'main']) async {
+    final p = config.provider(provider);
     try {
-      final google = config.usesGoogle;
+      final google = p.usesGoogle;
       final r = await _appAuth.authorizeAndExchangeCode(
         AuthorizationTokenRequest(
-          config.oidcClientId,
+          p.clientId,
           config.oidcRedirect,
-          issuer: config.oidcIssuer,
-          allowInsecureConnections: config.oidcIssuer.startsWith('http://'),
+          issuer: p.issuer,
+          allowInsecureConnections: p.issuer.startsWith('http://'),
           scopes: google
               ? const ['openid', 'profile', 'email']
               : const ['openid', 'profile', 'email', 'offline_access'],
@@ -44,7 +46,7 @@ class AppAuthAuthenticator implements Authenticator {
           additionalParameters: google ? const {'access_type': 'offline'} : null,
         ),
       );
-      final token = google ? r.idToken : r.accessToken;
+      final token = p.sendsIdToken ? r.idToken : r.accessToken;
       if (token == null) {
         throw Problem(ProblemCode.unauthenticated, 'Sign-in did not return a token.');
       }
@@ -53,6 +55,7 @@ class AppAuthAuthenticator implements Authenticator {
         authType: 'oidc',
         refreshToken: r.refreshToken,
         expiresAt: r.accessTokenExpirationDateTime,
+        provider: p.id,
       );
     } on FlutterAppAuthUserCancelledException {
       throw Problem(ProblemCode.unauthenticated, 'Sign-in was cancelled.');
@@ -67,17 +70,18 @@ class AppAuthAuthenticator implements Authenticator {
   @override
   Future<Session?> refresh(Session s) async {
     if (s.authType != 'oidc' || s.refreshToken == null) return null;
+    final p = config.provider(s.provider);                // renewed where it was issued
     try {
       final r = await _appAuth.token(
         TokenRequest(
-          config.oidcClientId,
+          p.clientId,
           config.oidcRedirect,
-          issuer: config.oidcIssuer,
-          allowInsecureConnections: config.oidcIssuer.startsWith('http://'),
+          issuer: p.issuer,
+          allowInsecureConnections: p.issuer.startsWith('http://'),
           refreshToken: s.refreshToken,
         ),
       );
-      final token = config.usesGoogle ? r.idToken : r.accessToken;
+      final token = p.sendsIdToken ? r.idToken : r.accessToken;
       if (token == null) return null;
       return s.copyWith(
         accessToken: token,

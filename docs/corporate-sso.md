@@ -9,11 +9,13 @@ ARGUS keeps both: the web's **INFN login** signs in with INFN AAI (below), and i
 |---|---|---|
 | Web *INFN login* | INFN AAI (`release.yml`: `WEB_OIDC_AUTHORITY`, client `argus-knowledge-hub`) | the local Keycloak; INFN AAI with `--env-file deploy/infn-test.env` (or `.env.infn-local`) |
 | Web *Google* | Google (Firebase), trusted as an extra provider | the same: compose trusts Google by default |
-| Mobile app | ARGUS's Keycloak (and its Google sign-in), trusted beside INFN AAI while `keycloak.enabled` | the local Keycloak, trusted beside INFN AAI by `deploy/infn-test.env` |
+| Mobile app *INFN login* | INFN AAI, the same client (redirect `it.infn.argus.field:/oauthredirect`); it sends its ID token | the local Keycloak by default (`OIDC_ISSUER`) |
+| Mobile app *Google or ARGUS account* | ARGUS's Keycloak (`OIDC_ALT_ISSUER`, client `argus-mobile`): Google, and ARGUS's own accounts | none unless `OIDC_ALT_ISSUER` is set |
 
 The chart adds the bundled Keycloak to the trusted issuers by itself when `api.oidc` names another provider and
-`keycloak.enabled` is on. The mobile app moves to INFN AAI once the client accepts its redirect
-`it.infn.argus.field:/oauthredirect` (and the app is built with that issuer). People are matched by e-mail, so an
+`keycloak.enabled` is on. The mobile app's two ways are set when it is built (`.github/workflows/mobile.yml`:
+`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_LABEL`, `OIDC_TOKEN=id`, and `OIDC_ALT_*`); a session is renewed by the
+provider that issued it. People are matched by e-mail, so an
 account keeps its roles whichever provider it signs in with, as long as the e-mail is the same.
 
 ARGUS signs in directly to the INFN test realm using public client **`argus-knowledge-hub`** and
