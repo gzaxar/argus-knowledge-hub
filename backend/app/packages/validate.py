@@ -25,7 +25,7 @@ ATTRIBUTE_TYPES = {"string", "text", "integer", "float", "boolean", "date", "dat
                    "group", "reference"}
 ATTRIBUTE_KEYS = {"key", "name", "type", "required", "indexed", "multi", "unique", "readonly", "options",
                   "option_set", "reference", "include_children", "regex", "renamed_from", "unit", "validator",
-                  "restricted", "description"}
+                  "restricted", "description", "group"}
 OPTION_KEYS = {"id", "value", "responsible", "meaning"}
 TYPE_KEYS = {"name", "parent", "description", "abstract", "aliases", "icon", "behaviors", "map_layer", "locatable",
              "attributes"}

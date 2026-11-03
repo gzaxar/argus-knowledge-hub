@@ -44,7 +44,7 @@ from app.services.catalogue_mapping import norm
 VENDOR_FIELDS = ("name", "website", "description")
 MODEL_FIELDS = ("name", "vendor", "model_code", "device_class", "datasheet_url", "firmware_version", "eol_date",
                 "typical_spares", "description")
-# Stated by the format, with no field on the Product Model type yet (core-objects 2.2): kept in the collection.
+# Stated by the format, with no field on the Product Model type yet (a later core-objects): kept in the collection.
 NOT_STORED = ("part_number", "instance_type", "specifications", "relations")
 FIELD_DECISIONS = ("managed", "local", "propose")
 

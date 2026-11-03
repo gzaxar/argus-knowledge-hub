@@ -30,6 +30,8 @@ describe("a record moved here with another workspace's type", () => {
     expect(await screen.findByText(/belongs to the workspace it came from/)).toBeInTheDocument();
     const picker = screen.getByPlaceholderText(/Type to search/);
     expect(picker).toBeEnabled();
+    await waitFor(() => expect((picker as HTMLInputElement).value).toContain("Area"));   // the suggestion is in
+    expect(await screen.findByDisplayValue("Edificio 6a")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Save asset/ }));
     await waitFor(() => expect(update).toHaveBeenCalledWith("e6a", expect.objectContaining({ schema_uid: "lnf:area" }), "lnf"));
   });

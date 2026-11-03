@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { assetsApi, intakeApi, schemasApi, type AssistResult } from "../../api/client";
 import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
-import { AttributeInput } from "../../components/AttributeInput";
+import { AttributeFields } from "../../components/AttributeFields";
 import { finalFor, GuidedEntry } from "../../components/GuidedEntry";
 import { emptyAddress, emptyPort, fromProposals, macLooksRight, NetworkPortSection } from "../../components/NetworkPortSection";
 import { portBody, ProposedPorts, type PortChoice } from "../../components/ProposedPorts";
@@ -88,6 +88,19 @@ export function AssetForm() {
   }, [strayType]);  // eslint-disable-line react-hooks/exhaustive-deps
   const schema = schemas.data?.find((s) => s.uid === schemaUid);
   const attrDefs = effectiveAttributes(schema, schemas.data);
+  // A Product model chosen fills what is recorded beside it — manufacturer and model as written — where empty.
+  const fillRecorded = (modelUid: string) => {
+    const keys = new Set(attrDefs.map((a) => a.key ?? a.name));
+    if (!keys.has("manufacturer") && !keys.has("model")) return;
+    assetsApi.get(modelUid).then((m) => {
+      const a = (m.attributes ?? {}) as Record<string, unknown>;
+      setAttributes((prev) => ({
+        ...prev,
+        ...(keys.has("manufacturer") && !prev.manufacturer && a.vendor ? { manufacturer: a.vendor } : {}),
+        ...(keys.has("model") && !prev.model && (a.model_code || m.name) ? { model: a.model_code ?? m.name } : {}),
+      }));
+    }).catch(() => undefined);
+  };
   // What a blank key becomes, from the workspace's key pattern.
   const nextKey = useQuery({
     queryKey: ["asset-next-key", schemaUid],
@@ -254,24 +267,11 @@ export function AssetForm() {
         {attrDefs.length > 0 && (
           <div>
             <label className="block text-sm font-medium text-slate-700">Attributes</label>
-            <div className="mt-2 space-y-3 rounded border border-slate-200 p-3">
-              {attrDefs.map((attr) => (
-                <div key={attr.id ?? attr.name}>
-                  <label className="block text-xs font-medium text-slate-500">
-                    {attr.name}
-                    {attr.required && <span className="text-red-500"> *</span>}
-                  </label>
-                  <div className="mt-1">
-                    <AttributeInput
-                      attribute={attr}
-                      value={attributes[attr.key ?? attr.name]}
-                      onChange={(v) =>
-                        setAttributes((prev) => ({ ...prev, [attr.key ?? attr.name]: v }))
-                      }
-                    />
-                  </div>
-                </div>
-              ))}
+            <div className="mt-2 rounded border border-slate-200 p-3">
+              <AttributeFields attrs={attrDefs} values={attributes} onChange={(k, v) => {
+                setAttributes((prev) => ({ ...prev, [k]: v }));
+                if (k === "product_model" && typeof v === "string" && v) fillRecorded(v);
+              }} />
             </div>
           </div>
         )}

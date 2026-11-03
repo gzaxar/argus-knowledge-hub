@@ -93,6 +93,16 @@ for example) is marked with its source, and one made in another workspace and sh
 held both by the workspace and by the shared catalogue — the same package type, kept in two places — is one
 entry, its records counted and filtered together.
 
+## A unit's fields
+
+- **Product model** is the catalogue's model of the unit: type its code as on the label (see *The product
+  catalogue*). Under it, folded once a model is chosen, **Manufacturer (as recorded)** and **Model (as
+  recorded)** keep what the label or an import (GLPI, a spreadsheet) wrote — filled from the model when empty,
+  and what GLPI matching reads.
+- **Located in** is where the unit is: a rack, a room, a hall, a building — a site's places among them.
+- **Product breakdown (PBS)**, folded while empty: the segments of the PBS naming code (PBS code, PBS area,
+  system, family, type, sequential number…) — names in the accelerator's breakdown, not places.
+
 ## Labels and QR codes
 
 A label is how a unit in front of you is found: its **QR code**, **serial number**, **barcode**,

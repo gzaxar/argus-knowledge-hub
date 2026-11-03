@@ -20,6 +20,8 @@ export interface SchemaAttribute {
   visible?: boolean;
   order?: number;
   global?: boolean;
+  /** Where a form shows it: fields of one group together, folded while all are empty ("PBS", "recorded"). */
+  group?: string;
 }
 
 export const ATTRIBUTE_TYPES = [

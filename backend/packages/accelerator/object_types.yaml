@@ -664,7 +664,7 @@ object_types:
         - {key: opi, name: OPI}
         - {key: autosync, name: Auto-sync, type: boolean}
         - {key: pva, name: PVAccess, type: boolean}
-        - {key: product_model, name: Instance of, type: reference, reference: Product Model}
+        - {key: product_model, name: Product model, type: reference, reference: Product Model, description: "The catalogue's model of this unit: type its code as on the label."}
     - name: "IOC"
       parent: "Control Item"
       description: "An EPICS IOC: the deployable unit of control software."

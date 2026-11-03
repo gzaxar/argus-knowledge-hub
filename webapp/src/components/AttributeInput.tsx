@@ -181,6 +181,16 @@ function ReferenceInput({
   );
 }
 
+function installProblem(e: unknown): string {
+  if (e instanceof ApiError) {
+    const d = (e.body as { detail?: unknown })?.detail;
+    if (d && typeof d === "object" && "error" in d) return String((d as { error: string }).error);
+    if (typeof d === "string") return d;
+    if (e.status === 403) return "you may not create records here";
+  }
+  return "no answer from ARGUS";
+}
+
 /** A unit's product model: typed, searched — the catalogue's models first, then the library of its sources (the
  *  NetBox Device Type Library among them) — and a library model installed in the catalogue when it is chosen.
  *  The models of this workspace's domains, unless every model is asked for. */
@@ -259,7 +269,11 @@ export function ModelPicker({ value, onChange, disabled, base }: {
               <button type="button" onClick={() => pick(lookAlike.uid)} className="font-medium underline">Use {lookAlike.name}</button>
             </p>
           )}
-          {install.isError && !lookAlike && <p className="text-xs text-red-600">It could not be added to the catalogue.</p>}
+          {install.isError && !lookAlike && (
+            <p role="alert" className="text-xs text-red-600">
+              It could not be added to the catalogue: {installProblem(install.error)}
+            </p>
+          )}
         </>
       )}
     </div>
