@@ -15,6 +15,7 @@ import {
 import { effectiveAttributes, inheritedKeys } from "../../lib/schemaAttributes";
 import { AttributeInput } from "../../components/AttributeInput";
 import { AttributeValue } from "../../components/AttributeValue";
+import { empty } from "../../components/AttributeFields";
 import { DocumentAssistant } from "../../components/DocumentAssistant";
 import { DrawingViewer } from "../../components/DrawingViewer";
 import { RecordPicker } from "../../components/RecordPicker";
@@ -54,6 +55,8 @@ export function DocumentDetail() {
   const [rejectComment, setRejectComment] = useState("");
   const [viewingDrawing, setViewingDrawing] = useState<string | null>(null);
   const [showReject, setShowReject] = useState(false);
+  // A published document lists the fields it has; the type's other fields one click away (as on a unit's page).
+  const [showEmpty, setShowEmpty] = useState(false);
 
   const document = useQuery({
     queryKey: ["documents", uid],
@@ -822,8 +825,9 @@ export function DocumentDetail() {
                   ))}
                 </div>
               ) : (
+                <>
                 <dl className="mt-2 space-y-1.5 text-sm">
-                  {attrDefs.map((attr) => (
+                  {attrDefs.filter((a) => showEmpty || !empty(viewed.attributes[a.key ?? a.name])).map((attr) => (
                     <div key={attr.id ?? attr.name} className="flex justify-between gap-4">
                       <dt className="text-slate-500">
                         {attr.name}
@@ -843,6 +847,21 @@ export function DocumentDetail() {
                     </div>
                   ))}
                 </dl>
+                {(() => {
+                  const filled = attrDefs.filter((a) => !empty(viewed.attributes[a.key ?? a.name]));
+                  return (
+                    <>
+                      {filled.length === 0 && <p className="mt-2 text-sm text-slate-400">No field filled in.</p>}
+                      {filled.length < attrDefs.length && (
+                        <button type="button" onClick={() => setShowEmpty((v) => !v)}
+                                className="mt-2 text-xs text-indigo-600 hover:text-indigo-800">
+                          {showEmpty ? "Hide the empty fields" : `Show ${attrDefs.length - filled.length} empty fields`}
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
+                </>
               )}
             </div>
           )}
