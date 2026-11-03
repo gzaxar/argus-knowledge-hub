@@ -184,6 +184,16 @@ object_types:
         - {key: mtbf_hours, name: MTBF (h), type: integer}
         - {key: typical_spares, name: Typical spares, indexed: true, multi: true}
         - {key: inventory_url, name: Inventory link}
+        # Its hardware, as its source states it (a NetBox device type, a datasheet): shown together on a form.
+        - {key: part_number, name: Part number, indexed: true, group: Hardware, description: "The vendor's orderable code (C9200-24T-E), often what a label or an invoice says."}
+        - {key: rack_units, name: Height (rack units), type: float, group: Hardware}
+        - {key: full_depth, name: Full depth, type: boolean, group: Hardware}
+        - {key: airflow, name: Airflow, group: Hardware}
+        - {key: weight_kg, name: Weight (kg), type: float, group: Hardware}
+        - {key: maximum_draw_w, name: Maximum draw per power input (W), type: integer, group: Hardware}
+        - {key: port_summary, name: Ports, group: Hardware, description: "Its sockets in one line; each one is in Components."}
+        - {key: components, name: Components, type: text, readonly: true, group: Hardware, description: "Every interface, console and power port, outlet, bay and part, as the source lists them: a unit made of this model is offered its ports."}
+        - {key: source_notes, name: Notes from the source, type: text, readonly: true, group: Hardware}
     - name: "Vendor"
       parent: "Catalog Item"
       description: "The company, its support contract and RMA route."

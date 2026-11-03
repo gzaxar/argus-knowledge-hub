@@ -8719,6 +8719,24 @@
         "title": "LifecycleIn",
         "type": "object"
       },
+      "LinkModelIn": {
+        "properties": {
+          "catalogue_id": {
+            "title": "Catalogue Id",
+            "type": "string"
+          },
+          "record_uid": {
+            "title": "Record Uid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "catalogue_id",
+          "record_uid"
+        ],
+        "title": "LinkModelIn",
+        "type": "object"
+      },
       "LookupBatchIn": {
         "properties": {
           "identifiers": {
@@ -25353,6 +25371,84 @@
         ]
       }
     },
+    "/v1/attachments/{uid}/about": {
+      "get": {
+        "description": "What a link to an attachment opens (issue #18): its name, kind and size, and the workspace to read it in —\nits own, for a person who may read there, whatever workspace they are working in now. Not found otherwise,\nas for a file that does not exist.",
+        "operationId": "about_attachment_v1_attachments__uid__about_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "About Attachment",
+        "tags": [
+          "attachments"
+        ]
+      }
+    },
     "/v1/attachments/{uid}/verify": {
       "get": {
         "description": "Whether the stored file still has the checksum recorded when it arrived.",
@@ -31110,6 +31206,85 @@
         ]
       }
     },
+    "/v1/catalogue/collections/models/link": {
+      "post": {
+        "description": "A catalogue model made by hand, linked to the same model in the pinned sources (a NetBox device type):\nits empty fields filled — part number, height, weight, every component — the ones it has kept, and kept up to\ndate with the source from then on. The catalogue's maintainers.",
+        "operationId": "link_model_v1_catalogue_collections_models_link_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkModelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Link Model",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
     "/v1/catalogue/collections/models/search": {
       "get": {
         "description": "Models for a picker: those installed in the catalogue first, then the pinned sources' not yet installed\n(the NetBox library among them), best first — the model code exactly, at its start, inside it, then the name.\nThe models of this workspace's domains, unless `every`.",
@@ -31143,6 +31318,16 @@
               "default": 30,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sources_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Sources Only",
+              "type": "boolean"
             }
           },
           {

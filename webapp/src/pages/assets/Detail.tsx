@@ -22,6 +22,7 @@ import { RelationGraph } from "../../components/RelationGraph";
 import { TransferItemAction } from "../../components/TransferItemAction";
 import { effectiveAttributes, inheritedKeys } from "../../lib/schemaAttributes";
 import { empty } from "../../components/AttributeFields";
+import { ModelComponents } from "../../components/ModelComponents";
 import { AssetContextPanel } from "../../components/hub/ContextPanels";
 import { SemanticRelated } from "../../components/SemanticRelated";
 import { LocationCard } from "../../components/LocationCard";
@@ -278,7 +279,7 @@ export function AssetDetail() {
             {filledDefs.length === 0 && <p className="text-sm text-slate-400">No field filled in yet.</p>}
             <dl className="space-y-1.5 text-sm">
               {(showEmpty ? attrDefs : filledDefs).map((attr) => {
-                const long = attr.type === "text";
+                const long = attr.type === "text" || attr.key === "components";
                 return (
                 <div key={attr.id ?? attr.name} className={long ? "space-y-1" : "flex justify-between gap-4"}>
                   <dt className="text-slate-500">
@@ -290,12 +291,16 @@ export function AssetDetail() {
                     )}
                   </dt>
                   <dd className={long ? "text-slate-900" : "text-right text-slate-900"}>
+                    {attr.key === "components" ? (
+                      <ModelComponents value={a.attributes.components} />
+                    ) : (
                     <AttributeValue
                       attribute={attr}
                       value={a.attributes[attr.key ?? attr.name]}
                       assets={allAssets.data}
                       members={members.data}
                     />
+                    )}
                   </dd>
                 </div>
                 );

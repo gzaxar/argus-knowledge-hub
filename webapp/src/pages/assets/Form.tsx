@@ -7,7 +7,9 @@ import { AttributeFields } from "../../components/AttributeFields";
 import { finalFor, GuidedEntry } from "../../components/GuidedEntry";
 import { emptyAddress, emptyPort, fromProposals, macLooksRight, NetworkPortSection } from "../../components/NetworkPortSection";
 import { portBody, ProposedPorts, type PortChoice } from "../../components/ProposedPorts";
-import { SchemaBrowser } from "../../components/SchemaBrowser";
+import { portsFromModel } from "../../lib/modelPorts";
+import type { PortAttributes } from "../../api/client";
+import { SchemaBrowser, subtree } from "../../components/SchemaBrowser";
 import { SchemaPicker } from "../../components/SchemaPicker";
 import { effectiveAttributes } from "../../lib/schemaAttributes";
 
@@ -34,6 +36,8 @@ export function AssetForm() {
   const [port, setPort] = useState(emptyPort);
   const [address, setAddress] = useState(emptyAddress);
   const [ports, setPorts] = useState<PortChoice[]>([]);
+  // Where the listed ports come from: a file the assistant read, or the chosen Product model's components.
+  const [portsFrom, setPortsFrom] = useState<"file" | "model" | null>(null);
   // What the assistant read for the network goes to the network section, ticked: the person may untick it.
   // The ports of a port table (a converter's serial ports) are listed apart, ticked too.
   const setAssisted = (r: AssistResult | null) => {
@@ -43,7 +47,10 @@ export function AssetForm() {
       setPort(next.port);
       setAddress(next.address);
       const listed = r.companions.filter((c) => c.kind === "port" && !c.attributes.mac);
-      if (listed.length) setPorts(listed.map((c) => ({ ...c.attributes, on: c.selected })));
+      if (listed.length) {
+        setPorts(listed.map((c) => ({ ...c.attributes, on: c.selected })));
+        setPortsFrom("file");
+      }
     }
   };
   const [browsing, setBrowsing] = useState(false);
@@ -74,6 +81,22 @@ export function AssetForm() {
   }, [existing.data]);
 
   const objectSchemas = (schemas.data ?? []).filter((s) => (s.applies_to ?? "objects") === "objects");
+  // The type chosen on the Assets page (issue #14): taken as it is; an abstract one (Location) is a choice among
+  // its kinds — the only one, or the browser opened on them.
+  const [within, setWithin] = useState<string | null>(null);
+  const fromPage = searchParams.get("schema_uid");
+  useEffect(() => {
+    if (isEditing || !fromPage || !schemas.data) return;
+    const chosen = objectSchemas.find((s) => s.uid === fromPage);
+    if (!chosen || chosen.is_concrete !== false) return;
+    const kinds = subtree(objectSchemas, chosen.uid).filter((s) => s.is_concrete !== false);
+    if (kinds.length === 1) {
+      setSchemaUid(kinds[0].uid);
+    } else {
+      setSchemaUid("");
+      if (kinds.length) { setWithin(chosen.uid); setBrowsing(true); }
+    }
+  }, [fromPage, schemas.data, isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
   // A record moved here with a type of the workspace it came from: that type cannot be used here, so its type is
   // chosen again (the same-named one here, suggested) — the one case an edit changes a type.
   const strayType = isEditing && !!existing.data && !!schemas.data &&
@@ -89,11 +112,17 @@ export function AssetForm() {
   const schema = schemas.data?.find((s) => s.uid === schemaUid);
   const attrDefs = effectiveAttributes(schema, schemas.data);
   // A Product model chosen fills what is recorded beside it — manufacturer and model as written — where empty.
+  // A new unit is offered the ports its model's components list, unless a file already gave them.
   const fillRecorded = (modelUid: string) => {
     const keys = new Set(attrDefs.map((a) => a.key ?? a.name));
-    if (!keys.has("manufacturer") && !keys.has("model")) return;
     assetsApi.get(modelUid).then((m) => {
       const a = (m.attributes ?? {}) as Record<string, unknown>;
+      if (!isEditing && portsFrom !== "file") {
+        const offered = portsFromModel(a.components);
+        setPorts(offered);
+        setPortsFrom(offered.length ? "model" : null);
+      }
+      if (!keys.has("manufacturer") && !keys.has("model")) return;
       setAttributes((prev) => ({
         ...prev,
         ...(keys.has("manufacturer") && !prev.manufacturer && a.vendor ? { manufacturer: a.vendor } : {}),
@@ -134,12 +163,11 @@ export function AssetForm() {
         attributes,
         is_global: isGlobal,
         ...((showNetwork && port.on && offer.data?.port_type_uid !== null) || ports.some((p) => p.on)
-          ? { ports: [
-              ...(showNetwork && port.on && offer.data?.port_type_uid !== null
-                ? [{ port_label: port.port_label.trim() || "eth0", port_kind: port.port_kind, mac: port.mac.trim() || null }]
-                : []),
-              ...ports.filter((p) => p.on).map(portBody),
-            ] }
+          ? { ports: withNetworkPort(
+              showNetwork && port.on && offer.data?.port_type_uid !== null
+                ? { port_label: port.port_label.trim() || "eth0", port_kind: port.port_kind, mac: port.mac.trim() || null }
+                : null,
+              ports.filter((p) => p.on).map(portBody)) }
           : {}),
         ...(showNetwork && address.on && (address.ip.trim() || address.hostname.trim())
           ? { addresses: [{ ip: address.ip.trim() || null, hostname: address.hostname.trim() || null }] }
@@ -215,11 +243,13 @@ export function AssetForm() {
           {browsing && (
             <SchemaBrowser
               schemas={objectSchemas}
+              within={within}
               onPick={(s) => {
                 setSchemaUid(s.uid);
                 setBrowsing(false);
+                setWithin(null);
               }}
-              onClose={() => setBrowsing(false)}
+              onClose={() => { setBrowsing(false); setWithin(null); }}
             />
           )}
         </div>
@@ -282,6 +312,10 @@ export function AssetForm() {
         )}
         {!isEditing && (
           <ProposedPorts ports={ports}
+                         {...(portsFrom === "model"
+                           ? { title: "Its ports, from the Product model",
+                               note: "As its model lists them: each ticked port becomes an Equipment Port record, “port of” this one." }
+                           : {})}
                          onToggle={(i, on) => setPorts((all) => all.map((p, j) => (j === i ? { ...p, on } : p)))} />
         )}
 
@@ -303,4 +337,15 @@ export function AssetForm() {
       </div>
     </div>
   );
+}
+
+
+/** The network section's port (its MAC) and the listed ones: one port when they share a label — the model's
+ *  eth0 with the MAC read for it — rather than two. */
+type NetworkPort = Omit<PortAttributes, "mac"> & { mac: string | null };
+function withNetworkPort(net: NetworkPort | null, listed: PortAttributes[]): (PortAttributes | NetworkPort)[] {
+  if (!net) return listed;
+  const same = listed.findIndex((p) => (p.port_label ?? "").toLowerCase() === (net.port_label ?? "").toLowerCase());
+  if (same < 0) return [net, ...listed];
+  return listed.map((p, i) => (i === same ? { ...p, ...(net.mac ? { mac: net.mac } : {}) } : p));
 }

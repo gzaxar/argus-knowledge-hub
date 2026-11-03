@@ -39,9 +39,17 @@ function getManager(): UserManager {
   return manager;
 }
 
-/** Sends the browser to the identity provider. Never returns: the page navigates away. */
+/** A page of this app to come back to: a path of its own ("/attachments/…"), never another site ("//host"). */
+export function ownPage(path: unknown): string | null {
+  return typeof path === "string" && path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\")
+    && !path.startsWith("/auth/") ? path : null;
+}
+
+/** Sends the browser to the identity provider, to come back to the page it was opened on (a link someone sent:
+ *  issue #18). Never returns: the page navigates away. */
 export async function startInfnLogin(): Promise<void> {
-  await getManager().signinRedirect();
+  const here = ownPage(window.location.pathname + window.location.search);
+  await getManager().signinRedirect(here && here !== "/" ? { state: { returnTo: here } } : undefined);
 }
 
 /** Signing in again, now, to prove it is still you before a sensitive change (step-up): the provider is asked

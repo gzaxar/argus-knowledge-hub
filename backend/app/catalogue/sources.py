@@ -217,6 +217,23 @@ def _count(items: Any) -> int:
     return len(items) if isinstance(items, list) else 0
 
 
+# A device type's components, as NetBox lists them (schema/components.json): every one is kept, as written.
+COMPONENT_LISTS = ("interfaces", "console-ports", "console-server-ports", "power-ports", "power-outlets",
+                   "front-ports", "rear-ports", "port-mappings", "module-bays", "device-bays", "inventory-items")
+_FIRST_URL = re.compile(r"https?://[^\s)\]>]+")
+
+
+def _components(doc: dict) -> dict:
+    """Each component list of a device type, its items' scalar properties as NetBox writes them."""
+    out = {}
+    for key in COMPONENT_LISTS:
+        items = [{k: v for k, v in i.items() if isinstance(v, (str, int, float, bool))}
+                 for i in doc.get(key) or [] if isinstance(i, dict)]
+        if items:
+            out[key.replace("-", "_")] = items
+    return out
+
+
 def netbox_entry(doc: dict, path: str, commit: str, vendors: list[dict]) -> tuple[Optional[dict], Optional[str]]:
     """A NetBox device type as a catalogue entry (without ARGUS's classification), or why it cannot be one."""
     manufacturer, model, slug = doc.get("manufacturer"), doc.get("model"), doc.get("slug")
@@ -232,6 +249,14 @@ def netbox_entry(doc: dict, path: str, commit: str, vendors: list[dict]) -> tupl
                    "name": f"{vendor['name']} {model}"}
     if doc.get("part_number"):
         entry["part_number"] = str(doc["part_number"])
+    if doc.get("description"):
+        entry["description"] = str(doc["description"])[:500]
+    if doc.get("comments"):
+        # NetBox's notes (Markdown): often the datasheet's link, which is then the model's datasheet.
+        entry["notes"] = str(doc["comments"])
+        url = _FIRST_URL.search(str(doc["comments"]))
+        if url:
+            entry["datasheet_url"] = url.group(0).rstrip(".,;")
     spec: dict = {}
     if doc.get("u_height"):
         spec["rack_units"] = doc["u_height"]
@@ -240,6 +265,14 @@ def netbox_entry(doc: dict, path: str, commit: str, vendors: list[dict]) -> tupl
         spec["airflow"] = doc["airflow"]
     if doc.get("weight") is not None:
         spec["weight"] = {"value": doc["weight"], "unit": doc.get("weight_unit") or "kg"}
+    if doc.get("is_powered") is False:
+        spec["is_powered"] = False
+    if doc.get("subdevice_role"):
+        spec["subdevice_role"] = doc["subdevice_role"]
+    draws = [p.get("maximum_draw") for p in doc.get("power-ports") or [] if isinstance(p, dict)
+             and isinstance(p.get("maximum_draw"), (int, float))]
+    if draws:
+        spec["maximum_draw_w"] = max(draws)
     interfaces = [i for i in doc.get("interfaces") or [] if isinstance(i, dict)]
     physical = [i for i in interfaces if i.get("type") not in ("virtual", "lag", "bridge")]
     if physical:
@@ -257,6 +290,9 @@ def netbox_entry(doc: dict, path: str, commit: str, vendors: list[dict]) -> tupl
             spec[label] = _count(doc[key])
     if spec:
         entry["specifications"] = spec
+    components = _components(doc)
+    if components:
+        entry["components"] = components
     entry["sources"] = [{"kind": "netbox-devicetype-library", "ref": path, "revision": commit[:12]}]
     return entry, None
 
@@ -305,55 +341,71 @@ def materialize(lock: Optional[Path] = None, cache: Optional[Path] = None) -> Pa
                             classified[str(c_["id"])] = c_
         for s in (s for s in sources if s["kind"] == "netbox-devicetype-library"):
             repo = fetch(s, cache)
-            entries, problems, made = [], [], []
+            problems, made = [], []
             taken = {str(v.get("id")) for v in vendors}
             wanted = [path for path in _files(repo, s["commit"], "device-types/")
                       if path.endswith((".yaml", ".yml"))
                       and _selected(path[len("device-types/"):].rsplit(".", 1)[0], s["select"], s.get("exclude"))]
             _fetch_files(repo, s["commit"], wanted)
-            contents = _show_many(repo, s["commit"], wanted)
-            for path in wanted:
-                try:
-                    doc = yaml.load(contents[path], Loader=_LOADER)
-                except yaml.YAMLError as e:
-                    problems.append(f"{path}: not valid YAML ({getattr(e, 'problem', e)})")
-                    continue
-                doc = doc if isinstance(doc, dict) else {}
-                manufacturer = doc.get("manufacturer")
-                if manufacturer and _vendor_for(manufacturer, vendors) is None:
-                    v = manufacturer_vendor(manufacturer, path.split("/")[1], s["commit"], taken)
-                    taken.add(v["id"])
-                    vendors.append(v)
-                    made.append(v)
-                entry, why = netbox_entry(doc, path, s["commit"], vendors)
-                if why:
-                    problems.append(why)
-                    continue
-                meta = classified.get(entry["id"], {})
-                for k in ("device_class", "instance_type", "eol_date", "typical_spares", "relations"):
-                    if meta.get(k) is not None:
-                        entry[k] = meta[k]
-                entries.append(entry)
-            if problems:
-                raise SourceProblem(f"{s['id']}: " + "; ".join(problems))
-            if not entries:
-                raise SourceProblem(f"{s['id']}: `select` matches no device type at {s['commit'][:12]}")
             spec = s["collection"]
             d = work / spec["id"]
-            d.mkdir(parents=True, exist_ok=True)
+            (d / "models").mkdir(parents=True, exist_ok=True)
+            # One manufacturer folder at a time, its models written to one file per vendor (models/<vendor>.yaml):
+            # every component of 12,760 device types is too much to hold, or to read, at once.
+            by_folder: dict[str, list[str]] = {}
+            for path in wanted:
+                by_folder.setdefault(path.split("/")[1], []).append(path)
+            shards: set[str] = set()
+            count = 0
+            for folder in sorted(by_folder):
+                contents = _show_many(repo, s["commit"], by_folder[folder])
+                found: dict[str, list[dict]] = {}
+                for path in by_folder[folder]:
+                    try:
+                        doc = yaml.load(contents[path], Loader=_LOADER)
+                    except yaml.YAMLError as e:
+                        problems.append(f"{path}: not valid YAML ({getattr(e, 'problem', e)})")
+                        continue
+                    doc = doc if isinstance(doc, dict) else {}
+                    manufacturer = doc.get("manufacturer")
+                    if manufacturer and _vendor_for(manufacturer, vendors) is None:
+                        v = manufacturer_vendor(manufacturer, path.split("/")[1], s["commit"], taken)
+                        taken.add(v["id"])
+                        vendors.append(v)
+                        made.append(v)
+                    entry, why = netbox_entry(doc, path, s["commit"], vendors)
+                    if why:
+                        problems.append(why)
+                        continue
+                    meta = classified.get(entry["id"], {})
+                    for k in ("device_class", "instance_type", "eol_date", "typical_spares", "relations"):
+                        if meta.get(k) is not None:
+                            entry[k] = meta[k]
+                    found.setdefault(entry["vendor"], []).append(entry)
+                del contents
+                for vid, items in found.items():
+                    shard = d / "models" / f"{vid}.yaml"
+                    if shard.is_file():                  # a vendor two folders name (an alias)
+                        items = (yaml.load(shard.read_text(), Loader=_LOADER) or {}).get("models", []) + items
+                    shard.write_text(yaml.dump({"models": sorted(items, key=lambda e: e["id"])},
+                                               Dumper=_Dumper, sort_keys=False, allow_unicode=True))
+                    shards.add(f"models/{vid}.yaml")
+                    count += len(found[vid])
+            if problems:
+                raise SourceProblem(f"{s['id']}: " + "; ".join(problems))
+            if not count:
+                raise SourceProblem(f"{s['id']}: `select` matches no device type at {s['commit'][:12]}")
             manifest = {"id": spec["id"], "version": str(spec["version"]),
                         "name": spec.get("name") or spec["id"],
                         "description": f"Device types of {s['repo']} at {s['commit'][:12]}, read by ARGUS.",
                         "domain": spec.get("domain", "catalogue"), "owner": spec.get("owner", "INFN ARGUS"),
                         "license": spec.get("license", "CC0-1.0"), "origin": "netbox",
                         "requires": spec.get("requires") or {},
-                        "contents": ["models.yaml"] + (["vendors.yaml"] if made else [])}
+                        "contents": sorted(shards) + (["vendors.yaml"] if made else [])}
             (d / MANIFEST).write_text(yaml.dump(manifest, Dumper=_Dumper, sort_keys=False))
             if made:
                 (d / "vendors.yaml").write_text(yaml.dump({"vendors": sorted(made, key=lambda v: v["id"])},
                                                           Dumper=_Dumper, sort_keys=False, allow_unicode=True))
-            (d / "models.yaml").write_text(yaml.dump({"models": sorted(entries, key=lambda e: e["id"])},
-                                                     Dumper=_Dumper, sort_keys=False, allow_unicode=True))
         (work / ".complete").write_text(yaml.safe_dump(sources))
         shutil.rmtree(out, ignore_errors=True)
         work.rename(out)

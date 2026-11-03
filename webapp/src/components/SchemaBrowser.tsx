@@ -2,6 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { AppSchema } from "../api/types";
 import { buildTree, filterTree, TreeNode } from "./SchemaTree";
 
+/** A type and every type below it. */
+export function subtree(schemas: AppSchema[], root: string): AppSchema[] {
+  const below = new Set([root]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const s of schemas) {
+      if (s.parent_schema_uid && below.has(s.parent_schema_uid) && !below.has(s.uid)) { below.add(s.uid); grew = true; }
+    }
+  }
+  return schemas.filter((s) => below.has(s.uid));
+}
+
 function BrowserRow({
   node,
   depth,
@@ -71,13 +83,16 @@ export function SchemaBrowser({
   schemas,
   onPick,
   onClose,
+  within,
 }: {
   schemas: AppSchema[];
   onPick: (schema: AppSchema) => void;
   onClose: () => void;
+  /** Only this type and the types below it (an abstract type chosen on the Assets page: its kinds). */
+  within?: string | null;
 }) {
   const [query, setQuery] = useState("");
-  const tree = useMemo(() => buildTree(schemas), [schemas]);
+  const tree = useMemo(() => buildTree(within ? subtree(schemas, within) : schemas), [schemas, within]);
   const shown = useMemo(() => filterTree(tree, query.trim()), [tree, query]);
 
   useEffect(() => {

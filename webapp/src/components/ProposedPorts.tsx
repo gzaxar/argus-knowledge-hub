@@ -10,17 +10,16 @@ export function portSettings(p: PortAttributes): string {
 
 /** The unit's ports a file or a description lists, one row each, ticked to be made as Equipment Ports
  *  (“port of” the unit) with their settings. */
-export function ProposedPorts({ ports, onToggle, title = "Its ports" }: {
-  ports: PortChoice[]; onToggle: (index: number, on: boolean) => void; title?: string;
+export function ProposedPorts({ ports, onToggle, title = "Its ports",
+  note = "Read from the file: each ticked port becomes an Equipment Port record, “port of” this one, with its settings." }: {
+  ports: PortChoice[]; onToggle: (index: number, on: boolean) => void; title?: string; note?: string;
 }) {
   if (!ports.length) return null;
   const all = ports.every((p) => p.on);
   return (
     <fieldset className="rounded-md border border-slate-200 bg-white p-3">
       <legend className="px-1 text-sm font-medium text-slate-800">{title}</legend>
-      <p className="text-xs text-slate-500">
-        Read from the file: each ticked port becomes an Equipment Port record, “port of” this one, with its settings.
-      </p>
+      <p className="text-xs text-slate-500">{note}</p>
       <div className="mt-2 overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead className="text-slate-500">

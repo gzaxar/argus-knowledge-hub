@@ -95,6 +95,15 @@ PBS_GROUP = {"pbs_code", "pbs_area", "pbs_system", "pbs_family", "pbs_type", "pb
              "wbs_code", "module_code", "station_name", "design_status", "unit_count", "sequence_index"}
 
 
+# core-objects 2.3.0 gave the Product Model its hardware (a NetBox device type's, a datasheet's): new fields only.
+HARDWARE_2_3 = {"part_number", "rack_units", "full_depth", "airflow", "weight_kg", "maximum_draw_w", "port_summary",
+                "components", "source_notes"}
+
+
+def before_2_3(type_name: str, attributes: list[dict]) -> list[dict]:
+    return [a for a in attributes if not (type_name == "Product Model" and a.get("key") in HARDWARE_2_3)]
+
+
 def before_2_2(attribute: dict) -> dict:
     a = dict(attribute)
     if a.get("key") in WORDING_2_2:

@@ -30,7 +30,7 @@ VENDOR_KEYS = {"id", "name", "aliases", "website", "country", "description", "so
                "transferred_from", "former_ids"}
 MODEL_KEYS = {"id", "vendor", "model_code", "part_number", "name", "description", "device_class", "instance_type",
               "specifications", "datasheet_url", "eol_date", "firmware_version", "typical_spares",
-              "relations", "sources", "retired", "transferred_from", "former_ids"}
+              "components", "notes", "relations", "sources", "retired", "transferred_from", "former_ids"}
 MOVED_KEYS = {"id", "moved_to"}
 # What ARGUS states about a model another source defines (a NetBox device type): never its physical definition.
 CLASSIFICATION_KEYS = {"id", "device_class", "instance_type", "eol_date", "typical_spares", "relations", "sources"}
@@ -138,6 +138,12 @@ def _sources(r: _Report, e: Entry, where: str) -> None:
             r.add(e.file, at, "needs a ref: where the value can be checked")
 
 
+class _AnyModel(set):
+    """Every model id: what a tree read in part assumes of the models it did not read."""
+    def __contains__(self, item) -> bool:
+        return True
+
+
 def _retired(r: _Report, e: Entry, where: str, model_ids: set[str]) -> None:
     retired = e.data.get("retired")
     if retired is None:
@@ -170,6 +176,25 @@ def _specifications(r: _Report, e: Entry, where: str) -> None:
             r.add(e.file, at, "a value is a number, text, a list of them, or a mapping of them (e.g. {value, unit})")
 
 
+def _components(r: _Report, e: Entry, where: str) -> None:
+    """A model's components (its interfaces, console and power ports, bays…): lists of items, each a mapping of
+    plain values, as NetBox writes them."""
+    comps = e.data.get("components")
+    if comps is None:
+        return
+    if not isinstance(comps, dict):
+        r.add(e.file, f"{where} › components", "must map a kind of component to a list of them")
+        return
+    scalar = (str, int, float, bool)
+    for k, items in comps.items():
+        at = f"{where} › components › {k}"
+        if not SPEC_KEY.match(str(k)):
+            r.add(e.file, at, "a kind is lowercase words joined by _ (interfaces, console_ports…)")
+        if not isinstance(items, list) or not all(isinstance(i, dict) and all(isinstance(v, scalar) for v in i.values())
+                                                  for i in items):
+            r.add(e.file, at, "a list of items, each a mapping of plain values (name, type…)")
+
+
 def validate_collection(c: Collection, tree: dict[str, Collection]) -> list[Problem]:
     """What is wrong with one collection, given every other one in the tree."""
     from app.packages.loader import available
@@ -197,6 +222,10 @@ def validate_collection(c: Collection, tree: dict[str, Collection]) -> list[Prob
     reachable = _collection_closure(c, tree)
     vendor_ids = {v.id for cid in reachable for v in tree[cid].vendors}
     all_models = {m.id for o in tree.values() for m in o.models}
+    # A tree with a NetBox library read in part (the running application's) cannot say a model is missing.
+    in_part = any(o.partial for o in tree.values())
+    if in_part:
+        all_models = _AnyModel()
     types, packages = object_types(), _package_closure(c.requires_packages)
 
     for e in c.vendors:
@@ -270,6 +299,9 @@ def validate_collection(c: Collection, tree: dict[str, Collection]) -> list[Prob
             if rel["model"] == e.id:
                 r.add(e.file, at, "a model does not relate to itself")
         _specifications(r, e, where)
+        _components(r, e, where)
+        if d.get("notes") is not None and not isinstance(d["notes"], str):
+            r.add(e.file, f"{where} › notes", "must be text")
         _sources(r, e, where)
         _retired(r, e, where, all_models)
 
@@ -325,7 +357,7 @@ def validate_tree(tree: dict[str, Collection]) -> dict[str, list[Problem]]:
 
     # A classification belongs to a model another source defines. Only checked when that source is in the tree
     # (ARGUS reading its pinned sources): the catalogue repository's own CI does not have it.
-    if any(c.origin == "netbox" for c in tree.values()):
+    if any(c.origin == "netbox" for c in tree.values()) and not any(c.partial for c in tree.values()):
         defined = {m.id: c for c in tree.values() for m in c.models}
         for c in tree.values():
             for e in c.classifications:

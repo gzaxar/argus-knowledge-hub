@@ -7934,6 +7934,16 @@
             }
           },
           {
+            "in": "query",
+            "name": "sources_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Sources Only",
+              "type": "boolean"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,

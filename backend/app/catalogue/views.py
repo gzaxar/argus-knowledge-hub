@@ -168,7 +168,8 @@ def provenance(db: Session, uid: str, readable: set[str], tree: Optional[dict[st
                         "adopted_at": e.adopted_at, "adopted_by": e.adopted_by,
                         "managed_fields": e.managed_fields}
         out["retired"] = e.retired
-        c, entry = _entry_in_tree(tree if tree is not None else load_tree(), e.catalogue_id, e.collection_id)
+        c, entry = _entry_in_tree(tree if tree is not None else load_tree(netbox_models={e.collection_id: {e.catalogue_id}}),
+                                  e.catalogue_id, e.collection_id)
         if entry is not None:
             data = entry.data
             out["stated_only"] = {k: data[k] for k in NOT_STORED if k in data and k != "relations"}

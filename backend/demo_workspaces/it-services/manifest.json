@@ -306,7 +306,7 @@
     "types": {
       "file": "records/types.jsonl",
       "rows": 115,
-      "sha256": "df4eec357d406be81b01f03d4300fd3adad68cf065320d9ccc7fb55d9acf08b4"
+      "sha256": "b21a19ae21d90812edc8b71b760fca74e82c5917ac6d08f77d864b371f76346c"
     },
     "workspace": {
       "file": "records/workspace.jsonl",
@@ -316,7 +316,7 @@
     "workspace_packages": {
       "file": "records/workspace_packages.jsonl",
       "rows": 8,
-      "sha256": "f14714739ed55847d81cb8978c88911c7a35d48849a32d4e414cc99d89b23d2b"
+      "sha256": "c7b654cdea80a3b3b3f8de7f38b51300e38f74cd0ad186dd3192435c8108c19e"
     }
   },
   "files": [
@@ -912,8 +912,8 @@
     },
     {
       "path": "records/types.jsonl",
-      "sha256": "df4eec357d406be81b01f03d4300fd3adad68cf065320d9ccc7fb55d9acf08b4",
-      "size": 141190
+      "sha256": "b21a19ae21d90812edc8b71b760fca74e82c5917ac6d08f77d864b371f76346c",
+      "size": 143336
     },
     {
       "path": "records/workspace.jsonl",
@@ -922,7 +922,7 @@
     },
     {
       "path": "records/workspace_packages.jsonl",
-      "sha256": "f14714739ed55847d81cb8978c88911c7a35d48849a32d4e414cc99d89b23d2b",
+      "sha256": "c7b654cdea80a3b3b3f8de7f38b51300e38f74cd0ad186dd3192435c8108c19e",
       "size": 1643
     }
   ],
@@ -937,9 +937,9 @@
       "version": "2.0.0"
     },
     {
-      "checksum": "74129a72560d6030fdfd6ed89fe901284083d92fa07fa2e739d953467123c5cc",
+      "checksum": "0e429fccc424f1ab000ccaedfa4c38184a98e9433caddee977d6f900af369f52",
       "id": "core-objects",
-      "version": "2.2.0"
+      "version": "2.3.0"
     },
     {
       "checksum": "da16f5f399767c53d195468d458d527b3813dbc55c04ec5ce3885e266bdfb6ef",

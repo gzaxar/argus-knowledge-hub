@@ -93,7 +93,8 @@ def index(root: Optional[Path] = None) -> Index:
             pass
     vendor_names: dict[str, str] = {}
     collections: dict[str, dict] = {}
-    raw: list[tuple[dict, str, str]] = []
+    # What a search needs of each model, kept as it is read (a NetBox library file by file: never all at once).
+    raw: list[tuple[str, str, str, str, Optional[str], str, str]] = []
     for child in sorted(Path(root).iterdir()) if Path(root).is_dir() else []:
         manifest = _read(child / MANIFEST)
         if not manifest.get("id"):
@@ -110,10 +111,12 @@ def index(root: Optional[Path] = None) -> Index:
                     vendor_names[str(v["id"])] = str(v.get("name") or v["id"])
             for m in data.get("models") or []:
                 if isinstance(m, dict) and m.get("id"):
-                    raw.append((m, cid, str(rel)))
-    items = [Item(str(m["id"]), str(m.get("vendor") or ""), vendor_names.get(str(m.get("vendor") or ""), str(m.get("vendor") or "")),
-                  str(m.get("model_code") or ""), str(m.get("name") or m["id"]),
-                  str(m["part_number"]) if m.get("part_number") else None, cid, rel) for m, cid, rel in raw]
+                    raw.append((str(m["id"]), str(m.get("vendor") or ""), str(m.get("model_code") or ""),
+                                str(m.get("name") or m["id"]), str(m["part_number"]) if m.get("part_number") else None,
+                                cid, str(rel)))
+            del data
+    items = [Item(mid, vendor, vendor_names.get(vendor, vendor), code, name, part, cid, rel)
+             for mid, vendor, code, name, part, cid, rel in raw]
     out = Index(Path(root), items, collections)
     if fixed:
         _INDEX[key] = out
@@ -146,9 +149,12 @@ def _rank(q: str, words: list[str], code: str, text: str) -> Optional[int]:
 
 
 def search(db: Session, q: str, *, workspace_id: Optional[str] = None, every: bool = False, limit: int = 30,
-           lib: Optional[Index] = None) -> dict:
+           lib: Optional[Index] = None, sources_only: bool = False) -> dict:
     """The models installed in the catalogue, then the library's not yet installed, that match `q`: best first.
-    For a workspace, those of its domains only, unless `every`."""
+    For a workspace, those of its domains only, unless `every`.
+
+    `sources_only`: the library's models only, those like a record already here included — what a model made by
+    hand is linked to."""
     from app.catalogue.install import catalogue_workspace, entries
     from app.catalogue.system import offered
     from app.models.asset import Asset
@@ -198,6 +204,8 @@ def search(db: Session, q: str, *, workspace_id: Optional[str] = None, every: bo
     here |= {(norm((a.attributes or {}).get("vendor")), code_key((a.attributes or {}).get("model_code")))
              for a in db.scalars(select(Asset).where(Asset.workspace_id == cat, Asset.schema_uid == model_schema.uid,
                                                      Asset.deleted_at.is_(None)))}
+    if sources_only:
+        found, here = [], set()
     hits = []
     for it in lib.items:
         if it.catalogue_id in have or (norm(it.vendor_name), it.key) in here:
@@ -223,42 +231,33 @@ def search(db: Session, q: str, *, workspace_id: Optional[str] = None, every: bo
 # --------------------------------------------------------------------------- installing one
 
 def _collection(lib: Index, cid: str) -> Collection:
-    """The collection, without its entries: what the installer needs to name the release."""
+    """The collection, as the installer needs it to name the release: a NetBox library without its models (its
+    manifest, its made vendors and its checksum), not its 12,760 entries."""
     from app.catalogue.loader import load
-    c = load(lib.collections[cid]["path"]) if lib.collections[cid].get("origin") != "netbox" else None
-    if c is not None:
-        return c
-    # A NetBox collection is large: only its manifest and checksum, not its 12,760 entries.
-    import hashlib
-    path: Path = lib.collections[cid]["path"]
-    digest = hashlib.sha256()
-    manifest = _read(path / MANIFEST)
-    for rel in [MANIFEST, *(manifest.get("contents") or [])]:
-        p = path / str(rel)
-        if p.is_file():
-            digest.update(str(rel).encode() + b"\0" + p.read_bytes() + b"\0")
-    d = manifest.get("domain")
-    domains = [str(x) for x in d] if isinstance(d, list) else ([str(d)] if d else [])
-    return Collection(id=cid, version=str(manifest.get("version") or ""), name=str(manifest.get("name") or cid),
-                      domain=", ".join(domains), domains=domains, owner=str(manifest.get("owner") or ""),
-                      license=str(manifest.get("license") or ""), description=str(manifest.get("description") or ""),
-                      requires_packages=dict((manifest.get("requires") or {}).get("packages") or {}),
-                      requires_collections=dict((manifest.get("requires") or {}).get("collections") or {}),
-                      path=path, checksum=digest.hexdigest(), origin=manifest.get("origin"))
+    return load(lib.collections[cid]["path"], models_of=set())
 
 
 def _entry(lib: Index, cid: str, kind: str, eid: str) -> Optional[Entry]:
     manifest = _read(lib.collections[cid]["path"] / MANIFEST)
-    for rel in manifest.get("contents") or []:
+    files = [str(r) for r in manifest.get("contents") or []]
+    if kind == "model":                                   # the file it is in, when the index knows it
+        known = next((i.file for i in lib.items if i.catalogue_id == eid and i.collection == cid), None)
+        files = [known] if known in files else files
+    for rel in files:
         for item in _read(lib.collections[cid]["path"] / str(rel)).get(f"{kind}s") or []:
             if isinstance(item, dict) and str(item.get("id")) == eid:
                 return Entry(kind, item, str(rel))
     return None
 
 
-def install_one(db: Session, catalogue_id: str, *, actor: str, lib: Optional[Index] = None) -> dict:
+def install_one(db: Session, catalogue_id: str, *, actor: str, lib: Optional[Index] = None,
+                record_uid: Optional[str] = None) -> dict:
     """Install one model of the library (and its vendor, when the catalogue does not have it). The caller
-    commits. Returns the model's record."""
+    commits. Returns the model's record.
+
+    With `record_uid`, the model is that existing record instead (a model made by hand, enriched): linked in
+    place, its empty fields filled from the source, the ones it has kept as they are — and kept up to date
+    with the source from then on, field by field."""
     from app.catalogue import install as inst
     from app.models.catalogue_entry import CatalogueInstallation
     from app.models.asset import Asset
@@ -267,6 +266,15 @@ def install_one(db: Session, catalogue_id: str, *, actor: str, lib: Optional[Ind
     if cat is None:
         raise LibraryProblem("this installation has no catalogue")
     rows = inst.entries(db, cat)
+    if record_uid is not None:
+        mine = next((r for r in rows.values() if r.record_uid == record_uid), None)
+        if mine is not None:
+            raise LibraryProblem(f"this model is already {mine.catalogue_id} of the catalogue")
+        if catalogue_id in rows:
+            other = db.get(Asset, rows[catalogue_id].record_uid)
+            raise LibraryProblem(f"{catalogue_id} is already {other.name if other else 'another record'} here: "
+                                 "the two are the same model, to merge", 
+                                 {"uid": other.uid, "name": other.name} if other else None)
     if catalogue_id in rows:
         a = db.get(Asset, rows[catalogue_id].record_uid)
         return {"uid": a.uid, "key": a.key, "name": a.name, "installed": False}
@@ -298,6 +306,10 @@ def install_one(db: Session, catalogue_id: str, *, actor: str, lib: Optional[Ind
         if ve is not None:
             run.vendor_entries[ve.id] = ve
     me = _entry(lib, item.collection, "model", catalogue_id)
+    if record_uid is not None:
+        # Every field it differs on stays its own ("local"); an empty one is the source's (managed).
+        run.decisions[catalogue_id] = {"action": "link", "record_uid": record_uid,
+                                       "fields": {k: "local" for k in run.model_keys | {"name", "vendor"}}}
     done = run.entry(c, me)
     if done.needs_decision:
         raise LibraryProblem(f"{done.record_name} is already here and looks like {item.name}: choose it instead "
@@ -305,7 +317,11 @@ def install_one(db: Session, catalogue_id: str, *, actor: str, lib: Optional[Ind
     _partial(db, cat, c, actor, catalogue_id)
     db.flush()
     a = db.get(Asset, done.record_uid)
-    return {"uid": a.uid, "key": a.key, "name": a.name, "installed": True}
+    out = {"uid": a.uid, "key": a.key, "name": a.name, "installed": True}
+    if record_uid is not None:
+        out["filled"] = sorted(f["field"] for f in done.fields if f["action"] == "managed" and inst._blank(f["record"]))
+        out["kept"] = sorted(f["field"] for f in done.fields if f["action"] == "local")
+    return out
 
 
 def _partial(db: Session, cat: str, c: Collection, actor: str, catalogue_id: str) -> None:
