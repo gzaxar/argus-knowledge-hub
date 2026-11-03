@@ -30,14 +30,31 @@ function Fit({ width, height }: { width: number; height: number }) {
 
 /** A floor plan in its own pixels: zoom and pan it, its pins (the records placed on it, the control points), and
  *  — with `onPick` — a click gives the pixel clicked. */
-export function PlanView({ planUid, width, height, pins = [], pick, onPick, className = "h-80" }: {
+/** True north on a plan placed on the map: an arrow turned as the drawing has north. */
+export function NorthArrow({ deg, className = "" }: { deg: number; className?: string }) {
+  return (
+    <div role="img" aria-label={`North: ${Math.round(deg)}° clockwise from the plan's top`} title="True north"
+         className={`pointer-events-none flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-white/90 shadow-sm ${className}`}>
+      <svg viewBox="-12 -12 24 24" width="30" height="30" style={{ transform: `rotate(${deg}deg)` }} aria-hidden="true">
+        <polygon points="0,-10 5,4 0,1 -5,4" fill="#dc2626" />
+        <polygon points="0,10 5,4 0,1 -5,4" fill="#94a3b8" />
+        <text x="0" y="-3.5" textAnchor="middle" fontSize="6" fontWeight="700" fill="#fff">N</text>
+      </svg>
+    </div>
+  );
+}
+
+export function PlanView({ planUid, width, height, pins = [], pick, onPick, className = "h-80", northDeg }: {
   planUid: string; width: number; height: number; pins?: PlanPin[];
   pick?: { x: number; y: number } | null; onPick?: (x: number, y: number) => void; className?: string;
+  /** Where true north points on the picture (a plan placed on the map); shown as an arrow. */
+  northDeg?: number | null;
 }) {
   const image = usePlanImage(planUid);
   const bounds: [[number, number], [number, number]] = [[0, 0], [height, width]];
   return (
-    <div className={`${className} overflow-hidden rounded border border-slate-200 bg-slate-50`}>
+    <div className={`${className} relative isolate overflow-hidden rounded border border-slate-200 bg-slate-50`}>
+      {northDeg != null && <NorthArrow deg={northDeg} className="absolute right-2 top-2 z-10" />}
       {image.isError ? <p className="p-3 text-xs text-red-600">The plan could not be loaded.</p> : (
         <MapContainer crs={L.CRS.Simple} bounds={bounds} minZoom={-6} maxZoom={4} zoomSnap={0.25} className="h-full w-full"
                       attributionControl={false}>

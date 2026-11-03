@@ -11,6 +11,7 @@ is not one this endpoint serves — and the third passes a naive health
 check and then fails on first use, so it is checked explicitly.
 """
 import json
+import logging
 import time
 from dataclasses import dataclass
 from typing import Iterator, Optional
@@ -20,6 +21,28 @@ import requests
 TIMEOUT_SECONDS = 30
 # Long enough for a real classification over a page of text.
 COMPLETION_TIMEOUT_SECONDS = 120
+
+log = logging.getLogger(__name__)
+
+
+class ModelSettings:
+    """How one model is called (AI settings › per-model settings). `temperature` None: ARGUS's default for the
+    call (0 to classify and chat; the model's own for a structured answer, since a reasoning model's thinking
+    runs on at 0)."""
+
+    def __init__(self, temperature: Optional[float] = None, no_thinking: bool = True, json_mode: bool = True,
+                 time_limit_s: Optional[int] = None):
+        self.temperature, self.no_thinking, self.json_mode = temperature, no_thinking, json_mode
+        self.time_limit_s = time_limit_s
+
+    @classmethod
+    def of(cls, raw: Optional[dict]) -> "ModelSettings":
+        raw = raw or {}
+        t = raw.get("temperature")
+        limit = raw.get("time_limit_s")
+        return cls(temperature=float(t) if isinstance(t, (int, float)) and not isinstance(t, bool) else None,
+                   no_thinking=raw.get("no_thinking") is not False, json_mode=raw.get("json_mode") is not False,
+                   time_limit_s=int(limit) if isinstance(limit, int) and not isinstance(limit, bool) and limit > 0 else None)
 
 
 @dataclass
@@ -34,6 +57,20 @@ class Endpoint:
     api_key: Optional[str] = None
     # The workspace's cap on a reply's length (AI settings); None: no limit, and no max_tokens is sent.
     max_output_tokens: Optional[int] = None
+    # The model for answers that are data (AI settings); None: `model`.
+    structured_model: Optional[str] = None
+    # How each model is called, by name (AI settings › per-model settings).
+    model_settings: Optional[dict] = None
+
+    def settings(self, model: Optional[str] = None) -> ModelSettings:
+        """How `model` (by default the chat model) is called."""
+        return ModelSettings.of((self.model_settings or {}).get(model or self.model))
+
+    def temperature(self, model: Optional[str], default: Optional[float]) -> dict:
+        """The temperature to send: the model's setting, or `default` (None: none sent, the model's own)."""
+        t = self.settings(model).temperature
+        t = default if t is None else t
+        return {} if t is None else {"temperature": t}
 
     @property
     def root(self) -> str:
@@ -198,8 +235,8 @@ def complete(endpoint: Endpoint, system: str, user: str,
                     {"role": "user", "content": user},
                 ],
                 **endpoint.budget(),
-                # Classification should not wander between runs.
-                "temperature": 0,
+                # Classification should not wander between runs (unless the model's settings say otherwise).
+                **endpoint.temperature(endpoint.model, 0),
                 **(extra or {}),
             },
             timeout=COMPLETION_TIMEOUT_SECONDS,
@@ -218,49 +255,153 @@ def complete(endpoint: Endpoint, system: str, user: str,
 NO_THINKING = {"chat_template_kwargs": {"enable_thinking": False}}
 
 
+# How long a structured answer may take, reasoning included: under the INFN gateway's own 300 s, so ARGUS says
+# what happened instead of the gateway cutting the connection.
+STRUCTURED_DEADLINE_SECONDS = 280
+
+
+class LLMOvertime(LLMError):
+    """A model that kept reasoning past the deadline without answering (a reasoning model that cannot be told
+    not to think, such as the INFN gateway's minimax)."""
+
+    def __init__(self, message: str, model: Optional[str] = None, reasoning_chars: int = 0,
+                 limit_s: int = STRUCTURED_DEADLINE_SECONDS):
+        super().__init__(message)
+        self.model, self.reasoning_chars, self.limit_s = model, reasoning_chars, limit_s
+
+
+def _collect(endpoint: Endpoint, resp, started: float, model: str,
+             limit: int) -> tuple[str, Optional[str], Optional[str], Optional[dict], int]:
+    """(content, finish reason, model that answered, usage, characters of reasoning) of a streamed answer — or of
+    a whole one, from a provider that does not stream. Reasoning is read as it comes and left aside."""
+    if (resp.headers.get("content-type") or "").startswith("application/json"):
+        try:
+            body = resp.json()
+            choice = body["choices"][0]
+            msg = choice["message"]
+        except (ValueError, KeyError, IndexError, AttributeError, TypeError) as e:
+            raise LLMError("The endpoint's reply was not in the expected shape.") from e
+        thought = msg.get("reasoning_content") or msg.get("reasoning") or ""
+        return msg.get("content") or "", choice.get("finish_reason"), body.get("model"), body.get("usage"), len(thought)
+    content: list[str] = []
+    finish = served = None
+    reported: Optional[dict] = None
+    thought = 0
+    deadline = started + limit
+    for line in resp.iter_lines(decode_unicode=True):
+        if time.monotonic() > deadline:
+            raise LLMOvertime(f"{served or model} was still reasoning after {limit} s ({thought} characters of it) "
+                              "and had not begun its answer"
+                              if not content else
+                              f"{served or model} had not finished its answer after {limit} s", served or model, thought,
+                              limit)
+        if not line or not line.startswith("data:"):
+            continue
+        data = line[5:].strip()
+        if data == "[DONE]":
+            break
+        try:
+            chunk = json.loads(data)
+        except ValueError:
+            continue
+        served = chunk.get("model") or served
+        if chunk.get("usage"):
+            reported = chunk["usage"]
+        for choice in chunk.get("choices") or []:
+            delta = choice.get("delta") or {}
+            thinking = delta.get("reasoning") or delta.get("reasoning_content")
+            if thinking:
+                thought += len(thinking)
+            if delta.get("content"):
+                content.append(delta["content"])
+            if choice.get("finish_reason"):
+                finish = choice["finish_reason"]
+    return "".join(content), finish, served, reported, thought
+
+
 def complete_structured(endpoint: Endpoint, system: str, user: str) -> str:
     """`complete` for an answer that is data (a JSON object), not prose.
 
-    A reasoning model thinks before it answers, and on a budget sized for the answer it spends all of it
-    thinking: the reply comes back with no content at all, which reads as "the model found nothing". It is
-    told not to; a provider that does not know the switch refuses it (400/422) and is asked again without.
-    A reply cut off before any answer is an error that says so, not an empty answer."""
-    try:
-        resp = _post("structured", endpoint.model, 
-            f"{endpoint.root}/chat/completions",
-            headers=endpoint.headers(),
-            json={"model": endpoint.model,
-                  "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-                  **endpoint.budget(), "temperature": 0, **NO_THINKING},
-            timeout=COMPLETION_TIMEOUT_SECONDS,
-        )
-    except requests.RequestException as e:
-        raise LLMError(f"Could not reach {endpoint.root}: {e}") from e
-    if resp.status_code in (400, 422):
-        return complete(endpoint, system, user)
-    if resp.status_code >= 400:
-        raise LLMError(f"The endpoint answered {resp.status_code}: {(resp.text or '')[:200]}")
-    try:
-        choice = resp.json()["choices"][0]
-        content = choice["message"].get("content")
-    except (ValueError, KeyError, IndexError, AttributeError) as e:
-        raise LLMError("The endpoint's reply was not in the expected shape.") from e
-    if not (content or "").strip() and choice.get("finish_reason") == "length":
-        raise LLMError(f"{endpoint.model} used all {endpoint.max_output_tokens} tokens before answering (a "
-                       "reasoning model that kept thinking): nothing to read. Raise or clear the output-token "
-                       "limit in the AI settings.")
-    if choice.get("finish_reason") == "length":
-        return Reply(content or "", cut_off=True)
-    return content or ""
+    Streamed, so the answer is read as the model writes it: a reasoning model that cannot be told not to think
+    (the INFN gateway's minimax, measured 2026-11-03) reasons first, and a request that waits for the whole
+    reply in silence is cut by the gateway at 300 s. Its reasoning is read and left aside; past its time limit
+    ARGUS stops and says so. The model is the AI settings' model for structured work (else the chat model),
+    called as its per-model settings say: by default at its own temperature (at 0 a reasoning model's thinking
+    runs on and on), in JSON mode, told not to think, within STRUCTURED_DEADLINE_SECONDS. Each switch is dropped
+    in turn when the provider refuses it (400/422), streaming last. A request left with no answer at all is sent once more. A reply
+    cut off before any answer is an error that says so, not an empty answer."""
+    from app.services import usage
+    model = endpoint.structured_model or endpoint.model
+    settings = endpoint.settings(model)
+    deadline = settings.time_limit_s or STRUCTURED_DEADLINE_SECONDS
+    base = {"model": model,
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            **endpoint.budget(), **endpoint.temperature(model, None), "stream": True}
+    # The switches this model is asked for, the most first; each dropped in turn when the provider refuses it.
+    thinking = NO_THINKING if settings.no_thinking else {}
+    tries = ([{"response_format": {"type": "json_object"}, **thinking}] if settings.json_mode else []) + [thinking]
+    if tries[-1]:
+        tries.append({})
+    tries.append({"stream": False})                    # a provider that does not stream: the whole reply
+    for extra in tries:
+        refused = False
+        for attempt in (1, 2):
+            started = time.monotonic()
+            try:
+                resp = _post("structured", model, f"{endpoint.root}/chat/completions",
+                             headers=endpoint.headers(), json={**base, **extra}, stream=True,
+                             timeout=COMPLETION_TIMEOUT_SECONDS)
+            except requests.Timeout as e:
+                if attempt == 2:
+                    raise LLMError(f"Could not reach {endpoint.root} (no answer, twice): {e}") from e
+                log.warning("structured request to %s left without an answer; sending it again", endpoint.root)
+                continue
+            except requests.RequestException as e:
+                raise LLMError(f"Could not reach {endpoint.root}: {e}") from e
+            if resp.status_code in (400, 422):
+                resp.close()
+                refused = True
+                break
+            if resp.status_code >= 400:
+                detail = (resp.text or "")[:200]
+                resp.close()
+                raise LLMError(f"The endpoint answered {resp.status_code}: {detail}")
+            content, finish, served, reported, thought = "", None, None, None, 0
+            try:
+                content, finish, served, reported, thought = _collect(endpoint, resp, started, model, deadline)
+            except requests.RequestException as e:
+                # Silent for the whole read timeout, or the connection dropped: once more.
+                if attempt == 2:
+                    raise LLMError(f"Could not reach {endpoint.root} (no answer, twice): {e}") from requests.Timeout(str(e))
+                log.warning("structured answer from %s stopped arriving; sending the request again", endpoint.root)
+                continue
+            finally:
+                resp.close()
+                usage.note_llm(model, "structured", seconds=time.monotonic() - started,
+                               prompt_tokens=(reported or {}).get("prompt_tokens") if reported else None,
+                               completion_tokens=(reported or {}).get("completion_tokens") if reported else None,
+                               prompt_text="" if reported else system + user,
+                               completion_text="" if reported else content)
+            if not content.strip() and finish == "length":
+                raise LLMError(f"{served or model} used all {endpoint.max_output_tokens} tokens before "
+                               "answering (a reasoning model that kept thinking): nothing to read. Raise or clear "
+                               "the output-token limit in the AI settings.")
+            return Reply(content, cut_off=finish == "length", model=served or model)
+        if not refused:
+            break
+    raise LLMError(f"{endpoint.root} refused every form of the request for {model} (400/422): check the model's "
+                   "name and its settings in the AI settings")
 
 
 class Reply(str):
     """A model's answer that also says whether it was cut off at the output-token limit (`cut_off`): a JSON
-    answer cut short does not parse, and the reason is then that, not a model that ignored the format."""
+    answer cut short does not parse, and the reason is then that, not a model that ignored the format — and
+    which model answered (`model`: the one a gateway's "auto" chose), for the error that names it."""
 
-    def __new__(cls, text: str, cut_off: bool = False):
+    def __new__(cls, text: str, cut_off: bool = False, model: Optional[str] = None):
         out = super().__new__(cls, text)
         out.cut_off = cut_off
+        out.model = model
         return out
 
 
@@ -304,7 +445,7 @@ def converse(endpoint: Endpoint, messages: list[dict], tools: Optional[list[dict
         "model": endpoint.model,
         "messages": messages,
         **endpoint.budget(),
-        "temperature": 0,
+        **endpoint.temperature(endpoint.model, 0),
     }
     if tools:
         payload["tools"] = tools
@@ -346,7 +487,8 @@ def converse_stream(endpoint: Endpoint, messages: list[dict], tools: Optional[li
     # The tokens used come in a last chunk when asked for (OpenAI, vLLM); a provider that does not know the
     # option refuses it, and is asked again without.
     payload: dict = {"model": endpoint.model, "messages": messages, **endpoint.budget(),
-                     "temperature": 0, "stream": True, "stream_options": {"include_usage": True}}
+                     **endpoint.temperature(endpoint.model, 0), "stream": True,
+                     "stream_options": {"include_usage": True}}
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
@@ -499,7 +641,7 @@ def look(endpoint: Endpoint, image: bytes, mime_type: str, system: str, user: st
                     },
                 ],
                 **endpoint.budget(),
-                "temperature": 0,
+                **endpoint.temperature(endpoint.vision_model, 0),
             },
             timeout=COMPLETION_TIMEOUT_SECONDS,
         )

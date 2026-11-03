@@ -22,6 +22,7 @@ the collection, and installing the same version again changes nothing.
 """
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -43,9 +44,16 @@ from app.services.catalogue_mapping import norm
 # name in `vendor` beside it, as the Product Model type keeps both.
 VENDOR_FIELDS = ("name", "website", "description")
 MODEL_FIELDS = ("name", "vendor", "model_code", "device_class", "datasheet_url", "firmware_version", "eol_date",
-                "typical_spares", "description")
-# Stated by the format, with no field on the Product Model type yet (core-objects 2.2): kept in the collection.
-NOT_STORED = ("part_number", "instance_type", "specifications", "relations")
+                "typical_spares", "description",
+                # Its hardware (core-objects 2.3): from the entry's part number, specifications, components, notes.
+                "part_number", "rack_units", "full_depth", "airflow", "weight_kg", "maximum_draw_w", "port_summary",
+                "components", "source_notes")
+# Stated by the format, kept in the collection and shown on the model's page: no field on the Product Model type
+# holds them whole (its height, weight, airflow and draw are taken from the specifications into fields).
+NOT_STORED = ("instance_type", "specifications", "relations")
+_WEIGHT_KG = {"kg": 1.0, "g": 0.001, "lb": 0.45359237, "oz": 0.028349523125}
+# Interfaces that are not a socket on the box (NetBox's virtual kinds).
+VIRTUAL_INTERFACES = {"virtual", "lag", "bridge"}
 FIELD_DECISIONS = ("managed", "local", "propose")
 
 
@@ -220,6 +228,48 @@ def _same(a: Any, b: Any) -> bool:
         else a == b
 
 
+def _hardware(d: dict) -> dict:
+    """A model's hardware as Product Model fields: from its part number, specifications, components and notes."""
+    spec = d.get("specifications") if isinstance(d.get("specifications"), dict) else {}
+    out: dict = {"part_number": d.get("part_number"), "source_notes": d.get("notes")}
+    if isinstance(spec.get("rack_units"), (int, float)):
+        out["rack_units"] = spec["rack_units"]
+        if isinstance(spec.get("full_depth"), bool):
+            out["full_depth"] = spec["full_depth"]
+    if spec.get("airflow"):
+        out["airflow"] = str(spec["airflow"])
+    w = spec.get("weight")
+    if isinstance(w, dict) and isinstance(w.get("value"), (int, float)) and str(w.get("unit") or "kg") in _WEIGHT_KG:
+        out["weight_kg"] = round(w["value"] * _WEIGHT_KG[str(w.get("unit") or "kg")], 3)
+    elif isinstance(w, (int, float)):
+        out["weight_kg"] = w
+    if isinstance(spec.get("maximum_draw_w"), (int, float)):
+        out["maximum_draw_w"] = int(spec["maximum_draw_w"])
+    comps = d.get("components") if isinstance(d.get("components"), dict) else {}
+    if comps:
+        out["components"] = json.dumps(comps, sort_keys=True, ensure_ascii=False)
+        out["port_summary"] = port_summary(comps)
+    return out
+
+
+def port_summary(comps: dict) -> Optional[str]:
+    """Its sockets in one line: 24 × 1000base-t, 2 × cisco-stackwise, 1 management, 2 console, 2 power."""
+    parts = []
+    physical = [i for i in comps.get("interfaces") or [] if i.get("type") not in VIRTUAL_INTERFACES]
+    data = [i for i in physical if not i.get("mgmt_only")]
+    kinds: dict[str, int] = {}
+    for i in data:
+        kinds[str(i.get("type") or "?")] = kinds.get(str(i.get("type") or "?"), 0) + 1
+    parts += [f"{n} × {t}" for t, n in sorted(kinds.items(), key=lambda x: (-x[1], x[0]))]
+    for label, items in (("management", [i for i in physical if i.get("mgmt_only")]),
+                         ("serial", comps.get("console_server_ports")), ("console", comps.get("console_ports")),
+                         ("power", comps.get("power_ports")), ("outlet", comps.get("power_outlets")),
+                         ("module bay", comps.get("module_bays")), ("front port", comps.get("front_ports"))):
+        if items:
+            parts.append(f"{len(items)} {label}")
+    return ", ".join(parts) or None
+
+
 def _statement(e: Entry, vendor_uids: dict[str, str], keys: set[str]) -> dict:
     """What an entry states, as the record's fields."""
     d = e.data
@@ -227,6 +277,7 @@ def _statement(e: Entry, vendor_uids: dict[str, str], keys: set[str]) -> dict:
         out = {f: d.get(f) for f in VENDOR_FIELDS}
     else:
         out = {f: d.get(f) for f in MODEL_FIELDS}
+        out.update(_hardware(d))
         out["vendor"] = vendor_uids.get(str(d.get("vendor")))
         if d.get("eol_date") is not None:
             out["eol_date"] = str(d["eol_date"])
@@ -596,8 +647,12 @@ def plan(db: Session, workspace_id: str, collection_ids: list[str], *, actor: st
     """Compare the releases with the records; with `apply`, also write them. The caller commits or rolls back."""
     if tree is None:
         from app.catalogue.sources import SourceProblem
+        # Of a NetBox library, the models this catalogue has: an upgrade of those, never all 12,760 installed.
+        have_ids: dict[str, set[str]] = {}
+        for r in entries(db, workspace_id).values():
+            have_ids.setdefault(r.collection_id, set()).add(r.catalogue_id)
         try:
-            tree = load_tree()
+            tree = load_tree(netbox_models=have_ids)
         except SourceProblem as e:
             raise CatalogueProblem(f"the catalogue's sources cannot be read as pinned: {e}")
     order = _order(tree, collection_ids)

@@ -282,6 +282,28 @@ def corners(plan: FloorPlan) -> Optional[list[list[float]]]:
     return [list(to_lonlat(plan.transform, x, y)) for x, y in ((0, 0), (w, 0), (w, h), (0, h))]
 
 
+def north_deg(plan: FloorPlan) -> Optional[float]:
+    """Where true north points on the plan's picture, in degrees clockwise from its top (0: north is up), for a
+    plan placed on the map: the pixel direction in which the longitude does not change and the latitude grows —
+    exact for a sheared fit too."""
+    t = plan.transform
+    if not t:
+        return None
+    det = t["a"] * t["e"] - t["b"] * t["d"]
+    if abs(det) < 1e-18:
+        return None
+    vx, vy = -t["b"] / det, t["a"] / det                 # pixels per degree of latitude, northwards
+    return round(math.degrees(math.atan2(vx, -vy)) % 360, 2)
+
+
+def centre(plan: FloorPlan) -> Optional[dict]:
+    """The plan's centre on the map (WGS 84), for a plan placed on it: where the compass's declination is taken."""
+    if not plan.transform:
+        return None
+    lon, lat = to_lonlat(plan.transform, plan.width_px / 2, plan.height_px / 2)
+    return {"longitude": round(lon, 7), "latitude": round(lat, 7)}
+
+
 def georeference(db: Session, plan: FloorPlan, points: list[dict]) -> dict:
     result = fit(points, plan.width_px, plan.height_px)
     plan.control_points = [{k: float(p[k]) for k in ("x", "y", "longitude", "latitude")} for p in points]
@@ -449,7 +471,8 @@ def plan_out(db: Session, plan: FloorPlan) -> dict:
             "level": level_out(level) if level else None, "width_px": plan.width_px, "height_px": plan.height_px,
             "mime_type": plan.mime_type, "source_kind": plan.source_kind, "source_filename": plan.source_filename,
             "control_points": plan.control_points or [], "transform": plan.transform, "residual_m": plan.residual_m,
-            "corners": corners(plan), "created_at": plan.created_at, "updated_at": plan.updated_at}
+            "corners": corners(plan), "north_deg": north_deg(plan), "centre": centre(plan),
+            "created_at": plan.created_at, "updated_at": plan.updated_at}
 
 
 def level_out(level: PlaceLevel) -> dict:
@@ -464,7 +487,7 @@ def placement_out(db: Session, p: IndoorPlacement) -> dict:
     return {"uid": p.uid, "place": {"uid": place_rec.uid, "key": place_rec.key, "name": place_rec.name,
                                     "type": place_rec.type} if place_rec else None,
             "level": level_out(level) if level else None,
-            "plan": {"uid": plan.uid, "name": plan.name, "width_px": plan.width_px, "height_px": plan.height_px}
-            if plan else None,
+            "plan": {"uid": plan.uid, "name": plan.name, "width_px": plan.width_px, "height_px": plan.height_px,
+                     "north_deg": north_deg(plan)} if plan else None,
             "x": p.plan_x, "y": p.plan_y, "source": p.source, "note": p.note, "state": p.state,
             "valid_from": p.valid_from, "valid_until": p.valid_until, "confirmed_by": p.confirmed_by}

@@ -3,6 +3,8 @@ import { IntakeProfiles } from "../../components/IntakeProfiles";
 import { KnowledgeIndex } from "../../components/KnowledgeIndex";
 import { useEffect, useState } from "react";
 import { aiApi } from "../../api/client";
+import type { ModelSetting } from "../../api/types";
+import { ModelSettingsEditor } from "../../components/ModelSettings";
 
 /** Where this workspace's AI features send their requests.
  *
@@ -21,9 +23,11 @@ export function InstallationAI() {
 }
 
 const API = {
-  workspace: { key: "ai-config", get: aiApi.getConfig, save: aiApi.saveConfig, check: aiApi.check, remove: aiApi.deleteConfig },
+  workspace: { key: "ai-config", get: aiApi.getConfig, save: aiApi.saveConfig, check: aiApi.check, remove: aiApi.deleteConfig,
+               test: aiApi.testModel },
   installation: { key: "ai-installation-config", get: aiApi.getInstallationConfig, save: aiApi.saveInstallationConfig,
-                  check: aiApi.checkInstallationConfig, remove: aiApi.deleteInstallationConfig },
+                  check: aiApi.checkInstallationConfig, remove: aiApi.deleteInstallationConfig,
+                  test: aiApi.testInstallationModel },
 };
 
 function AIEndpointSettings({ scope }: { scope: "workspace" | "installation" }) {
@@ -38,6 +42,8 @@ function AIEndpointSettings({ scope }: { scope: "workspace" | "installation" }) 
 
   const [baseUrl, setBaseUrl] = useState("");
   const [model, setModel] = useState("");
+  const [structuredModel, setStructuredModel] = useState("");
+  const [modelSettings, setModelSettings] = useState<Record<string, ModelSetting>>({});
   const [embeddingModel, setEmbeddingModel] = useState("");
   const [visionModel, setVisionModel] = useState("");
   const [asrModel, setAsrModel] = useState("");
@@ -58,6 +64,8 @@ function AIEndpointSettings({ scope }: { scope: "workspace" | "installation" }) 
     if (c) {
       setBaseUrl(c.base_url);
       setModel(c.model);
+      setStructuredModel(c.structured_model ?? "");
+      setModelSettings(c.model_settings ?? {});
       setEmbeddingModel(c.embedding_model ?? "");
       setVisionModel(c.vision_model ?? "");
       setAsrModel(c.asr_model ?? "");
@@ -77,6 +85,8 @@ function AIEndpointSettings({ scope }: { scope: "workspace" | "installation" }) 
       api.save({
         base_url: baseUrl.trim(),
         model: model.trim(),
+        structured_model: structuredModel.trim() || null,
+        model_settings: modelSettings,
         embedding_model: embeddingModel.trim() || null,
         vision_model: visionModel.trim() || null,
         asr_model: asrModel.trim() || null,
@@ -220,6 +230,22 @@ function AIEndpointSettings({ scope }: { scope: "workspace" | "installation" }) 
         </div>
 
         <div>
+          <label className="block text-sm font-medium text-slate-700">Model for structured work</label>
+          <input
+            value={structuredModel}
+            onChange={(e) => setStructuredModel(e.target.value)}
+            placeholder={model.trim() ? `The model above (${model.trim()})` : "The model above"}
+            className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Optional. Answers that are data rather than prose — reworking a text into a document, filling a form
+            from a description, drafting a ticket — come from this model. A fast one that does not reason suits
+            them best; a reasoning model may think for minutes first. An intake profile's evaluated model still
+            answers its own intake.
+          </p>
+        </div>
+
+        <div>
           <label className="block text-sm font-medium text-slate-700">Vision model</label>
           <input
             value={visionModel}
@@ -311,6 +337,23 @@ function AIEndpointSettings({ scope }: { scope: "workspace" | "installation" }) 
             answers, so a tight limit can leave it no room for the answer itself.
           </p>
         </div>
+
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium text-slate-700">Per-model settings</legend>
+          <p className="text-xs text-slate-500">
+            How each model is called, by the name used above ("auto" included). Temperature empty: ARGUS's default —
+            0 to classify and chat, the model's own for structured answers, since at 0 a reasoning model's thinking
+            can run on and on. Untick <i>Tell it not to think</i> for a model that cannot be told (it is then not
+            sent), and <i>JSON mode</i> for one that does not have it. <i>Test</i> tries the row as it is, saved or not, through the saved endpoint,
+            on a small extraction (no data of yours is sent).
+          </p>
+          <ModelSettingsEditor rows={modelSettings} onChange={setModelSettings}
+                               suggestions={[model.trim(), structuredModel.trim()]}
+                               test={(name, s) => api.test(name, s)} />
+          {Object.keys(modelSettings).length > 0 && !saved && (
+            <p className="text-xs text-amber-800">Save the settings for them to apply.</p>
+          )}
+        </fieldset>
 
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium text-slate-700">Keeping Ask ARGUS's knowledge index up to date</legend>

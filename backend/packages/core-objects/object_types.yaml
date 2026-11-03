@@ -40,19 +40,21 @@ object_types:
       abstract: true
       icon: tabler/components
       attributes:
-        - {key: pbs_code, name: PBS code, indexed: true, unique: true, regex: '^[A-Z0-9]+(-[A-Z0-9.]+){3,4}$'}
-        - {key: pbs_area, name: Area / zone, indexed: true}
-        - {key: pbs_system, name: PBS system, indexed: true}
-        - {key: pbs_family, name: PBS family, indexed: true}
-        - {key: pbs_type, name: PBS type, indexed: true}
-        - {key: pbs_sequential, name: Sequential number}
-        - {key: component_id, name: Component id, indexed: true}
-        - {key: wbs_code, name: Work package, indexed: true}
-        - {key: module_code, name: Module, indexed: true}
-        - {key: station_name, name: Station, indexed: true}
-        - {key: design_status, name: Design status, type: enumeration, options: [{id: study, value: Study}, {id: defined, value: Defined}, {id: approved, value: Approved}]}
-        - {key: unit_count, name: Number of units, type: integer}
-        - {key: sequence_index, name: Sequence in the PBS, type: integer}
+        # The product breakdown (PBS) naming: segments of the PBS code, not places — where a unit is, is
+        # `Located in`. Shown together on a form, folded while empty.
+        - {key: pbs_code, name: PBS code, indexed: true, unique: true, regex: '^[A-Z0-9]+(-[A-Z0-9.]+){3,4}$', group: PBS}
+        - {key: pbs_area, name: PBS area, indexed: true, group: PBS, description: "The area segment of the PBS code (e.g. LINAC), not a place: where it is, is Located in."}
+        - {key: pbs_system, name: PBS system, indexed: true, group: PBS}
+        - {key: pbs_family, name: PBS family, indexed: true, group: PBS}
+        - {key: pbs_type, name: PBS type, indexed: true, group: PBS}
+        - {key: pbs_sequential, name: Sequential number, group: PBS}
+        - {key: component_id, name: Component id, indexed: true, group: PBS}
+        - {key: wbs_code, name: Work package, indexed: true, group: PBS}
+        - {key: module_code, name: Module, indexed: true, group: PBS}
+        - {key: station_name, name: Station, indexed: true, group: PBS}
+        - {key: design_status, name: Design status, type: enumeration, options: [{id: study, value: Study}, {id: defined, value: Defined}, {id: approved, value: Approved}], group: PBS}
+        - {key: unit_count, name: Number of units, type: integer, group: PBS}
+        - {key: sequence_index, name: Sequence in the PBS, type: integer, group: PBS}
     - name: "Asset"
       parent: "Engineered Item"
       description: "The serialised box, with a purchase order."
@@ -62,10 +64,10 @@ object_types:
       icon: tabler/package
       behaviors: [equipment]
       attributes:
-        - {key: manufacturer, name: Manufacturer, indexed: true}
-        - {key: model, name: Model, indexed: true}
+        - {key: manufacturer, name: Manufacturer (as recorded), indexed: true, group: recorded, description: "As written on the label, or by the import (GLPI, a spreadsheet). The catalogue's is the Product model's."}
+        - {key: model, name: Model (as recorded), indexed: true, group: recorded, description: "As written on the label, or by the import. The catalogue's model is the Product model."}
         - {key: serial, name: Serial number, indexed: true}
-        - {key: product_model, name: Instance of, type: reference, reference: Product Model}
+        - {key: product_model, name: Product model, type: reference, reference: Product Model, description: "The catalogue's model of this unit: type its code as on the label."}
         - {key: argus_location, name: Located in, type: reference, reference: Location, include_children: true}
         - {key: inventory_number, name: Inventory number, indexed: true, unique: true}
         - {key: installed_on, name: Installed on, type: date}
@@ -182,6 +184,16 @@ object_types:
         - {key: mtbf_hours, name: MTBF (h), type: integer}
         - {key: typical_spares, name: Typical spares, indexed: true, multi: true}
         - {key: inventory_url, name: Inventory link}
+        # Its hardware, as its source states it (a NetBox device type, a datasheet): shown together on a form.
+        - {key: part_number, name: Part number, indexed: true, group: Hardware, description: "The vendor's orderable code (C9200-24T-E), often what a label or an invoice says."}
+        - {key: rack_units, name: Height (rack units), type: float, group: Hardware}
+        - {key: full_depth, name: Full depth, type: boolean, group: Hardware}
+        - {key: airflow, name: Airflow, group: Hardware}
+        - {key: weight_kg, name: Weight (kg), type: float, group: Hardware}
+        - {key: maximum_draw_w, name: Maximum draw per power input (W), type: integer, group: Hardware}
+        - {key: port_summary, name: Ports, group: Hardware, description: "Its sockets in one line; each one is in Components."}
+        - {key: components, name: Components, type: text, readonly: true, group: Hardware, description: "Every interface, console and power port, outlet, bay and part, as the source lists them: a unit made of this model is offered its ports."}
+        - {key: source_notes, name: Notes from the source, type: text, readonly: true, group: Hardware}
     - name: "Vendor"
       parent: "Catalog Item"
       description: "The company, its support contract and RMA route."

@@ -65,6 +65,8 @@ class Collection:
     # Where it came from when not written as collection files: e.g. "netbox" for device types read from a
     # NetBox library at a pinned revision (app/catalogue/sources.py).
     origin: Optional[str] = None
+    # Read in part: a NetBox library's models of a few vendors only (those the catalogue has), not all 12,760.
+    partial: bool = False
 
     def entries(self) -> list[Entry]:
         return [*self.vendors, *self.models]
@@ -75,6 +77,14 @@ class Collection:
         parts = [n(len(self.vendors), "vendor"), n(len(self.models), "model"), f"{len(self.moved)} moved" if self.moved else "",
                  n(len(self.classifications), "classification")]
         return ", ".join(p for p in parts if p) or "empty"
+
+
+def _manifest_id(child: Path) -> str:
+    import yaml
+    try:
+        return str((yaml.safe_load((child / MANIFEST).read_text(encoding="utf-8")) or {}).get("id") or child.name)
+    except (OSError, yaml.YAMLError):
+        return child.name
 
 
 def catalogue_dir() -> Path:
@@ -111,9 +121,12 @@ def _ranges(value: Any, cid: str, where: str, problems: list[Problem]) -> dict[s
     return {str(k): str(v) for k, v in value.items()}
 
 
-def load(path: Path | str) -> Collection:
+def load(path: Path | str, models_of: Optional[set[str]] = None) -> Collection:
     """A collection as written. Never raises for what is wrong inside it: that is in `read_problems`, and
-    `validate` finds the rest."""
+    `validate` finds the rest.
+
+    `models_of`, for a NetBox library (one file of models per vendor, models/<vendor>.yaml): the model ids to
+    read — only their vendors' files are parsed; the checksum still covers every file."""
     root = Path(path)
     problems: list[Problem] = []
     manifest = _read(root / MANIFEST, root.name, problems) or {}
@@ -130,6 +143,8 @@ def load(path: Path | str) -> Collection:
     if not isinstance(contents, list):
         problems.append(Problem(cid, MANIFEST, "contents", "must be a list of file names"))
         contents = []
+    partial = models_of is not None and manifest.get("origin") == "netbox"
+    vendors_read = {m.split("/", 1)[0] for m in models_of or ()}
     for entry in contents:
         rel = str(entry)
         target = (root / rel).resolve()
@@ -137,6 +152,8 @@ def load(path: Path | str) -> Collection:
             problems.append(Problem(cid, MANIFEST, f"contents › {rel}", "must be a .yaml file inside the collection"))
             continue
         files.append(rel)
+        if partial and rel.startswith("models/") and Path(rel).stem not in vendors_read:
+            continue
         data = _read(target, cid, problems)
         if data is None:
             continue
@@ -167,7 +184,7 @@ def load(path: Path | str) -> Collection:
         requires_collections=_ranges(requires.get("collections"), cid, "requires › collections", problems),
         path=root, checksum=digest.hexdigest(), vendors=found["vendors"], models=found["models"],
         origin=str(manifest["origin"]) if manifest.get("origin") else None,
-        moved=found["moved"], classifications=found["classifications"], read_problems=problems)
+        moved=found["moved"], classifications=found["classifications"], read_problems=problems, partial=partial)
 
 
 # Trees read from the pinned sources, by folder: such a folder is named after its lock's checksum and never
@@ -176,10 +193,15 @@ def load(path: Path | str) -> Collection:
 _MATERIALIZED: dict[str, dict] = {}
 
 
-def load_tree(root: Path | str | None = None) -> dict[str, Collection]:
+def load_tree(root: Path | str | None = None, *, netbox_models: Optional[dict[str, set[str]]] = None
+              ) -> dict[str, Collection]:
     """id -> collection, for every collection directory under `root`. By default, this installation's: the
     sources its lock file pins (app/catalogue/sources.py), read at their commits, or else the collection
-    folders in its catalogue directory."""
+    folders in its catalogue directory.
+
+    `netbox_models`: what the running application reads of a NetBox library — per collection, the model ids it
+    needs (those the catalogue has, the one a page shows); none for a collection not named. The whole library
+    (12,760 device types, every component) is read by the command line and CI only."""
     base = Path(root) if root is not None else catalogue_dir()
     if root is None:
         from app.catalogue.sources import lock_path, materialize
@@ -191,10 +213,15 @@ def load_tree(root: Path | str | None = None) -> dict[str, Collection]:
     out: dict[str, Collection] = {}
     if not base.is_dir():
         return out
+    partial = False
     for child in sorted(base.iterdir()):
         if (child / MANIFEST).is_file():
-            c = load(child)
+            c = load(child, None if netbox_models is None else set(netbox_models.get(child.name) or ())
+                     | set(netbox_models.get(_manifest_id(child)) or ()))
+            partial = partial or c.partial
             out[c.id] = c
+    if partial:
+        return out
     # Kept only while small: the whole NetBox library is about 220 MB loaded, and is read whole only to preview
     # or install a collection (searching it uses the compact index, app/catalogue/library.py).
     if fixed and sum(len(c.models) for c in out.values()) <= 2000:

@@ -33,7 +33,9 @@ SYSTEM = (
     "\n\nYou may also propose changes, but only when the person asks for one: propose_create_record, "
     "propose_update_record and propose_relation. A proposal changes nothing: it is shown to the person, who "
     "applies or discards it. Never say a change was made; say it is proposed and waits for their confirmation. "
-    "Look the records up first and use their keys. A record you propose to create is referred to as new:N "
+    "Look the records up first and use their keys — also as the value of an attribute that refers to a record "
+    "(where a unit is: its Located in, the argus_location attribute, takes a Location's key). "
+    "A record you propose to create is referred to as new:N "
     "(N is in the proposal's reply) until it exists, so you can relate it in the same answer. 'A composed of "
     "B' means B is a part of A; 'X part of Y' means X belongs to Y. If a proposal is refused, correct it from "
     "the reason given rather than repeating it."
@@ -135,17 +137,78 @@ def _attribute_keys(db: Session, schema: Schema) -> set[str]:
     return {a.get("key") or a.get("name") for a in effective_attributes(db, schema)} - {None}
 
 
-def _check_attributes(db: Session, schema: Schema, attributes) -> dict:
+def _reference(db: Session, attr: dict, value, workspace_id: str):
+    """A reference attribute's value as the record it names — its uid, its key, or its exact name among the
+    records of the referenced type (and below) visible here — or why it names none."""
+    from app.services.attribute_validation import _descendant_schema_uids, _is_reference_visible
+    if value is None or value == "":
+        return None
+    if isinstance(value, list):
+        return [_reference(db, attr, v, workspace_id) for v in value]
+    label = f"{attr.get('name') or attr.get('key')} ({attr.get('key')})"
+    ref = str(value).strip()
+    allowed = None
+    if attr.get("referenceSchemaUid"):
+        allowed = {attr["referenceSchemaUid"]}
+        if attr.get("includeChildren"):
+            allowed |= _descendant_schema_uids(db, attr["referenceSchemaUid"])
+    target = db.get(Asset, ref) or db.scalar(select(Asset).where(Asset.key == ref, Asset.deleted_at.is_(None)))
+    if target is None and allowed:
+        named = [a for a in db.scalars(select(Asset).where(Asset.name == ref, Asset.deleted_at.is_(None),
+                                                           Asset.schema_uid.in_(allowed)))
+                 if _is_reference_visible(db, a, workspace_id)]
+        if len(named) == 1:
+            target = named[0]
+        elif len(named) > 1:
+            raise Refused(f"{label} takes one record, and {len(named)} {attr.get('referenceType') or 'records'} are "
+                          f"named {ref!r} ({', '.join(a.key for a in named[:5])}): give the key")
+    if target is None:
+        raise Refused(f"{label} takes a record, not text: {ref!r} names no "
+                      f"{attr.get('referenceType') or 'record'} here — look it up and give its key")
+    if allowed and target.schema_uid not in allowed:
+        raise Refused(f"{label} takes a {attr.get('referenceType')} (or a kind of one); {target.key} is a "
+                      f"{target.type or 'record'} of another kind")
+    return target.uid
+
+
+def _check_attributes(db: Session, schema: Schema, attributes, workspace_id: Optional[str] = None,
+                      current: Optional[dict] = None, exclude_uid: Optional[str] = None) -> dict:
+    """The attributes as the record would get them: a reference resolved to the record it names (by key, uid or
+    exact name), and every value checked as the forms check it — so a proposal that cannot be applied is refused
+    now, with the reason, rather than failing when the person applies it."""
     if attributes in (None, {}):
         return {}
     if not isinstance(attributes, dict):
         raise Refused("attributes must be an object of attribute key → value")
-    known = _attribute_keys(db, schema)
+    from app.services.attribute_validation import check_attributes, effective_attributes
+    defs = {a.get("key") or a.get("name"): a for a in effective_attributes(db, schema)}
+    known = set(defs) - {None}
     unknown = sorted(k for k in attributes if k not in known)
     if unknown:
         usable = sorted(k for k in known if not k.startswith(SKIPPED_ATTRIBUTES))
         raise Refused(f"{schema.name} has no attribute {', '.join(unknown)}; its attributes are: {', '.join(usable)}")
-    return attributes
+    if workspace_id is None:
+        return attributes
+    out = dict(attributes)
+    for k, v in attributes.items():
+        if defs[k].get("type") == "reference":
+            out[k] = _reference(db, defs[k], v, workspace_id)
+    whole = {kk: vv for kk, vv in {**(current or {}), **out}.items() if vv is not None}
+    problems = check_attributes(db, schema, whole, workspace_id, Asset, exclude_uid=exclude_uid)
+    if problems:
+        raise Refused("; ".join(problems))
+    return out
+
+
+def _shown(db: Session, value) -> str:
+    """A value for the person: a record by its key and name rather than its uid."""
+    if isinstance(value, list):
+        return ", ".join(_shown(db, v) for v in value)
+    if isinstance(value, str) and len(value) == 36 and value.count("-") == 4:
+        a = db.get(Asset, value)
+        if a is not None:
+            return f"{a.key} ({a.name})"
+    return str(value)
 
 
 class Proposer:
@@ -224,9 +287,9 @@ class Proposer:
         key = str(a.get("key") or "").strip() or None
         if key and self.db.scalar(select(Asset.uid).where(Asset.key == key)) is not None:
             raise Refused(f"the key {key} is already taken")
-        attributes = _check_attributes(self.db, schema, a.get("attributes"))
+        attributes = _check_attributes(self.db, schema, a.get("attributes"), self.workspace_id)
         payload = {"schema_uid": schema.uid, "type": schema.name, "name": name, "key": key, "attributes": attributes}
-        details = "".join(f", {k} = {v}" for k, v in attributes.items())
+        details = "".join(f", {k} = {_shown(self.db, v)}" for k, v in attributes.items())
         return "create", payload, f"Create {schema.name} “{name}”" + (f" ({key})" if key else "") + details
 
     def _update(self, a: dict) -> tuple[str, dict, str]:
@@ -239,8 +302,9 @@ class Proposer:
         if asset.workspace_id != self.workspace_id:
             raise Refused(f"{asset.key} belongs to workspace {asset.workspace_id}; it can only be changed there")
         schema = self.db.get(Schema, asset.schema_uid) if asset.schema_uid else None
-        attributes = _check_attributes(self.db, schema, a.get("attributes")) if schema else (a.get("attributes") or {})
         current = asset.attributes or {}
+        attributes = (_check_attributes(self.db, schema, a.get("attributes"), self.workspace_id, current, asset.uid)
+                      if schema else (a.get("attributes") or {}))
         attributes = {k: v for k, v in attributes.items() if current.get(k) != v}
         name = str(a.get("name") or "").strip() or None
         if name == asset.name:
@@ -248,7 +312,7 @@ class Proposer:
         if not attributes and not name:
             raise Refused(f"that changes nothing on {asset.key}")
         parts = ([f"name → {name}"] if name else []) + [
-            f"{k} → {'(cleared)' if v is None else v}" for k, v in attributes.items()]
+            f"{k} → {'(cleared)' if v is None else _shown(self.db, v)}" for k, v in attributes.items()]
         return "update", {"uid": asset.uid, "key": asset.key, "name": name, "attributes": attributes}, \
             f"Update {asset.key}: " + ", ".join(parts)
 

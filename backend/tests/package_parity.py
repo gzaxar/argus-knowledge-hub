@@ -86,3 +86,29 @@ if __name__ == "__main__":
     FIXTURES.mkdir(parents=True, exist_ok=True)
     (FIXTURES / "seeding.json").write_text(json.dumps(seed_every_way(todays_seeding), indent=1, sort_keys=True))
     print("recorded", FIXTURES / "seeding.json")
+
+# core-objects and accelerator 2.2.0 reworded a few fields — a relabel, a description, a form group — and
+# nothing else: what was there before, for the parity checks.
+WORDING_2_2 = {"product_model": "Instance of", "manufacturer": "Manufacturer", "model": "Model",
+               "pbs_area": "Area / zone"}
+PBS_GROUP = {"pbs_code", "pbs_area", "pbs_system", "pbs_family", "pbs_type", "pbs_sequential", "component_id",
+             "wbs_code", "module_code", "station_name", "design_status", "unit_count", "sequence_index"}
+
+
+# core-objects 2.3.0 gave the Product Model its hardware (a NetBox device type's, a datasheet's): new fields only.
+HARDWARE_2_3 = {"part_number", "rack_units", "full_depth", "airflow", "weight_kg", "maximum_draw_w", "port_summary",
+                "components", "source_notes"}
+
+
+def before_2_3(type_name: str, attributes: list[dict]) -> list[dict]:
+    return [a for a in attributes if not (type_name == "Product Model" and a.get("key") in HARDWARE_2_3)]
+
+
+def before_2_2(attribute: dict) -> dict:
+    a = dict(attribute)
+    if a.get("key") in WORDING_2_2:
+        a["name"] = WORDING_2_2[a["key"]]
+        a.pop("description", None)
+    if a.get("key") in WORDING_2_2 or a.get("key") in PBS_GROUP:
+        a.pop("group", None)
+    return a

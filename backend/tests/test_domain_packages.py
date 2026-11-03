@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import select
 
+from tests.package_parity import before_2_2, before_2_3
 from app.db import SessionLocal
 from app.ledger import service
 from app.models.asset import Relation
@@ -163,7 +164,9 @@ def test_a_workspace_on_the_old_catalogue_moves_to_the_split_one_with_nothing_ch
     after = {s.uid: (s.name, s.parent_schema_uid, s.attributes) for s in db.scalars(
         select(Schema).where(Schema.workspace_id == ws, Schema.applies_to == "objects"))}
     # Every type as it was; the it package adds its GLPI provenance fields to the root (an extension).
-    unprovenanced = {u: (v[0], v[1], [a for a in v[2] if a["key"] not in ("glpi_url", "glpi_unmapped")])
+    # And 2.2.0's rewording (a relabel, a description, a form group) comes in, as definition changes do.
+    unprovenanced = {u: (v[0], v[1], before_2_3(v[0], [before_2_2(a) for a in v[2]
+                                                        if a["key"] not in ("glpi_url", "glpi_unmapped")]))
                      for u, v in after.items() if u in before}
     assert unprovenanced == before, "every type as it was"
     item = next(v for v in after.values() if v[0] == "Item")

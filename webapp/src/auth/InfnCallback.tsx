@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { completeInfnLogin, infnLoginLabel } from "../api/infnAuth";
+import { completeInfnLogin, infnLoginLabel, ownPage } from "../api/infnAuth";
 import { addOidcProfile, defaultApiBaseUrl } from "../api/session";
 
 /** The page the identity provider sends the browser back to. Exchanges the
@@ -20,7 +20,8 @@ export function InfnCallback() {
         }
         const who = user.profile.email ?? user.profile.preferred_username ?? user.profile.sub;
         addOidcProfile(who, defaultApiBaseUrl(), "infn");
-        window.location.replace("/");
+        // Back to the page sign-in started from (a link someone sent), when it is a page of this app.
+        window.location.replace(ownPage(state?.returnTo) ?? "/");
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
     // eslint-disable-next-line react-hooks/exhaustive-deps

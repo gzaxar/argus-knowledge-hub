@@ -324,3 +324,66 @@ def test_administrators_see_every_workspace_and_upgrade_where_no_decision_is_nee
             db.delete(db.get(User, u.id))
         db.commit()
         db.close()
+
+
+def test_core_objects_2_2_rewords_by_itself_and_keeps_a_workspaces_own_label(tmp_path, monkeypatch):
+    """2.2.0 relabels (Product model, the "as recorded" fields, PBS area), describes and groups them: definition
+    changes, applied with no decision — except where the workspace changed a field itself."""
+    root = tmp_path / "packages"
+    shutil.copytree(loader.packages_dir(), root)
+    co = root / "core-objects"
+    manifest = yaml.safe_load((co / "package.yaml").read_text())
+    manifest["version"] = "2.1.0"
+    (co / "package.yaml").write_text(yaml.safe_dump(manifest, sort_keys=False))
+    data = yaml.safe_load((co / "object_types.yaml").read_text())
+    from tests.package_parity import before_2_2
+    for t in data["object_types"]["types"]:
+        for a in t.get("attributes") or []:
+            back = before_2_2({"key": a["key"], "name": a["name"], **({"description": a["description"]} if "description" in a else {}),
+                               **({"group": a["group"]} if "group" in a else {})})
+            a["name"] = back["name"]
+            for k in ("description", "group"):
+                if k in back:
+                    a[k] = back[k]
+                else:
+                    a.pop(k, None)
+    (co / "object_types.yaml").write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
+    monkeypatch.setenv("ARGUS_PACKAGES_DIR", str(root))
+    loader.reload()
+    ws = f"wording-{secrets.token_hex(3)}"
+    db = SessionLocal()
+    try:
+        db.add(Workspace(id=ws, name=ws))
+        db.flush()
+        installer.install(db, ws, ["core-objects"])
+        asset = db.get(Schema, asset_types.type_uid(ws, "Asset"))
+        attrs = {a["key"]: a for a in asset.attributes}
+        assert attrs["product_model"]["name"] == "Instance of" and "group" not in attrs["manufacturer"]
+        # The workspace renamed one field itself.
+        asset.attributes = [{**a, "name": "Costruttore"} if a["key"] == "manufacturer" else a for a in asset.attributes]
+        db.commit()
+        monkeypatch.delenv("ARGUS_PACKAGES_DIR")
+        loader.reload()
+        plan = installer.plan(db, ws, ["core-objects"])
+        db.rollback()
+        step = next(s for s in plan.steps if s.package_id == "core-objects")
+        assert step.action == "upgrade" and step.result["needs_decision"] == []
+        installer.install(db, ws, ["core-objects"], actor="t")
+        db.commit()
+        db.expire_all()
+        attrs = {a["key"]: a for a in db.get(Schema, asset_types.type_uid(ws, "Asset")).attributes}
+        assert attrs["product_model"]["name"] == "Product model" and "catalogue" in attrs["product_model"]["description"]
+        assert attrs["model"]["name"] == "Model (as recorded)" and attrs["model"]["group"] == "recorded"
+        assert attrs["manufacturer"]["name"] == "Costruttore"                   # its own label kept
+        pbs = {a["key"]: a for a in db.get(Schema, asset_types.type_uid(ws, "Engineered Item")).attributes}
+        assert pbs["pbs_area"]["name"] == "PBS area" and pbs["pbs_code"]["group"] == "PBS"
+    finally:
+        db.rollback()
+        from app.ledger.audit import allow_purge
+        allow_purge(db)
+        w = db.get(Workspace, ws)
+        if w is not None:
+            db.delete(w)
+        db.commit()
+        db.close()
+        loader.reload()

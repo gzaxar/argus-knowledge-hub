@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth import require_permission
+from app.auth import get_identity, require_permission
 from app.db import get_db
 from app.models.asset import Asset
 from app.models.attachment import Attachment
@@ -90,6 +90,34 @@ def download_attachment(
         media_type=attachment.mime_type or "application/octet-stream",
         filename=attachment.filename,
     )
+
+
+@router.get("/{uid}/about")
+def about_attachment(uid: str, identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """What a link to an attachment opens (issue #18): its name, kind and size, and the workspace to read it in —
+    its own, for a person who may read there, whatever workspace they are working in now. Not found otherwise,
+    as for a file that does not exist."""
+    from app.auth import PatIdentity
+    from app.services.permissions import resolve_permission
+    attachment = db.get(Attachment, uid)
+    if attachment is None:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    if isinstance(identity, PatIdentity) or (identity.token is not None and identity.token.workspace_id):
+        ws = identity.workspace_id if isinstance(identity, PatIdentity) else identity.token.workspace_id
+        _get_readable_attachment(uid, ws, db)
+        where = ws
+    elif resolve_permission(db, identity.user, attachment.workspace_id, "read", "objects"):
+        where = attachment.workspace_id
+    else:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    document_uid = None
+    if attachment.document_revision_uid:
+        from app.models.document import DocumentRevision
+        revision = db.get(DocumentRevision, attachment.document_revision_uid)
+        document_uid = revision.document_uid if revision else None
+    return {"uid": attachment.uid, "filename": attachment.filename, "mime_type": attachment.mime_type,
+            "size_bytes": attachment.file_size, "workspace_id": where,
+            "asset_uid": attachment.asset_uid, "document_uid": document_uid}
 
 
 @router.get("/{uid}/verify")

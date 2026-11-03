@@ -41,12 +41,31 @@ names.
 
 A unit's **Product model** is typed as on its label — the model code, or part of it — on the web and on the
 phone. The models already in the catalogue come first; then the **library** of the catalogue's sources: every
-model of the pinned collections not yet installed, among them the NetBox Device Type Library's (marked
-*NetBox · add*). Choosing a library model adds it to the catalogue there and then — with its manufacturer, when
-the catalogue does not have it — and the unit points at it; the next person finds it already there. A record
-already here that looks like it (the same vendor and model code) is never overwritten: it is offered instead.
-Its part number and specifications stay with the collection (shown on the model's page) until the Product Model
-type has fields for them. Offline, the phone offers the models already in the catalogue.
+model of the pinned collections not yet installed, among them the whole NetBox Device Type Library — some 12,700
+devices of 390 manufacturers (marked *NetBox · add*). Choosing a library model adds it to the catalogue there and
+then — with its manufacturer, when the catalogue does not have it — and the unit points at it; the next person
+finds it already there. A record already here that looks like it (the same vendor and model code) is never
+overwritten: it is offered instead. Offline, the phone offers the models already in the catalogue.
+
+A NetBox model comes with everything NetBox says of it: its **part number**, **height** in rack units, **full
+depth**, **airflow**, **weight**, **maximum draw** per power input, its **ports** in one line, and its
+**components** — every interface (with its type, PoE, management flag), console and serial port, power input and
+outlet, front and rear port, module and device bay, and part — shown as tables on the model's page, with
+NetBox's notes; a link in those notes is its datasheet. These are the Product Model's *Hardware* fields
+(core-objects 2.3: the catalogue workspace needs that version to keep them).
+
+On the web, a **new unit** whose Product model lists its components is offered its ports, ticked: each
+interface, console and serial port becomes an Equipment Port, `port of` the unit — a C9200-24T's 24 copper ports,
+its management port and its consoles. A MAC typed in the network section goes on the port of the same name.
+
+## Linking a model made by hand to NetBox
+
+A model created before the catalogue had it (by hand, from GLPI or a spreadsheet) gets NetBox's information by
+being **linked** to the same NetBox model. On its catalogue page (*Product catalogue › the model*), a catalogue
+maintainer uses **Find it in the catalogue's sources**: the model code is searched in the library, the record's
+look-alikes included, and **Link to this one** adopts the record in place. Its empty fields are filled —
+part number, hardware, components, datasheet — the values it has are kept as local overrides, and every unit
+and link stays where it is. From then on the NetBox fields follow the library's releases.
 
 ## Which models a workspace is offered
 

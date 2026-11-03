@@ -101,10 +101,12 @@ class CatalogueApi {
   ///
   /// * [int] limit:
   ///
+  /// * [bool] sourcesOnly:
+  ///
   /// * [String] authorization:
   ///
   /// * [String] xWorkspaceId:
-  Future<Response> searchModelsWithHttpInfo({ String? q, bool? every, int? limit, String? authorization, String? xWorkspaceId, }) async {
+  Future<Response> searchModelsWithHttpInfo({ String? q, bool? every, int? limit, bool? sourcesOnly, String? authorization, String? xWorkspaceId, }) async {
     // ignore: prefer_const_declarations
     final path = r'/v1/catalogue/collections/models/search';
 
@@ -123,6 +125,9 @@ class CatalogueApi {
     }
     if (limit != null) {
       queryParams.addAll(_queryParams('', 'limit', limit));
+    }
+    if (sourcesOnly != null) {
+      queryParams.addAll(_queryParams('', 'sources_only', sourcesOnly));
     }
 
     if (authorization != null) {
@@ -158,11 +163,13 @@ class CatalogueApi {
   ///
   /// * [int] limit:
   ///
+  /// * [bool] sourcesOnly:
+  ///
   /// * [String] authorization:
   ///
   /// * [String] xWorkspaceId:
-  Future<Object?> searchModels({ String? q, bool? every, int? limit, String? authorization, String? xWorkspaceId, }) async {
-    final response = await searchModelsWithHttpInfo( q: q, every: every, limit: limit, authorization: authorization, xWorkspaceId: xWorkspaceId, );
+  Future<Object?> searchModels({ String? q, bool? every, int? limit, bool? sourcesOnly, String? authorization, String? xWorkspaceId, }) async {
+    final response = await searchModelsWithHttpInfo( q: q, every: every, limit: limit, sourcesOnly: sourcesOnly, authorization: authorization, xWorkspaceId: xWorkspaceId, );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }

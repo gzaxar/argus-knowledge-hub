@@ -21,3 +21,11 @@ body,
     outline-offset: 2px;
   }
 }
+
+/* A map keeps its layers to itself (issue #15). Leaflet stacks its panes and controls at z-index 400–1000, above
+   the app's popups (the search palette, dialogs at z-50): each map is its own stacking context, so the page's
+   layers decide what is on top, and a dialog covers a map like anything else. */
+.leaflet-container {
+  isolation: isolate;
+  z-index: 0;
+}

@@ -30,6 +30,8 @@ describe("a record moved here with another workspace's type", () => {
     expect(await screen.findByText(/belongs to the workspace it came from/)).toBeInTheDocument();
     const picker = screen.getByPlaceholderText(/Type to search/);
     expect(picker).toBeEnabled();
+    await waitFor(() => expect((picker as HTMLInputElement).value).toContain("Area"));   // the suggestion is in
+    expect(await screen.findByDisplayValue("Edificio 6a")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Save asset/ }));
     await waitFor(() => expect(update).toHaveBeenCalledWith("e6a", expect.objectContaining({ schema_uid: "lnf:area" }), "lnf"));
   });
@@ -63,5 +65,46 @@ describe("a facility's asset list", () => {
     expect(screen.queryByText("Some model")).not.toBeInTheDocument();       // shared by the catalogue, not the site
     expect(screen.getByLabelText("Whose records")).toHaveValue("site");
     expect(screen.getByRole("option", { name: "This workspace + LNF's places" })).toBeInTheDocument();
+  });
+});
+
+describe("a new object from the type chosen on the Assets page (issue #14)", () => {
+  const tree = [
+    { ...schema("loc", "Location"), is_concrete: false },
+    { ...schema("area", "Area"), parent_schema_uid: "loc" },
+    { ...schema("bld", "Building"), parent_schema_uid: "loc" },
+    schema("cam", "Camera"),
+  ] as AppSchema[];
+  const guide = () => vi.spyOn(intakeApi, "guide").mockResolvedValue({ kind: "asset", ready: false, checks: [], steps: [], next: null });
+
+  it("takes a concrete type as it is", async () => {
+    vi.spyOn(schemasApi, "list").mockResolvedValue(tree);
+    guide();
+    renderWith(<Routes><Route path="/assets/new" element={<AssetForm />} /></Routes>,
+               { path: "/assets/new?schema_uid=cam", cache: { '["me"]': me } });
+    const picker = screen.getByPlaceholderText(/Type to search/) as HTMLInputElement;
+    await waitFor(() => expect(picker.value).toContain("Camera"));
+  });
+
+  it("offers the kinds of an abstract one (Location: Area, Building), and nothing else", async () => {
+    vi.spyOn(schemasApi, "list").mockResolvedValue(tree);
+    guide();
+    renderWith(<Routes><Route path="/assets/new" element={<AssetForm />} /></Routes>,
+               { path: "/assets/new?schema_uid=loc", cache: { '["me"]': me } });
+    const browser = await screen.findByRole("dialog", { name: "All types" });
+    expect(browser).toHaveTextContent("Area");
+    expect(browser).toHaveTextContent("Building");
+    expect(browser).not.toHaveTextContent("Camera");
+    fireEvent.click(screen.getByText("Building"));
+    const picker = screen.getByPlaceholderText(/Type to search/) as HTMLInputElement;
+    await waitFor(() => expect(picker.value).toContain("Building"));
+  });
+
+  it("is what New object on the Assets page asks for", async () => {
+    vi.spyOn(workspacesApi, "listMine").mockResolvedValue([ws("lnf")]);
+    vi.spyOn(schemasApi, "list").mockResolvedValue(tree);
+    vi.spyOn(assetsApi, "list").mockResolvedValue([]);
+    renderWith(<AssetSearch />, { path: "/assets?type=loc", cache: { '["me"]': me } });
+    expect(await screen.findByRole("link", { name: "New object" })).toHaveAttribute("href", "/assets/new?schema_uid=loc");
   });
 });

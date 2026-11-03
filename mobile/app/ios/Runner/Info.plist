@@ -18,7 +18,7 @@
 		<string>processing</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Where you are is attached to a ticket, equipment or a document when you choose "Where I am".</string>
+	<string>Where you are is attached to a ticket, equipment or a document when you choose "Where I am", and the compass on a floor plan points to true north.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Speech recognition turns a question you ask the assistant into text.</string>
 	<key>CFBundleURLTypes</key>

@@ -5,6 +5,20 @@ import { CircleMarker, MapContainer, Polygon, Polyline, TileLayer, useMapEvents 
 import { Link } from "react-router-dom";
 import { ApiError, MAP_TILES, placesApi, type PlaceNeighbour, type PlacedFeature } from "../api/client";
 import { FitTo, GeoShape, drawnGeometry, fmtArea, fmtLength, parseGeometry, pointsOf, type LatLng } from "../lib/geo";
+import { FullPage, useFullPage } from "./FullPage";
+
+const DRAFT_TITLE = { position: "Set its position", route: "Draw its route", outline: "Draw its outline" } as const;
+
+/** The map beside its controls: side by side on the page, the map filling a full-page window. */
+function LocationLayout({ children }: { children: React.ReactNode }) {
+  return useFullPage()
+    ? <div className="grid h-full gap-4 md:grid-cols-[minmax(0,1fr)_22rem]">{children}</div>
+    : <div className="mt-2 grid gap-4 md:grid-cols-2">{children}</div>;
+}
+
+function MapBox({ children }: { children: React.ReactNode }) {
+  return <div className={`relative isolate ${useFullPage() ? "h-[60vh] md:h-full" : "h-56"} overflow-hidden rounded border border-slate-200`}>{children}</div>;
+}
 
 function problem(e: unknown): string {
   if (e instanceof ApiError) {
@@ -42,6 +56,8 @@ export function LocationCard({ uid, editable }: { uid: string; editable: boolean
   const queryClient = useQueryClient();
   const loc = useQuery({ queryKey: ["asset-location", uid], queryFn: () => placesApi.location(uid), retry: false });
   const [draft, setDraft] = useState<PointDraft | ShapeDraft | null>(null);
+  // Setting or drawing it, or looking closer: the map in a full-page window (issue #13).
+  const [viewing, setViewing] = useState(false);
   const l = loc.data;
   const placed = !!(l && (l.location || l.route || l.outline));
   const ctx = useQuery({ queryKey: ["asset-location-context", uid], queryFn: () => placesApi.context(uid),
@@ -89,8 +105,16 @@ export function LocationCard({ uid, editable }: { uid: string; editable: boolean
       {l.hidden ? (
         <p className="mt-2 text-sm text-slate-500">Its location is restricted.</p>
       ) : (
-        <div className="mt-2 grid gap-4 md:grid-cols-2">
-          <div className={`${shapeDraft ? "h-80" : "h-56"} overflow-hidden rounded border border-slate-200`}>
+        <FullPage open={!!draft || viewing} title={draft ? DRAFT_TITLE[draft.kind] : "Location"}
+                  onClose={() => { setDraft(null); setViewing(false); }}>
+        <LocationLayout>
+          <MapBox>
+            {!draft && !viewing && (
+              <button type="button" onClick={() => setViewing(true)} aria-label="Full page"
+                      className="absolute right-2 top-2 z-[1000] rounded border border-slate-300 bg-white/90 px-2 py-0.5 text-xs hover:bg-white">
+                Full page
+              </button>
+            )}
             <MapContainer center={[41.8217, 12.6726]} zoom={15} className="h-full w-full">
               <TileLayer url={MAP_TILES.url} attribution={MAP_TILES.attribution} maxZoom={20} />
               <FitTo points={fit} />
@@ -115,7 +139,7 @@ export function LocationCard({ uid, editable }: { uid: string; editable: boolean
                 <Picker onPick={(lat, lon) => setDraft({ ...shapeDraft, points: [...shapeDraft.points, [lat, lon]] })} />
               )}
             </MapContainer>
-          </div>
+          </MapBox>
           <div className="space-y-3 text-sm">
             <div>
               <p className="text-xs font-semibold uppercase text-slate-500">Position</p>
@@ -252,7 +276,8 @@ export function LocationCard({ uid, editable }: { uid: string; editable: boolean
               </details>
             )}
           </div>
-        </div>
+        </LocationLayout>
+        </FullPage>
       )}
       {ctx.data && <PlaceRelations ctx={ctx.data} />}
     </section>

@@ -47,6 +47,8 @@ dependencies:
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
   flutter_svg: ^2.3.0
+  flutter_compass: ^0.8.1
+  geomag: ^0.3.0
 
 dev_dependencies:
   flutter_test:

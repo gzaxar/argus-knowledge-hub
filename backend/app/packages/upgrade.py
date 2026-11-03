@@ -403,10 +403,18 @@ def _apply_automatic(db: Session, workspace_id: str, row: WorkspacePackage, new:
         elif ch.what == "added":
             if ch.element not in keys:
                 attrs.append(dict(ch.after))
-        elif ch.what in ("relabelled", "changed", "widened"):
-            attrs = [({**a, "name": ch.after["name"], "indexed": ch.after.get("indexed"),
+        elif ch.what in ("relabelled", "changed", "widened", "presented"):
+            def presented(a: dict) -> dict:
+                # The wording travels with a relabel: its description and form group, as the package has them.
+                out = {**a, "name": ch.after["name"], "indexed": ch.after.get("indexed"),
                        "readOnly": ch.after.get("readOnly"), "multiValue": ch.after.get("multiValue")}
-                      if a.get("key") == ch.element else a) for a in attrs]
+                for k in ("description", "group"):
+                    if ch.after.get(k):
+                        out[k] = ch.after[k]
+                    else:
+                        out.pop(k, None)
+                return out
+            attrs = [presented(a) if a.get("key") == ch.element else a for a in attrs]
         _set_attrs(schema, attrs)
         done.append(ch.id)
     return done

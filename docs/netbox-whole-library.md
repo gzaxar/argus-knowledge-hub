@@ -92,6 +92,31 @@ whole library: 35–55 ms.
 *Not yet.* GLPI matching against the library (a match would install its model when accepted): it needs a proposal
 whose value is a model not yet installed, applied on acceptance.
 
+## N2c, as built (2026-11-03): everything NetBox says, and the whole library pinned
+
+*Everything.* A device type's entry keeps each component list as NetBox writes it (`components`: interfaces,
+console and console-server ports, power ports and outlets, front and rear ports, port mappings, module and device
+bays, inventory items), its notes (`notes`; a link in them is `datasheet_url`), its description, its power draw.
+The install maps them to Product Model fields (core-objects 2.3.0, group *Hardware*): part number, rack units,
+full depth, airflow, weight in kg, maximum draw, a port summary, the components as JSON, the notes. A new unit is
+offered its model's sockets as Equipment Ports. A model made by hand is linked to its NetBox entry
+(`POST …/models/link`, maintainers; `search?sources_only=true` finds the entry although the record looks like it).
+
+*Size.* With every component the library is 20 MB of YAML and about 1 GB to load whole — the pod's limit. So the
+NetBox collection is written one file per vendor (`models/<vendor>.yaml`, 392 files), built one manufacturer
+folder at a time, and the application reads a NetBox collection in part (`load_tree(netbox_models=…)`): a model's
+page reads its vendor's file, an upgrade preview the vendors of the models the catalogue has, the collections list
+the manifest only (counted by the index). The whole tree is read by the command line and CI. Measured from an
+empty cache, each step in a fresh process:
+
+| Step | Time | Peak memory |
+|---|---|---|
+| Build the whole library (fetch, read, write) | 60 s | 169 MB |
+| The search index, first build | 5.9 s | 193 MB |
+| A model's page (Cisco: 1,073 models in its file) | 1.2 s | 191 MB |
+| The collections list | 0.1 s | 70 MB |
+| One model installed | 1.2 s | 198 MB |
+
 ## Stages
 
 - **N2a** — vendors from NetBox manufacturers; the batched read; `exclude:`. Tests; the local copy reads all

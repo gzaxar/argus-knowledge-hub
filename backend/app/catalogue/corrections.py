@@ -128,8 +128,12 @@ def patches(db: Session, workspace_id: str, tree: Optional[dict[str, Collection]
 
     `netbox_file(path) -> str` reads a file of the NetBox source at its pinned commit (default: from the
     source cache)."""
-    tree = tree if tree is not None else load_tree()
     rows = list(db.scalars(select(CatalogueEntry).where(CatalogueEntry.workspace_id == workspace_id)))
+    if tree is None:
+        have: dict[str, set[str]] = {}
+        for r in rows:
+            have.setdefault(r.collection_id, set()).add(r.catalogue_id)
+        tree = load_tree(netbox_models=have)
     vendor_ids = {r.record_uid: r.catalogue_id for r in rows if r.kind == "vendor"}
     if netbox_file is None:
         netbox_file = _netbox_reader()

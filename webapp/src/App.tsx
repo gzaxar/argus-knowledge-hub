@@ -23,6 +23,7 @@ import { AssetSearch } from "./pages/assets/Search";
 import { AdvancedSearch } from "./pages/search/Advanced";
 import { MapPage } from "./pages/map/MapPage";
 import { DocumentDetail } from "./pages/documents/Detail";
+import { AttachmentPage } from "./pages/attachments/AttachmentPage";
 import { DocumentForm } from "./pages/documents/Form";
 import { DocumentList } from "./pages/documents/List";
 import { DocumentSuggestions } from "./pages/documents/Suggestions";
@@ -137,6 +138,7 @@ export function App() {
           <Route path="/documents/templates" element={<DocumentTemplates />} />
           <Route path="/documents/templates/:ref" element={<DocumentTemplatePage />} />
           <Route path="/documents/:uid" element={<DocumentDetail />} />
+          <Route path="/attachments/:uid" element={<AttachmentPage />} />
 
           <Route path="/graph" element={<GraphExplorer />} />
           <Route path="/beam-model" element={<BeamModelPage />} />

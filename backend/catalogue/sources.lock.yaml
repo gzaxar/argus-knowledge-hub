@@ -13,19 +13,16 @@ sources:
     repo: https://github.com/infn-argus/devicetype-library.git
     ref: infn
     commit: 25e998f1aa57e9c7c7457c6de2b0d9bd2282e959
-    # device-types/<Manufacturer>/<file without .yaml>: the IT devices INFN uses.
+    # device-types/<Manufacturer>/<file without .yaml>: the whole library — each model installed in the catalogue
+    # the first time someone chooses it, or links a model of the catalogue to it (docs/netbox-whole-library.md).
     select:
-      - Moxa/NPort-5250A
-      - Moxa/NPort-5410
-      - Moxa/NPort-5450
-      - Moxa/NPort-5650-8
-      - Moxa/NPort-5650-16
-      - Basler/a2A1920-51gmBAS
-      - Basler/a2A2600-20gmBAS
-      - Basler/scA640-70gm
+      - "*"
+    exclude:
+      # The same product as Cisco/N2K-C2348TQ-10G-E, in the library itself.
+      - Cisco/N2K-C2348TQ-10GE
     collection:
       id: it-devices
-      version: 0.1.1
+      version: 0.2.0
       name: IT devices (NetBox Device Type Library)
       domain: it
       requires:

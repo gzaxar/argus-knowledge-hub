@@ -20,6 +20,8 @@ export interface SchemaAttribute {
   visible?: boolean;
   order?: number;
   global?: boolean;
+  /** Where a form shows it: fields of one group together, folded while all are empty ("PBS", "recorded"). */
+  group?: string;
 }
 
 export const ATTRIBUTE_TYPES = [
@@ -915,10 +917,34 @@ export interface EffectivePermissions {
   workspace: string[];
 }
 
+/** How one model is called (AI settings › per-model settings). */
+export interface ModelSetting {
+  /** Null: ARGUS's default (0 to classify and chat; the model's own for structured answers). */
+  temperature: number | null;
+  /** Send the switch that tells a reasoning model not to think. */
+  no_thinking: boolean;
+  /** Ask for JSON mode on structured answers. */
+  json_mode: boolean;
+  /** How long a structured answer may take; null: ARGUS's 280 s. */
+  time_limit_s: number | null;
+}
+
+export interface ModelTestResult {
+  ok: boolean;
+  model: string;
+  answered_by: string | null;
+  seconds: number;
+  valid_json: boolean;
+  error: string | null;
+}
+
 export interface LLMConfig {
   workspace_id: string;
   base_url: string;
   model: string;
+  /** The model for answers that are data (a rework, a form, a ticket); null: `model`. */
+  structured_model?: string | null;
+  model_settings?: Record<string, ModelSetting>;
   embedding_model: string | null;
   vision_model: string | null;
   asr_model: string | null;
@@ -942,6 +968,9 @@ export interface LLMConfig {
 export interface LLMConfigInput {
   base_url: string;
   model: string;
+  structured_model?: string | null;
+  /** Omitted keeps the stored settings. */
+  model_settings?: Record<string, ModelSetting>;
   embedding_model?: string | null;
   vision_model?: string | null;
   asr_model?: string | null;

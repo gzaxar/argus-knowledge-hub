@@ -4,9 +4,22 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ModelSettingIn(BaseModel):
+    """How one model is called. `temperature` empty: ARGUS's default (0 to classify and chat; the model's own for
+    structured answers)."""
+    temperature: Optional[float] = Field(default=None, ge=0, le=2)
+    no_thinking: bool = True
+    json_mode: bool = True
+    time_limit_s: Optional[int] = Field(default=None, ge=10, le=3600)
+
+
 class LLMConfigIn(BaseModel):
     base_url: str
     model: str
+    # The model for answers that are data (a rework, a form, a ticket); empty: `model`.
+    structured_model: Optional[str] = None
+    # How each model is called, by name. Left out on an update, the stored settings are kept.
+    model_settings: Optional[dict[str, ModelSettingIn]] = None
     embedding_model: Optional[str] = None
     vision_model: Optional[str] = None
     asr_model: Optional[str] = None
@@ -34,6 +47,8 @@ class LLMConfigOut(BaseModel):
     workspace_id: str
     base_url: str
     model: str
+    structured_model: Optional[str] = None
+    model_settings: dict[str, ModelSettingIn] = {}
     embedding_model: Optional[str]
     vision_model: Optional[str]
     asr_model: Optional[str]
@@ -48,6 +63,22 @@ class LLMConfigOut(BaseModel):
     last_checked_at: Optional[datetime]
     last_check_ok: Optional[bool]
     last_check_error: Optional[str]
+
+
+class ModelTestIn(BaseModel):
+    """A model to try on a small structured extraction, with the settings to try it with (the form's, saved or
+    not)."""
+    model: str
+    settings: Optional[ModelSettingIn] = None
+
+
+class ModelTestResult(BaseModel):
+    ok: bool
+    model: str
+    answered_by: Optional[str] = None
+    seconds: float
+    valid_json: bool = False
+    error: Optional[str] = None
 
 
 class LLMCheckResult(BaseModel):

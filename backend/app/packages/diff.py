@@ -156,6 +156,9 @@ def _attribute_changes(area: str, subject: str, old: dict, new: dict, renamed: d
         if o.get("name") != n.get("name"):
             out.append(Change(f"{base}/{key}/relabelled", DEFINITION, area, subject, key, "relabelled",
                               f"{key!r} is called {n['name']!r} instead of {o['name']!r}", o, n))
+        if (o.get("description"), o.get("group")) != (n.get("description"), n.get("group")) and o.get("name") == n.get("name"):
+            out.append(Change(f"{base}/{key}/presented", DEFINITION, area, subject, key, "presented",
+                              f"{key!r}: its description or form group changes", o, n))
         if not o.get("multiValue") and n.get("multiValue"):
             out.append(Change(f"{base}/{key}/multi", ADDITIVE, area, subject, key, "widened",
                               f"{key!r} takes several values", o, n))

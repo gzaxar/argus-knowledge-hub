@@ -60,6 +60,8 @@ import type {
   LLMCheckResult,
   LLMConfig,
   LLMConfigInput,
+  ModelSetting,
+  ModelTestResult,
   MarkdownImportResult,
   Relation,
   RetypeResult,
@@ -442,6 +444,11 @@ export const exportApi = {
   },
 };
 
+export interface AttachmentAbout {
+  uid: string; filename: string; mime_type: string | null; size_bytes: number | null; workspace_id: string;
+  asset_uid: string | null; document_uid: string | null;
+}
+
 export const attachmentsApi = {
   list: (assetUid: string) =>
     request<Attachment[]>(`/v1/attachments?asset_uid=${assetUid}`),
@@ -473,17 +480,20 @@ export const attachmentsApi = {
     return resp.text();
   },
 
-  fetchBlobUrl: async (uid: string): Promise<string> => {
+  /** `workspaceId`: read it in that workspace (a link's file, of a workspace other than the current one). */
+  fetchBlobUrl: async (uid: string, workspaceId?: string): Promise<string> => {
     const session = await loadSession();
     if (!session) throw new Error("Not signed in");
     const resp = await fetch(`${session.baseUrl}/v1/attachments/${uid}`, {
-      headers: authHeaders(session),
+      headers: authHeaders(workspaceId ? { ...session, workspaceId } : session),
     });
     if (!resp.ok) throw new ApiError(resp.status, await resp.text());
     const blob = await resp.blob();
     return URL.createObjectURL(blob);
   },
   delete: (uid: string) => request<void>(`/v1/attachments/${uid}`, { method: "DELETE" }),
+  /** What a link to a file opens: its name and kind, and the workspace to read it in. */
+  about: (uid: string) => request<AttachmentAbout>(`/v1/attachments/${uid}/about`),
 };
 
 /** The shared icon library types are chosen from — upload once, reuse
@@ -1185,6 +1195,11 @@ export const aiApi = {
     request<LLMConfig>("/v1/ai/config", { method: "PUT", body: json(input) }),
   deleteConfig: () => request<void>("/v1/ai/config", { method: "DELETE" }),
   check: () => request<LLMCheckResult>("/v1/ai/config/check", { method: "POST" }),
+  /** A model tried on a small structured extraction, with the settings given (saved or not). */
+  testModel: (model: string, settings: ModelSetting | null) =>
+    request<ModelTestResult>("/v1/ai/config/test-model", { method: "POST", body: json({ model, settings }) }),
+  testInstallationModel: (model: string, settings: ModelSetting | null) =>
+    request<ModelTestResult>("/v1/admin/ai/config/test-model", { method: "POST", body: json({ model, settings }) }),
   /** The installation's settings (Administration → AI): what every workspace without its own uses. */
   getInstallationConfig: () => request<LLMConfig | null>("/v1/admin/ai/config"),
   saveInstallationConfig: (input: LLMConfigInput) =>
@@ -2397,6 +2412,10 @@ export interface FloorPlanView {
   control_points: ControlPoint[]; transform: Record<string, number> | null; residual_m: number | null;
   /** [longitude, latitude] of the top-left, top-right, bottom-right, bottom-left corners, once placed. */
   corners: [number, number][] | null;
+  /** Where true north points on the picture, degrees clockwise from its top; null: not placed on the map. */
+  north_deg?: number | null;
+  /** The plan's centre on the map, once placed. */
+  centre?: { longitude: number; latitude: number } | null;
   placed?: { uid: string; key: string; name: string; type: string; x: number; y: number; place_uid: string | null }[];
   residuals_m?: number[]; metres_per_px?: number; rotation_deg?: number;
 }
@@ -2404,7 +2423,7 @@ export interface IndoorPlacementView {
   uid: string;
   place: { uid: string; key: string; name: string; type: string } | null;
   level: PlaceLevel | null;
-  plan: { uid: string; name: string; width_px: number; height_px: number } | null;
+  plan: { uid: string; name: string; width_px: number; height_px: number; north_deg?: number | null } | null;
   x: number | null; y: number | null; source: string; note: string | null; state: string;
   valid_from: string | null; valid_until: string | null; confirmed_by: string | null;
 }
@@ -3104,6 +3123,14 @@ export const catalogueCollectionsApi = {
   /** A picker's search: installed models first, then the pinned sources' (the NetBox library among them). */
   searchModels: (q: string, every = false) =>
     request<ModelSearch>(`${CC}/models/search?${new URLSearchParams({ q, ...(every ? { every: "true" } : {}) })}`),
+  /** The pinned sources' models only, those like a record already here included: what a model made by hand is
+   *  linked to. */
+  searchSources: (q: string) =>
+    request<ModelSearch>(`${CC}/models/search?${new URLSearchParams({ q, every: "true", sources_only: "true" })}`),
+  /** A model made by hand, linked to the same one in the sources: its empty fields filled, its own kept. */
+  link: (catalogueId: string, recordUid: string) =>
+    request<{ uid: string; name: string; installed: boolean; filled: string[]; kept: string[] }>(`${CC}/models/link`,
+      { method: "POST", body: json({ catalogue_id: catalogueId, record_uid: recordUid }) }),
   /** Install one model of the sources (and its vendor): 409 names an existing record to choose instead. */
   installOne: (catalogueId: string) =>
     request<{ uid: string; key: string; name: string; installed: boolean }>(`${CC}/models/install-one`,
