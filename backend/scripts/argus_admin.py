@@ -106,9 +106,11 @@ def create_workspace(db, workspace_id: str, name: str, is_global: bool = False) 
     if created:
         db.add(Workspace(id=workspace_id, name=name, is_global=is_global))
         db.flush()
-    # The core-facility package, through the installer (recorded); unchanged on a workspace that has it.
-    from app.packages.install import install
-    install(db, workspace_id, ["core-facility"], actor="argus-admin")
+    # The core-facility package, through the installer (recorded), on a workspace without it. One that has it,
+    # at any version, is left as it is: an upgrade can need decisions, made in Administration › Packages.
+    from app.packages.install import install, installed
+    if "core-facility" not in installed(db, workspace_id):
+        install(db, workspace_id, ["core-facility"], actor="argus-admin")
     return created
 
 
