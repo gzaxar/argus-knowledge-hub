@@ -237,8 +237,9 @@ def create_export(db: Session, actor: str, *, mode: str, workspaces: list[str], 
         raise ServiceError(f"unknown identity profile {profile!r}", "invalid", 422)
     if mode == "incremental":
         base = db.get(PortabilityExport, base_export_id or "")
-        if base is None or base.state != "published":
-            raise ServiceError("an incremental export needs a published base export", "invalid", 422)
+        if not was_published(base):
+            raise ServiceError("an incremental export needs a base export published to Git (expired since is fine: "
+                               "its publication stays)", "invalid", 422)
         workspaces = list(base.workspaces)
         classifications = list(base.classifications)
         profile = (base.manifest or {}).get("identity", {}).get("profile", profile)
@@ -1140,6 +1141,12 @@ def set_legal_hold(db: Session, subject, on: bool, reason: str, actor: str):
 
 
 EXPORT_DONE = ("published", "ready_to_publish", "failed", "revoked", "expired")
+
+
+def was_published(exp: Optional[PortabilityExport]) -> bool:
+    """Published to Git — still, or expired since: retention deletes an export's local files, not its publication
+    (its record, manifest and tag stay), so an increment can still be built on it. Not one revoked."""
+    return exp is not None and exp.state in ("published", "expired") and bool((exp.git or {}).get("tag"))
 IMPORT_DONE = ("finalized", "discarded", "failed", "invalid")
 
 
