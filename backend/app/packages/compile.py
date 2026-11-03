@@ -41,6 +41,10 @@ def attribute(spec: dict, option_sets: dict) -> dict:
         out["restricted"] = str(spec["restricted"])
     if spec.get("description"):
         out["description"] = str(spec["description"])
+    if spec.get("group"):
+        # Where a form shows it: fields of one group together, folded while all are empty (the PBS segments; what
+        # an import recorded beside the catalogue's model).
+        out["group"] = str(spec["group"])
     return out
 
 

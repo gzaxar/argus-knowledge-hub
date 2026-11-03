@@ -21,7 +21,7 @@ from app.packages import available, load, validate
 from app.packages import install as installer
 from app.packages.__main__ import main as cli
 from app.services import asset_types
-from tests.package_parity import FIXTURES, seed_every_way
+from tests.package_parity import FIXTURES, before_2_2, seed_every_way
 
 client = TestClient(app)
 
@@ -157,7 +157,7 @@ def _as_before(schema: dict) -> dict:
         if a.get("key") in ("argus_impact", "argus_criticality", "argus_source") and a.get("options"):
             a["options"] = sorted((o for o in a["options"] if o.get("id") not in NEUTRAL_OPTIONS),
                                   key=lambda o: o["id"])
-        attrs.append(a)
+        attrs.append(before_2_2(a))
     s["attributes"] = attrs
     if s["name"] in MADE_CONCRETE:
         s["is_concrete"] = False
@@ -182,7 +182,8 @@ def test_installing_the_packages_writes_exactly_what_seeding_wrote_before_them()
     beam options kept, with their ids and labels, by the accelerator package), added the GLPI provenance
     fields, made two IT types concrete, and brought the types of the packages the accelerator now stands on
     (safety, vacuum-cryo, optics-alignment, core-records); core-objects 2.1.0 gave Equipment Port a serial
-    port's settings. Nothing else changed: no type, field or option a
+    port's settings; 2.2.0 reworded a few fields (Product model, the "as recorded" ones, PBS area) and grouped
+    them. Nothing else changed: no type, field or option a
     workspace had is gone or different."""
     before = json.loads((FIXTURES / "seeding.json").read_text())
     now = seed_every_way(_by_installer)

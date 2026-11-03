@@ -1,5 +1,5 @@
 id: core-objects
-version: 2.1.0
+version: 2.2.0
 name: Core objects
 description: >-
   The backbone every object catalogue stands on: the root type and its branches, physical equipment and what
