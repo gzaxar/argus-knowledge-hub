@@ -1,0 +1,10 @@
+# Direct authentication against INFN's existing TEST Keycloak.
+# Apply after environment values. The web image must be built with matching VITE_* settings.
+# See docs/corporate-sso.md. Public client with PKCE; no client secret.
+keycloak:
+  enabled: false
+api:
+  oidc:
+    issuer: https://idp-test.app.infn.it/auth/realms/aai
+    jwksUri: https://idp-test.app.infn.it/auth/realms/aai/protocol/openid-connect/certs
+    audience: argus-knowledge-hub

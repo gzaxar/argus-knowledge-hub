@@ -115,6 +115,9 @@ def expired(request: Request) -> Optional[Response]:
 
 
 async def run(request: Request, call_next):
+    # Token responses must never be persisted or replayed by the API.
+    if request.url.path == "/v1/auth/oidc/token":
+        return await call_next(request)
     key = request.headers.get(HEADER)
     if request.method not in MUTATING or key is None:
         refused = expired(request)

@@ -168,6 +168,9 @@ def legacy_jira(path: str, request: Request):
                             status_code=301)
 
 
+from app.routers import oidc_login  # noqa: E402
+app.include_router(oidc_login.router)
+
 app.include_router(schemas.router)
 app.include_router(assets.router)
 app.include_router(assets.relations_router)

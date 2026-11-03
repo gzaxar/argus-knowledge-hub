@@ -11,6 +11,7 @@ import { User, UserManager, WebStorageStateStore } from "oidc-client-ts";
  */
 const authority = import.meta.env.VITE_OIDC_AUTHORITY;
 const clientId = import.meta.env.VITE_OIDC_CLIENT_ID;
+const tokenEndpoint = import.meta.env.VITE_OIDC_TOKEN_ENDPOINT;
 
 export const infnLoginLabel = import.meta.env.VITE_OIDC_LABEL || "INFN login";
 /** Off unless a provider is configured, so a build with none simply doesn't show the button. */
@@ -29,6 +30,11 @@ function getManager(): UserManager {
       redirect_uri: `${window.location.origin}${CALLBACK_PATH}`,
       post_logout_redirect_uri: `${window.location.origin}/`,
       response_type: "code",
+      // Confidential clients exchange and refresh tokens through the API.
+      ...(tokenEndpoint ? {
+        metadataSeed: { token_endpoint: tokenEndpoint },
+        refreshTokenAllowedScope: "openid email profile",
+      } : {}),
       scope: "openid email profile",
       // localStorage, not the default sessionStorage: a new tab, or a reload
       // after the tab was discarded, must not mean signing in again.

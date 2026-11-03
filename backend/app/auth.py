@@ -9,6 +9,7 @@ import jwt
 from fastapi import Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth_oidc import oidc_configured, verify_oidc_token
@@ -175,9 +176,19 @@ def _resolve_oidc_user(db: Session, claims: dict) -> User:
     if user is None:
         user = User(id=str(uuid.uuid4()), oidc_sub=sub, email=email, name=claims.get("name"),
                     is_admin=bool(email) and email.lower() in bootstrap_admins())
-        db.add(user)
-        db.flush()
-        return user
+        try:
+            # /me and /me/workspaces can be the first requests in parallel.
+            # A savepoint contains a competing insert without aborting the
+            # caller's transaction; the unique subject picks the same user.
+            with db.begin_nested():
+                db.add(user)
+                db.flush()
+        except IntegrityError:
+            user = db.scalar(select(User).where(User.oidc_sub == sub))
+            if user is None:
+                raise
+        else:
+            return user
 
     user.oidc_sub = sub
     if email:
