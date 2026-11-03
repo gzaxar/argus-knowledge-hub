@@ -14,6 +14,8 @@ class ModelSettingIn(BaseModel):
 
 
 class LLMConfigIn(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())    # `model_settings` is a field, not pydantic's
+
     base_url: str
     model: str
     # The model for answers that are data (a rework, a form, a ticket); empty: `model`.

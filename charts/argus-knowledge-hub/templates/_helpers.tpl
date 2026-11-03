@@ -23,6 +23,11 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 - {name: ARGUS_PORTABILITY_ROOT, value: /data/portability}
 - {name: ARGUS_PORTABILITY_DECRYPTION_KEYS, value: /etc/argus/portability-decryption}
 {{- $oidc := .Values.api.oidc | default dict }}
+{{- if and (or $oidc.issuer $oidc.jwksUri $oidc.audience) .Values.keycloak.enabled }}
+{{- /* Signing in with an external provider (INFN AAI) while the bundled Keycloak still runs: Keycloak's tokens stay
+     trusted beside it — the mobile app and Keycloak's own Google sign-in use them. */}}
+{{- $providers = append ($providers | default list) (dict "issuer" $kcIssuer "jwks_uri" (printf "http://argus-keycloak:8080/realms/%s/protocol/openid-connect/certs" .Values.keycloak.realm) "audience" .Values.keycloak.clientId) }}
+{{- end }}
 {{- if or $oidc.issuer $oidc.jwksUri $oidc.audience }}
 - {name: OIDC_ISSUER, value: {{ required "api.oidc.issuer is required" $oidc.issuer | quote }}}
 - {name: OIDC_JWKS_URI, value: {{ required "api.oidc.jwksUri is required" $oidc.jwksUri | quote }}}

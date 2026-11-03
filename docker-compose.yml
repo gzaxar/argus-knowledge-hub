@@ -65,6 +65,9 @@ services:
       OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:${KEYCLOAK_PORT:-8081}/realms/argus-dev}
       OIDC_JWKS_URI: ${OIDC_JWKS_URI:-http://keycloak:8080/realms/argus-dev/protocol/openid-connect/certs}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-argus-webapp}
+      # More issuers the API trusts (JSON): by default Google (Firebase), the web's Google button, as in production.
+      # With INFN AAI as the issuer, deploy/infn-test.env adds this Keycloak too (the mobile app, the test users).
+      OIDC_EXTRA_PROVIDERS: '${OIDC_EXTRA_PROVIDERS:-[{"issuer": "https://securetoken.google.com/seraphic-camera-479521-s5", "jwks_uri": "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com", "audience": "seraphic-camera-479521-s5"}]}'
       # Confidential clients: used only by the API, never passed to the web build.
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
       OIDC_TOKEN_ENDPOINT: ${OIDC_TOKEN_ENDPOINT:-}

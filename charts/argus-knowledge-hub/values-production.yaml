@@ -27,6 +27,12 @@ api:
   portabilitySize: 5Gi
   nodeSelector:
     kubernetes.io/hostname: vnode-2
+  # The web's INFN login: INFN AAI (test realm), public client with PKCE (docs/corporate-sso.md). ARGUS's Keycloak
+  # stays trusted beside it (the mobile app, and Keycloak's Google sign-in), and so does Google below.
+  oidc:
+    issuer: https://idp-test.app.infn.it/auth/realms/aai
+    jwksUri: https://idp-test.app.infn.it/auth/realms/aai/protocol/openid-connect/certs
+    audience: argus-knowledge-hub
   # Google sign-in (Firebase), as before Keycloak, so existing accounts keep working.
   extraProviders:
     - issuer: https://securetoken.google.com/seraphic-camera-479521-s5

@@ -1,5 +1,21 @@
 # Direct INFN Keycloak sign-in
 
+## INFN AAI and Google, side by side
+
+ARGUS keeps both: the web's **INFN login** signs in with INFN AAI (below), and its **Google** button with Google
+(Firebase), as before. The API trusts every issuer it is given — `OIDC_ISSUER` and the `OIDC_EXTRA_PROVIDERS` list:
+
+| | Production | Development (`docker compose`) |
+|---|---|---|
+| Web *INFN login* | INFN AAI (`release.yml`: `WEB_OIDC_AUTHORITY`, client `argus-knowledge-hub`) | the local Keycloak; INFN AAI with `--env-file deploy/infn-test.env` (or `.env.infn-local`) |
+| Web *Google* | Google (Firebase), trusted as an extra provider | the same: compose trusts Google by default |
+| Mobile app | ARGUS's Keycloak (and its Google sign-in), trusted beside INFN AAI while `keycloak.enabled` | the local Keycloak, trusted beside INFN AAI by `deploy/infn-test.env` |
+
+The chart adds the bundled Keycloak to the trusted issuers by itself when `api.oidc` names another provider and
+`keycloak.enabled` is on. The mobile app moves to INFN AAI once the client accepts its redirect
+`it.infn.argus.field:/oauthredirect` (and the app is built with that issuer). People are matched by e-mail, so an
+account keeps its roles whichever provider it signs in with, as long as the e-mail is the same.
+
 ARGUS signs in directly to the INFN test realm using public client **`argus-knowledge-hub`** and
 Authorization Code with PKCE S256. The browser exchanges and refreshes tokens directly with INFN;
 there is no client secret and no token mediation through the ARGUS API. The API verifies ID tokens
