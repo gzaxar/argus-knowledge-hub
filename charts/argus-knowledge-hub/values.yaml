@@ -40,6 +40,15 @@ api:
   nodeSelector: {}
   # Sign-in providers besides Keycloak, as the API's OIDC_EXTRA_PROVIDERS entries: {issuer, jwks_uri, audience}.
   extraProviders: []
+  # Direct external OIDC authentication; takes precedence over the bundled Keycloak.
+  oidc:
+    issuer: ""
+    jwksUri: ""
+    audience: ""
+    # Optional confidential-client token mediation (secret from existingSecret).
+    tokenEndpoint: ""
+    redirectUris: []
+    clientSecretKey: ""
   # More environment, e.g. the portability settings (docs/operations.md, "Configuration").
   env: {}
   resources:

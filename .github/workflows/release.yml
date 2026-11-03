@@ -70,9 +70,10 @@ jobs:
           context: webapp
           push: true
           build-args: |
-            VITE_OIDC_AUTHORITY=${{ env.WEB_KEYCLOAK }}
-            VITE_OIDC_CLIENT_ID=argus-webapp
-            VITE_OIDC_LABEL=Keycloak login
+            VITE_OIDC_AUTHORITY=${{ vars.OIDC_AUTHORITY || env.WEB_KEYCLOAK }}
+            VITE_OIDC_CLIENT_ID=${{ vars.OIDC_CLIENT_ID || 'argus-webapp' }}
+            VITE_OIDC_TOKEN_ENDPOINT=${{ vars.OIDC_TOKEN_ENDPOINT }}
+            VITE_OIDC_LABEL=${{ vars.OIDC_LABEL || 'Keycloak login' }}
             VITE_API_BASE_URL=${{ env.WEB_API }}
             VITE_APP_VERSION=${{ steps.version.outputs.version }}
             VITE_APP_COMMIT=${{ steps.version.outputs.commit }}
