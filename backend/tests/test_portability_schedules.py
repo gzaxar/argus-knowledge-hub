@@ -276,3 +276,59 @@ def test_the_api_lets_administrators_set_change_run_and_remove_a_schedule(env, m
         assert all(s["id"] != sched["id"] for s in client.get("/v1/portability/schedules").json())
     finally:
         app.dependency_overrides.pop(get_identity, None)
+
+
+def _expire_everything(eng, env):
+    """Retention after its period: every finished export's local files deleted, a published one now expired."""
+    from datetime import datetime, timezone
+    with Session(eng) as db:
+        cfg = env.cfg("src")
+        later = datetime.now(timezone.utc) + timedelta(days=cfg.policy.retention_days + 1)
+        out = service.cleanup(db, cfg, now=later)
+        db.commit()
+        return out["exports"]
+
+
+def test_a_chain_goes_on_when_retention_expires_its_last_publication(dbs, env):
+    """Production, 3 November 2026: retention of one day expired every export, and the daily schedule failed —
+    "no longer published". Retention deletes an export's local files, not its publication, which is all an
+    increment needs: the chain goes on from the expired export, and a schedule can be set on one."""
+    src = dbs()
+    s = populate(src, env.tmp)
+    first, _ = run_export(src, env, s)
+    sid = _schedule(src, env, first["id"])
+    assert first["id"] in _expire_everything(src, env)
+    with Session(src) as db:
+        assert db.get(PortabilityExport, first["id"]).state == "expired"
+
+    _edit(src, s, "Rack E1")
+    out = _run(src, env, sid)
+    assert out["outcome"] == "published", out["message"]
+    with Session(src) as db:
+        inc = db.get(PortabilityExport, out["export"])
+        assert inc.base_export_id == first["id"] and inc.git["previous_tag"] == first["git"]["tag"]
+
+    _expire_everything(src, env)
+    _edit(src, s, "Rack E2")
+    out2 = _run(src, env, sid)
+    assert out2["outcome"] == "published", out2["message"]
+    with Session(src) as db:
+        assert db.get(PortabilityExport, out2["export"]).base_export_id == inc.id      # from the expired increment
+        # A new schedule can be set on an expired export too.
+        db.query(PortabilitySchedule).filter_by(id=sid).delete()
+        db.commit()
+    assert _schedule(src, env, out2["export"])
+
+
+def test_a_revoked_publication_ends_the_chain(dbs, env):
+    src = dbs()
+    s = populate(src, env.tmp)
+    first, _ = run_export(src, env, s)
+    sid = _schedule(src, env, first["id"])
+    with Session(src) as db:
+        exp = db.get(PortabilityExport, first["id"])
+        exp.state = "revoked"
+        db.commit()
+    _edit(src, s, "Rack E3")
+    out = _run(src, env, sid)
+    assert out["outcome"] == "failed" and "no longer published (revoked)" in out["message"]
