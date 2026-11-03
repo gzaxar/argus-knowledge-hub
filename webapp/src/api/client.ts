@@ -60,6 +60,8 @@ import type {
   LLMCheckResult,
   LLMConfig,
   LLMConfigInput,
+  ModelSetting,
+  ModelTestResult,
   MarkdownImportResult,
   Relation,
   RetypeResult,
@@ -1193,6 +1195,11 @@ export const aiApi = {
     request<LLMConfig>("/v1/ai/config", { method: "PUT", body: json(input) }),
   deleteConfig: () => request<void>("/v1/ai/config", { method: "DELETE" }),
   check: () => request<LLMCheckResult>("/v1/ai/config/check", { method: "POST" }),
+  /** A model tried on a small structured extraction, with the settings given (saved or not). */
+  testModel: (model: string, settings: ModelSetting | null) =>
+    request<ModelTestResult>("/v1/ai/config/test-model", { method: "POST", body: json({ model, settings }) }),
+  testInstallationModel: (model: string, settings: ModelSetting | null) =>
+    request<ModelTestResult>("/v1/admin/ai/config/test-model", { method: "POST", body: json({ model, settings }) }),
   /** The installation's settings (Administration → AI): what every workspace without its own uses. */
   getInstallationConfig: () => request<LLMConfig | null>("/v1/admin/ai/config"),
   saveInstallationConfig: (input: LLMConfigInput) =>

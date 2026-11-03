@@ -35,7 +35,7 @@ import requests
 
 from app.services import doc_templates as dt
 from app.services.ai_suggestions import CODE_FENCE, THINK_BLOCK
-from app.services.llm import COMPLETION_TIMEOUT_SECONDS, Endpoint, LLMError, complete_structured
+from app.services.llm import COMPLETION_TIMEOUT_SECONDS, Endpoint, LLMError, LLMOvertime, complete_structured
 
 MAX_SOURCE_CHARS = 60_000
 MAX_ITEM_CHARS = 4000
@@ -299,6 +299,10 @@ def extract(endpoint: Endpoint, t: dt.Template, source: str, meta: SourceMeta, d
     system, user = build_prompt(t, source, meta, document_types)
     try:
         reply = complete_structured(endpoint, system, user)
+    except LLMOvertime as e:
+        raise ReshapeError(f"The assistant ({e.model}) kept reasoning for over {e.limit_s} s without answering; "
+                           "nothing was made. Its model thinks at length before every answer: try again, or choose a "
+                           "model for structured work that answers without reasoning in the AI settings.", 504) from e
     except LLMError as e:
         if isinstance(e.__cause__, requests.Timeout):
             raise ReshapeError(f"The assistant did not finish within {COMPLETION_TIMEOUT_SECONDS // 60} minutes, "
