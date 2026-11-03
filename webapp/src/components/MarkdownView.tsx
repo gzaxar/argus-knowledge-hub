@@ -67,9 +67,10 @@ export function MarkdownView({
           ),
           p: ({ children }) => <p className="my-2">{children}</p>,
           a: ({ href, children }) =>
-            // A page of ARGUS itself (a record an answer cites) opens here, like any other link in the app.
-            href && /^\/(assets|tickets|documents)\//.test(href) ? (
-              <Link to={href} className="text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-600">
+            // A page of ARGUS itself (a record an answer cites, a file) opens here, like any other link in the app;
+            // a file's API address opens its page, which reads it signed in (issue #18).
+            href && /^\/(assets|tickets|documents|attachments|v1\/attachments)\//.test(href) ? (
+              <Link to={href.replace(/^\/v1\/attachments\//, "/attachments/")} className="text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-600">
                 {children}
               </Link>
             ) : (

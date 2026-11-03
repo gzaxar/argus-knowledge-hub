@@ -8,6 +8,12 @@ import type { Asset } from "../api/types";
 import { AffineImage } from "../lib/affineOverlay";
 import { FitTo, pointsOf, type LatLng } from "../lib/geo";
 import { PlanView, usePlanImage } from "./PlanView";
+import { FullPage, useFullPage } from "./FullPage";
+
+/** A plan or map's height: modest on the page, the screen's in a full-page window. */
+function useTall(inline: string): string {
+  return useFullPage() ? "h-[calc(100vh-11rem)] min-h-[20rem]" : inline;
+}
 
 function problem(e: unknown): string {
   if (e instanceof ApiError) {
@@ -29,6 +35,7 @@ export function IndoorCard({ uid, editable }: { uid: string; editable: boolean }
   const view = useQuery({ queryKey: ["asset-indoors", uid], queryFn: () => indoorApi.indoors(uid), retry: false });
   const floors = useQuery({ queryKey: ["asset-levels", uid], queryFn: () => indoorApi.levels(uid), retry: false });
   const [editing, setEditing] = useState(false);
+  const [seeing, setSeeing] = useState(false);
   const refresh = () => {
     for (const k of ["asset-indoors", "asset-levels", "asset-location", "asset-location-context", "asset-history"]) {
       queryClient.invalidateQueries({ queryKey: [k] });
@@ -61,8 +68,14 @@ export function IndoorCard({ uid, editable }: { uid: string; editable: boolean }
             )}
             {p.plan && p.x != null && p.y != null && (
               <div className="mt-2 max-w-xl">
-                <PlanView planUid={p.plan.uid} width={p.plan.width_px} height={p.plan.height_px} className="h-56"
-                          pins={[{ id: uid, x: p.x, y: p.y, label: "here", colour: "#dc2626" }]} />
+                <FullPage open={seeing} title={`On the plan ${p.plan.name}`} onClose={() => setSeeing(false)}>
+                  <HerePlan plan={p.plan} x={p.x} y={p.y} uid={uid} />
+                </FullPage>
+                {!seeing && (
+                  <button type="button" onClick={() => setSeeing(true)} className="mt-1 text-xs text-indigo-700 underline">
+                    Full page
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -76,7 +89,11 @@ export function IndoorCard({ uid, editable }: { uid: string; editable: boolean }
                           className="text-xs text-red-600 underline">remove</button>}
           </div>
         )}
-        {editing && <PlacementEditor uid={uid} current={v} onDone={() => { setEditing(false); refresh(); }} onCancel={() => setEditing(false)} />}
+        {editing && (
+          <FullPage open title={p ? "Move it" : "Place it inside"} onClose={() => setEditing(false)}>
+            <PlacementEditor uid={uid} current={v} onDone={() => { setEditing(false); refresh(); }} onCancel={() => setEditing(false)} />
+          </FullPage>
+        )}
       </div>
 
       {isPlace && floors.data && (
@@ -155,6 +172,11 @@ export function SiteSharing({ uid }: { uid: string }) {
   );
 }
 
+function HerePlan({ plan, x, y, uid }: { plan: { uid: string; width_px: number; height_px: number }; x: number; y: number; uid: string }) {
+  return <PlanView planUid={plan.uid} width={plan.width_px} height={plan.height_px} className={useTall("h-56")}
+                   pins={[{ id: uid, x, y, label: "here", colour: "#dc2626" }]} />;
+}
+
 /** Choose the place (a room, a hall) by searching, optionally a plan of it (or of a place it is in) and the
  *  point on it. */
 function PlacementEditor({ uid, current, onDone, onCancel }: {
@@ -176,6 +198,7 @@ function PlacementEditor({ uid, current, onDone, onCancel }: {
     enabled: owners.length > 0,
   });
   const plan = plans.data?.find((x) => x.uid === planUid) ?? null;
+  const tall = useTall("h-72");
   const save = useMutation({
     mutationFn: () => indoorApi.setIndoors(uid, { place_uid: place?.uid ?? null, plan_uid: planUid,
                                                    x: planUid && point ? point.x : null, y: planUid && point ? point.y : null }),
@@ -219,7 +242,7 @@ function PlacementEditor({ uid, current, onDone, onCancel }: {
             <>
               <p className="mt-1 text-xs text-slate-500">Click the plan where it is{plan.corners ? "; the plan is placed on the map, so this gives it its position too" : ""}.</p>
               <PlanView planUid={plan.uid} width={plan.width_px} height={plan.height_px} pick={point}
-                        onPick={(x, y) => setPoint({ x, y })} className="mt-1 h-72" />
+                        onPick={(x, y) => setPoint({ x, y })} className={`mt-1 ${tall}`} />
             </>
           )}
         </div>
@@ -302,7 +325,11 @@ function FloorsAndPlans({ placeUid, levels, plans, contents, editable, onChanged
               {editable && <button type="button" onClick={() => confirm(`Remove the plan ${pl.name}?`) && removePlan.mutate(pl.uid)}
                                    className="ml-2 text-red-600 underline">remove</button>}
               {open === pl.uid && <OpenPlan uid={pl.uid} />}
-              {placing === pl.uid && <PlanPlacer plan={pl} onDone={() => { setPlacing(null); onChanged(); }} />}
+              {placing === pl.uid && (
+                <FullPage open title={`Place the plan ${pl.name} on the map`} onClose={() => setPlacing(null)}>
+                  <PlanPlacer plan={pl} onDone={() => { setPlacing(null); onChanged(); }} />
+                </FullPage>
+              )}
             </li>
           ))}
         </ul>
@@ -343,15 +370,25 @@ function FloorsAndPlans({ placeUid, levels, plans, contents, editable, onChanged
 /** A plan with the records placed on it. */
 function OpenPlan({ uid }: { uid: string }) {
   const plan = useQuery({ queryKey: ["plan", uid], queryFn: () => indoorApi.plan(uid) });
+  const [full, setFull] = useState(false);
   if (!plan.data) return null;
   const p = plan.data;
   return (
     <div className="mt-1 max-w-3xl">
-      <PlanView planUid={p.uid} width={p.width_px} height={p.height_px} className="h-96"
-                pins={(p.placed ?? []).map((r) => ({ id: r.uid, x: r.x, y: r.y, label: r.name }))} />
-      <p className="mt-1 text-slate-500">{(p.placed ?? []).length} record(s) placed on it.</p>
+      <FullPage open={full} title={`Plan ${p.name}`} onClose={() => setFull(false)}>
+        <PlacedOnPlan plan={p} />
+      </FullPage>
+      <p className="mt-1 text-slate-500">
+        {(p.placed ?? []).length} record(s) placed on it.
+        {!full && <button type="button" onClick={() => setFull(true)} className="ml-2 text-indigo-700 underline">Full page</button>}
+      </p>
     </div>
   );
+}
+
+function PlacedOnPlan({ plan: p }: { plan: FloorPlanView }) {
+  return <PlanView planUid={p.uid} width={p.width_px} height={p.height_px} className={useTall("h-96")}
+                   pins={(p.placed ?? []).map((r) => ({ id: r.uid, x: r.x, y: r.y, label: r.name }))} />;
 }
 
 function WorldClicks({ onPick }: { onPick: (lat: number, lon: number) => void }) {
@@ -366,6 +403,7 @@ function PlanPlacer({ plan, onDone }: { plan: FloorPlanView; onDone: () => void 
   const [pixel, setPixel] = useState<{ x: number; y: number } | null>(null);
   const [result, setResult] = useState<FloorPlanView | null>(null);
   const image = usePlanImage(plan.uid);
+  const tall = useTall("h-80");
   const save = useMutation({ mutationFn: () => indoorApi.placePlan(plan.uid, points), onSuccess: (r) => setResult(r) });
   const unplace = useMutation({ mutationFn: () => indoorApi.unplacePlan(plan.uid), onSuccess: onDone });
   const shown = result ?? plan;
@@ -377,10 +415,10 @@ function PlanPlacer({ plan, onDone }: { plan: FloorPlanView; onDone: () => void 
         {pixel ? "Now click the same place on the map." : "Click a point you can recognise on the plan (a corner, a column), then the same place on the map."}
       </p>
       <div className="grid gap-2 lg:grid-cols-2">
-        <PlanView planUid={plan.uid} width={plan.width_px} height={plan.height_px} className="h-80" pick={pixel}
+        <PlanView planUid={plan.uid} width={plan.width_px} height={plan.height_px} className={tall} pick={pixel}
                   pins={points.map((p, i) => ({ id: String(i), x: p.x, y: p.y, label: `point ${i + 1}`, colour: "#7c3aed" }))}
                   onPick={(x, y) => setPixel({ x, y })} />
-        <div className="h-80 overflow-hidden rounded border border-slate-200">
+        <div className={`${tall} overflow-hidden rounded border border-slate-200`}>
           <MapContainer center={[41.8217, 12.6726]} zoom={17} className="h-full w-full">
             <TileLayer url={MAP_TILES.url} attribution={MAP_TILES.attribution} maxZoom={21} />
             <FitTo points={fit} maxZoom={20} />

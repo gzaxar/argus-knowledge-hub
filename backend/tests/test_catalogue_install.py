@@ -271,8 +271,8 @@ def test_the_database_holds_one_record_per_id_and_one_id_per_record(w):
 def test_the_api_previews_and_installs_for_administrators(w, monkeypatch):
     tree = release(w)
     monkeypatch.setattr(inst, "catalogue_workspace", lambda db: w["ws"])
-    monkeypatch.setattr("app.routers.catalogue_collections.load_tree", lambda: tree)
-    monkeypatch.setattr(inst, "load_tree", lambda: tree)
+    monkeypatch.setattr("app.routers.catalogue_collections.load_tree", lambda **_: tree)
+    monkeypatch.setattr(inst, "load_tree", lambda **_: tree)
     client = TestClient(app)
     app.dependency_overrides[get_identity] = lambda: OidcIdentity(user=w["admin"])
     try:
@@ -429,3 +429,24 @@ def test_an_install_that_would_lose_references_keeps_nothing(w):
                      expected={"moxa/nport-5450": {"units": 5, "relations": 0, "documents": 0}})
     w["db"].rollback()
     assert w["db"].scalar(select(CatalogueEntry).where(CatalogueEntry.workspace_id == w["ws"])) is None
+
+
+def test_a_models_hardware_fills_the_product_model_fields(w):
+    """core-objects 2.3: the part number, height, weight, airflow, draw, ports and every component become the
+    model's fields (where its type has them); the specifications are still shown whole."""
+    import json
+    keys = {a.get("key") for a in w["model"].attributes or []}
+    assert {"part_number", "components", "weight_kg"} <= keys, "the Product Model type has its hardware fields"
+    hw = {**NPORT, "part_number": "NP5450-T", "notes": "See the [manual](https://moxa.example/m.pdf)",
+          "specifications": {"rack_units": 1, "full_depth": False, "weight": {"value": 740, "unit": "g"},
+                             "airflow": "passive", "maximum_draw_w": 12},
+          "components": {"interfaces": [{"name": "eth0", "type": "100base-tx"}],
+                         "console_server_ports": [{"name": f"P{i}", "type": "de-9"} for i in range(1, 5)]}}
+    run(w, release(w, models=[hw]))
+    model, row = record(w, "moxa/nport-5450")
+    a = model.attributes
+    assert a["part_number"] == "NP5450-T" and a["rack_units"] == 1 and a["full_depth"] is False
+    assert a["weight_kg"] == 0.74 and a["airflow"] == "passive" and a["maximum_draw_w"] == 12
+    assert a["port_summary"] == "1 × 100base-tx, 4 serial" and a["source_notes"].startswith("See the")
+    assert json.loads(a["components"])["console_server_ports"][3] == {"name": "P4", "type": "de-9"}
+    assert {"part_number", "components", "weight_kg"} <= set(row.managed_fields)

@@ -98,6 +98,14 @@ def _entry_view(r) -> dict:
             "corrections": r.corrections, "adopted_at": r.adopted_at, "adopted_by": r.adopted_by}
 
 
+def _counts(c, lib) -> dict:
+    """A collection's size; a NetBox library's from the index (its models are read only when chosen)."""
+    if not c.partial:
+        return {"summary": c.summary(), "vendors": len(c.vendors), "models": len(c.models)}
+    n = sum(1 for i in lib.items if i.collection == c.id)
+    return {"summary": f"{n} models, each installed when it is chosen", "vendors": len(c.vendors), "models": n}
+
+
 @router.get("")
 def list_collections(identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
     """The collections this installation ships, whether each is valid, and the release the catalogue workspace
@@ -107,7 +115,9 @@ def list_collections(identity: Identity = Depends(get_identity), db: Session = D
     _may_read(db, identity, ws)
     try:
         pins = describe()
-        tree = load_tree()
+        tree = load_tree(netbox_models={})                 # a NetBox library: its manifest, counted by the index
+        from app.catalogue.library import index
+        lib = index() if any(c.partial for c in tree.values()) else None
     except SourceProblem as e:
         raise HTTPException(status_code=502, detail={"error": f"the catalogue's sources cannot be read as pinned: {e}"})
     problems = tree_problems(tree)
@@ -117,7 +127,7 @@ def list_collections(identity: Identity = Depends(get_identity), db: Session = D
         got = have.get(c.id)
         rows.append({"id": c.id, "name": c.name, "description": c.description, "version": c.version,
                      "domain": c.domain, "domains": c.domains, "owner": c.owner, "license": c.license, "checksum": c.checksum,
-                     "summary": c.summary(), "vendors": len(c.vendors), "models": len(c.models),
+                     **_counts(c, lib),
                      "requires": {"packages": c.requires_packages, "collections": c.requires_collections},
                      "problems": [str(p) for p in problems.get(c.id, [])],
                      "installed_version": got.version if got else None,
@@ -201,7 +211,7 @@ def browse_models(q: Optional[str] = None, device_class: Optional[str] = None, v
 
 
 @router.get("/models/search")
-def search_models(q: str = "", every: bool = False, limit: int = 30,
+def search_models(q: str = "", every: bool = False, limit: int = 30, sources_only: bool = False,
                   workspace_id: str = Depends(require_permission("read")), db: Session = Depends(get_db)):
     """Models for a picker: those installed in the catalogue first, then the pinned sources' not yet installed
     (the NetBox library among them), best first — the model code exactly, at its start, inside it, then the name.
@@ -209,7 +219,8 @@ def search_models(q: str = "", every: bool = False, limit: int = 30,
     from app.catalogue.library import search
     from app.catalogue.sources import SourceProblem
     try:
-        return search(db, q, workspace_id=workspace_id, every=every, limit=max(1, min(limit, 100)))
+        return search(db, q, workspace_id=workspace_id, every=every, limit=max(1, min(limit, 100)),
+                      sources_only=sources_only)
     except SourceProblem as e:
         raise HTTPException(status_code=503, detail={"error": f"the catalogue's sources cannot be read: {e}",
                                                      "code": "catalogue_sources"})
@@ -236,6 +247,32 @@ def install_one_model(body: InstallOneIn, identity: Identity = Depends(get_ident
     except installer.CatalogueProblem as e:
         db.rollback()
         raise HTTPException(status_code=422, detail={"error": str(e), "code": "catalogue_install_one"})
+    db.commit()
+    return out
+
+
+class LinkModelIn(BaseModel):
+    catalogue_id: str
+    record_uid: str
+
+
+@router.post("/models/link")
+def link_model(body: LinkModelIn, identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """A catalogue model made by hand, linked to the same model in the pinned sources (a NetBox device type):
+    its empty fields filled — part number, height, weight, every component — the ones it has kept, and kept up to
+    date with the source from then on. The catalogue's maintainers."""
+    from app.catalogue.library import LibraryProblem, install_one
+    ws = _workspace(db)
+    _may_install(db, identity, ws)
+    try:
+        out = install_one(db, body.catalogue_id, actor=_actor(identity), record_uid=body.record_uid)
+    except LibraryProblem as e:
+        db.rollback()
+        raise HTTPException(status_code=409 if e.candidate else 422,
+                            detail={"error": str(e), "code": "catalogue_link", "candidate": e.candidate})
+    except installer.CatalogueProblem as e:
+        db.rollback()
+        raise HTTPException(status_code=422, detail={"error": str(e), "code": "catalogue_link"})
     db.commit()
     return out
 

@@ -470,6 +470,30 @@ def test_an_answer_cut_off_at_the_token_limit_says_the_text_is_too_long(world, m
     assert "one day of a log" in r.json()["detail"]
 
 
+def test_an_answer_in_prose_is_asked_for_again_and_twice_names_the_model(world, monkeypatch):
+    """A gateway's "auto" sent one SPARC log day to a model that answered without the JSON (2026-11-03): asked
+    once more, the next answer is used; two such answers are an error that names the model that gave them."""
+    from app.services.llm import Reply
+    as_(world["writer"])
+    answers = [Reply("Here is the logbook entry you asked for: …", model="some-chat-model")]
+    calls = []
+
+    def model(endpoint, system, user):
+        calls.append(1)
+        return answers.pop(0) if answers else Reply(json.dumps(EXTRACTION), model="minimax-m27")
+    monkeypatch.setattr(reshape, "complete_structured", model)
+    r = _preview(world)
+    assert r.status_code == 200, r.text
+    assert len(calls) == 2                                                     # asked once more, then used
+
+    calls.clear()
+    monkeypatch.setattr(reshape, "complete_structured",
+                        lambda endpoint, system, user: calls.append(1) or Reply("Sure! The entry:", model="some-chat-model"))
+    r = _preview(world)
+    assert r.status_code == 502 and len(calls) == 2
+    assert "twice (some-chat-model answered)" in r.json()["detail"]
+
+
 def test_an_answer_that_times_out_says_why(world, monkeypatch):
     import requests
     from app.services.llm import LLMError

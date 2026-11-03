@@ -131,8 +131,8 @@ def test_picking_a_library_model_installs_it_and_its_vendor_once(w):
     model = db.get(Asset, got["uid"])
     assert got["installed"] and model.workspace_id == w["cat"] and model.is_global
     assert model.attributes["model_code"] == "C9200-24T"
-    # Part number and specifications have no field on the Product Model type yet (core-objects 2.2): they stay
-    # stated by the collection, shown on the model's page.
+    # The workspace here has no core-objects 2.3 hardware fields: part number and specifications stay stated by
+    # the collection, shown on the model's page.
     rows = {r.catalogue_id: r for r in db.scalars(select(CatalogueEntry).where(CatalogueEntry.workspace_id == w["cat"]))}
     assert set(rows) == {"cisco", "cisco/c9200-24t"}                                      # the vendor came with it
     assert rows["cisco/c9200-24t"].stated.get("model_code") == "C9200-24T"
@@ -175,3 +175,56 @@ def test_the_api_searches_and_installs_for_whoever_may_create_records(w, monkeyp
     assert r.status_code == 200 and r.json()["installed"], r.text
     r = client.post("/v1/catalogue/collections/models/install-one", json={"catalogue_id": "nope/x"}, headers=h)
     assert r.status_code == 422
+
+
+def test_a_model_made_by_hand_is_linked_to_the_same_one_in_the_sources(w, monkeypatch):
+    """Found among the sources although it looks like it (that is the point), linked in place: its empty fields
+    filled, its own values kept, its units untouched; refused when either side already has a link."""
+    db, lib = w["db"], w["lib"]
+    cisco = record(w, w["vendor"], "Cisco")
+    mine = record(w, w["model"], "Our C9200-24T", model_code="C9200-24T", vendor="Cisco", vendor_ref=cisco.uid,
+                  datasheet_url="https://intranet.example/c9200.pdf")
+    assert library.search(db, "C9200-24T", lib=lib)["library"] == []                      # not offered twice
+    found = library.search(db, "C9200-24T", lib=lib, sources_only=True)
+    assert found["installed"] == [] and [x["catalogue_id"] for x in found["library"]] == ["cisco/c9200-24t"]
+
+    monkeypatch.setattr(library, "index", lambda root=None: lib)
+    app.dependency_overrides[get_identity] = lambda: OidcIdentity(user=w["admin"])
+    client, h = TestClient(app), {"X-Workspace-Id": w["it"]}
+    r = client.post("/v1/catalogue/collections/models/link", json={"catalogue_id": "cisco/c9200-24t",
+                                                                  "record_uid": mine.uid}, headers=h)
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["uid"] == mine.uid and "name" in out["kept"]
+    assert {"part_number", "rack_units"} <= set(out["filled"])                        # its hardware, from NetBox
+    db.expire_all()
+    a = db.get(Asset, mine.uid)
+    assert a.name == "Our C9200-24T" and a.attributes["datasheet_url"] == "https://intranet.example/c9200.pdf"
+    row = inst.entries(db, w["cat"])["cisco/c9200-24t"]
+    assert row.record_uid == mine.uid
+    again = client.post("/v1/catalogue/collections/models/link", json={"catalogue_id": "cisco/c9200-48t",
+                                                                      "record_uid": mine.uid}, headers=h)
+    assert again.status_code == 422 and "already cisco/c9200-24t" in again.json()["detail"]["error"]
+    other = record(w, w["model"], "Another C9200-24T", model_code="C9200-24T-X")
+    taken = client.post("/v1/catalogue/collections/models/link", json={"catalogue_id": "cisco/c9200-24t",
+                                                                      "record_uid": other.uid}, headers=h)
+    assert taken.status_code == 409 and taken.json()["detail"]["candidate"]["uid"] == mine.uid
+
+
+def test_linking_is_for_the_catalogues_maintainers(w, monkeypatch):
+    monkeypatch.setattr(library, "index", lambda root=None: w["lib"])
+    plain = User(id=str(uuid.uuid4()), email=f"plain-{secrets.token_hex(3)}@argus.test", is_admin=False)
+    w["db"].add(plain)
+    w["db"].commit()
+    w["db"].refresh(plain)
+    w["db"].expunge(plain)
+    mine = record(w, w["model"], "Our C9200-48T", model_code="C9200-48T")
+    try:
+        app.dependency_overrides[get_identity] = lambda: OidcIdentity(user=plain)
+        r = TestClient(app).post("/v1/catalogue/collections/models/link",
+                                 json={"catalogue_id": "cisco/c9200-48t", "record_uid": mine.uid},
+                                 headers={"X-Workspace-Id": w["it"]})
+        assert r.status_code == 403
+    finally:
+        w["db"].delete(w["db"].get(User, plain.id))
+        w["db"].commit()

@@ -3,6 +3,7 @@ Type Library fork, read at their pinned commits (local repositories here, no net
 types turned into entries with ARGUS's classification, and the rules that keep one shared catalogue: a model
 defined once across both sources, a classification only for a model NetBox defines, a vendor that exists,
 and a release tag that has not moved."""
+import json
 import subprocess
 from pathlib import Path
 
@@ -205,3 +206,68 @@ def test_a_lock_that_names_a_branch_head_is_refused(tmp_path):
         {"id": "argus", "kind": "argus-collections", "repo": "x", "ref": "main", "commit": "main"}]}))
     with pytest.raises(SourceProblem, match="full 40-character commit"):
         materialize(d / "sources.lock.yaml", cache=tmp_path / "cache")
+
+
+def test_a_netbox_device_type_keeps_every_component_its_notes_and_its_datasheet(tmp_path):
+    """Everything a device type says comes in: each component list as NetBox writes it, its notes (and the
+    datasheet linked from them), its weight and power draw."""
+    from app.catalogue.sources import netbox_entry
+    doc = {**SWITCH, "comments": "[Data sheet](https://vendor.example/c9200.pdf).", "description": "A switch",
+           "weight": 8.6, "weight_unit": "lb",
+           "interfaces": SWITCH["interfaces"] + [{"name": "Gi0/0", "type": "1000base-t", "mgmt_only": True}],
+           "console-ports": [{"name": "Console", "type": "rj-45"}],
+           "power-ports": [{"name": "PS-A", "type": "iec-60320-c14", "maximum_draw": 125, "allocated_draw": 60},
+                           {"name": "PS-B", "type": "iec-60320-c14", "maximum_draw": 125}],
+           "module-bays": [{"name": "Network Module", "position": "1"}],
+           "inventory-items": [{"name": "Fan", "manufacturer": "Cisco", "part_id": "FAN-T1"}]}
+    e, why = netbox_entry(doc, "device-types/Cisco/C9200-24T.yaml", "abcdef1234567890", [{"id": "cisco", "name": "Cisco"}])
+    assert why is None
+    assert e["datasheet_url"] == "https://vendor.example/c9200.pdf" and e["notes"].startswith("[Data sheet]")
+    assert e["description"] == "A switch" and e["specifications"]["maximum_draw_w"] == 125
+    assert set(e["components"]) == {"interfaces", "console_ports", "power_ports", "module_bays", "inventory_items"}
+    assert e["components"]["power_ports"][0] == {"name": "PS-A", "type": "iec-60320-c14", "maximum_draw": 125,
+                                                 "allocated_draw": 60}
+    assert {"name": "Gi0/0", "type": "1000base-t", "mgmt_only": True} in e["components"]["interfaces"]
+
+    from app.catalogue.install import _hardware
+    h = _hardware(e)
+    assert h["weight_kg"] == 3.901 and h["rack_units"] == 1 and h["full_depth"] is False
+    assert h["part_number"] == "C9200-24T" and h["maximum_draw_w"] == 125
+    assert h["port_summary"] == "24 × 1000base-t, 1 management, 1 console, 2 power, 1 module bay"   # Vlan1: not a socket
+    assert json.loads(h["components"]) == e["components"]
+
+
+def test_a_collection_with_components_is_valid_and_a_malformed_one_is_not(tmp_path):
+    good = [{"id": "moxa/nport-5650-8", "vendor": "moxa", "model_code": "NPort 5650-8", "name": "Moxa NPort 5650-8",
+             "device_class": "converter", "notes": "8 ports",
+             "components": {"console_server_ports": [{"name": "P1", "type": "de-9", "description": "RS-232/422/485"}]}}]
+    repo_with(tmp_path / "argus", argus_files(models=good, classifications=[]))
+    assert not [p for p in problems_of(tmp_path, "c1") if "vacuum" in p]
+    bad = [{**good[0], "components": {"Console Server Ports": [{"name": ["P1"]}]}}]
+    repo_with(tmp_path / "argus", argus_files(models=bad, classifications=[]))
+    found = [p for p in problems_of(tmp_path, "c2") if "components" in p]
+    assert any("lowercase words" in p for p in found) and any("plain values" in p for p in found)
+
+
+def problems_of(tmp_path: Path, cache: str) -> list[str]:
+    a = git(tmp_path / "argus", "rev-parse", "HEAD")
+    n = netbox(tmp_path) if not (tmp_path / "netbox").exists() else git(tmp_path / "netbox", "rev-parse", "HEAD")
+    return problems(materialize(lock(tmp_path, a, n), cache=tmp_path / cache))
+
+
+def test_the_netbox_library_is_one_file_per_vendor_and_read_in_part(tmp_path):
+    """Every component of 12,760 device types is too much to read on a page view: the library's models are
+    written one file per vendor, and the application reads only the vendors of the models it needs — the same
+    collection (checksum), with no problem for the models it did not read."""
+    a, n = repo_with(tmp_path / "argus", argus_files()), netbox(tmp_path)
+    root = materialize(lock(tmp_path, a, n), cache=tmp_path / "cache")
+    manifest = yaml.safe_load((root / "it-devices" / "collection.yaml").read_text())
+    assert manifest["contents"] == ["models/cisco.yaml", "models/moxa.yaml"]
+    part = load_tree(root, netbox_models={"it-devices": {"moxa/nport-5450"}})
+    some = part["it-devices"]
+    assert [m.id for m in load_tree(root, netbox_models={})["it-devices"].models] == []
+    assert [str(p) for ps in tree_problems(part).values() for p in ps] == []      # cisco: classified, not read
+    full = load_tree(root)["it-devices"]                  # a small tree is then kept whole
+    assert some.partial and not full.partial and some.checksum == full.checksum
+    assert [m.id for m in some.models] == ["moxa/nport-5450"]
+    assert problems(root) == []

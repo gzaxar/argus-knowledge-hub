@@ -51,6 +51,7 @@ from app.routers import (
 logging.basicConfig(level=logging.INFO)
 
 from app.auth import bind_grants  # noqa: E402
+import re
 import app.ledger.audit  # noqa: E402,F401  (append-only guards on create_all)
 from app import idempotency, problems  # noqa: E402
 from app import log_redaction  # noqa: E402,F401  (redacts capability tokens from access logs)
@@ -110,6 +111,22 @@ async def api_policy_and_legacy_hosts(request: Request, call_next):
         response.headers.update(api_policy.headers(deprecated))
     response.headers["X-ARGUS-API-Version"] = api_policy.API_VERSION
     return response
+
+
+_ATTACHMENT_LINK = re.compile(r"^/v1/attachments/([0-9a-fA-F-]{36})/?$")
+
+
+@app.middleware("http")
+async def attachment_links_open_in_the_app(request: Request, call_next):
+    """A link to a file (/v1/attachments/{uid}) opened in a browser carries no sign-in, so the API could only
+    refuse it — a blank page (issue #18). Such a visit goes to the web app's page for the file instead, which signs
+    the person in and opens it. Requests of the app itself (signed in) are untouched."""
+    m = _ATTACHMENT_LINK.match(request.url.path)
+    if (m and request.method == "GET" and not request.headers.get("authorization")
+            and "text/html" in (request.headers.get("accept") or "")):
+        from app.services.legacy_hosts import web_url
+        return RedirectResponse(f"{web_url()}/attachments/{m.group(1)}", status_code=303)
+    return await call_next(request)
 
 
 @app.middleware("http")

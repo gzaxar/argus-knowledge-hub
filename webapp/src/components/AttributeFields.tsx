@@ -4,9 +4,10 @@ import { AttributeInput } from "./AttributeInput";
 const GROUP_NAMES: Record<string, string> = {
   PBS: "Product breakdown (PBS)",
   recorded: "As recorded — on the label, or by the import",
+  Hardware: "Hardware — as its source states it",
 };
 
-const empty = (v: unknown) => v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+export const empty = (v: unknown) => v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
 const keyOf = (a: SchemaAttribute) => a.key ?? a.name;
 
 type Block = { group: null; attrs: SchemaAttribute[] } | { group: string; attrs: SchemaAttribute[] };

@@ -644,6 +644,7 @@ def test_a_reasoning_model_is_asked_not_to_think_and_a_cut_off_answer_is_an_erro
     monkeypatch.setattr(llm.requests, "post", post)
     assert llm.complete_structured(ep, "s", "u") == '{"type": "Ion Pump"}'
     assert sent[0]["chat_template_kwargs"] == {"enable_thinking": False}
+    assert sent[0]["response_format"] == {"type": "json_object"}      # JSON mode, where the provider has it
     assert "max_tokens" not in sent[0]                        # no limit unless the AI settings set one
 
     # A provider that does not know the switch refuses it, and is asked again without.
@@ -655,7 +656,7 @@ def test_a_reasoning_model_is_asked_not_to_think_and_a_cut_off_answer_is_an_erro
             return _Reply(400, {"error": "unknown field chat_template_kwargs"})
         return _Reply(200, {"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]})
     monkeypatch.setattr(llm.requests, "post", strict)
-    assert llm.complete_structured(ep, "s", "u") == "{}" and len(sent) == 2
+    assert llm.complete_structured(ep, "s", "u") == "{}" and len(sent) == 3    # JSON mode, the switch, then plain
 
     # Still thinking when the budget ran out: said, not returned as an empty answer.
     monkeypatch.setattr(llm.requests, "post", lambda url, headers=None, json=None, timeout=None: _Reply(
@@ -663,3 +664,50 @@ def test_a_reasoning_model_is_asked_not_to_think_and_a_cut_off_answer_is_an_erro
     capped = llm.Endpoint(base_url=ep.base_url, model=ep.model, max_output_tokens=900)
     with pytest.raises(llm.LLMError, match="used all 900 tokens before answering"):
         llm.complete_structured(capped, "s", "u")
+
+
+def test_a_provider_without_json_mode_is_asked_again_without_it_and_the_answering_model_is_kept(monkeypatch):
+    """A gateway's "auto" chooses the model; JSON mode keeps it to the format where the provider has the mode, and
+    the reply says which model answered, for an error to name it."""
+    from app.services import llm
+    ep = llm.Endpoint(base_url="https://gateway.example/v1", model="auto")
+    sent = []
+
+    def no_json_mode(url, headers=None, json=None, timeout=None):
+        sent.append(json)
+        if "response_format" in json:
+            return _Reply(400, {"error": "response_format is not supported"})
+        return _Reply(200, {"model": "minimax-m27",
+                            "choices": [{"message": {"content": '{"a": 1}'}, "finish_reason": "stop"}]})
+    monkeypatch.setattr(llm.requests, "post", no_json_mode)
+    reply = llm.complete_structured(ep, "s", "u")
+    assert reply == '{"a": 1}' and reply.model == "minimax-m27" and not reply.cut_off
+    assert len(sent) == 2 and "response_format" not in sent[1]
+    assert sent[1]["chat_template_kwargs"] == {"enable_thinking": False}            # still told not to think
+
+
+def test_a_request_the_gateway_leaves_unanswered_is_sent_once_more(monkeypatch):
+    """The INFN gateway answered a 435-character request in 15 s once, and left it unanswered for 300 s twice
+    (2026-11-03): a stalled request is sent again; two stalls are the error, still a timeout."""
+    import requests as rq
+    from app.services import llm
+    ep = llm.Endpoint(base_url="https://gateway.example/v1", model="auto")
+    tries = []
+
+    def stalls_once(url, headers=None, json=None, timeout=None):
+        tries.append(1)
+        if len(tries) == 1:
+            raise rq.ReadTimeout("read timed out")
+        return _Reply(200, {"model": "minimax-m27", "choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]})
+    monkeypatch.setattr(llm.requests, "post", stalls_once)
+    assert llm.complete_structured(ep, "s", "u") == "{}" and len(tries) == 2
+
+    tries.clear()
+
+    def stalls(url, headers=None, json=None, timeout=None):
+        tries.append(1)
+        raise rq.ReadTimeout("read timed out")
+    monkeypatch.setattr(llm.requests, "post", stalls)
+    with pytest.raises(llm.LLMError, match="no answer, twice") as e:
+        llm.complete_structured(ep, "s", "u")
+    assert len(tries) == 2 and isinstance(e.value.__cause__, rq.Timeout)      # the rework says it timed out

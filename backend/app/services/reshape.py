@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import email.utils
 import json
+import logging
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -42,6 +43,8 @@ MAX_ITEMS = 100
 STATUSES = ("present", "inferred", "absent")
 SOURCE_KINDS = ("paste", "email", "intake", "import")
 DATE_COLUMNS = {"due", "date", "deadline", "scadenza", "data", "when"}
+
+log = logging.getLogger(__name__)
 
 
 class ReshapeError(Exception):
@@ -298,21 +301,35 @@ def extract(endpoint: Endpoint, t: dt.Template, source: str, meta: SourceMeta, d
         reply = complete_structured(endpoint, system, user)
     except LLMError as e:
         if isinstance(e.__cause__, requests.Timeout):
-            raise ReshapeError(f"The assistant did not finish within {COMPLETION_TIMEOUT_SECONDS // 60} minutes; "
-                               "nothing was made. "
+            raise ReshapeError(f"The assistant did not finish within {COMPLETION_TIMEOUT_SECONDS // 60} minutes, "
+                               "asked twice; nothing was made. "
                                + ("The text is long: rework it a part at a time (one day of a log, one e-mail)."
                                   if len(source) > 8000 else
                                   "The text is short, so the AI service is slow or stuck: try again later, and if it "
                                   "keeps happening ask an administrator to check the AI endpoint."), 504) from e
         raise ReshapeError(f"The assistant could not be reached: {e}", 502) from e
     data = json_object(reply)
+    if not isinstance(data, dict) and not getattr(reply, "cut_off", False):
+        # An answer that is not the JSON asked for: once more. A gateway's "auto" may have chosen a model that
+        # answered in prose, and the next request is often served by another (or the same, now in form).
+        log.warning("rework: %s answered without the JSON object (%d chars, begins %r); asking again",
+                    getattr(reply, "model", None) or endpoint.model, len(reply or ""), (reply or "")[:200])
+        try:
+            reply = complete_structured(endpoint, system, user)
+        except LLMError as e:
+            raise ReshapeError(f"The assistant could not be reached: {e}", 502) from e
+        data = json_object(reply)
     if not isinstance(data, dict) and getattr(reply, "cut_off", False):
         raise ReshapeError("The assistant's answer was cut off at the output-token limit: the text is too long to "
                            "rework as one document. Rework it a part at a time (one day of a log, one e-mail), or "
                            "raise the output-token limit in the AI settings.", 422)
     if not isinstance(data, dict):
-        raise ReshapeError("The assistant did not answer with the structured extraction this needs; nothing was "
-                           "made. Try again, or with a shorter text"
+        who = getattr(reply, "model", None)
+        log.warning("rework: %s answered twice without the JSON object (begins %r)", who or endpoint.model,
+                    (reply or "")[:200])
+        raise ReshapeError("The assistant did not answer with the structured extraction this needs, twice"
+                           + (f" ({who} answered)" if who and who != endpoint.model else "")
+                           + "; nothing was made. Try again, or with a shorter text"
                            + (" (one day of a log, one e-mail at a time)" if len(source) > 8000 else "") + ".", 502)
     return data
 

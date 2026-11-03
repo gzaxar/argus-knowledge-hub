@@ -11,6 +11,7 @@ is not one this endpoint serves — and the third passes a naive health
 check and then fails on first use, so it is checked explicitly.
 """
 import json
+import logging
 import time
 from dataclasses import dataclass
 from typing import Iterator, Optional
@@ -20,6 +21,8 @@ import requests
 TIMEOUT_SECONDS = 30
 # Long enough for a real classification over a page of text.
 COMPLETION_TIMEOUT_SECONDS = 120
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -225,42 +228,56 @@ def complete_structured(endpoint: Endpoint, system: str, user: str) -> str:
     thinking: the reply comes back with no content at all, which reads as "the model found nothing". It is
     told not to; a provider that does not know the switch refuses it (400/422) and is asked again without.
     A reply cut off before any answer is an error that says so, not an empty answer."""
-    try:
-        resp = _post("structured", endpoint.model, 
-            f"{endpoint.root}/chat/completions",
-            headers=endpoint.headers(),
-            json={"model": endpoint.model,
-                  "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-                  **endpoint.budget(), "temperature": 0, **NO_THINKING},
-            timeout=COMPLETION_TIMEOUT_SECONDS,
-        )
-    except requests.RequestException as e:
-        raise LLMError(f"Could not reach {endpoint.root}: {e}") from e
+    base = {"model": endpoint.model,
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            **endpoint.budget(), "temperature": 0}
+    # JSON mode where the provider has it: a gateway's "auto" may send the request to a model that otherwise
+    # answers in prose. Each switch a provider does not know is dropped on its refusal (400/422), in turn.
+    resp = None
+    for extra in ({"response_format": {"type": "json_object"}, **NO_THINKING}, NO_THINKING):
+        # A request a gateway leaves without an answer is sent once more: measured on the INFN gateway
+        # (2026-11-03), the same 435-character request was answered in 15 s once and left unanswered for its own
+        # 300 s limit twice — a stall of the request, not of the text.
+        for attempt in (1, 2):
+            try:
+                resp = _post("structured", endpoint.model, f"{endpoint.root}/chat/completions",
+                             headers=endpoint.headers(), json={**base, **extra}, timeout=COMPLETION_TIMEOUT_SECONDS)
+                break
+            except requests.Timeout as e:
+                if attempt == 2:
+                    raise LLMError(f"Could not reach {endpoint.root} (no answer, twice): {e}") from e
+                log.warning("structured request to %s left without an answer; sending it again", endpoint.root)
+            except requests.RequestException as e:
+                raise LLMError(f"Could not reach {endpoint.root}: {e}") from e
+        if resp.status_code not in (400, 422):
+            break
     if resp.status_code in (400, 422):
         return complete(endpoint, system, user)
     if resp.status_code >= 400:
         raise LLMError(f"The endpoint answered {resp.status_code}: {(resp.text or '')[:200]}")
     try:
-        choice = resp.json()["choices"][0]
+        body = resp.json()
+        choice = body["choices"][0]
         content = choice["message"].get("content")
     except (ValueError, KeyError, IndexError, AttributeError) as e:
         raise LLMError("The endpoint's reply was not in the expected shape.") from e
+    served = body.get("model") if isinstance(body, dict) else None
     if not (content or "").strip() and choice.get("finish_reason") == "length":
         raise LLMError(f"{endpoint.model} used all {endpoint.max_output_tokens} tokens before answering (a "
                        "reasoning model that kept thinking): nothing to read. Raise or clear the output-token "
                        "limit in the AI settings.")
-    if choice.get("finish_reason") == "length":
-        return Reply(content or "", cut_off=True)
-    return content or ""
+    return Reply(content or "", cut_off=choice.get("finish_reason") == "length", model=served)
 
 
 class Reply(str):
     """A model's answer that also says whether it was cut off at the output-token limit (`cut_off`): a JSON
-    answer cut short does not parse, and the reason is then that, not a model that ignored the format."""
+    answer cut short does not parse, and the reason is then that, not a model that ignored the format — and
+    which model answered (`model`: the one a gateway's "auto" chose), for the error that names it."""
 
-    def __new__(cls, text: str, cut_off: bool = False):
+    def __new__(cls, text: str, cut_off: bool = False, model: Optional[str] = None):
         out = super().__new__(cls, text)
         out.cut_off = cut_off
+        out.model = model
         return out
 
 

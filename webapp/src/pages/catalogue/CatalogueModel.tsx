@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { catalogueCollectionsApi, type CatalogueFieldDecision, type CatalogueRecordField } from "../../api/client";
+import { catalogueCollectionsApi, workspacesApi, type CatalogueFieldDecision, type CatalogueRecordField } from "../../api/client";
+import { LinkToSource } from "./LinkToSource";
 import { problem, shown, SourceBadge } from "./catalogueText";
 
 /** What a person may say about one field of a catalogue entry, given where its value comes from now. */
@@ -22,6 +23,7 @@ export function CatalogueModelPage() {
   const { uid = "" } = useParams();
   const queryClient = useQueryClient();
   const page = useQuery({ queryKey: ["catalogue-record", uid], queryFn: () => catalogueCollectionsApi.record(uid) });
+  const me = useQuery({ queryKey: ["me"], queryFn: workspacesApi.me });
   const decide = useMutation({
     mutationFn: (v: { field: string; decision: CatalogueFieldDecision }) =>
       catalogueCollectionsApi.decideField(page.data!.entry!.catalogue_id, v.field, v.decision),
@@ -57,6 +59,11 @@ export function CatalogueModelPage() {
           <p className="mt-2 text-sm text-slate-700">
             A local record: no collection states it. It can be proposed for one through a Git review.
           </p>
+        )}
+        {!entry && r.kind === "model" && (me.data?.is_admin || me.data?.catalogue_maintainer) && (
+          <div className="mt-3">
+            <LinkToSource uid={r.uid} initial={String(r.fields.find((f) => f.field === "model_code")?.value ?? r.name)} />
+          </div>
         )}
         {r.retired && (
           <p role="status" className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-900">

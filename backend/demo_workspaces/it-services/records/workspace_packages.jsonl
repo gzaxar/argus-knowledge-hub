@@ -1,5 +1,5 @@
 {"$row": 327, "checksum": "d45c176e4d9c99917e36703a4a679cfc938f777fd7c472c84e56089169c5dc1a", "options": null, "package_id": "core-facility", "version": "2.0.0", "workspace_id": "it-services-demo"}
-{"$row": 328, "checksum": "74129a72560d6030fdfd6ed89fe901284083d92fa07fa2e739d953467123c5cc", "options": {"scope": "all"}, "package_id": "core-objects", "version": "2.2.0", "workspace_id": "it-services-demo"}
+{"$row": 328, "checksum": "0e429fccc424f1ab000ccaedfa4c38184a98e9433caddee977d6f900af369f52", "options": {"scope": "all"}, "package_id": "core-objects", "version": "2.3.0", "workspace_id": "it-services-demo"}
 {"$row": 329, "checksum": "da16f5f399767c53d195468d458d527b3813dbc55c04ec5ce3885e266bdfb6ef", "options": {"scope": "all"}, "package_id": "core-records", "version": "1.0.0", "workspace_id": "it-services-demo"}
 {"$row": 330, "checksum": "6bbb830b6a4caebbdd4300ab3d8acd81d03ef91a04c47675dd0f402e742dea56", "options": {"scope": "all"}, "package_id": "it", "version": "1.1.0", "workspace_id": "it-services-demo"}
 {"$row": 331, "checksum": "63cbf6d75cfd60e16df819c2f8bdf793ffe7e9c0a38382bf53416e7ca07830e4", "options": {"scope": "all"}, "package_id": "civil-access", "version": "1.0.0", "workspace_id": "it-services-demo"}

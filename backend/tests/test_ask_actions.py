@@ -175,3 +175,38 @@ def test_a_relation_the_rules_forbid_is_refused_when_proposed(world, monkeypatch
     step = next(e for e in evs if e["type"] == "step")
     assert step["error"] and "cannot start at type Camera" in step["error"]
     assert not [e for e in evs if e["type"] == "proposal"]
+
+
+def test_a_reference_takes_the_record_its_value_names_and_is_checked_when_proposed(world, monkeypatch):
+    """Issue #16: a unit's Located in was proposed as the room's name ("Stanza 118") and failed only when applied
+    (“must reference an object of the correct type”). A reference now takes the record its value names — its
+    key, uid or exact name — and a value no record answers is refused when proposed, with the reason."""
+    w = world
+    db = SessionLocal()
+    area = db.query(Schema).filter(Schema.workspace_id == w["ws"], Schema.name == "Area").one()
+    room = Asset(uid=str(uuid.uuid4()), workspace_id=w["ws"], schema_uid=area.uid, key=f"{w['ws'].upper()}-ARE-0001",
+                 name="Stanza 118", type="Area")
+    db.add(room)
+    db.commit()
+    room_uid, room_key = room.uid, room.key
+    db.close()
+    scripted(monkeypatch, [
+        call("propose_update_record", {"record": w["camera"], "attributes": {"argus_location": "Stanza 999"}}),
+        call("propose_update_record", {"record": w["camera"], "attributes": {"argus_location": w["motor"]}}),
+        call("propose_update_record", {"record": w["camera"], "attributes": {"argus_location": "Stanza 118"}}),
+        answer("Proposed: the camera is in Stanza 118."),
+    ])
+    evs = events(client.post("/v1/ai/chat", headers=w["h"], json={"question": "The camera is in Stanza 118"}))
+    refused = [e["error"] for e in evs if e["type"] == "step" and e["error"]]
+    assert len(refused) == 2
+    assert "takes a record, not text" in refused[0] and "'Stanza 999'" in refused[0]
+    assert "takes a Location" in refused[1] and w["motor"] in refused[1]                 # a record of another kind
+    proposal = next(e["action"] for e in evs if e["type"] == "proposal")
+    assert f"argus_location → {room_key} (Stanza 118)" in proposal["summary"]           # the room, not its uid
+    applied = client.post(f"/v1/ai/conversations/{evs[0]['id']}/actions/apply", headers=w["h"],
+                          json={"ids": [proposal["id"]]}).json()
+    assert applied[0]["status"] == "applied", applied
+    db = SessionLocal()
+    camera = db.query(Asset).filter(Asset.key == w["camera"]).one()
+    assert camera.attributes["argus_location"] == room_uid
+    db.close()
