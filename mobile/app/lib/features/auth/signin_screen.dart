@@ -105,12 +105,22 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               ],
               const SizedBox(height: 24),
               if (auth.supportsOidc)
-                FilledButton.icon(
-                  key: const Key('signin-oidc'),
-                  onPressed: _busy ? null : () => _run(controller.signInWithOidc),
-                  icon: const Icon(Icons.login),
-                  label: const Text('Sign in with your organization account'),
-                ),
+                for (final p in config.providers) ...[
+                  if (p.id != 'main') const SizedBox(height: 8),
+                  p.id == 'main'
+                      ? FilledButton.icon(
+                          key: const Key('signin-oidc'),
+                          onPressed: _busy ? null : () => _run(() => controller.signInWithOidc(p.id)),
+                          icon: const Icon(Icons.login),
+                          label: Text(p.label),
+                        )
+                      : OutlinedButton.icon(
+                          key: Key('signin-oidc-${p.id}'),
+                          onPressed: _busy ? null : () => _run(() => controller.signInWithOidc(p.id)),
+                          icon: const Icon(Icons.account_circle_outlined),
+                          label: Text(p.label),
+                        ),
+                ],
               if (config.allowsDeveloperToken) ...[
                 if (auth.supportsOidc) const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider()),
                 TextField(

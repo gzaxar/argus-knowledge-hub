@@ -15,6 +15,7 @@ class Session {
     this.workspaceName,
     this.deviceId,
     this.userLabel,
+    this.provider,
   });
 
   final String accessToken;
@@ -25,6 +26,7 @@ class Session {
   final String? workspaceName;
   final String? deviceId;
   final String? userLabel;
+  final String? provider; // the OidcProvider that issued it (main | alt); null: main
 
   bool get expired => expiresAt != null && DateTime.now().isAfter(expiresAt!.subtract(const Duration(seconds: 30)));
 
@@ -46,6 +48,7 @@ class Session {
         workspaceName: workspaceName ?? this.workspaceName,
         deviceId: deviceId ?? this.deviceId,
         userLabel: userLabel ?? this.userLabel,
+        provider: provider,
       );
 
   Map<String, dynamic> toJson() => {
@@ -53,6 +56,7 @@ class Session {
         'authType': authType,
         'refreshToken': refreshToken,
         'expiresAt': expiresAt?.toIso8601String(),
+        'provider': provider,
         'workspaceId': workspaceId,
         'workspaceName': workspaceName,
         'deviceId': deviceId,
@@ -68,6 +72,7 @@ class Session {
         workspaceName: j['workspaceName'] as String?,
         deviceId: j['deviceId'] as String?,
         userLabel: j['userLabel'] as String?,
+        provider: j['provider'] as String?,
       );
 }
 

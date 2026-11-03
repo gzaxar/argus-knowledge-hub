@@ -193,8 +193,8 @@ class SessionController extends AsyncNotifier<Session?> {
     await _finishSignIn(Session(accessToken: token.trim(), authType: 'token'));
   }
 
-  Future<void> signInWithOidc() async {
-    final s = await ref.read(authenticatorProvider).signInWithOidc();
+  Future<void> signInWithOidc([String provider = 'main']) async {
+    final s = await ref.read(authenticatorProvider).signInWithOidc(provider);
     await _finishSignIn(s);
   }
 

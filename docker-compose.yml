@@ -62,9 +62,16 @@ services:
       # works with none of this running (see auth.py get_identity); these only
       # matter once a bearer token isn't a known PAT. Swapping in INFN's real
       # GODiVA-fed Keycloak later is changing these three values, nothing else.
-      OIDC_ISSUER: http://localhost:${KEYCLOAK_PORT:-8081}/realms/argus-dev
-      OIDC_JWKS_URI: http://keycloak:8080/realms/argus-dev/protocol/openid-connect/certs
-      OIDC_AUDIENCE: argus-webapp
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:${KEYCLOAK_PORT:-8081}/realms/argus-dev}
+      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-http://keycloak:8080/realms/argus-dev/protocol/openid-connect/certs}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-argus-webapp}
+      # More issuers the API trusts (JSON): by default Google (Firebase), the web's Google button, as in production.
+      # With INFN AAI as the issuer, deploy/infn-test.env adds this Keycloak too (the mobile app, the test users).
+      OIDC_EXTRA_PROVIDERS: '${OIDC_EXTRA_PROVIDERS:-[{"issuer": "https://securetoken.google.com/seraphic-camera-479521-s5", "jwks_uri": "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com", "audience": "seraphic-camera-479521-s5"}]}'
+      # Confidential clients: used only by the API, never passed to the web build.
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_TOKEN_ENDPOINT: ${OIDC_TOKEN_ENDPOINT:-}
+      OIDC_REDIRECT_URIS: ${OIDC_REDIRECT_URIS:-}
       # The development realm's administrator, so a fresh local hub has someone who can manage it
       # (the other test users get their access from scripts/seed_dev_users.py).
       ARGUS_BOOTSTRAP_ADMINS: ${ARGUS_BOOTSTRAP_ADMINS:-admin.test@argus.test}
@@ -94,9 +101,10 @@ services:
       # The browser talks to Keycloak and to the API by the addresses published
       # on this machine, not by the compose-network names the containers use.
       args:
-        VITE_OIDC_AUTHORITY: http://localhost:${KEYCLOAK_PORT:-8081}/realms/argus-dev
-        VITE_OIDC_CLIENT_ID: argus-webapp
-        VITE_OIDC_LABEL: INFN login
+        VITE_OIDC_AUTHORITY: ${VITE_OIDC_AUTHORITY:-http://localhost:${KEYCLOAK_PORT:-8081}/realms/argus-dev}
+        VITE_OIDC_CLIENT_ID: ${VITE_OIDC_CLIENT_ID:-argus-webapp}
+        VITE_OIDC_TOKEN_ENDPOINT: ${VITE_OIDC_TOKEN_ENDPOINT:-}
+        VITE_OIDC_LABEL: ${VITE_OIDC_LABEL:-INFN login}
         VITE_API_BASE_URL: http://localhost:${API_PORT:-8080}
     depends_on:
       api:

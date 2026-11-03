@@ -22,11 +22,26 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 - {name: ATTACHMENTS_DIR, value: /data/attachments}
 - {name: ARGUS_PORTABILITY_ROOT, value: /data/portability}
 - {name: ARGUS_PORTABILITY_DECRYPTION_KEYS, value: /etc/argus/portability-decryption}
-{{- if .Values.keycloak.enabled }}
+{{- $oidc := .Values.api.oidc | default dict }}
+{{- if and (or $oidc.issuer $oidc.jwksUri $oidc.audience) .Values.keycloak.enabled }}
+{{- /* Signing in with an external provider (INFN AAI) while the bundled Keycloak still runs: Keycloak's tokens stay
+     trusted beside it — the mobile app and Keycloak's own Google sign-in use them. */}}
+{{- $providers = append ($providers | default list) (dict "issuer" $kcIssuer "jwks_uri" (printf "http://argus-keycloak:8080/realms/%s/protocol/openid-connect/certs" .Values.keycloak.realm) "audience" .Values.keycloak.clientId) }}
+{{- end }}
+{{- if or $oidc.issuer $oidc.jwksUri $oidc.audience }}
+- {name: OIDC_ISSUER, value: {{ required "api.oidc.issuer is required" $oidc.issuer | quote }}}
+- {name: OIDC_JWKS_URI, value: {{ required "api.oidc.jwksUri is required" $oidc.jwksUri | quote }}}
+- {name: OIDC_AUDIENCE, value: {{ required "api.oidc.audience is required" $oidc.audience | quote }}}
+{{- else if .Values.keycloak.enabled }}
 # The issuer is the public address the browser signs in at; the keys are fetched inside the cluster.
 - {name: OIDC_ISSUER, value: {{ $kcIssuer | quote }}}
 - {name: OIDC_JWKS_URI, value: "http://argus-keycloak:8080/realms/{{ .Values.keycloak.realm }}/protocol/openid-connect/certs"}
 - {name: OIDC_AUDIENCE, value: {{ .Values.keycloak.clientId | quote }}}
+{{- end }}
+{{- if $oidc.tokenEndpoint }}
+- {name: OIDC_TOKEN_ENDPOINT, value: {{ $oidc.tokenEndpoint | quote }}}
+- {name: OIDC_REDIRECT_URIS, value: {{ join "," (required "api.oidc.redirectUris is required for confidential login" $oidc.redirectUris) | quote }}}
+{{ include "argus.secretEnv" (dict "name" "OIDC_CLIENT_SECRET" "secret" .Values.existingSecret "key" (required "api.oidc.clientSecretKey is required for confidential login" $oidc.clientSecretKey)) }}
 {{- end }}
 {{- with $providers }}
 - name: OIDC_EXTRA_PROVIDERS

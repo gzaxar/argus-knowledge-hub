@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 import uuid
 from dataclasses import dataclass
@@ -9,6 +10,7 @@ import jwt
 from fastapi import Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth_oidc import oidc_configured, verify_oidc_token
@@ -27,6 +29,8 @@ security = HTTPBearer(auto_error=False)
 
 Action = Literal["read", "create", "modify", "delete", "approve"]
 Resource = Literal["objects", "tickets", "documents"]
+
+log = logging.getLogger(__name__)
 
 
 def hash_token(raw_token: str) -> str:
@@ -175,9 +179,19 @@ def _resolve_oidc_user(db: Session, claims: dict) -> User:
     if user is None:
         user = User(id=str(uuid.uuid4()), oidc_sub=sub, email=email, name=claims.get("name"),
                     is_admin=bool(email) and email.lower() in bootstrap_admins())
-        db.add(user)
-        db.flush()
-        return user
+        try:
+            # /me and /me/workspaces can be the first requests in parallel.
+            # A savepoint contains a competing insert without aborting the
+            # caller's transaction; the unique subject picks the same user.
+            with db.begin_nested():
+                db.add(user)
+                db.flush()
+        except IntegrityError:
+            user = db.scalar(select(User).where(User.oidc_sub == sub))
+            if user is None:
+                raise
+        else:
+            return user
 
     user.oidc_sub = sub
     if email:
@@ -229,8 +243,15 @@ def get_identity(
     if oidc_configured():
         try:
             claims = verify_oidc_token(raw_token)
-        except jwt.PyJWTError:
-            pass
+        except jwt.PyJWTError as e:
+            # Why a sign-in token was refused, for whoever sets up an identity provider: never the token, only its
+            # issuer, audience and times (a wrong issuer or audience is the usual mistake).
+            try:
+                seen = jwt.decode(raw_token, options={"verify_signature": False})
+                log.info("OIDC token refused (%s: %s): iss=%s aud=%s azp=%s exp=%s iat=%s", type(e).__name__, e,
+                         seen.get("iss"), seen.get("aud"), seen.get("azp"), seen.get("exp"), seen.get("iat"))
+            except jwt.PyJWTError:
+                log.info("OIDC token refused (%s: %s): not a JWT", type(e).__name__, e)
         else:
             user = _resolve_oidc_user(db, claims)
             user.last_login_at = datetime.now(timezone.utc)
