@@ -3,7 +3,10 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+// Use the existing API helper so attachment requests include authentication
+// and resolve against the configured API address.
+import { attachmentsApi } from "../api/client";
 import { AuthenticatedImage } from "./AuthenticatedImage";
 import { ImageLightbox } from "./ImageLightbox";
 
@@ -66,22 +69,43 @@ export function MarkdownView({
             <h4 className="mb-1 mt-3 text-sm font-semibold text-slate-800">{children}</h4>
           ),
           p: ({ children }) => <p className="my-2">{children}</p>,
-          a: ({ href, children }) =>
+          a: ({ href, children }) => {
+            // Attachment links require Bearer authentication, just like images.
+            // Opening their relative URL directly can reach the frontend instead
+            // of the API. Prepare an authenticated Blob URL before navigation.
+            const attachment = href?.match(ATTACHMENT_URL);
+
+            if (attachment) {
+              return (
+                <AttachmentLink key={attachment[1]} uid={attachment[1]}>
+                  {children}
+                </AttachmentLink>
+              );
+            }
+
             // A page of ARGUS itself (a record an answer cites) opens here, like any other link in the app.
-            href && /^\/(assets|tickets|documents)\//.test(href) ? (
-              <Link to={href} className="text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-600">
+            if (href && /^\/(assets|tickets|documents)\//.test(href)) {
+              return (
+                <Link
+                  to={href}
+                  className="text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-600"
+                >
+                  {children}
+                </Link>
+              );
+            }
+            // Other links retain their normal browser behavior.
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-600"
+              >
                 {children}
-              </Link>
-            ) : (
-            <a
-              href={href}
-              target="_blank"
-              rel="noreferrer"
-              className="text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-600"
-            >
-              {children}
-            </a>
-            ),
+              </a>
+            );
+          },
           ul: ({ children }) => <ul className="my-2 list-disc space-y-1 pl-6">{children}</ul>,
           ol: ({ children }) => <ol className="my-2 list-decimal space-y-1 pl-6">{children}</ol>,
           li: ({ children }) => <li className="pl-0.5">{children}</li>,
@@ -166,6 +190,117 @@ export function MarkdownView({
   );
 }
 
+/**
+ * A protected attachment linked from the document body.
+ *
+ * Fetch through the existing authenticated API helper and render a normal
+ * link to the resulting Blob URL. Fetching when this component mounts
+ * allows the eventual click to open a new tab synchronously, avoiding
+ * popup blocking caused by opening a window after an asynchronous request.
+ *
+ * This preloads each linked attachment when the document is rendered.
+ */
+function AttachmentLink({
+  uid,
+  children,
+}: {
+  uid: string;
+  children: ReactNode;
+}) {
+  // Associate the result with its attachment so a previous URL is never
+  // displayed if this component receives a different uid.
+  const [result, setResult] = useState<{
+    uid: string;
+    url: string | null;
+    failed: boolean;
+  } | null>(null);
+
+  // Incrementing this value retries a failed request.
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    attachmentsApi.fetchBlobUrl(uid)
+      .then((url) => {
+        // A request may finish after unmounting or after uid changes.
+        // Release that unused URL instead of updating stale state.
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+
+        objectUrl = url;
+        setResult({ uid, url, failed: false });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setResult({ uid, url: null, failed: true });
+        }
+      });
+
+    // Release the Blob URL when this effect is replaced or unmounted,
+    // following the existing AuthenticatedImage cleanup pattern.
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [uid, attempt]);
+
+  const current = result?.uid === uid ? result : null;
+  const linkClass =
+    "text-indigo-600 underline decoration-indigo-300 " +
+    "underline-offset-2 hover:decoration-indigo-600";
+
+  // Keep failures visible and let the reader retry without reloading
+  // the whole document.
+  if (current?.failed) {
+    return (
+      <span>
+        <button
+          type="button"
+          className={linkClass}
+          title="Retry loading attachment"
+          onClick={() => {
+            setResult(null);
+            setAttempt((value) => value + 1);
+          }}
+        >
+          {children}
+        </button>
+        <span role="status" className="ml-1 text-xs text-red-600">
+          Unable to load attachment. Click to retry or use FILES → Download.
+        </span>
+      </span>
+    );
+  }
+
+  // Do not expose the original unauthenticated URL while loading.
+  if (!current?.url) {
+    return (
+      <span aria-busy="true" className="text-slate-500">
+        {children}
+        <span role="status" className="ml-1 text-xs">
+          (Loading…)
+        </span>
+      </span>
+    );
+  }
+
+  // The browser opens the fetched file. PDF display depends on the
+  // MIME type preserved by fetchBlobUrl and the browser's settings.
+  return (
+    <a
+      href={current.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={linkClass}
+    >
+      {children}
+    </a>
+  );
+}
 /** An image in the text, at most as wide as the text; a click shows it full size. */
 function InlineImage({ uid, alt }: { uid: string; alt: string }) {
   const [open, setOpen] = useState(false);
