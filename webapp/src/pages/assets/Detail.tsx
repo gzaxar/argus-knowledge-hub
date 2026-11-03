@@ -21,6 +21,7 @@ import { LabelScanner } from "../../components/LabelScanner";
 import { RelationGraph } from "../../components/RelationGraph";
 import { TransferItemAction } from "../../components/TransferItemAction";
 import { effectiveAttributes, inheritedKeys } from "../../lib/schemaAttributes";
+import { empty } from "../../components/AttributeFields";
 import { AssetContextPanel } from "../../components/hub/ContextPanels";
 import { SemanticRelated } from "../../components/SemanticRelated";
 import { LocationCard } from "../../components/LocationCard";
@@ -62,6 +63,7 @@ export function AssetDetail() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [commentText, setCommentText] = useState("");
   const [commentAuthor, setCommentAuthor] = useState("web-user");
+  const [showEmpty, setShowEmpty] = useState(false);
   const [relationTarget, setRelationTarget] = useState("");
   const [relationType, setRelationType] = useState("related_to");
   const [showGraph, setShowGraph] = useState(false);
@@ -184,6 +186,8 @@ export function AssetDetail() {
   const a = asset.data;
   const attrDefs = effectiveAttributes(schema.data, allSchemas.data);
   const inherited = inheritedKeys(schema.data, attrDefs);
+  // Only what has a value; the type's other fields one click away (a Switch need not list PBS segments).
+  const filledDefs = attrDefs.filter((d) => !empty(a.attributes[d.key ?? d.name]));
   const assetName = (id: string) => allAssets.data?.find((x) => x.uid === id)?.name ?? id;
   const outbound = relations.data?.filter((r) => r.from_asset_uid === a.uid) ?? [];
   const inbound = relations.data?.filter((r) => r.to_asset_uid === a.uid) ?? [];
@@ -270,8 +274,10 @@ export function AssetDetail() {
           {attrDefs.length === 0 ? (
             <p className="text-sm text-slate-400">This schema has no attributes defined.</p>
           ) : (
+            <>
+            {filledDefs.length === 0 && <p className="text-sm text-slate-400">No field filled in yet.</p>}
             <dl className="space-y-1.5 text-sm">
-              {attrDefs.map((attr) => {
+              {(showEmpty ? attrDefs : filledDefs).map((attr) => {
                 const long = attr.type === "text";
                 return (
                 <div key={attr.id ?? attr.name} className={long ? "space-y-1" : "flex justify-between gap-4"}>
@@ -295,6 +301,13 @@ export function AssetDetail() {
                 );
               })}
             </dl>
+            {filledDefs.length < attrDefs.length && (
+              <button type="button" onClick={() => setShowEmpty((v) => !v)}
+                      className="mt-3 text-xs text-indigo-600 hover:text-indigo-800">
+                {showEmpty ? "Hide the empty fields" : `Show ${attrDefs.length - filledDefs.length} empty fields`}
+              </button>
+            )}
+            </>
           )}
         </SectionCard>
 
