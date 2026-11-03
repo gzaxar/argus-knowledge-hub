@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, Integer, String, true as sa_true
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -41,6 +42,13 @@ class LLMConfig(Base, TimestampMixin):
     # Orders the passages written-knowledge search found by how well they answer the question (a cross-encoder,
     # served at the endpoint's /rerank). Optional: without it the search's own ranking stands.
     rerank_model: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # The model for answers that are data, not prose (a rework, a form filled from a description, a ticket): a
+    # fast one that does not reason, where `model` (the chat's) may. Empty: `model`.
+    structured_model: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # How each model is called, by its name (as configured, "auto" included): {"temperature": float or null for
+    # ARGUS's default, "no_thinking": send the no-thinking switch, "json_mode": ask for JSON, "time_limit_s":
+    # how long a structured answer may take}. A model not listed is called with ARGUS's defaults.
+    model_settings: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     tts_model: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     # Fernet-encrypted, never returned to the client — the same handling the
     # import configurations give a source PAT. Nullable: some endpoints on

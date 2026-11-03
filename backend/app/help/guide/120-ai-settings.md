@@ -1,7 +1,7 @@
 ---
 title: AI settings
-summary: Connecting an AI endpoint, choosing models, the output-token limit, keeping the knowledge index up to date automatically, and evaluating models for guided entry.
-keywords: [ai, ai endpoint, installation, default, inherit, shared, re-ranker, reranker, rerank, llm, model, embedding, vision, speech, transcription, whisper, token limit, output-token limit, reasoning model, qwen, index, knowledge index, automatic, schedule, reindex, evaluation, golden dataset, profile, candidate, activate, troubleshoot]
+summary: Connecting an AI endpoint, choosing models, the model for structured work and each model's settings, the output-token limit, keeping the knowledge index up to date automatically, and evaluating models for guided entry.
+keywords: [ai, ai endpoint, structured model, model settings, temperature, json mode, time limit, minimax, installation, default, inherit, shared, re-ranker, reranker, rerank, llm, model, embedding, vision, speech, transcription, whisper, token limit, output-token limit, reasoning model, qwen, index, knowledge index, automatic, schedule, reindex, evaluation, golden dataset, profile, candidate, activate, troubleshoot]
 order: 120
 ---
 
@@ -22,6 +22,9 @@ itself.
 2. **Endpoint URL** (for example `https://ai-gateway.example.infn.it/v1`) and the API key, if it needs one. The key
    is stored encrypted and never shown again.
 3. **Model** for questions and forms. Optionally:
+   - a **Model for structured work**: answers that are data rather than prose — reworking a text into a document,
+     filling a form from a description, drafting a ticket. A fast model that does not reason suits them best;
+     empty, the model above answers them;
    - an **Embedding model**, for searching what is written by meaning and for *Related by meaning*;
    - a **Re-ranker model**, to put the passages found in order of how well they answer the question;
    - a **Vision model**, for nameplate photos;
@@ -32,6 +35,22 @@ itself.
    reasoning model (Qwen, DeepSeek…) no room to answer.
 5. Tick **Offer AI features in this workspace**, save, then press **Check endpoint**: features turn on only once the
    check passes.
+
+## Per-model settings
+
+How each model is called, by the name used above (`auto` included):
+
+- **Temperature**: empty is ARGUS's default — 0 to classify and chat, the model's own for structured answers. At 0 a
+  reasoning model's thinking can run on and on: on 3 November 2026 the INFN gateway's `auto` chose `minimax-m27`,
+  which reasoned past the gateway's 300 s at 0, and answered in about 15 s at its own temperature.
+- **Tell it not to think**: sends the switch that turns a reasoning model's thinking off. Untick it for a model that
+  cannot be told; it is then not sent.
+- **JSON mode**: asks for JSON on structured answers. Untick it for a model that does not have it.
+- **Time limit**: how long a structured answer may take before ARGUS stops and says so (280 s when empty, under the
+  INFN gateway's 300 s).
+
+**Test** tries a row as it stands, saved or not, through the saved endpoint, on a small sample extraction (none of
+your data is sent): how long it took, which model answered (`auto` chooses), and whether the answer was the JSON.
 
 Documents marked *riservato* are sent to the model only if you allow it here. Use an endpoint approved for the
 information it will receive.
@@ -86,6 +105,7 @@ and evidence, not only fluency and speed.
 | Questions work, but nothing written is found | an embedding model is set and the index has been built |
 | A new document is not found | it is published; the index has run since (or press *Update the index*); you may read it; it is not *riservato* (unless allowed) |
 | Empty or cut-short answers | the endpoint's errors on this page, and the output-token limit |
+| A rework says the assistant *kept reasoning* | a model for structured work that does not reason, or that model's settings (*Test* it) |
 | Photos of nameplates fail | a vision model is set and the endpoint serves it |
 | Dictation fails | a speech model is set and the endpoint serves `/audio/transcriptions` |
 

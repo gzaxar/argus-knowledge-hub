@@ -494,6 +494,17 @@ def test_an_answer_in_prose_is_asked_for_again_and_twice_names_the_model(world, 
     assert "twice (some-chat-model answered)" in r.json()["detail"]
 
 
+def test_a_model_that_keeps_reasoning_says_so(world, monkeypatch):
+    from app.services.llm import LLMOvertime
+    as_(world["writer"])
+
+    def thinks(endpoint, system, user):
+        raise LLMOvertime("minimax-m27 was still reasoning after 280 s", "minimax-m27", 40000)
+    monkeypatch.setattr(reshape, "complete_structured", thinks)
+    r = _preview(world)
+    assert r.status_code == 504 and "minimax-m27" in r.json()["detail"] and "kept reasoning" in r.json()["detail"]
+
+
 def test_an_answer_that_times_out_says_why(world, monkeypatch):
     import requests
     from app.services.llm import LLMError

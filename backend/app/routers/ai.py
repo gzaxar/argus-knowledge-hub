@@ -19,6 +19,8 @@ from app.models.ai_suggestion import AISuggestion
 from app.models.document import Document
 from app.models.schema import Schema
 from app.schemas.ai import (
+    ModelTestIn,
+    ModelTestResult,
     AskFeedbackIn,
     AskFeedbackOut,
     AIStatus,
@@ -70,6 +72,8 @@ def endpoint_for(config: LLMConfig) -> Endpoint:
         rerank_model=config.rerank_model,
         api_key=decrypt_secret(config.encrypted_secret) if config.encrypted_secret else None,
         max_output_tokens=config.max_output_tokens,
+        structured_model=config.structured_model,
+        model_settings=config.model_settings or None,
     )
 
 
@@ -78,6 +82,8 @@ def _out(config: LLMConfig) -> LLMConfigOut:
         workspace_id=config.workspace_id,
         base_url=config.base_url,
         model=config.model,
+        structured_model=config.structured_model,
+        model_settings=config.model_settings or {},
         embedding_model=config.embedding_model,
         vision_model=config.vision_model,
         asr_model=config.asr_model,
@@ -130,6 +136,10 @@ def _save(db: Session, key: str, body: LLMConfigIn) -> LLMConfigOut:
     config.asr_model = (body.asr_model or "").strip() or None
     config.tts_model = (body.tts_model or "").strip() or None
     config.rerank_model = (body.rerank_model or "").strip() or None
+    config.structured_model = (body.structured_model or "").strip() or None
+    if body.model_settings is not None:
+        config.model_settings = {name.strip(): s.model_dump() for name, s in body.model_settings.items()
+                                 if name.strip()} or None
     config.enabled = body.enabled
     config.allow_confidential = body.allow_confidential
     config.max_output_tokens = body.max_output_tokens
@@ -169,6 +179,57 @@ def check_config(
 ):
     """Ask the endpoint whether it can do what it has been configured for."""
     return _check(db, workspace_id)
+
+
+# A small structured extraction, as a rework of one day of a running log asks for: what a model's settings are
+# tried on. Its answer is checked for the JSON, not for its content.
+_TEST_SYSTEM = ("You extract structured content from raw text. Answer with one JSON object only, exactly in the "
+                "shape given. No prose, no Markdown.\nShape: {\"date\": \"YYYY-MM-DD or null\", \"events\": "
+                "[{\"time\": \"HH:MM\", \"what\": \"…\"}]}")
+_TEST_USER = ("<<<SOURCE\n16.10.2026\n9.35: laser banda C e modulatori riaccesi.\n9h53: misure di energia al gun.\n"
+              "10h28: misura emittanza witness AC1.\nSOURCE>>>\n\nAnswer with the JSON object.")
+
+
+def _test_model(db: Session, key: str, body: ModelTestIn) -> ModelTestResult:
+    """The model, with the settings given (else its saved ones), on the small extraction: how long it took,
+    which model answered (a gateway's "auto" chooses), and whether the answer is the JSON asked for."""
+    import time as _time
+    from dataclasses import replace
+    from app.services.llm import LLMOvertime, complete_structured
+    from app.services.reshape import json_object
+    config = _get(db, key)
+    if config is None:
+        raise HTTPException(status_code=404, detail="No AI endpoint is configured")
+    name = body.model.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name the model to test")
+    endpoint = endpoint_for(config)
+    stored = dict(config.model_settings or {})
+    if body.settings is not None:
+        stored[name] = body.settings.model_dump()
+    endpoint = replace(endpoint, structured_model=name, model_settings=stored)
+    started = _time.monotonic()
+    try:
+        reply = complete_structured(endpoint, _TEST_SYSTEM, _TEST_USER)
+    except LLMOvertime as e:
+        return ModelTestResult(ok=False, model=name, answered_by=e.model, seconds=round(_time.monotonic() - started, 1),
+                               error=str(e))
+    except LLMError as e:
+        return ModelTestResult(ok=False, model=name, seconds=round(_time.monotonic() - started, 1), error=str(e))
+    data = json_object(reply)
+    valid = isinstance(data, dict) and isinstance(data.get("events"), list)
+    return ModelTestResult(ok=valid, model=name, answered_by=getattr(reply, "model", None),
+                           seconds=round(_time.monotonic() - started, 1), valid_json=valid,
+                           error=None if valid else "The answer was not the JSON object asked for: "
+                                                    + (str(reply)[:160] or "(empty)"))
+
+
+@router.post("/config/test-model", response_model=ModelTestResult)
+def test_model(body: ModelTestIn, workspace_id: str = Depends(require_permission("modify")),
+               db: Session = Depends(get_db)):
+    """Try a model on a small structured extraction with the settings given: time, the model that answered,
+    whether its answer is the JSON. Sends the sample (no workspace data) to the endpoint."""
+    return _test_model(db, workspace_id, body)
 
 
 def _check(db: Session, key: str) -> LLMCheckResult:
@@ -878,6 +939,12 @@ def delete_installation_config(_admin=Depends(_administrator), db: Session = Dep
     if config is not None:
         db.delete(config)
         db.commit()
+
+
+@admin_router.post("/config/test-model", response_model=ModelTestResult)
+def test_installation_model(body: ModelTestIn, _admin=Depends(_administrator), db: Session = Depends(get_db)):
+    from app.services.ai_config import INSTALLATION
+    return _test_model(db, INSTALLATION, body)
 
 
 @admin_router.post("/config/check", response_model=LLMCheckResult)

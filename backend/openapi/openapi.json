@@ -8438,6 +8438,20 @@
             "title": "Model",
             "type": "string"
           },
+          "model_settings": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/ModelSettingIn"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Settings"
+          },
           "rerank_model": {
             "anyOf": [
               {
@@ -8448,6 +8462,17 @@
               }
             ],
             "title": "Rerank Model"
+          },
+          "structured_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structured Model"
           },
           "tts_model": {
             "anyOf": [
@@ -8579,6 +8604,14 @@
             "title": "Model",
             "type": "string"
           },
+          "model_settings": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModelSettingIn"
+            },
+            "default": {},
+            "title": "Model Settings",
+            "type": "object"
+          },
           "rerank_model": {
             "anyOf": [
               {
@@ -8589,6 +8622,17 @@
               }
             ],
             "title": "Rerank Model"
+          },
+          "structured_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structured Model"
           },
           "tts_model": {
             "anyOf": [
@@ -9437,6 +9481,123 @@
           "loser_uid"
         ],
         "title": "MergeIn",
+        "type": "object"
+      },
+      "ModelSettingIn": {
+        "description": "How one model is called. `temperature` empty: ARGUS's default (0 to classify and chat; the model's own for\nstructured answers).",
+        "properties": {
+          "json_mode": {
+            "default": true,
+            "title": "Json Mode",
+            "type": "boolean"
+          },
+          "no_thinking": {
+            "default": true,
+            "title": "No Thinking",
+            "type": "boolean"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "time_limit_s": {
+            "anyOf": [
+              {
+                "maximum": 3600.0,
+                "minimum": 10.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Limit S"
+          }
+        },
+        "title": "ModelSettingIn",
+        "type": "object"
+      },
+      "ModelTestIn": {
+        "description": "A model to try on a small structured extraction, with the settings to try it with (the form's, saved or\nnot).",
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelSettingIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "title": "ModelTestIn",
+        "type": "object"
+      },
+      "ModelTestResult": {
+        "properties": {
+          "answered_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answered By"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "seconds": {
+            "title": "Seconds",
+            "type": "number"
+          },
+          "valid_json": {
+            "default": false,
+            "title": "Valid Json",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "model",
+          "seconds"
+        ],
+        "title": "ModelTestResult",
         "type": "object"
       },
       "MyWorkspaceOut": {
@@ -16652,6 +16813,86 @@
         ]
       }
     },
+    "/v1/admin/ai/config/test-model": {
+      "post": {
+        "operationId": "test_installation_model_v1_admin_ai_config_test_model_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelTestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelTestResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Test Installation Model",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
     "/v1/admin/bundles": {
       "get": {
         "operationId": "list_bundles_v1_admin_bundles_get",
@@ -20191,6 +20432,87 @@
           }
         ],
         "summary": "Check Config",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/v1/ai/config/test-model": {
+      "post": {
+        "description": "Try a model on a small structured extraction with the settings given: time, the model that answered,\nwhether its answer is the JSON. Sends the sample (no workspace data) to the endpoint.",
+        "operationId": "test_model_v1_ai_config_test_model_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelTestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelTestResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Test Model",
         "tags": [
           "ai"
         ]

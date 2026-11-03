@@ -70,7 +70,9 @@ def active(db: Session, workspace_id: str, kind: str) -> Optional[IntakeProfile]
 def endpoint_for(endpoint: Endpoint, profile: Optional[IntakeProfile]) -> Endpoint:
     if profile is None:
         return endpoint
-    return replace(endpoint, model=profile.model, vision_model=profile.vision_model or endpoint.vision_model)
+    # The profile's evaluated model answers this intake, the AI settings' model for structured work included.
+    return replace(endpoint, model=profile.model, structured_model=profile.model,
+                   vision_model=profile.vision_model or endpoint.vision_model)
 
 
 def create(db: Session, workspace_id: str, actor: str, kind: str, model: str,

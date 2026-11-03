@@ -620,11 +620,30 @@ def test_A69_a_password_read_from_a_nameplate_photo_is_never_proposed(world, mod
 # --- a reasoning model (Qwen 3.x behind vLLM) -------------------------------------------------------
 
 class _Reply:
+    """A whole (not streamed) reply, as a provider that ignores `stream` sends it."""
     def __init__(self, status, body):
         self.status_code, self._body, self.text = status, body, json.dumps(body)
+        self.headers = {"content-type": "application/json"}
 
     def json(self):
         return self._body
+
+    def close(self):
+        pass
+
+
+class _Stream:
+    """A streamed reply: server-sent events, one chunk each."""
+    def __init__(self, chunks, model="minimax-m27"):
+        self.status_code, self.text = 200, ""
+        self.headers = {"content-type": "text/event-stream"}
+        self._lines = [f"data: {json.dumps({'model': model, **c})}" for c in chunks] + ["data: [DONE]"]
+
+    def iter_lines(self, decode_unicode=True):
+        yield from self._lines
+
+    def close(self):
+        pass
 
 
 def test_a_reasoning_model_is_asked_not_to_think_and_a_cut_off_answer_is_an_error(monkeypatch):
@@ -634,7 +653,7 @@ def test_a_reasoning_model_is_asked_not_to_think_and_a_cut_off_answer_is_an_erro
     ep = llm.Endpoint(base_url="https://gateway.example/v1", model="qwen36-27b")
     sent = []
 
-    def post(url, headers=None, json=None, timeout=None):
+    def post(url, headers=None, json=None, timeout=None, **kw):
         sent.append(json)
         if "chat_template_kwargs" in json:
             return _Reply(200, {"choices": [{"message": {"content": '{"type": "Ion Pump"}'},
@@ -650,7 +669,7 @@ def test_a_reasoning_model_is_asked_not_to_think_and_a_cut_off_answer_is_an_erro
     # A provider that does not know the switch refuses it, and is asked again without.
     sent.clear()
 
-    def strict(url, headers=None, json=None, timeout=None):
+    def strict(url, headers=None, json=None, timeout=None, **kw):
         sent.append(json)
         if "chat_template_kwargs" in json:
             return _Reply(400, {"error": "unknown field chat_template_kwargs"})
@@ -659,7 +678,7 @@ def test_a_reasoning_model_is_asked_not_to_think_and_a_cut_off_answer_is_an_erro
     assert llm.complete_structured(ep, "s", "u") == "{}" and len(sent) == 3    # JSON mode, the switch, then plain
 
     # Still thinking when the budget ran out: said, not returned as an empty answer.
-    monkeypatch.setattr(llm.requests, "post", lambda url, headers=None, json=None, timeout=None: _Reply(
+    monkeypatch.setattr(llm.requests, "post", lambda url, headers=None, json=None, timeout=None, **kw: _Reply(
         200, {"choices": [{"message": {"content": None, "reasoning": "…"}, "finish_reason": "length"}]}))
     capped = llm.Endpoint(base_url=ep.base_url, model=ep.model, max_output_tokens=900)
     with pytest.raises(llm.LLMError, match="used all 900 tokens before answering"):
@@ -673,7 +692,7 @@ def test_a_provider_without_json_mode_is_asked_again_without_it_and_the_answerin
     ep = llm.Endpoint(base_url="https://gateway.example/v1", model="auto")
     sent = []
 
-    def no_json_mode(url, headers=None, json=None, timeout=None):
+    def no_json_mode(url, headers=None, json=None, timeout=None, **kw):
         sent.append(json)
         if "response_format" in json:
             return _Reply(400, {"error": "response_format is not supported"})
@@ -694,7 +713,7 @@ def test_a_request_the_gateway_leaves_unanswered_is_sent_once_more(monkeypatch):
     ep = llm.Endpoint(base_url="https://gateway.example/v1", model="auto")
     tries = []
 
-    def stalls_once(url, headers=None, json=None, timeout=None):
+    def stalls_once(url, headers=None, json=None, timeout=None, **kw):
         tries.append(1)
         if len(tries) == 1:
             raise rq.ReadTimeout("read timed out")
@@ -704,10 +723,37 @@ def test_a_request_the_gateway_leaves_unanswered_is_sent_once_more(monkeypatch):
 
     tries.clear()
 
-    def stalls(url, headers=None, json=None, timeout=None):
+    def stalls(url, headers=None, json=None, timeout=None, **kw):
         tries.append(1)
         raise rq.ReadTimeout("read timed out")
     monkeypatch.setattr(llm.requests, "post", stalls)
     with pytest.raises(llm.LLMError, match="no answer, twice") as e:
         llm.complete_structured(ep, "s", "u")
     assert len(tries) == 2 and isinstance(e.value.__cause__, rq.Timeout)      # the rework says it timed out
+
+
+def test_a_reasoning_model_is_read_as_it_streams_its_reasoning_left_aside_and_stopped_at_a_deadline(monkeypatch):
+    """The INFN gateway's minimax reasons before every answer and cannot be told not to; asked to wait in silence,
+    at temperature 0, it reasoned past the gateway's 300 s (2026-11-03). The answer is now streamed, its reasoning
+    read and left aside, the temperature the model's own, and ARGUS stops by itself at its deadline."""
+    from app.services import llm
+    ep = llm.Endpoint(base_url="https://gateway.example/v1", model="auto")
+    sent = []
+
+    def streams(url, headers=None, json=None, timeout=None, **kw):
+        sent.append({**json, "_stream": kw.get("stream")})
+        return _Stream([{"choices": [{"delta": {"reasoning_content": "Let me think. " * 50}}]},
+                        {"choices": [{"delta": {"content": '{"title": '}}]},
+                        {"choices": [{"delta": {"content": '"Run 16"}'}, "finish_reason": "stop"}]},
+                        {"choices": [], "usage": {"prompt_tokens": 1900, "completion_tokens": 900}}])
+    monkeypatch.setattr(llm.requests, "post", streams)
+    reply = llm.complete_structured(ep, "s", "u")
+    assert reply == '{"title": "Run 16"}' and reply.model == "minimax-m27" and not reply.cut_off
+    assert sent[0]["stream"] is True and sent[0]["_stream"] is True
+    assert "temperature" not in sent[0]                                   # the model's own: 0 makes it loop
+
+    # Still reasoning at the deadline: stopped, and said so.
+    monkeypatch.setattr(llm, "STRUCTURED_DEADLINE_SECONDS", -1)
+    with pytest.raises(llm.LLMOvertime, match="still reasoning") as e:
+        llm.complete_structured(ep, "s", "u")
+    assert e.value.model in ("auto", "minimax-m27")
