@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError, documentsApi, intakeApi, schemasApi, type AssistResult } from "../../api/client";
 import { finalFor, GuidedEntry } from "../../components/GuidedEntry";
+import { ConfluenceImport, type ConfluenceSelection } from "../../components/ConfluenceImport";
+import { replaceResourceLinks } from "../../lib/confluenceImport";
 import { WebFolderImport } from "../../components/WebFolderImport";
 import { effectiveAttributes } from "../../lib/schemaAttributes";
 import { AttributeInput } from "../../components/AttributeInput";
@@ -41,6 +43,15 @@ export function DocumentForm() {
   // The file the document starts from, attached to it when it is saved unless the person says not to.
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [attachSource, setAttachSource] = useState(true);
+  const [confluenceFiles, setConfluenceFiles] = useState<File[]>([]);
+  const uploadedConfluenceFiles = useRef(new Map<string, string>());
+  const [confluenceSaving, setConfluenceSaving] = useState(false);
+  const useConfluence = ({ page, original, attachments }: ConfluenceSelection) => {
+    setTitle(page.title); setBodyMarkdown(page.body); setSteps([]); setSummary("");
+    setSourceFile(original); setAttachSource(true); setIsGlobal(false); setAssisted(null);
+    setAttributes((prev) => ({ ...prev, argus_confluence_import: page.metadata }));
+    setConfluenceFiles(attachments); uploadedConfluenceFiles.current.clear();
+  };
   const allAttributes = { ...attributes, ...(summary.trim() ? { argus_summary: summary.trim() } : {}) };
   const draft = { title, document_type_uid: documentTypeUid, code, body_markdown: bodyMarkdown,
                   confidentiality, is_global: isGlobal, attributes: allAttributes };
@@ -107,6 +118,25 @@ export function DocumentForm() {
     };
   };
 
+  // A successful upload is retained across retries of a partially completed import.
+  const finishConfluenceImport = async (uid: string) => {
+    if (!confluenceFiles.length) return;
+    for (const file of confluenceFiles) {
+      if (uploadedConfluenceFiles.current.has(file.name)) continue;
+      try {
+        const saved = await documentsApi.uploadRevisionAttachment(uid, `${uid}-r1`, file);
+        uploadedConfluenceFiles.current.set(file.name, `/v1/attachments/${saved.uid}`);
+      } catch (e) {
+        throw new Error(`Draft ${uid} exists. Could not attach ${file.name}: ${e instanceof Error ? e.message : String(e)}. Retry Save document; completed uploads will be reused.`);
+      }
+    }
+    const linked = replaceResourceLinks(bodyMarkdown, uploadedConfluenceFiles.current);
+    setBodyMarkdown(linked);
+    await documentsApi.updateRevision(uid, `${uid}-r1`, {
+      body_markdown: linked, steps, attributes: allAttributes,
+    });
+  };
+
   const createMutation = useMutation({
     mutationFn: async () => {
       // Already created by an attachment: save the rest onto it rather
@@ -124,9 +154,10 @@ export function DocumentForm() {
           steps,
           attributes: allAttributes,
         });
+        await finishConfluenceImport(createdUid);
         return { uid: createdUid };
       }
-      return documentsApi.create({
+      const created = await documentsApi.create({
         uid: documentUid,
         code: code.trim() || null,
         title: title.trim(),
@@ -138,6 +169,11 @@ export function DocumentForm() {
         steps,
         attributes: allAttributes,
       });
+      setCreatedUid(documentUid);
+      setAssignedCode(created!.code);
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      await finishConfluenceImport(documentUid);
+      return created;
     },
     onSuccess: async (doc) => {
       if (doc && sourceFile && attachSource) {
@@ -176,10 +212,13 @@ export function DocumentForm() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          createMutation.mutate();
+          if (confluenceSaving) return;
+          setConfluenceSaving(true);
+          createMutation.mutate(undefined, { onSettled: () => setConfluenceSaving(false) });
         }}
         className="mt-6 space-y-5"
       >
+        <fieldset disabled={confluenceSaving} className="space-y-5 disabled:opacity-60">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700">Code</label>
@@ -204,7 +243,8 @@ export function DocumentForm() {
               value={documentTypeUid}
               onChange={(e) => {
                 setDocumentTypeUid(e.target.value);
-                setAttributes({});
+                setAttributes((prev) => prev.argus_confluence_import
+                  ? { argus_confluence_import: prev.argus_confluence_import } : {});
               }}
               className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
             >
@@ -354,11 +394,14 @@ export function DocumentForm() {
           </div>
         )}
 
+        {confluenceFiles.length > 0 && (
+          <p className="text-xs text-slate-600">Confluence supporting files queued: {confluenceFiles.map((f) => f.name).join(", ")}. These upload when you save.</p>
+        )}
         {createMutation.isError && (
           <p className="text-sm text-red-600">
             {createMutation.error instanceof ApiError
               ? JSON.stringify(createMutation.error.body)
-              : "Failed to create document"}
+              : createMutation.error instanceof Error ? createMutation.error.message : "Failed to create document"}
           </p>
         )}
 
@@ -373,13 +416,17 @@ export function DocumentForm() {
               ? "Save document"
               : "Create document"}
         </button>
+        </fieldset>
       </form>
       <aside className="xl:sticky xl:top-4 xl:self-start">
         <div className="space-y-4">
+          <ConfluenceImport disabled={!!createdUid || confluenceSaving} hasContent={!!title.trim() || !!bodyMarkdown.trim()} onImport={useConfluence} />
+          <fieldset disabled={confluenceSaving || !!attributes.argus_confluence_import} className="space-y-4">
           <GuidedEntry kind="document" draft={draft} onApply={apply} onAssist={setAssisted}
                        onSource={(f) => { setSourceFile(f); setAttachSource(true); }} />
           <WebFolderImport documentTypeUid={documentTypeUid} confidentiality={confidentiality}
                            authorityLevel={authorityLevel} relateAsset={relateAsset} />
+          </fieldset>
         </div>
       </aside>
       </div>
