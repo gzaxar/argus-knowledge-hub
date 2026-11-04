@@ -1,3 +1,4 @@
+import { headingAnchors } from "../lib/markdownHeadingAnchors";
 import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -45,31 +46,40 @@ export function MarkdownView({
     <div className={`markdown-body text-sm leading-relaxed text-slate-700 ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], headingAnchors]}
         components={{
-          h1: ({ children }) => (
-            <h1 className="mb-2 mt-5 border-b border-slate-200 pb-1 text-xl font-semibold text-slate-900 first:mt-0">
+          h1: ({ children, id }) => (
+            <h1 id={id} className="mb-2 mt-5 border-b border-slate-200 pb-1 text-xl font-semibold text-slate-900 first:mt-0">
               {children}
             </h1>
           ),
-          h2: ({ children }) => (
-            <h2 className="mb-2 mt-5 text-lg font-semibold text-slate-900 first:mt-0">
+          h2: ({ children, id }) => (
+            <h2 id={id} className="mb-2 mt-5 text-lg font-semibold text-slate-900 first:mt-0">
               {children}
             </h2>
           ),
-          h3: ({ children }) => (
-            <h3 className="mb-1 mt-4 text-base font-semibold text-slate-800 first:mt-0">
+          h3: ({ children, id }) => (
+            <h3 id={id} className="mb-1 mt-4 text-base font-semibold text-slate-800 first:mt-0">
               {children}
             </h3>
           ),
-          h4: ({ children }) => (
-            <h4 className="mb-1 mt-3 text-sm font-semibold text-slate-800">{children}</h4>
+          h4: ({ children, id }) => (
+            <h4 id={id} className="mb-1 mt-3 text-sm font-semibold text-slate-800">{children}</h4>
           ),
           p: ({ children }) => <p className="my-2">{children}</p>,
           a: ({ href, children }) =>
             // A page of ARGUS itself (a record an answer cites, a file) opens here, like any other link in the app;
             // a file's API address opens its page, which reads it signed in (issue #18).
-            href && /^\/(assets|tickets|documents|attachments|v1\/attachments)\//.test(href) ? (
+            href?.startsWith("#") ? (
+              <a href={href} className="text-indigo-600 underline" onClick={(event) => {
+                let fragment: string;
+                try { fragment = decodeURIComponent(href.slice(1)); } catch { return; }
+                const root = event.currentTarget.closest(".markdown-body");
+                const targetId = fragment.startsWith("argus-heading-") ? fragment : `argus-heading-${fragment}`;
+                const target = Array.from(root?.querySelectorAll<HTMLElement>("[id]") ?? []).find((el) => el.id === targetId);
+                if (target) { event.preventDefault(); target.scrollIntoView({ behavior: "smooth", block: "start" }); }
+              }}>{children}</a>
+            ) : href && /^\/(assets|tickets|documents|attachments|v1\/attachments)\//.test(href) ? (
               <Link to={href.replace(/^\/v1\/attachments\//, "/attachments/")} className="text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-600">
                 {children}
               </Link>
