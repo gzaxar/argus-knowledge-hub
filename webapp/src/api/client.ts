@@ -2920,7 +2920,8 @@ export interface CatalogueProposal {
 export interface CatalogueProposalDraft {
   record_uid: string;
   entry: Record<string, string>;
-  vendor: { id: string; name: string; new: boolean; record_uid: string | null; entry?: Record<string, unknown> };
+  vendor: { id: string; name: string; new: boolean; record_uid: string | null; entry?: Record<string, unknown>;
+            library_name?: string };
   collections: { id: string; name: string; version: string; domains: string[] }[];
   device_classes: string[];
   source_kinds: string[];

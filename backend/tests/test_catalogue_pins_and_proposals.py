@@ -285,6 +285,16 @@ def test_a_vendor_only_the_netbox_library_has_is_proposed_to_vendors_under_its_i
         ["agilent", "keysight"]
     assert {m["id"]: m["vendor"] for m in yaml.safe_load(built["files"]["collections/vacuum/models.yaml"])["models"]} \
         == {"agilent/xgs-600": "agilent", "keysight/34465a": "keysight"}
+    # The library finds its manufacturer in `vendors` by name or alias, and keeps its models under the id: a
+    # renamed company keeps the library's name as a spelling, and another id is refused.
+    renamed = proposals.build(cat["db"], cat["ws"], {**BODY, "record_uid": cat["model"].uid, "collection": {"id": "vacuum"},
+                                                     "vendor": {"name": "Keysight Measurement"}}, cat["gh"])
+    keysight = next(v for v in yaml.safe_load(renamed["files"]["collections/vendors/vendors.yaml"])["vendors"]
+                    if v["id"] == "keysight")
+    assert keysight["name"] == "Keysight Measurement" and keysight["aliases"] == ["Keysight"]
+    with pytest.raises(proposals.ProposalProblem, match="NetBox library's id for Keysight"):
+        proposals.build(cat["db"], cat["ws"], {**BODY, "record_uid": cat["model"].uid, "collection": {"id": "vacuum"},
+                                               "vendor": {"id": "keysight-technologies"}}, cat["gh"])
 
 
 def test_a_model_the_netbox_library_defines_is_linked_not_proposed(cat):
@@ -355,3 +365,29 @@ def test_the_repository_is_the_github_one_the_lock_pins(monkeypatch):
     assert proposals.repository() == "infn-argus/argus-catalogue"
     monkeypatch.setenv("ARGUS_CATALOGUE_REPO", "Other/Repo")
     assert proposals.repository() == "other/repo"
+
+
+def test_a_library_vendor_the_argus_vendors_now_state_is_absorbed_not_lost(tmp_path):
+    """v0.3.0 added Keysight to `vendors`; the NetBox collection, written when the sources are read, then made no
+    Keysight of its own, and the pin was refused (keysight "no longer in" it-devices, its content changed at the
+    same version). The same id now in `vendors` is the library's vendor absorbed — not a loss."""
+    from app.catalogue.validate import compare
+
+    def tree(root, argus_vendors, library_vendors):
+        content = {"collections/vendors/collection.yaml": manifest("vendors", "0.2.0", "vendors.yaml"),
+                   "collections/vendors/vendors.yaml": {"vendors": argus_vendors},
+                   "collections/it-devices/collection.yaml": {**manifest("it-devices", "0.2.0", "vendors.yaml"),
+                                                              "origin": "netbox"},
+                   "collections/it-devices/vendors.yaml": {"vendors": library_vendors}}
+        for rel, data in content.items():
+            f = root / rel
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(yaml.safe_dump(data, sort_keys=False))
+        return load_tree(root / "collections", netbox_models={})
+
+    keysight, rs = {"id": "keysight", "name": "Keysight"}, {"id": "rs", "name": "Rohde & Schwarz"}
+    before = tree(tmp_path / "a", [AGILENT], [keysight, rs])
+    after = tree(tmp_path / "b", [AGILENT, keysight], [rs])
+    assert compare(before, after)["it-devices"] == []
+    lost = tree(tmp_path / "c", [AGILENT], [rs])                      # gone, and not in `vendors`: still refused
+    assert any("keysight" in str(p) and "no longer in" in str(p) for p in compare(before, lost)["it-devices"])

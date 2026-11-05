@@ -11,6 +11,7 @@ A record proposed in the same conversation is referred to as `new:N` before it e
 of this camera" can be proposed in one go with the station itself.
 """
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -36,7 +37,8 @@ SYSTEM = (
     "Look the records up first and use their keys — also as the value of an attribute that refers to a record "
     "(where a unit is: its Located in, the argus_location attribute, takes a Location's key). "
     "A record you propose to create is referred to as new:N "
-    "(N is in the proposal's reply) until it exists, so you can relate it in the same answer. 'A composed of "
+    "(N is in the proposal's reply) until it exists, so you can relate it in the same answer (a relation only: an "
+    "attribute takes a key once the record exists, and a text attribute takes the name). 'A composed of "
     "B' means B is a part of A; 'X part of Y' means X belongs to Y. If a proposal is refused, correct it from "
     "the reason given rather than repeating it."
 )
@@ -191,8 +193,19 @@ def _check_attributes(db: Session, schema: Schema, attributes, workspace_id: Opt
         return attributes
     out = dict(attributes)
     for k, v in attributes.items():
+        label = defs[k].get("name") or k
+        pending = isinstance(v, str) and re.fullmatch(r"\s*new:\d+\s*", v, re.IGNORECASE)
         if defs[k].get("type") == "reference":
+            if pending:
+                # A reference is stored as the record's uid, which a record still to be created does not have
+                # (and a relation proposed instead would not fill the field: fields make relations, not back).
+                raise Refused(f"{label} cannot take {v.strip()}, which is not created yet: leave it out, and once "
+                              f"the person has created {v.strip()}, set {label} with propose_update_record and its key")
             out[k] = _reference(db, defs[k], v, workspace_id)
+        elif pending:
+            # In a text value new:N would be kept as the text "new:1" (a Product Model's vendor, then proposed to
+            # the catalogue as a vendor called new:1).
+            raise Refused(f"{label} is text: write the name itself, not {v.strip()}")
     whole = {kk: vv for kk, vv in {**(current or {}), **out}.items() if vv is not None}
     problems = check_attributes(db, schema, whole, workspace_id, Asset, exclude_uid=exclude_uid)
     if problems:

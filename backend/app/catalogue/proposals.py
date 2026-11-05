@@ -192,8 +192,11 @@ def _vendor(db: Session, ws: str, rec: Asset, tree: dict) -> dict:
         website = known.data.get("website")
     if website:
         entry["website"] = website
-    return {"id": entry["id"], "name": entry["name"], "new": True, "entry": entry,
-            "record_uid": vrec.uid if vrec is not None else None}
+    out = {"id": entry["id"], "name": entry["name"], "new": True, "entry": entry,
+           "record_uid": vrec.uid if vrec is not None else None}
+    if known is not None:
+        out["library_name"] = str(known.data.get("name") or known.id)
+    return out
 
 
 def _collections(tree: dict) -> list[dict]:
@@ -372,6 +375,17 @@ def build(db: Session, ws: str, body: dict, gh: Optional[GitHub] = None) -> dict
             ventry["aliases"] = aliases
         if not SLUG.match(ventry["id"]):
             raise ProposalProblem(f"{ventry['id']!r} is not a vendor id: lower-case letters, digits and dashes")
+        library_name = vendor.get("library_name")
+        if library_name:
+            from app.services.catalogue_mapping import norm
+            # The NetBox library's manufacturer, stated in `vendors`: the library then matches it by name or alias
+            # and keeps its models under this id. Another id, or a name it no longer matches, would move every
+            # library model of this company to a new id.
+            if ventry["id"] != vendor["id"]:
+                raise ProposalProblem(f"{vendor['id']} is the NetBox library's id for {library_name}: its models "
+                                      f"are under it, so the vendor keeps it")
+            if norm(library_name) not in {norm(n) for n in [ventry["name"], *aliases]}:
+                ventry["aliases"] = [*aliases, library_name]
         ventry["sources"] = [{"kind": "manufacturer-page" if ventry.get("website") else "other",
                               "ref": ventry.get("website") or f"ARGUS record {vendor.get('record_uid') or ''}".strip(),
                               "checked": dt.date.today()}]
