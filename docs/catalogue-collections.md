@@ -76,7 +76,7 @@ file it belongs in — the fork's device type or `argus-catalogue`'s entry — f
   with no classification, a classification with no model, and a classification of a model the Argus-native
   collections define themselves are each refused.
 - **`backend/catalogue/sources.lock.yaml`** pins both repositories by full commit (and the release tag, which must
-  still point at it); `app/catalogue/sources.py` fetches only that commit into a bare cache and reads files with
+  still point at it; a newer release can be pinned from Administration, §4); `app/catalogue/sources.py` fetches only that commit into a bare cache and reads files with
   `git show` — nothing is checked out or run — maps the selected NetBox device types to the `it-devices`
   collection (id, vendor by alias, model code, part number; height, weight, network, serial and power ports
   as specifications) with their classification, and writes the result once per lock. `load_tree()` reads
@@ -397,10 +397,27 @@ Upgrading uses the same comparison: the previous release's snapshot, the new rel
 - Search knows them by name, model code, part number, alias and catalogue id (`moxa/nport-5450`).
 - **Local entries** are records made by hand, with no catalogue id. They work like any other record.
 - **Promote to Git.** On a local entry, the action *Propose for the catalogue* writes the YAML entry, checks
-  it with the validator, and opens a promotion item for review. A catalogue maintainer downloads the entry or
-  patch for the collection and merges it through a normal Git review. When that release is installed, the
-  local record is linked by the `link` step: same uid, now with a catalogue id. Opening the pull request
-  automatically is left for later (§9).
+  it with the validator, and opens a pull request on the catalogue repository. When that release is installed,
+  the local record is linked by the `link` step: same uid, now with a catalogue id.
+
+  **As built (2026-11-05).** `app/catalogue/proposals.py`: `draft` reads the entry from a Product Model of the
+  catalogue workspace (vendor by its catalogue entry, else by name or alias, else a new vendor proposed with
+  it); `build` writes the files against the repository's default branch — the entry inserted by id, a new
+  collection's manifest, the collection's version raised once since the last release tag (two proposals raise
+  it the same way, so they merge cleanly) — and runs `validate_tree` with them over the catalogue read now;
+  `propose` opens the pull request with `ARGUS_GITHUB_TOKEN` (one commit on `argus/model-…`, its body naming
+  the person) and keeps a `catalogue_proposals` row. Installing a release gives each open or merged proposal's
+  entry a `link` decision to its record, the differing fields taking the release's (reviewed) values
+  (`fields_default: managed`), and marks it installed. API: `GET/POST /v1/catalogue/collections/proposals`,
+  `GET …/proposals/draft`, `POST …/proposals/preview` (maintainers; opening needs a signed-in person). The
+  catalogue repository releases each merge by itself (`release.yml` there: validator, next version, CHANGELOG,
+  tag).
+- **A release pinned from Administration.** `app/catalogue/pins.py` and `catalogue_pins` (migration
+  `b7d9f1a3c5e8`): a maintainer pins a newer release tag of a source the lock pins by tag; the tag's commit
+  is read with `git ls-remote`, the catalogue it makes is checked with the validator against the one read now,
+  and the pin is kept only if it passes. `sources.effective()` reads the stored pin over the lock while it is
+  newer, so an ARGUS release that ships a newer lock wins. API: `GET …/releases`, `POST …/pin`,
+  `DELETE …/pin/{source}`. Pinning installs nothing.
 
 ## 5. The UI
 

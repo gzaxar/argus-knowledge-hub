@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { catalogueCollectionsApi, workspacesApi, type CatalogueFieldDecision, type CatalogueRecordField } from "../../api/client";
+import { ProposeModel } from "./CatalogueGit";
 import { LinkToSource } from "./LinkToSource";
 import { problem, shown, SourceBadge } from "./catalogueText";
 
@@ -61,8 +62,10 @@ export function CatalogueModelPage() {
           </p>
         )}
         {!entry && r.kind === "model" && (me.data?.is_admin || me.data?.catalogue_maintainer) && (
-          <div className="mt-3">
+          <div className="mt-3 space-y-2">
             <LinkToSource uid={r.uid} initial={String(r.fields.find((f) => f.field === "model_code")?.value ?? r.name)} />
+            <p className="text-xs text-slate-500">Not in the sources? Propose it, with the document its values were checked against.</p>
+            <ProposeModel uid={r.uid} />
           </div>
         )}
         {r.retired && (

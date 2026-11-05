@@ -270,6 +270,9 @@ NOT_CARRIED = {
     **{t: "which catalogue release this installation installed, and which of its records each catalogue id is: the "
           "target installs the collections itself, and adopts the carried records with a migration manifest"
        for t in ("catalogue_entries", "catalogue_installations")},
+    "catalogue_pins": "the catalogue release this installation reads, moved from Administration: the target pins its own",
+    "catalogue_proposals": "pull requests this installation opened on the catalogue repository: they are followed where "
+                           "they were opened; the target installs the release that carries them",
     **{t: "a type migration is this installation's administrative record of moving records between types; the "
           "records carry their result and history"
        for t in ("type_migrations", "type_migration_items")},
