@@ -164,18 +164,32 @@ def _vendor(db: Session, ws: str, rec: Asset, tree: dict) -> dict:
     name = (vrec.name if vrec is not None else None) or a.get("vendor")
     if not name:
         raise ProposalProblem(f"{rec.name} has no vendor: set its vendor first")
+    # Only an Argus collection's vendor may be a proposed model's: the NetBox library's are not reachable from
+    # the Argus collections. A company only the library has is proposed to `vendors`, under the library's id.
+    argus = [v for c in tree.values() if c.origin != "netbox" for v in c.vendors]
+    library = [v for c in tree.values() if c.origin == "netbox" for v in c.vendors]
+    linked = None
     if vrec is not None:
         row = db.execute(select(CatalogueEntry).where(CatalogueEntry.record_uid == vrec.uid)).scalar_one_or_none()
         if row is not None:
-            return {"id": row.catalogue_id, "name": vrec.name, "new": False, "record_uid": vrec.uid}
+            if any(v.id == row.catalogue_id for v in argus):
+                return {"id": row.catalogue_id, "name": vrec.name, "new": False, "record_uid": vrec.uid}
+            linked = next((v for v in library if v.id == row.catalogue_id), None)
     key = norm(name)
-    for c in tree.values():
-        for v in c.vendors:
-            if key in {norm(str(n)) for n in [v.data.get("name"), *(v.data.get("aliases") or [])] if n}:
-                return {"id": v.id, "name": v.data.get("name"), "new": False,
-                        "record_uid": vrec.uid if vrec is not None else None}
-    entry: dict = {"id": slug(name), "name": str(name)}
+
+    def named(v) -> bool:
+        return key in {norm(str(n)) for n in [v.data.get("name"), *(v.data.get("aliases") or [])] if n}
+
+    for v in argus:
+        if named(v):
+            return {"id": v.id, "name": v.data.get("name"), "new": False,
+                    "record_uid": vrec.uid if vrec is not None else None}
+    known = linked or next((v for v in library if named(v)), None)
+    entry: dict = ({"id": known.id, "name": str(known.data.get("name") or name)} if known is not None
+                   else {"id": slug(name), "name": str(name)})
     website = (vrec.attributes or {}).get("website") if vrec is not None else None
+    if not website and known is not None:
+        website = known.data.get("website")
     if website:
         entry["website"] = website
     return {"id": entry["id"], "name": entry["name"], "new": True, "entry": entry,
@@ -285,6 +299,27 @@ def _models_file(manifest: str) -> str:
     return (named or contents or ["models.yaml"])[0]
 
 
+def _not_in_library(entry: dict, vendor: dict) -> None:
+    """A model a NetBox library defines is never defined again in argus-catalogue (docs/catalogue-collections.md):
+    the proposal's tree reads the library without its models, so its search index is asked — by id, and by the
+    vendor (id or name) with the same model code."""
+    from app.catalogue import library
+    from app.catalogue.validate import code_key
+    from app.services.catalogue_mapping import norm
+    try:
+        lib = library.index()
+    except Exception:                                   # no library to read: the validator in CI still runs
+        return
+    netbox = {cid for cid, c in lib.collections.items() if c.get("origin") == "netbox"}
+    key, vid, vname = code_key(entry["model_code"]), entry["vendor"], norm(vendor.get("name"))
+    for it in lib.items:
+        if it.collection not in netbox:
+            continue
+        if it.catalogue_id == entry["id"] or (it.key == key and (it.vendor == vid or norm(it.vendor_name) == vname)):
+            raise ProposalProblem(f"it is in the NetBox library as {it.catalogue_id} ({it.vendor_name} "
+                                  f"{it.model_code}): link the record to it instead")
+
+
 def _check(files: dict[str, str], touched: set[str]) -> list[str]:
     """The validator over the catalogue read now, with these files in it (the pull request's CI runs it again,
     against the repository's last release)."""
@@ -365,6 +400,7 @@ def build(db: Session, ws: str, body: dict, gh: Optional[GitHub] = None) -> dict
             if m.data.get("vendor") == entry["vendor"] and code_key(m.data.get("model_code")) == code_key(entry["model_code"]):
                 raise ProposalProblem(f"{m.id} in {c.id} is the same model ({m.data.get('model_code')}): link the "
                                       f"record to it")
+    _not_in_library(entry, vendor)
 
     col = body.get("collection") or {}
     cid = str(col.get("id") or "").strip()
