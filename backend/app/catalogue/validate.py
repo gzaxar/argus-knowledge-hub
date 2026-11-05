@@ -380,10 +380,18 @@ def validate_tree(tree: dict[str, Collection]) -> dict[str, list[Problem]]:
     seen_ids: dict[str, str] = {}
     vendor_names: dict[str, tuple[str, str]] = {}
     products: dict[tuple[str, str], tuple[str, str]] = {}
+    # A manufacturer the NetBox library brought, then stated in an Argus collection (a model of it proposed
+    # there): the same id is the same company, and the Argus entry is the one that counts. The library's copy
+    # goes when the fork is next regenerated against the Argus vendors.
+    netbox_vendors = {v.id for c in tree.values() if c.origin == "netbox" for v in c.vendors}
+    argus_vendors = {v.id for c in tree.values() if c.origin != "netbox" for v in c.vendors}
+    restated = netbox_vendors & argus_vendors
     for c in tree.values():
         for e in c.entries():
             for ident in [e.id, *(e.data.get("former_ids") or [])]:
                 if not ident:
+                    continue
+                if ident in seen_ids and e.kind == "vendor" and ident in restated:
                     continue
                 if ident in seen_ids:
                     add(c, e, f"{ident!r} is already used in {seen_ids[ident]!r}: an id names one thing, everywhere")

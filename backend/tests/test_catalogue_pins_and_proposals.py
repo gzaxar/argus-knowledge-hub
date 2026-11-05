@@ -270,6 +270,38 @@ def test_an_existing_collection_gets_the_entry_by_id_and_a_known_vendor_is_not_p
     assert not built["vendor"]["new"] and built["vendor"]["id"] == "agilent"
 
 
+def test_a_vendor_only_the_netbox_library_has_is_proposed_to_vendors_under_its_id(cat):
+    lib = cat["root"] / "collections" / "it-devices"
+    lib.mkdir()
+    (lib / "collection.yaml").write_text(yaml.safe_dump({**manifest("it-devices", "0.2.0", "vendors.yaml"),
+                                                         "origin": "netbox"}, sort_keys=False))
+    (lib / "vendors.yaml").write_text(yaml.safe_dump({"vendors": [
+        {"id": "keysight", "name": "Keysight", "website": "https://www.keysight.com"}]}))
+    d = proposals.draft(cat["db"], cat["ws"], cat["model"].uid)
+    assert d["vendor"]["new"] and d["vendor"]["id"] == "keysight"
+    built = proposals.build(cat["db"], cat["ws"], {**BODY, "record_uid": cat["model"].uid,
+                                                   "collection": {"id": "vacuum"}}, cat["gh"])
+    assert [v["id"] for v in yaml.safe_load(built["files"]["collections/vendors/vendors.yaml"])["vendors"]] == \
+        ["agilent", "keysight"]
+    assert {m["id"]: m["vendor"] for m in yaml.safe_load(built["files"]["collections/vacuum/models.yaml"])["models"]} \
+        == {"agilent/xgs-600": "agilent", "keysight/34465a": "keysight"}
+
+
+def test_a_model_the_netbox_library_defines_is_linked_not_proposed(cat):
+    lib = cat["root"] / "collections" / "it-devices"
+    lib.mkdir()
+    (lib / "collection.yaml").write_text(yaml.safe_dump({**manifest("it-devices", "0.2.0", "vendors.yaml"),
+                                                         "contents": ["vendors.yaml", "models/keysight.yaml"],
+                                                         "origin": "netbox"}, sort_keys=False))
+    (lib / "vendors.yaml").write_text(yaml.safe_dump({"vendors": [{"id": "keysight", "name": "Keysight"}]}))
+    (lib / "models").mkdir()
+    (lib / "models" / "keysight.yaml").write_text(yaml.safe_dump({"models": [
+        {"id": "keysight/truevolt-34465", "vendor": "keysight", "model_code": "34465-A", "name": "Truevolt"}]}))
+    with pytest.raises(proposals.ProposalProblem, match="NetBox library as keysight/truevolt-34465"):
+        proposals.build(cat["db"], cat["ws"], {**BODY, "record_uid": cat["model"].uid,
+                                               "collection": {"id": "vacuum"}}, cat["gh"])
+
+
 def test_a_model_the_catalogue_has_or_an_unchecked_one_is_refused(cat):
     same = cat["make"](cat["model_schema"], "XGS 600", vendor="Agilent Technologies", model_code="XGS600")
     with pytest.raises(proposals.ProposalProblem, match="agilent/xgs-600 in vacuum is the same model"):

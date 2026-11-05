@@ -127,8 +127,10 @@ The API pod needs to reach github.com to list releases and fetch a new pin; each
 A model a unit needs today can be made by hand in the catalogue. To put it in the Git catalogue, open it from
 the product catalogue and choose **Propose for the catalogue…**:
 
-- ARGUS fills the entry from the record: its vendor (the catalogue's, or a new one proposed with it), model
-  code, name, part number, device class, datasheet; the catalogue id is `vendor/model`.
+- ARGUS fills the entry from the record: its vendor (the catalogue's, or a new one proposed with it — a
+  manufacturer only the NetBox library has is added to the Manufacturers collection under the library's id),
+  model code, name, part number, device class, datasheet; the catalogue id is `vendor/model`. A model the
+  NetBox library already defines is not proposed: link the record to it.
 - Choose the collection, or name a new one (with the packages its models are offered to, or `catalogue` for
   every workspace), and say what the values were **checked against** — the datasheet or manufacturer page.
   Only what the source confirms goes in: a unit's serial number, firmware, address or location never does.
@@ -252,7 +254,7 @@ waiting for their datasheet.
 | *the tag … no longer points at the pinned commit* | someone moved a release tag: check the release before pinning again |
 | *… is not a valid catalogue for this ARGUS* (pinning) | the release fails ARGUS's validator: the list says why; fix it in the repository and release again |
 | *… is not newer than …, the release this ARGUS ships* | the lock already has it, or a newer one: nothing to pin |
-| *… is in the catalogue already* / *… is the same model* (proposing) | link the record to that model instead (**Link to the same model in the sources**) |
+| *… is in the catalogue already* / *… is the same model* / *it is in the NetBox library as …* (proposing) | link the record to that model instead (**Link to the same model in the sources**) |
 | *no ARGUS_GITHUB_TOKEN is installed* | an administrator adds the credential before ARGUS opens pull requests |
 | *the catalogue's sources cannot be read as pinned* | the API pod cannot reach github.com, or the commit is gone |
 | *no vendor named … in the catalogue* | a NetBox device type's manufacturer is not in `vendors.yaml` (or its aliases): add it |
