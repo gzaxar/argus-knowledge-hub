@@ -49,6 +49,11 @@ api:
     tokenEndpoint: ""
     redirectUris: []
     clientSecretKey: ""
+  # Optional confidential client used only by the API to send mail through INFN.
+  mail:
+    url: ""
+    tokenUrl: ""
+    clientOAuthSecretKey: "back-end-client-oauth"
   # More environment, e.g. the portability settings (docs/operations.md, "Configuration").
   env: {}
   resources:

@@ -47,6 +47,12 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 - name: OIDC_EXTRA_PROVIDERS
   value: {{ toJson . | quote }}
 {{- end }}
+{{- $mail := .Values.api.mail | default dict }}
+{{- if $mail.url }}
+- {name: INFN_MAIL_URL, value: {{ $mail.url | quote }}}
+- {name: INFN_MAIL_TOKEN_URL, value: {{ required "api.mail.tokenUrl is required with api.mail.url" $mail.tokenUrl | quote }}}
+{{ include "argus.secretEnv" (dict "name" "BACK_END_CLIENT_OAUTH" "secret" $.Values.existingSecret "key" (required "api.mail.clientOAuthSecretKey is required with api.mail.url" $mail.clientOAuthSecretKey)) }}
+{{- end }}
 # Links in e-mails and notifications lead to the web app.
 - {name: ARGUS_WEB_URL, value: {{ printf "https://%s" .Values.hosts.web | quote }}}
 {{- with .Values.email }}

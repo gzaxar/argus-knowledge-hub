@@ -225,7 +225,8 @@ class MailError(RuntimeError):
 
 
 def email_configured() -> bool:
-    return bool(os.environ.get("SMTP_HOST"))
+    from app.services.infn_mail import configured
+    return bool(os.environ.get("SMTP_HOST")) or configured()
 
 
 def web_url() -> str:
@@ -392,14 +393,14 @@ def deliver_pending(db: Session, at: Optional[datetime] = None) -> int:
     (5xx) does not stop the others; a mail server that cannot be reached, or defers (4xx, as a relay does until
     it is signed in to), leaves the rest for the next run."""
     import logging
-    if not email_configured():
+    if not os.environ.get("SMTP_HOST"):
         return 0
     from app.models.workspace import Workspace
     log = logging.getLogger("argus.notify")
     at = at or now()
     oldest = at - timedelta(hours=float(os.environ.get("NOTIFY_EMAIL_MAX_AGE_HOURS", "48")))
     pending = list(db.scalars(select(Notification).where(Notification.delivered_at.is_(None))
-                              .order_by(Notification.id)))
+                              .order_by(Notification.id).with_for_update(skip_locked=True)))
     names: dict[str, str] = {}
 
     def workspace(ws: str) -> str:
@@ -475,11 +476,18 @@ def deliver_pending(db: Session, at: Optional[datetime] = None) -> int:
 def send_test(user: User) -> str:
     """A message to this person now, to check the mail server and their address."""
     if not email_configured():
-        raise MailError("E-mail is not configured on this installation (SMTP_HOST).")
+        raise MailError("E-mail is not configured on this installation (SMTP_HOST or INFN mail client credentials).")
     if not user.email or "@" not in user.email:
         raise MailError("Your account has no e-mail address.")
     if not deliverable(user.email):
         raise MailError(f"{user.email} is at a domain that cannot receive mail.")
+    from app.services import infn_mail
+    if infn_mail.configured():
+        infn_mail.send(user.email, "[ARGUS] Test message",
+                       "This is a test from ARGUS: notifications by e-mail reach you here.\n" + _footer())
+        return user.email
+    if not os.environ.get("SMTP_HOST"):
+        raise MailError("Configure INFN_MAIL_URL, INFN_MAIL_TOKEN_URL and BACK_END_CLIENT_OAUTH.")
     smtp = _connect()
     try:
         smtp.send_message(_message(user.email, "[ARGUS] Test message",
