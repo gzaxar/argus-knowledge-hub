@@ -69,6 +69,10 @@ services:
       # With INFN AAI as the issuer, deploy/infn-test.env adds this Keycloak too (the mobile app, the test users).
       OIDC_EXTRA_PROVIDERS: '${OIDC_EXTRA_PROVIDERS:-[{"issuer": "https://securetoken.google.com/seraphic-camera-479521-s5", "jwks_uri": "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com", "audience": "seraphic-camera-479521-s5"}]}'
       # Confidential clients: used only by the API, never passed to the web build.
+      INFN_MAIL_URL: ${INFN_MAIL_URL:-}
+      INFN_MAIL_TOKEN_URL: ${INFN_MAIL_TOKEN_URL:-}
+      BACK_END_CLIENT_OAUTH: ${BACK_END_CLIENT_OAUTH:-}
+      INFN_MAIL_FROM: ${INFN_MAIL_FROM:-}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
       OIDC_TOKEN_ENDPOINT: ${OIDC_TOKEN_ENDPOINT:-}
       OIDC_REDIRECT_URIS: ${OIDC_REDIRECT_URIS:-}
