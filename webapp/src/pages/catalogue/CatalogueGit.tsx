@@ -194,8 +194,17 @@ export function ProposeModel({ uid }: { uid: string }) {
           <span className="text-xs text-slate-500">Device class</span>
           <select className={input} value={f.entry.device_class ?? ""} onChange={(e) => setEntry("device_class", e.target.value)}>
             <option value="">—</option>
+            {/* The record's own class, when the catalogue has no such class: shown, so it is not sent unseen. */}
+            {f.entry.device_class && !d.device_classes.includes(f.entry.device_class) && (
+              <option value={f.entry.device_class}>{f.entry.device_class} (not a catalogue class)</option>
+            )}
             {d.device_classes.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
+          {f.entry.device_class && !d.device_classes.includes(f.entry.device_class) && (
+            <span className="text-xs text-amber-800">
+              The record says “{f.entry.device_class}”: choose the catalogue's class for it.
+            </span>
+          )}
         </label>
         {FIELDS.map((x) => (
           <label key={x.key} className="block">
