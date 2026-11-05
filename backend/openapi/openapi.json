@@ -10084,6 +10084,24 @@
         "title": "PhotoIdentification",
         "type": "object"
       },
+      "PinIn": {
+        "properties": {
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "ref"
+        ],
+        "title": "PinIn",
+        "type": "object"
+      },
       "PlacementIn": {
         "properties": {
           "points": {
@@ -10493,35 +10511,6 @@
           "reason"
         ],
         "title": "PromoteIn",
-        "type": "object"
-      },
-      "ProposalIn": {
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "package_id": {
-            "title": "Package Id",
-            "type": "string"
-          },
-          "schema_uid": {
-            "title": "Schema Uid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "schema_uid",
-          "package_id"
-        ],
-        "title": "ProposalIn",
         "type": "object"
       },
       "ReassignIn": {
@@ -14106,6 +14095,39 @@
         "title": "ExportIn",
         "type": "object"
       },
+      "app__routers__catalogue_collections__ProposalIn": {
+        "properties": {
+          "collection": {
+            "title": "Collection",
+            "type": "object"
+          },
+          "entry": {
+            "default": {},
+            "title": "Entry",
+            "type": "object"
+          },
+          "record_uid": {
+            "title": "Record Uid",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "object"
+          },
+          "vendor": {
+            "default": {},
+            "title": "Vendor",
+            "type": "object"
+          }
+        },
+        "required": [
+          "record_uid",
+          "collection",
+          "source"
+        ],
+        "title": "ProposalIn",
+        "type": "object"
+      },
       "app__routers__documents__RetentionIn": {
         "properties": {
           "retention_class": {
@@ -14553,6 +14575,35 @@
           "reason"
         ],
         "title": "CreateIn",
+        "type": "object"
+      },
+      "app__routers__type_migrations__ProposalIn": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "package_id": {
+            "title": "Package Id",
+            "type": "string"
+          },
+          "schema_uid": {
+            "title": "Schema Uid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_uid",
+          "package_id"
+        ],
+        "title": "ProposalIn",
         "type": "object"
       },
       "app__routers__type_migrations__RevertIn": {
@@ -19710,7 +19761,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProposalIn"
+                "$ref": "#/components/schemas/app__routers__type_migrations__ProposalIn"
               }
             }
           },
@@ -31848,6 +31899,163 @@
         ]
       }
     },
+    "/v1/catalogue/collections/pin": {
+      "post": {
+        "description": "Read a newer release of a source, checked first with the validator against the catalogue read now.\nInstalls nothing: the collections then show their upgrades.",
+        "operationId": "pin_release_v1_catalogue_collections_pin_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Pin Release",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
+    "/v1/catalogue/collections/pin/{source}": {
+      "delete": {
+        "description": "Back to the release the lock file ships. What is installed stays installed.",
+        "operationId": "unpin_release_v1_catalogue_collections_pin__source__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Unpin Release",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
     "/v1/catalogue/collections/preview": {
       "post": {
         "description": "What installing these collections (and those they require) would do, entry by entry: add, change, link,\nconflict, transfer, retire, unchanged. Nothing is kept.",
@@ -31927,6 +32135,319 @@
         ]
       }
     },
+    "/v1/catalogue/collections/proposals": {
+      "get": {
+        "description": "The models proposed to Git, each with its pull request's state (open, merged, closed) or installed.",
+        "operationId": "list_proposals_v1_catalogue_collections_proposals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Refresh",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Proposals",
+        "tags": [
+          "catalogue"
+        ]
+      },
+      "post": {
+        "description": "Open the pull request on the catalogue repository (signed-in maintainers only: it names them).",
+        "operationId": "proposal_open_v1_catalogue_collections_proposals_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routers__catalogue_collections__ProposalIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Proposal Open",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
+    "/v1/catalogue/collections/proposals/draft": {
+      "get": {
+        "description": "What ARGUS would propose for a Product Model of the catalogue, and the choices left.",
+        "operationId": "proposal_draft_v1_catalogue_collections_proposals_draft_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "record_uid",
+            "required": true,
+            "schema": {
+              "title": "Record Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Proposal Draft",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
+    "/v1/catalogue/collections/proposals/preview": {
+      "post": {
+        "description": "The pull request's files, checked with the validator. Nothing is opened.",
+        "operationId": "proposal_preview_v1_catalogue_collections_proposals_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__routers__catalogue_collections__ProposalIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Proposal Preview",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
     "/v1/catalogue/collections/records/{uid}": {
       "get": {
         "description": "A catalogue record's values, each with its source (the collection, edited here, local, a correction\nproposed back), what the collection states beyond the type's fields, its units per workspace, and the\nreleases.",
@@ -32000,6 +32521,85 @@
           }
         ],
         "summary": "Record Provenance",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
+    "/v1/catalogue/collections/releases": {
+      "get": {
+        "description": "A source's releases newer than the lock ARGUS ships, and which one is read now.",
+        "operationId": "source_releases_v1_catalogue_collections_releases_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "default": "argus",
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Source Releases",
         "tags": [
           "catalogue"
         ]

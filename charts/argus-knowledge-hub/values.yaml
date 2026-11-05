@@ -124,7 +124,8 @@ iocEngineer:
   # every release: https://github.com/infn-epics/infn-epics-ioc/releases/latest/download/ioc-catalog.json.gz
   catalog: ""
   # Pull requests Ask ARGUS proposes and a person confirms. Off until the key ioc-github-token is in
-  # existingSecret: a token with contents and pull-requests write on these repositories only.
+  # existingSecret: a token with contents and pull-requests write on these repositories only — and on
+  # infn-argus/argus-catalogue, where catalogue maintainers propose models (docs/catalogue-collections.md §4).
   pullRequests:
     repositories: "infn-epics/ibek-support-infn,infn-epics/ibek-templates,infn-epics/infn-epics-ioc"
     draft: true

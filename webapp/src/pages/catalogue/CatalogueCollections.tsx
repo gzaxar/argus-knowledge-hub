@@ -5,6 +5,7 @@ import {
   catalogueCollectionsApi, type CatalogueDecision, type CatalogueFieldDecision, type CataloguePatches,
   type CataloguePlan, type CataloguePlanItem,
 } from "../../api/client";
+import { CatalogueProposals, SourceReleases } from "./CatalogueGit";
 import { CATEGORY, problem, shown } from "./catalogueText";
 
 const FIELD_CHOICES: { v: CatalogueFieldDecision; label: string }[] = [
@@ -266,14 +267,19 @@ export function CatalogueCollectionsPage({ embedded = false }: { embedded?: bool
                 <span className="text-xs text-slate-500">
                   {s.kind === "netbox-devicetype-library" ? ` · NetBox device types: ${(s.select ?? []).length} selected` : " · ARGUS collections"}
                 </span>
+                <SourceReleases source={s} />
               </li>
             ))}
           </ul>
           <p className="mt-1 text-xs text-slate-500">
-            Read at exactly these commits. Changing a pin is a reviewed change to <span className="font-mono">backend/catalogue/sources.lock.yaml</span>.
+            Read at exactly these commits. ARGUS ships its pins in <span className="font-mono">backend/catalogue/sources.lock.yaml</span>;
+            a newer release of a source can be pinned here once the validator accepts it, and an ARGUS release that
+            ships a newer one takes over.
           </p>
         </section>
       )}
+
+      <CatalogueProposals />
 
       <table className="w-full rounded border border-slate-200 bg-white text-sm">
         <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">

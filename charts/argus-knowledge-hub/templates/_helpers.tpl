@@ -72,7 +72,7 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 - {name: ARGUS_IOC_PR_REPOS, value: {{ .pullRequests.repositories | quote }}}
 - {name: ARGUS_IOC_PR_DRAFT, value: {{ .pullRequests.draft | quote }}}
 {{- end }}
-# Pull requests are offered only when this key is in the Secret.
+# Pull requests (the IOC engineer's, and models proposed to the catalogue) only when this key is in the Secret.
 - name: ARGUS_GITHUB_TOKEN
   valueFrom: {secretKeyRef: {name: {{ .Values.existingSecret }}, key: ioc-github-token, optional: true}}
 {{- range $k, $v := .Values.api.env }}

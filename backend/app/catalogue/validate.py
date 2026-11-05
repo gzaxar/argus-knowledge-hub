@@ -40,9 +40,11 @@ SOURCE_KINDS = {"netbox-devicetype-library", "datasheet", "manufacturer-page", "
 RELATION_VERBS = {"successor-of", "compatible-with", "accessory-of"}
 # The device classes in use (the production inventory, 2026-10-31), with spelling variants merged: "switch" and
 # "network switch", "host" and "server", "chassi", "controller motor". Adoption maps the old spellings (§6).
+# Bench and test instruments (2026-11-05): multimeter, oscilloscope, signal generator, spectrum analyzer.
 DEVICE_CLASSES = {"adc", "bpm", "cable", "camera", "chassis", "converter", "desktop computer", "io",
-                  "ion pump controller", "laser", "modulator", "monitor", "motion controller", "motor", "nas",
-                  "network switch", "plasma", "power supply", "rf", "server", "timing", "vacuum", "vacuum chamber"}
+                  "ion pump controller", "laser", "modulator", "monitor", "motion controller", "motor", "multimeter",
+                  "nas", "network switch", "oscilloscope", "plasma", "power supply", "rf", "server",
+                  "signal generator", "spectrum analyzer", "timing", "vacuum", "vacuum chamber"}
 # A description says what the product is. A copied datasheet is not ours to license: facts go in
 # `specifications`, and the datasheet is linked.
 DESCRIPTION_MAX = 500

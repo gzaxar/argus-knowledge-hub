@@ -65,3 +65,43 @@ class CatalogueInstallation(Base):
     domains: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
     installed_by: Mapped[str] = mapped_column(String)
     installed_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CataloguePin(Base):
+    """A catalogue source moved to a newer release from Administration › Catalogue (app/catalogue/pins.py). The
+    lock file shipped with ARGUS is the floor: this pin is read only while it is newer than the lock's."""
+    __tablename__ = "catalogue_pins"
+
+    source_id: Mapped[str] = mapped_column(String, primary_key=True)
+    ref: Mapped[str] = mapped_column(String)                          # the release tag, vX.Y.Z
+    commit: Mapped[str] = mapped_column(String)                       # the commit it pointed at when pinned
+    previous_ref: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    previous_commit: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    pinned_by: Mapped[str] = mapped_column(String)
+    pinned_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CatalogueProposal(Base):
+    """A model made in ARGUS, proposed for the Git catalogue as a pull request (app/catalogue/proposals.py).
+    When a release carrying it is installed, the record is linked to its entry and the proposal is done."""
+    __tablename__ = "catalogue_proposals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[str] = mapped_column(String, ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    record_uid: Mapped[str] = mapped_column(String, ForeignKey("assets.uid", ondelete="CASCADE"), index=True)
+    catalogue_id: Mapped[str] = mapped_column(String, index=True)     # keysight/34465a
+    # The vendor proposed with it, when the catalogue had none: its record and id.
+    vendor_record_uid: Mapped[Optional[str]] = mapped_column(String, ForeignKey("assets.uid", ondelete="SET NULL"),
+                                                             nullable=True)
+    vendor_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    collection_id: Mapped[str] = mapped_column(String)
+    repository: Mapped[str] = mapped_column(String)                   # owner/name
+    number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    branch: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # open | merged | closed (not merged) | installed (a release carrying it is installed: the record is linked)
+    state: Mapped[str] = mapped_column(String, default="open")
+    files: Mapped[dict] = mapped_column(JSONB, default=dict)          # path -> the content proposed
+    proposed_by: Mapped[str] = mapped_column(String)
+    proposed_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

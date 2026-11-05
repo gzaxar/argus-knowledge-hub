@@ -2879,6 +2879,61 @@ export interface CatalogueSourcePin {
   ref: string | null;
   commit: string;
   select: string[] | null;
+  /** The lock file's pin; `ref` and `commit` differ when a maintainer pinned a newer release. */
+  shipped_ref?: string | null;
+  shipped_commit?: string;
+  pinned_in?: "lock" | "administration";
+  pinned_by?: string | null;
+  pinned_at?: string | null;
+  /** Pinned to a release tag: a newer one can be pinned from Administration. */
+  releasable?: boolean;
+}
+
+/** A source's releases newer than the lock ARGUS ships (GET …/releases). */
+export interface CatalogueReleases {
+  source: string;
+  repo: string;
+  ref: string | null;
+  commit: string;
+  shipped_ref: string;
+  shipped_commit: string;
+  releases: { tag: string; commit: string; current: boolean; newer: boolean }[];
+}
+
+/** A model made here, proposed to the catalogue repository as a pull request. */
+export interface CatalogueProposal {
+  id: number;
+  record_uid: string;
+  record_name: string | null;
+  catalogue_id: string;
+  vendor_id: string | null;
+  collection_id: string;
+  repository: string;
+  number: number | null;
+  url: string | null;
+  state: "open" | "merged" | "closed" | "installed";
+  proposed_by: string;
+  proposed_at: string;
+  files: string[];
+}
+
+export interface CatalogueProposalDraft {
+  record_uid: string;
+  entry: Record<string, string>;
+  vendor: { id: string; name: string; new: boolean; record_uid: string | null; entry?: Record<string, unknown> };
+  collections: { id: string; name: string; version: string; domains: string[] }[];
+  device_classes: string[];
+  source_kinds: string[];
+  repository: string | null;
+  enabled: boolean;
+}
+
+export interface CatalogueProposalIn {
+  record_uid: string;
+  entry: Record<string, string>;
+  vendor: { id?: string; name?: string; website?: string; aliases?: string[] };
+  collection: { id: string; name?: string; description?: string; domain?: string };
+  source: { kind: string; ref: string; note?: string };
 }
 
 export interface CatalogueHistoryRow {
@@ -3145,6 +3200,21 @@ export const catalogueCollectionsApi = {
     request<CataloguePlan>(`${CC}/preview`, { method: "POST", body: json({ collections, decisions, manifest: manifest ?? null }) }),
   install: (collections: string[], decisions: Record<string, CatalogueDecision>, manifest?: string | null) =>
     request<CataloguePlan>(`${CC}/install`, { method: "POST", body: json({ collections, decisions, manifest: manifest ?? null }) }),
+  releases: (source: string) => request<CatalogueReleases>(`${CC}/releases?${new URLSearchParams({ source })}`),
+  /** Read a newer release: checked by the server first; installs nothing. */
+  pin: (source: string, ref: string) =>
+    request<{ source: string; ref: string; commit: string; previous_ref: string | null }>(`${CC}/pin`,
+      { method: "POST", body: json({ source, ref }) }),
+  unpin: (source: string) =>
+    request<{ source: string; ref: string; commit: string }>(`${CC}/pin/${encodeURIComponent(source)}`, { method: "DELETE" }),
+  proposals: () => request<{ enabled: boolean; repository: string | null; proposals: CatalogueProposal[] }>(`${CC}/proposals`),
+  proposalDraft: (recordUid: string) =>
+    request<CatalogueProposalDraft>(`${CC}/proposals/draft?${new URLSearchParams({ record_uid: recordUid })}`),
+  proposalPreview: (body: CatalogueProposalIn) =>
+    request<{ title: string; base: string; files: Record<string, string>; repository: string }>(`${CC}/proposals/preview`,
+      { method: "POST", body: json(body) }),
+  propose: (body: CatalogueProposalIn) =>
+    request<CatalogueProposal>(`${CC}/proposals`, { method: "POST", body: json(body) }),
   decideField: (catalogueId: string, field: string, decision: CatalogueFieldDecision, reason?: string) =>
     request<unknown>(`${CC}/entries/${catalogueId.split("/").map(encodeURIComponent).join("/")}/fields`,
                      { method: "POST", body: json({ field, decision, reason }) }),

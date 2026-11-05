@@ -202,9 +202,9 @@ def patches(db: Session, workspace_id: str, tree: Optional[dict[str, Collection]
 
 
 def _netbox_reader():
-    from app.catalogue.sources import _show, cache_dir, fetch, lock_path, read_lock
+    from app.catalogue.sources import _show, cache_dir, effective, fetch
 
     def read(path: str) -> str:
-        source = next(s for s in read_lock(lock_path()) if s["kind"] == "netbox-devicetype-library")
+        source = next(s for s in effective() if s["kind"] == "netbox-devicetype-library")
         return _show(fetch(source, cache_dir()), source["commit"], path).decode()
     return read

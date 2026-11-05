@@ -103,17 +103,46 @@ Its shared types are managed by its packages, as in any workspace.
 
 ## Which release ARGUS reads
 
-ARGUS reads each repository at exactly the commit pinned in `backend/catalogue/sources.lock.yaml` (the
-collections page shows the pins). A release tag must still point at its commit: if someone moved it, ARGUS
-refuses to read it. To take a new release:
+ARGUS reads each repository at exactly one commit. The lock file it ships, `backend/catalogue/sources.lock.yaml`,
+pins each source at a release tag and its commit; the collections page shows the pins. A release tag must still
+point at its commit: if someone moved it, ARGUS refuses to read it.
 
-1. In the repository, the release is a tag (`v0.2.0`), with its changes in `CHANGELOG.md`; its CI has run the
-   ARGUS validator, including the check against the previous tag.
-2. Change the pin (the tag and the full commit) in a pull request to ARGUS, and release ARGUS.
-3. On the collections page, **Preview** the collections that changed, then **Install** (below).
+A source pinned to a release can be moved to a newer one **from the collections page**, without an ARGUS release:
 
-The API pod needs to reach github.com to fetch a new pin; each pin is fetched once. `python -m app.catalogue
-sources` in the pod shows the pins and reads them.
+1. In the repository, the release is a tag (`v0.3.0`), with its changes in `CHANGELOG.md`. The catalogue
+   repository makes one by itself after each merge that changes its collections, once the ARGUS validator passes.
+2. Under **Sources**, **Check for newer releases**, then **Check and pin** the one you want. ARGUS reads it and
+   runs its validator over it, against the catalogue read now (nothing removed without being retired or moved,
+   versions raised); a release that fails is not pinned, and the problems are listed. Pinning installs nothing.
+3. **Preview** the collections that now show an upgrade, then **Install** (below).
+
+The page says who pinned a release and when; **Back to** returns to the lock's release (what is installed stays
+installed). An ARGUS release whose lock ships a newer release than the one pinned here takes over by itself.
+
+The API pod needs to reach github.com to list releases and fetch a new pin; each pin is fetched once.
+`python -m app.catalogue sources` in the pod shows the pins and reads them.
+
+## Proposing a model made here
+
+A model a unit needs today can be made by hand in the catalogue. To put it in the Git catalogue, open it from
+the product catalogue and choose **Propose for the catalogue…**:
+
+- ARGUS fills the entry from the record: its vendor (the catalogue's, or a new one proposed with it), model
+  code, name, part number, device class, datasheet; the catalogue id is `vendor/model`.
+- Choose the collection, or name a new one (with the packages its models are offered to, or `catalogue` for
+  every workspace), and say what the values were **checked against** — the datasheet or manufacturer page.
+  Only what the source confirms goes in: a unit's serial number, firmware, address or location never does.
+- **Check the files**: ARGUS writes them against the repository's main branch (the entry in its place, the
+  collection's version raised once per release) and runs its validator. Then **Open the pull request**: it
+  names you, and the repository's reviewers decide. ARGUS never merges.
+
+**Proposed to Git**, on the collections page, follows each one: pull request open, merged (waiting for a
+release), closed, installed. When the release carrying it is pinned and installed, the record you made is linked
+to its entry — same record, its units untouched — and takes the reviewed values.
+
+Proposing needs ARGUS's GitHub credential (`ARGUS_GITHUB_TOKEN`, key `ioc-github-token` in the chart) with
+*Contents* and *Pull requests* on the catalogue repository; `ARGUS_CATALOGUE_REPO` names another repository than
+the one the lock pins.
 
 ## Installing or upgrading a release
 
@@ -221,6 +250,10 @@ waiting for their datasheet.
 | *needs the package … and … has …* | install or upgrade that package on the catalogue workspace's Packages page |
 | *… is installed with other content* | the release changed without a new version: ask its maintainers for one |
 | *the tag … no longer points at the pinned commit* | someone moved a release tag: check the release before pinning again |
+| *… is not a valid catalogue for this ARGUS* (pinning) | the release fails ARGUS's validator: the list says why; fix it in the repository and release again |
+| *… is not newer than …, the release this ARGUS ships* | the lock already has it, or a newer one: nothing to pin |
+| *… is in the catalogue already* / *… is the same model* (proposing) | link the record to that model instead (**Link to the same model in the sources**) |
+| *no ARGUS_GITHUB_TOKEN is installed* | an administrator adds the credential before ARGUS opens pull requests |
 | *the catalogue's sources cannot be read as pinned* | the API pod cannot reach github.com, or the commit is gone |
 | *no vendor named … in the catalogue* | a NetBox device type's manufacturer is not in `vendors.yaml` (or its aliases): add it |
 | *references would be lost* | an install with a manifest would leave a unit or document pointing nowhere: nothing was installed; check the manifest's merges |
