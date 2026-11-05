@@ -7,8 +7,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from app.auth import hash_token
 from app.db import SessionLocal
 from app.main import app
+from app.models.api_token import ApiToken
 from app.models.asset import Asset
 from app.models.schema import Schema
 from app.models.workspace import Workspace
@@ -102,6 +104,26 @@ def test_a_location_is_set_superseded_and_kept_in_the_history(world):
     assert loc["history"][1]["valid_until"] is not None
     history = client.get(f"/v1/assets/{world['pump']}/history", headers=world["headers"]).json()
     assert any(h["type"] == "location" and h["details"].startswith("Location set: 41.822100, 12.673100") for h in history)
+
+
+def test_a_position_set_from_the_phone_says_how_it_was_known_and_who_may_set_it_is_told(world):
+    got = lambda: client.get(f"/v1/assets/{world['pump']}/location", headers=world["headers"]).json()
+    assert got()["may_set"] is True
+    here = _set(world, world["pump"], *LNF, accuracy_m=4, source="field")
+    assert here.status_code == 200 and here.json()["source"] == "field" and here.json()["accuracy_m"] == 4
+    assert _set(world, world["pump"], 41.8221, 12.6731).json()["source"] == "manual"
+    assert _set(world, world["pump"], *LNF, source="import").status_code == 422, "an import is not a person's claim"
+
+    # A token that may only read is told so, and is refused the same way if it tries.
+    db = SessionLocal()
+    raw = secrets.token_urlsafe(12)
+    db.add(ApiToken(workspace_id=world["ws"], token_hash=hash_token(raw), scopes=["read"]))
+    db.commit()
+    db.close()
+    reader = {"Authorization": f"Bearer {raw}"}
+    assert client.get(f"/v1/assets/{world['pump']}/location", headers=reader).json()["may_set"] is False
+    assert client.put(f"/v1/assets/{world['pump']}/location", headers=reader,
+                      json={"latitude": LNF[0], "longitude": LNF[1]}).status_code == 403
 
 
 def test_a_type_its_package_does_not_place_on_the_map_has_no_location(world):

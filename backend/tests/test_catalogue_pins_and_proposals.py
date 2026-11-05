@@ -6,6 +6,7 @@ import secrets
 import subprocess
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -17,12 +18,14 @@ from app.catalogue.loader import load_tree
 from app.catalogue.sources import _over, describe, effective, releases
 from app.db import SessionLocal
 from app.ledger import service as ledger
+from app.ledger.identity import add_label
 from app.models.asset import Asset
 from app.models.catalogue_entry import CatalogueEntry, CatalogueInstallation, CataloguePin, CatalogueProposal
 from app.models.package import WorkspacePackage
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.services import catalogue_mapping as cm
+from app.services import model_vendor
 from app.services.asset_types import ensure_asset_types
 
 GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
@@ -213,7 +216,7 @@ def cat(tmp_path, monkeypatch):
                  device_class="multimeter")
     gh = FakeGitHub({"main": as_text(files()), "v0.1.0": as_text(files())})
     yield {"db": db, "ws": ws, "actor": actor.id, "vendor": vendor, "model": model, "gh": gh, "root": tmp_path,
-           "make": make, "model_schema": model_schema}
+           "make": make, "model_schema": model_schema, "vendor_schema": vendor_schema}
     db.rollback()
     for table in (CatalogueProposal, CatalogueEntry, CatalogueInstallation):
         db.execute(table.__table__.delete().where(table.workspace_id == ws))
@@ -310,6 +313,73 @@ def test_a_model_the_netbox_library_defines_is_linked_not_proposed(cat):
     with pytest.raises(proposals.ProposalProblem, match="NetBox library as keysight/truevolt-34465"):
         proposals.build(cat["db"], cat["ws"], {**BODY, "record_uid": cat["model"].uid,
                                                "collection": {"id": "vacuum"}}, cat["gh"])
+
+
+def test_the_draft_reads_the_device_class_and_offers_the_likeliest_collection_first(cat):
+    assert proposals.closest_class("multimeter") == "multimeter"
+    assert proposals.closest_class("Digital Multimeter") == "multimeter"
+    assert proposals.closest_class("ion pump controller unit") == "ion pump controller"   # the longest it names
+    assert proposals.closest_class("flux capacitor") is None
+    assert proposals.closest_class(None) is None
+    rec = cat["make"](cat["model_schema"], "Pump", vendor="Keysight", model_code="P1", device_class="digital multimeter")
+    d = proposals.draft(cat["db"], cat["ws"], rec.uid)
+    assert d["entry"]["device_class"] == "multimeter" and d["device_class_written"] == "digital multimeter"
+    odd = cat["make"](cat["model_schema"], "Odd", vendor="Keysight", model_code="O1", device_class="flux capacitor")
+    d = proposals.draft(cat["db"], cat["ws"], odd.uid)
+    assert "device_class" not in d["entry"] and d["device_class_written"] == "flux capacitor"
+    tree = {"a": SimpleNamespace(models=[]),
+            "b": SimpleNamespace(models=[SimpleNamespace(data={"device_class": "multimeter"})])}
+    assert [c["id"] for c in proposals._likeliest_first([{"id": "a"}, {"id": "b"}], tree, "multimeter")] == ["b", "a"]
+
+
+def test_a_model_the_sources_have_is_refused_when_the_form_opens(cat):
+    same = cat["make"](cat["model_schema"], "XGS 600", vendor="Agilent Technologies", model_code="XGS600")
+    with pytest.raises(proposals.ProposalProblem, match="same model|in the catalogue already"):
+        proposals.draft(cat["db"], cat["ws"], same.uid)
+
+
+def test_a_models_vendor_is_one_fact(cat):
+    db, ws, make, schema, keysight = cat["db"], cat["ws"], cat["make"], cat["model_schema"], cat["vendor"]
+    attrs = lambda r: (db.refresh(r), r.attributes)[1]
+
+    # The reference decides the name; a name alone finds its reference, in any spelling; an unknown one stays text.
+    assert attrs(make(schema, "A", vendor="Wrong", vendor_ref=keysight.uid))["vendor"] == "Keysight"
+    assert attrs(make(schema, "B", vendor=" keysight "))["vendor_ref"] == keysight.uid
+    assert attrs(make(schema, "C", vendor=" keysight "))["vendor"] == "Keysight"
+    unknown = attrs(make(schema, "D", vendor="Nobody Inc"))
+    assert unknown["vendor"] == "Nobody Inc" and "vendor_ref" not in unknown
+
+    # By an alias too; and two vendors going by a name are not guessed between.
+    add_label(db, keysight.uid, "alias", "Agilent Test", "test")
+    db.commit()
+    assert attrs(make(schema, "E", vendor="Agilent Test"))["vendor_ref"] == keysight.uid
+    make(cat["vendor_schema"], "Twin"); make(cat["vendor_schema"], "TWIN")
+    assert "vendor_ref" not in attrs(make(schema, "F", vendor="Twin"))
+
+    # Editing: another name unlinks it, the reference brings its name, clearing it clears both.
+    m = make(schema, "G", vendor_ref=keysight.uid)
+    ledger.edit_values(db, ws, cat["actor"], m.uid, {"attr:vendor": "Nobody Inc"})
+    assert attrs(m)["vendor"] == "Nobody Inc" and "vendor_ref" not in attrs(m)
+    ledger.edit_values(db, ws, cat["actor"], m.uid, {"attr:vendor_ref": keysight.uid})
+    assert attrs(m)["vendor"] == "Keysight" and attrs(m)["vendor_ref"] == keysight.uid
+    ledger.edit_values(db, ws, cat["actor"], m.uid, {"attr:vendor_ref": None})
+    assert "vendor" not in attrs(m) and "vendor_ref" not in attrs(m)
+
+    # A Vendor renamed takes its models' name with it, and the relation stays.
+    ledger.edit_values(db, ws, cat["actor"], keysight.uid, {"name": "Keysight Technologies"})
+    db.commit()
+    assert attrs(cat["model"])["vendor"] == "Keysight Technologies" and attrs(cat["model"])["vendor_ref"] == keysight.uid
+
+
+def test_adding_a_vendor_by_name_never_makes_a_second_one(cat):
+    db, ws = cat["db"], cat["ws"]
+    found, created = model_vendor.ensure(db, ws, cat["vendor_schema"].uid, "KEYSIGHT", cat["actor"])
+    assert found.uid == cat["vendor"].uid and not created
+    new, created = model_vendor.ensure(db, ws, cat["vendor_schema"].uid, " Acme Instruments ", cat["actor"])
+    assert created and new.name == "Acme Instruments" and new.type == "Vendor" and new.is_global
+    with pytest.raises(ValueError):
+        model_vendor.ensure(db, ws, cat["vendor_schema"].uid, "  ", cat["actor"])
+    db.commit()
 
 
 def test_a_model_the_catalogue_has_or_an_unchecked_one_is_refused(cat):

@@ -20,7 +20,7 @@ import { isScannableType, LabelCode, printLabel } from "../../components/LabelCo
 import { LabelScanner } from "../../components/LabelScanner";
 import { RelationGraph } from "../../components/RelationGraph";
 import { TransferItemAction } from "../../components/TransferItemAction";
-import { effectiveAttributes, inheritedKeys } from "../../lib/schemaAttributes";
+import { effectiveAttributes, inheritedKeys, oneVendorField } from "../../lib/schemaAttributes";
 import { empty } from "../../components/AttributeFields";
 import { ModelComponents } from "../../components/ModelComponents";
 import { AssetContextPanel } from "../../components/hub/ContextPanels";
@@ -185,8 +185,9 @@ export function AssetDetail() {
   if (!asset.data) return <p className="text-sm text-red-600">Asset not found.</p>;
 
   const a = asset.data;
-  const attrDefs = effectiveAttributes(schema.data, allSchemas.data);
-  const inherited = inheritedKeys(schema.data, attrDefs);
+  const allAttrDefs = effectiveAttributes(schema.data, allSchemas.data);
+  const attrDefs = oneVendorField(allAttrDefs, a.attributes, "page");
+  const inherited = inheritedKeys(schema.data, allAttrDefs);
   // Only what has a value; the type's other fields one click away (a Switch need not list PBS segments).
   const filledDefs = attrDefs.filter((d) => !empty(a.attributes[d.key ?? d.name]));
   const assetName = (id: string) => allAssets.data?.find((x) => x.uid === id)?.name ?? id;

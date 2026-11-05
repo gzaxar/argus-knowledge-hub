@@ -112,7 +112,7 @@ class _AssetEditScreenState extends ConsumerState<AssetEditScreen> {
               for (final def in defs) {
                 _form.ensure(def, a.attributes);
               }
-              final editable = defs.where((d) => d.editable).toList();
+              final editable = oneVendorField(defs.where((d) => d.editable).toList(), a.attributes, form: true);
               final readOnly = defs.where((d) => !d.editable).toList();
               return ListView(
                 key: const Key('asset-edit-list'),

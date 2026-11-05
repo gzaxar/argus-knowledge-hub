@@ -7409,7 +7409,7 @@
     },
     "/v1/assets/{uid}/location": {
       "get": {
-        "description": "The record's approved location (or none), whether its type may have one and on which map layer, the\nhistory of its approved locations, and the field observations of it.",
+        "description": "The record's approved location (or none), whether its type may have one and on which map layer, whether\nthis person may set it (`may_set`), the history of its approved locations, and the field observations of it.",
         "operationId": "get_location",
         "parameters": [
           {

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   catalogueCollectionsApi, type CatalogueCollection, type CataloguePlan, type CataloguePlanItem, type CatalogueRecord,
 } from "../api/client";
-import { CatalogueCollectionsPage, linkAllVendors, openVendorLinks, stillOpen } from "../pages/catalogue/CatalogueCollections";
+import { CatalogueCollectionsPage, linkAllVendors, openVendorLinks, stillOpen, updatesOf } from "../pages/catalogue/CatalogueCollections";
 import { CatalogueModelPage } from "../pages/catalogue/CatalogueModel";
 import { renderWith } from "../test/render";
 
@@ -134,6 +134,66 @@ describe("linking every matching vendor at once", () => {
       moxa: { action: "create" },
       "moxa/nport-5450": { action: "create" },
     }, undefined));
+  });
+});
+
+describe("updating the catalogue", () => {
+  const proposed = { ...link, catalogue_id: "keysight/34465a", record_name: "Keysight 34465A", needs_decision: false,
+                     fields: [{ field: "name", record: "34465A", release: "Truevolt 34465A", action: "managed" as const }] };
+  const update: CataloguePlan = { workspace_id: "cat", counts: { link: 1 }, undecided: [], trial: null,
+    releases: [{ collection: "diagnostics", from_version: "0.1.1", version: "0.1.2", checksum: "x", already_installed: false,
+                 counts: { link: 1 }, not_stored: {}, items: [proposed] }] };
+  const source = { id: "argus", kind: "argus-collections", repo: "https://github.com/o/r.git", ref: "v0.2.0",
+                   commit: "a".repeat(40), releasable: true, pinned_in: "lock", shipped_ref: "v0.2.0" };
+
+  it("takes one click from the release to the preview, and a proposed record needs no decision", async () => {
+    const installed = collection("diagnostics", { installed_version: "0.1.1" });
+    const list = vi.spyOn(catalogueCollectionsApi, "list").mockResolvedValue({ workspace_id: "cat", sources: [source], history: [],
+      collections: [installed, collection("spares")] } as never);
+    vi.spyOn(catalogueCollectionsApi, "review").mockResolvedValue([]);
+    vi.spyOn(catalogueCollectionsApi, "proposals").mockResolvedValue({ enabled: true, repository: "r", proposals: [] });
+    vi.spyOn(catalogueCollectionsApi, "releases").mockResolvedValue({ source: "argus", repo: "r", ref: "v0.2.0", commit: "a",
+      shipped_ref: "v0.2.0", shipped_commit: "a", releases: [{ tag: "v0.3.0", commit: "b", current: false, newer: true }] });
+    const pin = vi.spyOn(catalogueCollectionsApi, "pin").mockImplementation(async () => {
+      list.mockResolvedValue({ workspace_id: "cat", sources: [source], history: [], collections: [
+        { ...installed, version: "0.1.2", upgrade_available: true }, collection("spares")] } as never);
+      return { source: "argus", ref: "v0.3.0", commit: "b" } as never;
+    });
+    const preview = vi.spyOn(catalogueCollectionsApi, "preview").mockResolvedValue(update);
+    const install = vi.spyOn(catalogueCollectionsApi, "install").mockResolvedValue({ ...update, counts: { link: 1 } });
+    renderWith(<CatalogueCollectionsPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Review the update" }));
+    expect(await screen.findByText(/Keysight 34465A: linked/)).toBeInTheDocument();
+    expect(pin).toHaveBeenCalledWith("argus", "v0.3.0");
+    expect(preview).toHaveBeenCalledWith(["diagnostics"], {}, null);       // not the collection never installed
+    fireEvent.click(screen.getByRole("button", { name: "Install" }));
+    await waitFor(() => expect(install).toHaveBeenCalledWith(["diagnostics"], {}, undefined));
+    expect(await screen.findByRole("status")).toHaveTextContent("Installed");
+  });
+
+  it("leaves everything as it is when the release is refused", async () => {
+    vi.spyOn(catalogueCollectionsApi, "list").mockResolvedValue({ workspace_id: "cat", sources: [source], history: [],
+      collections: [collection("diagnostics", { installed_version: "0.1.1" })] } as never);
+    vi.spyOn(catalogueCollectionsApi, "review").mockResolvedValue([]);
+    vi.spyOn(catalogueCollectionsApi, "proposals").mockResolvedValue({ enabled: true, repository: "r", proposals: [] });
+    vi.spyOn(catalogueCollectionsApi, "releases").mockResolvedValue({ source: "argus", repo: "r", ref: "v0.2.0", commit: "a",
+      shipped_ref: "v0.2.0", shipped_commit: "a", releases: [{ tag: "v0.3.0", commit: "b", current: false, newer: true }] });
+    vi.spyOn(catalogueCollectionsApi, "pin").mockRejectedValue(new Error("not valid"));
+    const preview = vi.spyOn(catalogueCollectionsApi, "preview");
+    renderWith(<CatalogueCollectionsPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Review the update" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review the update" })).toBeEnabled());
+    expect(preview).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
+  });
+
+  it("chooses what has an upgrade and what a merged proposal waits in, and never one that does not validate", () => {
+    expect(updatesOf([
+      collection("up", { installed_version: "0.1", upgrade_available: true }),
+      collection("bad", { installed_version: "0.1", upgrade_available: true, problems: ["x"] }),
+      collection("new-with-proposal"), collection("new-other"),
+    ], new Set(["new-with-proposal"]))).toEqual(["up", "new-with-proposal"]);
   });
 });
 

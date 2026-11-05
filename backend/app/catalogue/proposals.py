@@ -206,6 +206,28 @@ def _collections(tree: dict) -> list[dict]:
             if not c.partial and c.origin != "netbox" and c.id != "vendors" and c.models]
 
 
+def closest_class(text: Any) -> Optional[str]:
+    """The catalogue's device class a record's free text means: itself, or the one class it names
+    ("digital multimeter" is a multimeter). None when it names none, or several equally."""
+    from app.catalogue.validate import DEVICE_CLASSES
+    said = " ".join(str(text or "").lower().replace("_", " ").replace("-", " ").split())
+    if not said:
+        return None
+    if said in DEVICE_CLASSES:
+        return said
+    named = [c for c in DEVICE_CLASSES if f" {c} " in f" {said} "]
+    longest = max((len(c) for c in named), default=0)
+    best = [c for c in named if len(c) == longest]
+    return best[0] if len(best) == 1 else None
+
+
+def _likeliest_first(collections: list[dict], tree: dict, device_class: Optional[str]) -> list[dict]:
+    """The collection already holding most models of this device class comes first: it is the one preselected."""
+    def held(c: dict) -> int:
+        return sum(1 for m in tree[c["id"]].models if m.data.get("device_class") == device_class)
+    return sorted(collections, key=held, reverse=True) if device_class else collections
+
+
 def _existing(db: Session, ws: str, rec: Asset) -> None:
     from app.models.catalogue_entry import CatalogueEntry, CatalogueProposal
     row = db.execute(select(CatalogueEntry).where(CatalogueEntry.record_uid == rec.uid)).scalar_one_or_none()
@@ -228,12 +250,20 @@ def draft(db: Session, ws: str, record_uid: str) -> dict:
     code = a.get("model_code") or rec.name
     entry: dict = {"id": f"{vendor['id']}/{slug(code, model=True)}", "vendor": vendor["id"], "model_code": str(code),
                    "name": rec.name}
-    for k in ("part_number", "device_class", "datasheet_url", "eol_date"):
+    for k in ("part_number", "datasheet_url", "eol_date"):
         if a.get(k):
             entry[k] = str(a[k])
-    return {"record_uid": rec.uid, "entry": entry, "vendor": vendor, "collections": _collections(tree),
-            "device_classes": sorted(DEVICE_CLASSES), "source_kinds": list(SOURCE_KINDS),
-            "repository": repository(), "enabled": enabled()}
+    device_class = closest_class(a.get("device_class"))
+    if device_class:
+        entry["device_class"] = device_class
+    _not_known(entry, vendor, tree)
+    out = {"record_uid": rec.uid, "entry": entry, "vendor": vendor,
+           "collections": _likeliest_first(_collections(tree), tree, device_class),
+           "device_classes": sorted(DEVICE_CLASSES), "source_kinds": list(SOURCE_KINDS),
+           "repository": repository(), "enabled": enabled()}
+    if a.get("device_class") and a["device_class"] != device_class:
+        out["device_class_written"] = str(a["device_class"])
+    return out
 
 
 # --------------------------------------------------------------------------- writing the files
@@ -302,6 +332,19 @@ def _models_file(manifest: str) -> str:
     return (named or contents or ["models.yaml"])[0]
 
 
+def _not_known(entry: dict, vendor: dict, tree: dict) -> None:
+    """A model the catalogue's sources have is linked, never proposed again."""
+    from app.catalogue.validate import code_key
+    for c in tree.values():
+        for m in c.models:
+            if m.id == entry["id"]:
+                raise ProposalProblem(f"{entry['id']} is in the catalogue already ({c.id}): link the record to it")
+            if m.data.get("vendor") == entry["vendor"] and code_key(m.data.get("model_code")) == code_key(entry["model_code"]):
+                raise ProposalProblem(f"{m.id} in {c.id} is the same model ({m.data.get('model_code')}): link the "
+                                      f"record to it")
+    _not_in_library(entry, vendor)
+
+
 def _not_in_library(entry: dict, vendor: dict) -> None:
     """A model a NetBox library defines is never defined again in argus-catalogue (docs/catalogue-collections.md):
     the proposal's tree reads the library without its models, so its search index is asked — by id, and by the
@@ -353,7 +396,7 @@ def _check(files: dict[str, str], touched: set[str]) -> list[str]:
 
 def build(db: Session, ws: str, body: dict, gh: Optional[GitHub] = None) -> dict:
     """The pull request's files for this proposal, checked: refuses one the validator would."""
-    from app.catalogue.validate import MODEL_ID, SLUG, code_key
+    from app.catalogue.validate import MODEL_ID, SLUG
     d = draft(db, ws, body["record_uid"])
     entry = dict(d["entry"])
     for k in ENTRY_FIELDS:
@@ -407,14 +450,7 @@ def build(db: Session, ws: str, body: dict, gh: Optional[GitHub] = None) -> dict
     entry = {k: entry[k] for k in order if k in entry}
 
     tree = _tree()
-    for c in tree.values():
-        for m in c.models:
-            if m.id == entry["id"]:
-                raise ProposalProblem(f"{entry['id']} is in the catalogue already ({c.id}): link the record to it")
-            if m.data.get("vendor") == entry["vendor"] and code_key(m.data.get("model_code")) == code_key(entry["model_code"]):
-                raise ProposalProblem(f"{m.id} in {c.id} is the same model ({m.data.get('model_code')}): link the "
-                                      f"record to it")
-    _not_in_library(entry, vendor)
+    _not_known(entry, vendor, tree)
 
     col = body.get("collection") or {}
     cid = str(col.get("id") or "").strip()

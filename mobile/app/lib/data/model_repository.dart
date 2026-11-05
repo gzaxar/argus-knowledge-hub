@@ -51,6 +51,13 @@ class ModelRepository {
     );
   }
 
+  /// The catalogue's Vendor of this name or alias, or a new one (the catalogue's maintainers); its record's uid.
+  Future<String> addVendor(String name) async {
+    final r = _map(await _api.json((c) => c.invokeAPI(
+        '/v1/catalogue/collections/vendors', 'POST', [], {'name': name}, {}, {}, 'application/json')));
+    return r['uid'].toString();
+  }
+
   /// Installs a library model in the catalogue (with its vendor) and returns its record's uid. A record already
   /// here that looks like it comes back as a `Problem` whose `candidates` name it.
   Future<String> installOne(String catalogueId) async {

@@ -484,6 +484,7 @@ class LocationRepository {
         locatable: r['locatable'] == true,
         layer: r['map_layer']?.toString(),
         hidden: r['hidden'] == true,
+        maySet: r['may_set'] == true,
         current: _point(r['location']),
         observations: _list(r['observations']).map(_map).map(_observation).toList(),
         route: _shape(r['route']),
@@ -599,6 +600,13 @@ class LocationRepository {
     }
     return out;
   }
+
+  /// Set the record's position (someone who may edit it): at once, the one it had kept in its history. [fromHere]
+  /// says it is where the phone stands, with its GPS accuracy, rather than a point chosen on the map.
+  Future<void> setPosition(String uid, double lat, double lon, {double? accuracy, required bool fromHere}) =>
+      _api.json((c) => c.invokeAPI('/v1/assets/$uid/location', 'PUT', [],
+          {'latitude': lat, 'longitude': lon, 'accuracy_m': ?accuracy, 'source': fromHere ? 'field' : 'manual'},
+          {}, {}, 'application/json'));
 
   /// Where the person sees the record now: it never moves it; the answer says whether it agrees with the
   /// approved location or waits for review.

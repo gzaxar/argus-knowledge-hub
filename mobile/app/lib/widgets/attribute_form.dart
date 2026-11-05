@@ -196,6 +196,21 @@ class _AttributeFieldsState extends ConsumerState<AttributeFields> {
     }
   }
 
+  /// A vendor not listed: added to the catalogue by name (one going by that name or alias is chosen instead), and
+  /// the field set to it.
+  Future<void> _addVendor(AttributeDef def, List<String?> values) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final typed = await showDialog<String>(context: context, builder: (_) => const _VendorNameDialog());
+    if (typed == null || typed.isEmpty || !mounted) return;
+    try {
+      final uid = await ref.read(modelRepositoryProvider).addVendor(typed);
+      ref.invalidate(referenceCandidatesProvider((def.referenceSchemaUid!, def.includeChildren)));
+      if (mounted) setState(() => values[0] = uid);
+    } on Problem catch (p) {
+      messenger.showSnackBar(SnackBar(content: Text(p.message)));
+    }
+  }
+
   /// The candidates of the reference's target type (and its descendants, when includeChildren) to pick
   /// among, instead of a free-text uid the person could never type correctly — the web's ReferenceInput.
   Widget _referencePicker(AttributeDef def, String label) {
@@ -245,6 +260,16 @@ class _AttributeFieldsState extends ConsumerState<AttributeFields> {
                 ),
             ]),
           ),
+        if (def.key == 'vendor_ref') ...[
+          if (def.description != null)
+            Text(def.description!, key: const Key('vendor-not-linked'), style: Theme.of(context).textTheme.bodySmall),
+          TextButton.icon(
+            key: const Key('vendor-add'),
+            onPressed: () => _addVendor(def, values),
+            icon: const Icon(Icons.add_business_outlined),
+            label: const Text('Not listed? Add a vendor'),
+          ),
+        ],
         if (def.multiValue && (def.maxCardinality == null || values.length < def.maxCardinality!))
           TextButton.icon(
             onPressed: () => setState(() => values.add(null)),
@@ -568,4 +593,42 @@ class _ModelSearchFieldState extends ConsumerState<ModelSearchField> {
       if (_message != null) Text(_message!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12)),
     ]);
   }
+}
+
+/// The name of a vendor to add. It owns its text field, which outlives the tap that closes it by the closing animation.
+class _VendorNameDialog extends StatefulWidget {
+  const _VendorNameDialog();
+
+  @override
+  State<_VendorNameDialog> createState() => _VendorNameDialogState();
+}
+
+class _VendorNameDialogState extends State<_VendorNameDialog> {
+  final _name = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Add a vendor'),
+        content: TextField(
+          key: const Key('vendor-add-name'),
+          controller: _name,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(labelText: "The company's name"),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(
+            key: const Key('vendor-add-confirm'),
+            onPressed: () => Navigator.pop(context, _name.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      );
 }

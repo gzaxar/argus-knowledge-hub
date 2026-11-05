@@ -132,7 +132,16 @@ cannot open.
 
 ## Reporting a position from the phone
 
-On an equipment page in the app, **I'm next to it** sends where the phone is, with its GPS accuracy. It never
+Someone who may edit the record sets its position from its page in the app:
+
+- **Set position here** takes where the phone is, with its GPS accuracy, once you have confirmed it;
+- **Choose on the map** moves the map (or takes a tap) until the crosshair is on the place, then **Use this point**.
+
+The position takes effect at once, and the one it had stays in the history, with who set it. A record pinned on a
+floor plan is moved on the plan instead, since its position comes from there; and one in a room is not moved by a
+GPS fix less precise than 10 m (**Choose on the map** or a plan is the way there).
+
+Anyone can say where they see a record. **I'm next to it** sends where the phone is, with its GPS accuracy. It never
 moves the record:
 
 - close to the approved location (within 15 m plus both accuracies), it is noted as **consistent**;
@@ -145,7 +154,8 @@ the button centres it on the phone. On an equipment page, a small map shows its 
 
 Indoors, on an equipment page: **In Room 12, Ground floor** and the places it is in; **Show on the plan** opens
 the plan with its pin, and a tap there (asked first) places it at that point. **Place it on a plan** offers the
-plans of its room and of the places the room is in (or, with only a position, those around it).
+plans of its room and of the places the room is in (or, with only a position, those around it; for someone who may
+edit a record with no location yet, those around the phone).
 
 ## Review
 
