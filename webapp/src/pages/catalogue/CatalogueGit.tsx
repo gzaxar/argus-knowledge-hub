@@ -222,11 +222,24 @@ export function ProposeModel({ uid }: { uid: string }) {
             <p className="text-xs text-amber-800 sm:col-span-3">
               The catalogue has no vendor {d.vendor.name}: it is proposed with the model. If it is a company the
               catalogue has under another name, set that name on the record's vendor instead.
+              {d.vendor.library_name && <> The NetBox library knows it as {d.vendor.library_name}, under the id{" "}
+                <span className="font-mono">{d.vendor.id}</span>: the id stays, and that name is kept as a spelling.</>}
             </p>
             {(["id", "name", "website"] as const).map((k) => (
               <label key={k} className="block">
                 <span className="text-xs text-slate-500">{k === "id" ? "Vendor id" : k === "name" ? "Name" : "Website"}</span>
-                <input className={input} value={f.vendor[k] ?? ""} onChange={(e) => set({ vendor: { ...f.vendor, [k]: e.target.value } })} />
+                <input className={input} value={f.vendor[k] ?? ""}
+                       readOnly={k === "id" && !!d.vendor.library_name}
+                       title={k === "id" && d.vendor.library_name ? "The NetBox library's id for this company: its models are under it" : undefined}
+                       onChange={(e) => {
+                  const vendor = { ...f.vendor, [k]: e.target.value };
+                  // The catalogue id is vendor/model: a new vendor id carries the model's id with it.
+                  const was = `${f.vendor.id ?? ""}/`;
+                  const id = String(f.entry.id ?? "");
+                  set(k === "id" && id.startsWith(was)
+                    ? { vendor, entry: { ...f.entry, id: `${e.target.value}/${id.slice(was.length)}` } }
+                    : { vendor });
+                }} />
               </label>
             ))}
             <label className="block sm:col-span-3">

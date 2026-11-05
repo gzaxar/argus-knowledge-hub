@@ -210,3 +210,27 @@ def test_a_reference_takes_the_record_its_value_names_and_is_checked_when_propos
     camera = db.query(Asset).filter(Asset.key == w["camera"]).one()
     assert camera.attributes["argus_location"] == room_uid
     db.close()
+
+
+def test_a_record_still_to_be_created_is_not_written_into_a_text_value(world, monkeypatch):
+    """A Product Model proposed with vendor = "new:1" (the vendor proposed just before) kept the text "new:1",
+    then went to the catalogue as a vendor called new:1. A new:N in a text value is refused when proposed."""
+    w = world
+    scripted(monkeypatch, [
+        call("propose_update_record", {"record": w["camera"], "attributes": {"description": "new:1"}}),
+        answer("I cannot write that."),
+    ])
+    evs = events(client.post("/v1/ai/chat", headers=w["h"], json={"question": "Its vendor is the new one"}))
+    refused = [e["error"] for e in evs if e["type"] == "step" and e["error"]]
+    assert len(refused) == 1 and "is text: write the name itself, not new:1" in refused[0]
+
+
+def test_a_reference_to_a_record_still_to_be_created_says_how_to_set_it_later(world, monkeypatch):
+    w = world
+    scripted(monkeypatch, [
+        call("propose_update_record", {"record": w["camera"], "attributes": {"argus_location": "new:3"}}),
+        answer("Set it once the room exists."),
+    ])
+    evs = events(client.post("/v1/ai/chat", headers=w["h"], json={"question": "It is in the new room"}))
+    refused = [e["error"] for e in evs if e["type"] == "step" and e["error"]]
+    assert len(refused) == 1 and "not created yet" in refused[0] and "propose_update_record" in refused[0]
