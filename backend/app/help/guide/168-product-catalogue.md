@@ -37,6 +37,16 @@ administrator renames it on *Administration › Catalogue* (its id and record ke
 and, rarely, opens it as a workspace from there — to clean up a record that does not belong in it, which the page
 names.
 
+## A model's vendor
+
+A Product Model has one vendor: the **Vendor** record it points at, chosen on the model's form, or added there
+with **Not listed? Add a vendor** (a maintainer's step: a vendor is shared with every workspace). One going by
+that name or alias is chosen instead of a second one being made. The company's name is also kept beside the
+reference, for search and imports: ARGUS keeps it in step, and a Vendor renamed takes its models' name with it.
+A name that arrives alone (an import, Ask ARGUS) is linked to the Vendor of that name or alias; an older record
+that names a company no Vendor has shows that name, and its form asks for the vendor. The record's relation
+*supplied by* comes from the same reference. The web and the field app work the same way.
+
 ## Choosing a unit's model
 
 A unit's **Product model** is typed as on its label — the model code, or part of it — on the web and on the
@@ -107,14 +117,18 @@ ARGUS reads each repository at exactly one commit. The lock file it ships, `back
 pins each source at a release tag and its commit; the collections page shows the pins. A release tag must still
 point at its commit: if someone moved it, ARGUS refuses to read it.
 
-A source pinned to a release can be moved to a newer one **from the collections page**, without an ARGUS release:
+A newer release is taken **from the top of Administration › Catalogue**, without an ARGUS release:
 
 1. In the repository, the release is a tag (`v0.3.0`), with its changes in `CHANGELOG.md`. The catalogue
    repository makes one by itself after each merge that changes its collections, once the ARGUS validator passes.
-2. Under **Sources**, **Check for newer releases**, then **Check and pin** the one you want. ARGUS reads it and
-   runs its validator over it, against the catalogue read now (nothing removed without being retired or moved,
-   versions raised); a release that fails is not pinned, and the problems are listed. Pinning installs nothing.
-3. **Preview** the collections that now show an upgrade, then **Install** (below).
+2. The page says the release is out. **Review the update** reads it and runs its validator over it, against the
+   catalogue read now (nothing removed without being retired or moved, versions raised); a release that fails is
+   not pinned, and the problems are listed. It then chooses every collection with an upgrade (and any a merged
+   proposal is waiting in), and shows what would change. Nothing is installed.
+3. Decide any entry that needs it, then **Install** (below).
+
+To take an older release than the newest, use **Check for newer releases** under **Sources**, and **Check and
+pin** the one you want.
 
 The page says who pinned a release and when; **Back to** returns to the lock's release (what is installed stays
 installed). An ARGUS release whose lock ships a newer release than the one pinned here takes over by itself.
@@ -134,13 +148,16 @@ the product catalogue and choose **Propose for the catalogue…**:
 - Choose the collection, or name a new one (with the packages its models are offered to, or `catalogue` for
   every workspace), and say what the values were **checked against** — the datasheet or manufacturer page.
   Only what the source confirms goes in: a unit's serial number, firmware, address or location never does.
-- **Check the files**: ARGUS writes them against the repository's main branch (the entry in its place, the
-  collection's version raised once per release) and runs its validator. Then **Open the pull request**: it
-  names you, and the repository's reviewers decide. ARGUS never merges.
+- The form opens with the catalogue's device class the record's text means ("digital multimeter" is read as
+  `multimeter`), and with the collection holding most models of that class first; change either if it is wrong.
+- **Open the pull request**: ARGUS writes the files against the repository's main branch (the entry in its place,
+  the collection's version raised once per release) and runs its validator; anything refused is listed and nothing
+  is opened. **Show the files** shows them first, if you want to read them. The pull request names you, and the
+  repository's reviewers decide. ARGUS never merges.
 
 **Proposed to Git**, on the collections page, follows each one: pull request open, merged (waiting for a
-release), closed, installed. When the release carrying it is pinned and installed, the record you made is linked
-to its entry — same record, its units untouched — and takes the reviewed values.
+release), closed, installed. When the update carrying it is installed, the record you made is linked to its entry — same
+record, its units untouched — and takes the reviewed values, with no decision to make.
 
 Proposing needs ARGUS's GitHub credential (`ARGUS_GITHUB_TOKEN`, key `ioc-github-token` in the chart) with
 *Contents* and *Pull requests* on the catalogue repository; `ARGUS_CATALOGUE_REPO` names another repository than
@@ -148,8 +165,9 @@ the one the lock pins.
 
 ## Installing or upgrading a release
 
-1. **Catalogue collections**: tick the collections to install or upgrade (those they require come with them; one
-   that does not validate cannot be ticked), then **Preview**.
+1. **Review the update** at the top of the page (above) chooses them for you. To choose by hand, for a collection
+   not installed yet: tick the collections (those they require come with them; one that does not validate cannot be
+   ticked), then **Preview**.
 2. Read the preview, entry by entry:
    - *New* — created, shared, every value it states managed by the collection;
    - *Changed* — a managed value the release changed, written;

@@ -268,6 +268,29 @@ def test_the_database_holds_one_record_per_id_and_one_id_per_record(w):
         db.rollback()
 
 
+def test_a_vendor_is_added_by_name_for_maintainers_only(w, monkeypatch):
+    monkeypatch.setattr(inst, "catalogue_workspace", lambda db: w["ws"])
+    client = TestClient(app)
+    other = User(id=str(uuid.uuid4()), email=f"o-{secrets.token_hex(3)}@argus.test", is_admin=False)
+    w["db"].add(other)
+    w["db"].commit()
+    w["db"].refresh(other)
+    w["db"].expunge(other)
+    try:
+        app.dependency_overrides[get_identity] = lambda: OidcIdentity(user=other)
+        assert client.post("/v1/catalogue/collections/vendors", json={"name": "Acme"}).status_code == 403
+        app.dependency_overrides[get_identity] = lambda: OidcIdentity(user=w["admin"])
+        made = client.post("/v1/catalogue/collections/vendors", json={"name": "Acme Instruments"})
+        assert made.status_code == 200, made.text
+        assert made.json()["created"] is True
+        again = client.post("/v1/catalogue/collections/vendors", json={"name": "ACME INSTRUMENTS"}).json()
+        assert again["uid"] == made.json()["uid"] and again["created"] is False
+        assert client.post("/v1/catalogue/collections/vendors", json={"name": " "}).status_code == 422
+    finally:
+        app.dependency_overrides.pop(get_identity, None)
+    w["db"].expire_all()
+
+
 def test_the_api_previews_and_installs_for_administrators(w, monkeypatch):
     tree = release(w)
     monkeypatch.setattr(inst, "catalogue_workspace", lambda db: w["ws"])

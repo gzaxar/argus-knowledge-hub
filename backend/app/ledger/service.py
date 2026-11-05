@@ -183,7 +183,9 @@ def create_record(db: Session, workspace_id: str, actor: str, *, uid: str, schem
     from app.ledger.cutover import assert_writable
     from app.ledger.writer import writing
     from app.models.ledger import RecordEvent
+    from app.services.model_vendor import settle_new
     assert_writable(db, workspace_id, "objects")
+    attributes = settle_new(db, workspace_id, type_name, attributes)
     with writing(db):
         record = Asset(uid=uid, workspace_id=workspace_id, schema_uid=schema_uid, key=key, name=name, type=type_name,
                        attributes={}, is_global=is_global, avatar_icon_uid=avatar_icon_uid, record_status="Active")
@@ -215,11 +217,25 @@ def edit_values(db: Session, workspace_id: str, actor: str, uid: str, changes: d
                 reason: Optional[str] = None) -> list:
     """Several fields at once, as one batch: each a person's statement,
     confirmed, replacing what was confirmed before. A value of None removes
-    the field."""
+    the field. A Product Model's vendor is settled here, and a Vendor's new name reaches its models
+    (services/model_vendor.py)."""
     from app.ledger.cutover import assert_writable
+    from app.services.model_vendor import VENDOR, models_of, settle_changes
     assert_writable(db, workspace_id, "objects")
     if not changes:
         return []
+    record = db.get(Asset, uid)
+    if record is not None:
+        changes = settle_changes(db, record, changes)
+    decided = _edit_values(db, workspace_id, actor, uid, changes, reason)
+    if record is not None and record.type == VENDOR and "name" in changes:
+        for model in models_of(db, record):
+            decided += _edit_values(db, workspace_id, actor, model.uid, {"attr:vendor": record.name}, reason)
+    return decided
+
+
+def _edit_values(db: Session, workspace_id: str, actor: str, uid: str, changes: dict,
+                 reason: Optional[str] = None) -> list:
     stream = engine.person_stream(db, workspace_id, actor)
     current = (db.get(Asset, uid).attributes or {}) if any(engine.is_multi(p) for p in changes) else {}
     claims: list[ParsedClaim] = []

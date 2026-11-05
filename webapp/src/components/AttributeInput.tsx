@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ApiError, assetsApi, attributeValuesApi, catalogueCollectionsApi, directoryApi, membersApi, schemasApi } from "../api/client";
 import { SchemaAttribute } from "../api/types";
@@ -170,7 +170,7 @@ function ReferenceInput({
     ? allSchemas.isLoading || allAssets.isLoading
     : targets.isLoading;
 
-  return (
+  const picker = (
     <AssetPicker
       options={options ?? []}
       value={typeof value === "string" ? value : null}
@@ -178,6 +178,39 @@ function ReferenceInput({
       disabled={disabled || isLoading}
       placeholder={isLoading ? "Loading…" : "Search assets…"}
     />
+  );
+  if (attribute.key !== "vendor_ref" || disabled) return picker;
+  return <div className="space-y-1">{picker}<AddVendor onAdded={onChange} base={base} /></div>;
+}
+
+/** A Product Model's vendor not listed yet: added to the catalogue by name (one going by that name or alias is
+ *  chosen instead), so a model never needs its company written as text. */
+function AddVendor({ onAdded, base }: { onAdded: (uid: string) => void; base: string }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const add = useMutation({
+    mutationFn: () => catalogueCollectionsApi.addVendor(name.trim()),
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      onAdded(r.uid);
+      setName("");
+      setOpen(false);
+    },
+  });
+  if (!open) {
+    return <button type="button" className="text-xs text-sky-800 underline" onClick={() => setOpen(true)}>Not listed? Add a vendor</button>;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <input className={`${base} max-w-xs`} aria-label="New vendor's name" placeholder="The company's name" value={name}
+             onChange={(e) => setName(e.target.value)} />
+      <button type="button" className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50"
+              disabled={!name.trim() || add.isPending} onClick={() => add.mutate()}>
+        {add.isPending ? "Adding…" : "Add"}
+      </button>
+      {add.isError && <span className="text-xs text-red-600">{installProblem(add.error)}</span>}
+    </div>
   );
 }
 

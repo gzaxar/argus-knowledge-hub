@@ -8781,6 +8781,66 @@
         "title": "LinkModelIn",
         "type": "object"
       },
+      "LocationIn": {
+        "properties": {
+          "accuracy_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy M"
+          },
+          "crs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crs"
+          },
+          "latitude": {
+            "title": "Latitude",
+            "type": "number"
+          },
+          "longitude": {
+            "title": "Longitude",
+            "type": "number"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "source": {
+            "default": "manual",
+            "enum": [
+              "manual",
+              "field"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "title": "LocationIn",
+        "type": "object"
+      },
       "LookupBatchIn": {
         "properties": {
           "identifiers": {
@@ -10164,57 +10224,6 @@
           }
         },
         "title": "PlanIn",
-        "type": "object"
-      },
-      "PointIn": {
-        "properties": {
-          "accuracy_m": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Accuracy M"
-          },
-          "crs": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Crs"
-          },
-          "latitude": {
-            "title": "Latitude",
-            "type": "number"
-          },
-          "longitude": {
-            "title": "Longitude",
-            "type": "number"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          }
-        },
-        "required": [
-          "latitude",
-          "longitude"
-        ],
-        "title": "PointIn",
         "type": "object"
       },
       "PortIn": {
@@ -13608,6 +13617,19 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VendorIn": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "VendorIn",
         "type": "object"
       },
       "VerifyIn": {
@@ -24460,7 +24482,7 @@
         ]
       },
       "get": {
-        "description": "The record's approved location (or none), whether its type may have one and on which map layer, the\nhistory of its approved locations, and the field observations of it.",
+        "description": "The record's approved location (or none), whether its type may have one and on which map layer, whether\nthis person may set it (`may_set`), the history of its approved locations, and the field observations of it.",
         "operationId": "get_location_v1_assets__uid__location_get",
         "parameters": [
           {
@@ -24585,7 +24607,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PointIn"
+                "$ref": "#/components/schemas/LocationIn"
               }
             }
           },
@@ -32669,6 +32691,85 @@
           }
         ],
         "summary": "Review",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
+    "/v1/catalogue/collections/vendors": {
+      "post": {
+        "description": "The catalogue's Vendor of this name or alias, or a new one: what the Vendor field of a Product Model offers\nwhen the company is not listed. Maintainers only: a vendor is shared with every workspace.",
+        "operationId": "add_vendor_v1_catalogue_collections_vendors_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add Vendor",
         "tags": [
           "catalogue"
         ]

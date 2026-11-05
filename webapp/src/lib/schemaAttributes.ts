@@ -32,6 +32,24 @@ export function effectiveAttributes(
   return Array.from(merged.values());
 }
 
+/** A Product Model has one vendor: the Vendor record it points at. The type's text `vendor` is that record's name
+ *  (kept by the server for search and imports), so a form offers only the reference, called Vendor. A page shows the
+ *  reference, or the text of an older record not linked yet. */
+export function oneVendorField(attrs: SchemaAttribute[], values: Record<string, unknown>,
+                               mode: "form" | "page"): SchemaAttribute[] {
+  const keys = new Set(attrs.map((a) => a.key ?? a.name));
+  if (!keys.has("vendor") || !keys.has("vendor_ref")) return attrs;
+  const text = values.vendor ? String(values.vendor) : "";
+  const showText = mode === "page" && !values.vendor_ref && !!text;
+  return attrs
+    .filter((a) => (a.key ?? a.name) !== (showText ? "vendor_ref" : "vendor"))
+    .map((a) => (a.key ?? a.name) !== "vendor_ref" ? a : {
+      ...a, name: "Vendor",
+      ...(mode === "form" && !values.vendor_ref && text
+        ? { description: `“${text}” is not linked to a vendor record yet: choose it, or add it.` } : {}),
+    });
+}
+
 /** Which of a schema's effective attributes came from an ancestor rather
  * than being defined locally — used to badge them as "(inherited)" in the UI. */
 export function inheritedKeys(

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   catalogueCollectionsApi, type CatalogueDecision, type CatalogueFieldDecision, type CataloguePatches,
-  type CataloguePlan, type CataloguePlanItem,
+  type CatalogueCollection, type CataloguePlan, type CataloguePlanItem,
 } from "../../api/client";
 import { CatalogueProposals, SourceReleases } from "./CatalogueGit";
 import { CATEGORY, problem, shown } from "./catalogueText";
@@ -72,7 +72,7 @@ export function CorrectionPatches() {
 /** Whether an item still needs something from the person, given the decisions made so far. */
 export function stillOpen(item: CataloguePlanItem, d: CatalogueDecision | undefined): boolean {
   if (item.category !== "link") return false;
-  if (!d?.action) return true;
+  if (!d?.action) return item.needs_decision;              // the server decided it: a record proposed to Git
   if (d.action === "create") return false;
   return item.fields.some((f) => f.action === null && !d.fields?.[f.field]);
 }
@@ -83,7 +83,7 @@ export function openVendorLinks(plan: CataloguePlan, decisions: Record<string, C
                                 manifest: boolean): CataloguePlanItem[] {
   const undecided = new Set(plan.undecided);
   return plan.releases.flatMap((r) => r.items).filter((i) =>
-    i.kind === "vendor" && i.category === "link" && (!manifest || undecided.has(i.catalogue_id)) &&
+    i.kind === "vendor" && i.category === "link" && i.needs_decision && (!manifest || undecided.has(i.catalogue_id)) &&
     !decisions[i.catalogue_id]?.action);
 }
 
@@ -94,6 +94,12 @@ export function linkAllVendors(items: CataloguePlanItem[]): Record<string, Catal
     action: "link" as const,
     fields: Object.fromEntries(i.fields.filter((f) => f.action === null).map((f) => [f.field, "local" as const])),
   }]));
+}
+
+/** What an update brings: every collection with a newer version, and those a merged proposal is waiting in. */
+export function updatesOf(collections: CatalogueCollection[], merged: Set<string>): string[] {
+  return collections.filter((c) => c.problems.length === 0 && (c.upgrade_available || (merged.has(c.id) && !c.installed_version)))
+    .map((c) => c.id);
 }
 
 /** A record that may already be the entry: link it (deciding the fields that differ) or create a separate one. */
@@ -189,7 +195,12 @@ function PlanView({ plan, decisions, setDecision, setMany, manifest }: {
                     {i.record_name}: linked as the migration manifest says
                   </span>
                 )}
-                {i.category === "link" && (!manifest || undecided.has(i.catalogue_id)) && (
+                {i.category === "link" && !manifest && !i.needs_decision && !decisions[i.catalogue_id] && (
+                  <span className="ml-2 text-xs text-emerald-800">
+                    {i.record_name}: linked, the same record, with the reviewed values
+                  </span>
+                )}
+                {i.category === "link" && (i.needs_decision || !!decisions[i.catalogue_id]) && (!manifest || undecided.has(i.catalogue_id)) && (
                   <LinkDecision item={i} d={decisions[i.catalogue_id]} onChange={(d) => setDecision(i.catalogue_id, d)} />
                 )}
               </li>
@@ -216,8 +227,48 @@ export function CatalogueCollectionsPage({ embedded = false }: { embedded?: bool
   const [plan, setPlan] = useState<CataloguePlan | null>(null);
   const [decisions, setDecisions] = useState<Record<string, CatalogueDecision>>({});
   const [manifest, setManifest] = useState<{ name: string; text: string } | null>(null);
+  const [fromUpdate, setFromUpdate] = useState(false);
+  const proposals = useQuery({ queryKey: ["catalogue-proposals"], queryFn: catalogueCollectionsApi.proposals, retry: false });
+  const merged = new Set((proposals.data?.proposals ?? []).filter((p) => p.state === "merged").map((p) => p.collection_id));
+  // The newest release of each source that moves by release; a repository out of reach only means nothing is offered.
+  const releasable = (list.data?.sources ?? []).filter((s) => s.releasable).map((s) => s.id);
+  const newer = useQuery({
+    queryKey: ["catalogue-newer", releasable], enabled: releasable.length > 0, retry: false,
+    queryFn: async () => {
+      const found: { source: string; tag: string }[] = [];
+      for (const source of releasable) {
+        const got = await catalogueCollectionsApi.releases(source).catch(() => null);
+        const next = got?.releases.find((r) => r.newer);
+        if (next) found.push({ source, tag: next.tag });
+      }
+      return found;
+    },
+  });
+  const waiting = updatesOf(list.data?.collections ?? [], merged);
+  // One step for the whole of an update: the release read (the validator first), its collections chosen, previewed.
+  const update = useMutation({
+    mutationFn: async () => {
+      for (const n of newer.data ?? []) await catalogueCollectionsApi.pin(n.source, n.tag);
+      const fresh = await queryClient.fetchQuery({ queryKey: ["catalogue-collections"], queryFn: catalogueCollectionsApi.list, staleTime: 0 });
+      const ids = updatesOf(fresh.collections, merged);
+      return { ids, plan: ids.length ? await catalogueCollectionsApi.preview(ids, {}, null) : null };
+    },
+    onSuccess: ({ ids, plan: got }) => {
+      install.reset();
+      setChosen(ids);
+      setPlan(got);
+      setDecisions({});
+      setManifest(null);
+      setFromUpdate(true);
+    },
+    onSettled: () => {
+      for (const k of ["catalogue-collections", "catalogue-newer", "catalogue-releases", "catalogue-models"]) {
+        queryClient.invalidateQueries({ queryKey: [k] });
+      }
+    },
+  });
   const preview = useMutation({ mutationFn: () => catalogueCollectionsApi.preview(chosen, decisions, manifest?.text),
-                                onSuccess: setPlan });
+                                onSuccess: (got) => setPlan(got) });
   const install = useMutation({
     mutationFn: () => catalogueCollectionsApi.install(chosen, decisions, manifest?.text),
     onSuccess: () => {
@@ -225,7 +276,8 @@ export function CatalogueCollectionsPage({ embedded = false }: { embedded?: bool
       setDecisions({});
       setChosen([]);
       setManifest(null);
-      for (const k of ["catalogue-collections", "catalogue-review", "catalogue-models"]) {
+      setFromUpdate(false);
+      for (const k of ["catalogue-collections", "catalogue-review", "catalogue-models", "catalogue-proposals"]) {
         queryClient.invalidateQueries({ queryKey: [k] });
       }
     },
@@ -233,6 +285,7 @@ export function CatalogueCollectionsPage({ embedded = false }: { embedded?: bool
   const toggle = (id: string) => {
     setChosen(chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id]);
     setPlan(null);
+    setFromUpdate(false);
   };
   const items = plan?.releases.flatMap((r) => r.items) ?? [];
   // The server applied the manifest's decisions to this plan: an item it left undecided is still open.
@@ -240,6 +293,26 @@ export function CatalogueCollectionsPage({ embedded = false }: { embedded?: bool
   const open = items.filter((i) => (manifest ? undecided.has(i.catalogue_id) : true) &&
                                    stillOpen(i, decisions[i.catalogue_id]));
   const nothing = plan?.releases.every((r) => r.already_installed || r.items.every((i) => i.category === "unchanged"));
+  const planBlock = plan && (
+    <div className="mt-3 space-y-3">
+      <PlanView plan={plan} decisions={decisions} manifest={!!manifest}
+                setDecision={(id, d) => setDecisions({ ...decisions, [id]: d })}
+                setMany={(many) => setDecisions({ ...decisions, ...many })} />
+      {plan.trial && plan.trial !== "ok" && (
+        <p className="text-sm text-red-700">A trial installation failed: {plan.trial.replace(/^failed: /, "")}</p>
+      )}
+      {open.length > 0 && (
+        <p className="text-sm text-amber-800">
+          {open.length} entr{open.length === 1 ? "y needs" : "ies need"} a decision before installing.
+        </p>
+      )}
+      <button type="button" disabled={!!nothing || open.length > 0 || install.isPending} onClick={() => install.mutate()}
+              className="rounded bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+        {install.isPending ? "Installing…" : nothing ? "Nothing to install" : "Install"}
+      </button>
+      {install.isError && <p className="whitespace-pre-line text-sm text-red-600">{problem(install.error)}</p>}
+    </div>
+  );
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -254,6 +327,39 @@ export function CatalogueCollectionsPage({ embedded = false }: { embedded?: bool
         <Link to="/catalogue/models" className="text-sm font-medium text-sky-800 underline">Product catalogue</Link>
       </div>}
       {list.isError && <p className="whitespace-pre-line text-sm text-red-600">{problem(list.error)}</p>}
+
+      {list.data && (
+        <section aria-label="Update the catalogue" className="rounded border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-slate-800">
+              {(newer.data ?? []).length > 0
+                ? <>Release <b className="font-mono">{newer.data!.map((n) => n.tag).join(", ")}</b> is out.</>
+                : waiting.length > 0
+                  ? <>{waiting.length} collection{waiting.length === 1 ? " has" : "s have"} an update to install.</>
+                  : merged.size > 0
+                    ? "A proposal is merged: its release is offered here once the repository has made it."
+                    : "The catalogue is up to date."}
+            </p>
+            {((newer.data ?? []).length > 0 || waiting.length > 0) && (
+              <button type="button" disabled={update.isPending} onClick={() => update.mutate()}
+                      className="rounded bg-sky-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-800 disabled:opacity-50">
+                {update.isPending ? "Checking the release…" : "Review the update"}
+              </button>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            Reviewing checks the release and shows what would change. Nothing changes until you install.
+          </p>
+          {update.isError && <p className="mt-2 whitespace-pre-line text-sm text-red-600">{problem(update.error)}</p>}
+          {install.isSuccess && (
+            <p role="status" className="mt-2 text-sm text-emerald-800">
+              Installed{Object.keys(install.data.counts).length > 0 &&
+                `: ${Object.entries(install.data.counts).map(([k, n]) => `${n} ${CATEGORY[k] ?? k}`).join(", ")}`}.
+            </p>
+          )}
+          {fromUpdate && planBlock}
+        </section>
+      )}
 
       {(list.data?.sources ?? []).length > 0 && (
         <section aria-label="Sources">
@@ -322,8 +428,9 @@ export function CatalogueCollectionsPage({ embedded = false }: { embedded?: bool
             {chosen.length ? `${chosen.join(", ")} (and the collections they require)` : "Choose the collections to install or upgrade."}
           </span>
         </div>
-        <div className="mt-2 text-xs text-slate-600">
-          <label>
+        <details className="mt-2 text-xs text-slate-600">
+          <summary className="cursor-pointer">Migrating existing records with a manifest</summary>
+          <label className="mt-1 block">
             Migration manifest (optional):{" "}
             <input type="file" accept=".yaml,.yml" aria-label="Migration manifest"
                    onChange={async (e) => {
@@ -337,28 +444,9 @@ export function CatalogueCollectionsPage({ embedded = false }: { embedded?: bool
             entry is, the duplicates merged into it, and the references checked after the install.
             {manifest && <> Using <b>{manifest.name}</b>.</>}
           </span>
-        </div>
+        </details>
         {preview.isError && <p className="mt-2 whitespace-pre-line text-sm text-red-600">{problem(preview.error)}</p>}
-        {plan && (
-          <div className="mt-3 space-y-3">
-            <PlanView plan={plan} decisions={decisions} manifest={!!manifest}
-                      setDecision={(id, d) => setDecisions({ ...decisions, [id]: d })}
-                      setMany={(many) => setDecisions({ ...decisions, ...many })} />
-            {plan.trial && plan.trial !== "ok" && (
-              <p className="text-sm text-red-700">A trial installation failed: {plan.trial.replace(/^failed: /, "")}</p>
-            )}
-            {open.length > 0 && (
-              <p className="text-sm text-amber-800">
-                {open.length} entr{open.length === 1 ? "y needs" : "ies need"} a decision before installing.
-              </p>
-            )}
-            <button type="button" disabled={!!nothing || open.length > 0 || install.isPending} onClick={() => install.mutate()}
-                    className="rounded bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
-              {install.isPending ? "Installing…" : nothing ? "Nothing to install" : "Install"}
-            </button>
-            {install.isError && <p className="whitespace-pre-line text-sm text-red-600">{problem(install.error)}</p>}
-          </div>
-        )}
+        {!fromUpdate && planBlock}
       </div>
 
       <section>

@@ -11,7 +11,7 @@ import { portsFromModel } from "../../lib/modelPorts";
 import type { PortAttributes } from "../../api/client";
 import { SchemaBrowser, subtree } from "../../components/SchemaBrowser";
 import { SchemaPicker } from "../../components/SchemaPicker";
-import { effectiveAttributes } from "../../lib/schemaAttributes";
+import { effectiveAttributes, oneVendorField } from "../../lib/schemaAttributes";
 
 export function AssetForm() {
   const { uid } = useParams<{ uid: string }>();
@@ -298,7 +298,7 @@ export function AssetForm() {
           <div>
             <label className="block text-sm font-medium text-slate-700">Attributes</label>
             <div className="mt-2 rounded border border-slate-200 p-3">
-              <AttributeFields attrs={attrDefs} values={attributes} onChange={(k, v) => {
+              <AttributeFields attrs={oneVendorField(attrDefs, attributes, "form")} values={attributes} onChange={(k, v) => {
                 setAttributes((prev) => ({ ...prev, [k]: v }));
                 if (k === "product_model" && typeof v === "string" && v) fillRecorded(v);
               }} />

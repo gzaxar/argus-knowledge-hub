@@ -2924,6 +2924,8 @@ export interface CatalogueProposalDraft {
             library_name?: string };
   collections: { id: string; name: string; version: string; domains: string[] }[];
   device_classes: string[];
+  /** What the record says, when it is not a catalogue class: the entry's class, if any, is ARGUS's reading of it. */
+  device_class_written?: string;
   source_kinds: string[];
   repository: string | null;
   enabled: boolean;
@@ -3216,6 +3218,9 @@ export const catalogueCollectionsApi = {
       { method: "POST", body: json(body) }),
   propose: (body: CatalogueProposalIn) =>
     request<CatalogueProposal>(`${CC}/proposals`, { method: "POST", body: json(body) }),
+  /** The catalogue's Vendor of this name or alias, or a new one (maintainers). */
+  addVendor: (name: string) =>
+    request<{ uid: string; key: string; name: string; created: boolean }>(`${CC}/vendors`, { method: "POST", body: json({ name }) }),
   decideField: (catalogueId: string, field: string, decision: CatalogueFieldDecision, reason?: string) =>
     request<unknown>(`${CC}/entries/${catalogueId.split("/").map(encodeURIComponent).join("/")}/fields`,
                      { method: "POST", body: json({ field, decision, reason }) }),

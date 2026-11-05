@@ -35,13 +35,29 @@ describe("proposing a model to the catalogue", () => {
     fireEvent.click(screen.getByLabelText("a new one"));
     fireEvent.change(screen.getByPlaceholderText("test-measurement"), { target: { value: "test-measurement" } });
     fireEvent.change(screen.getByPlaceholderText(/datasheet's link/), { target: { value: "https://keysight.com/ds.pdf" } });
-    fireEvent.click(screen.getByRole("button", { name: "Check the files" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show the files" }));          // to read them: not a step
     expect(await screen.findByText(/validator accepts it/)).toBeInTheDocument();
     expect(preview.mock.calls[0][0]).toMatchObject({ collection: { id: "test-measurement" },
                                                       source: { kind: "datasheet", ref: "https://keysight.com/ds.pdf" } });
     fireEvent.click(screen.getByRole("button", { name: "Open the pull request" }));
     expect(await screen.findByRole("status")).toHaveTextContent("pull request #7");
     expect(propose).toHaveBeenCalledOnce();
+  });
+
+  it("opens the pull request without showing the files first, and says how it read the device class", async () => {
+    vi.spyOn(catalogueCollectionsApi, "proposalDraft").mockResolvedValue(
+      { ...draft, entry: { ...draft.entry, device_class: "multimeter" }, device_class_written: "digital multimeter" });
+    const preview = vi.spyOn(catalogueCollectionsApi, "proposalPreview");
+    const propose = vi.spyOn(catalogueCollectionsApi, "propose").mockRejectedValue(new Error("no"));
+    renderWith(<ProposeModel uid="m-1" />);
+    fireEvent.click(screen.getByRole("button", { name: /propose for the catalogue/i }));
+    expect(await screen.findByText(/says “digital multimeter”: read as multimeter/)).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("a new one"));
+    fireEvent.change(screen.getByPlaceholderText("test-measurement"), { target: { value: "test-measurement" } });
+    fireEvent.change(screen.getByPlaceholderText(/datasheet's link/), { target: { value: "https://keysight.com/ds.pdf" } });
+    fireEvent.click(screen.getByRole("button", { name: "Open the pull request" }));
+    await waitFor(() => expect(propose).toHaveBeenCalledOnce());
+    expect(preview).not.toHaveBeenCalled();
   });
 
   it("lists what was proposed and how far it got", async () => {

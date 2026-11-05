@@ -22,7 +22,7 @@ export function SourceReleases({ source }: { source: CatalogueSourcePin }) {
   const releases = useQuery({ queryKey: ["catalogue-releases", source.id], enabled: open,
                               queryFn: () => catalogueCollectionsApi.releases(source.id) });
   const done = () => {
-    for (const k of ["catalogue-collections", "catalogue-releases", "catalogue-models"]) {
+    for (const k of ["catalogue-collections", "catalogue-releases", "catalogue-newer", "catalogue-models"]) {
       queryClient.invalidateQueries({ queryKey: [k] });
     }
   };
@@ -158,8 +158,8 @@ export function ProposeModel({ uid }: { uid: string }) {
       <p role="status" className="rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-900">
         Proposed as <span className="font-mono">{propose.data.catalogue_id}</span>:{" "}
         {propose.data.url ? <a href={propose.data.url} target="_blank" rel="noreferrer" className="underline">
-          pull request #{propose.data.number}</a> : "pull request opened"}. After review and a release, pin the release
-        in Administration › Catalogue and install it: this record is then linked to its entry.
+          pull request #{propose.data.number}</a> : "pull request opened"}. Once it is merged, its release is offered at the top of
+        Administration › Catalogue: <i>Review the update</i>, then <i>Install</i>. This record is then linked to its entry.
       </p>
     );
   }
@@ -171,15 +171,15 @@ export function ProposeModel({ uid }: { uid: string }) {
   const f = form ?? initial(d);
   const set = (next: Partial<CatalogueProposalIn>) => { setForm({ ...f, ...next }); preview.reset(); };
   const setEntry = (k: string, v: string) => set({ entry: { ...f.entry, [k]: v } });
-  const ready = !!f.collection.id && !!f.source.ref.trim();
+  const ready = !!f.collection.id && !!f.source.ref.trim() && !!f.entry.device_class;
 
   return (
     <form className="space-y-3 rounded border border-slate-200 bg-white p-3 text-sm"
           onSubmit={(e) => { e.preventDefault(); preview.mutate(f); }}>
       <h2 className="font-semibold text-slate-900">Propose for the catalogue</h2>
       <p className="text-xs text-slate-500">
-        A pull request on <span className="font-mono">{d.repository ?? "the catalogue repository"}</span>, reviewed
-        before it is released. Only what the source confirms goes in; the unit's serial, firmware and addresses stay on
+        A pull request on <span className="font-mono">{d.repository ?? "the catalogue repository"}</span>, checked
+        by the validator when it is opened and reviewed before it is released. Only what the source confirms goes in; the unit's serial, firmware and addresses stay on
         the unit.
       </p>
       {!d.enabled && (
@@ -194,15 +194,13 @@ export function ProposeModel({ uid }: { uid: string }) {
           <span className="text-xs text-slate-500">Device class</span>
           <select className={input} value={f.entry.device_class ?? ""} onChange={(e) => setEntry("device_class", e.target.value)}>
             <option value="">—</option>
-            {/* The record's own class, when the catalogue has no such class: shown, so it is not sent unseen. */}
-            {f.entry.device_class && !d.device_classes.includes(f.entry.device_class) && (
-              <option value={f.entry.device_class}>{f.entry.device_class} (not a catalogue class)</option>
-            )}
             {d.device_classes.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-          {f.entry.device_class && !d.device_classes.includes(f.entry.device_class) && (
+          {d.device_class_written && (
             <span className="text-xs text-amber-800">
-              The record says “{f.entry.device_class}”: choose the catalogue's class for it.
+              The record says “{d.device_class_written}”{d.entry.device_class
+                ? `: read as ${d.entry.device_class}. Change it if that is wrong.`
+                : ": choose the catalogue's class for it."}
             </span>
           )}
         </label>
@@ -299,12 +297,12 @@ export function ProposeModel({ uid }: { uid: string }) {
       </fieldset>
 
       <div className="flex flex-wrap gap-2">
-        <button type="submit" className={button} disabled={!ready || preview.isPending}>
-          {preview.isPending ? "Checking…" : "Check the files"}
-        </button>
-        <button type="button" className={primary} disabled={!ready || !d.enabled || !preview.isSuccess || propose.isPending}
+        <button type="button" className={primary} disabled={!ready || !d.enabled || propose.isPending}
                 onClick={() => propose.mutate(f)}>
-          {propose.isPending ? "Opening…" : "Open the pull request"}
+          {propose.isPending ? "Checking and opening…" : "Open the pull request"}
+        </button>
+        <button type="submit" className={button} disabled={!ready || preview.isPending}>
+          {preview.isPending ? "Checking…" : "Show the files"}
         </button>
         <button type="button" className={button} onClick={() => setOpen(false)}>Cancel</button>
       </div>

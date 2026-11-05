@@ -251,6 +251,27 @@ def install_one_model(body: InstallOneIn, identity: Identity = Depends(get_ident
     return out
 
 
+class VendorIn(BaseModel):
+    name: str
+
+
+@router.post("/vendors")
+def add_vendor(body: VendorIn, identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """The catalogue's Vendor of this name or alias, or a new one: what the Vendor field of a Product Model offers
+    when the company is not listed. Maintainers only: a vendor is shared with every workspace."""
+    from app.services.model_vendor import ensure
+    ws = _workspace(db)
+    _may_install(db, identity, ws)
+    _, vendor_schema = installer._types(db, ws)
+    try:
+        record, created = ensure(db, ws, vendor_schema.uid, body.name, _actor(identity))
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=422, detail={"error": str(e)})
+    db.commit()
+    return {"uid": record.uid, "key": record.key, "name": record.name, "created": created}
+
+
 class LinkModelIn(BaseModel):
     catalogue_id: str
     record_uid: str
