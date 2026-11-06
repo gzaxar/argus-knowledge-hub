@@ -57,6 +57,28 @@ The PV itself is on the record, under `pv`.
 A BPM whose IOC lists no devices is one monitor, so the import makes one Control Device for it on the IOC's own
 prefix (`BTF-DEV-libera02-BPSA31`, PV `ACC:DIA:LIB02:BPSA31`).
 
+## One supply, several magnets
+
+Say in the values file which magnets a channel's power supply drives, with `magnets:` on the device. It works
+with or without inference:
+
+```yaml
+- name: QUAA-001
+  id: 2
+  magnets: [QUAA101, QUAA201, QUAA301, QUAA401]
+```
+
+- The channel gets a **Power Supply** record (one already held under the channel's name is reused), and each
+  magnet is linked to it with `powers`. The magnet's page then shows its supply and channel.
+- With no list, a channel of a magnet IOC (`devgroup: mag`) powers the magnet of its own name, if the workspace
+  has one.
+- Magnets are found by name among the beam elements, the beam model's first. A name that matches nothing, or
+  several, is reported in the import's messages and no magnet is invented.
+- With a list, the file decides: a magnet taken off the list loses its `powers` link at the next import.
+
+An element the beam model or a person already recorded is also reused by **Infer equipment and lattice elements**,
+which no longer makes a second record beside it.
+
 ## Import an EPIK8s configuration, step by step
 
 1. The workspace has the **Accelerator catalogue** (its **Packages** page). Hanging from a catalogue
