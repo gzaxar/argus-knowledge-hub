@@ -47,7 +47,7 @@ from typing import Any, Optional
 
 import requests
 import yaml
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
@@ -66,13 +66,14 @@ from app.services.git_import import (
 )
 from app.services.asset_types import resolve_type_uids
 from app.services.element_inference import (
-    ASSET_TYPES, CAMERA, CONTROLLER_TYPES, ELEMENT_TYPES, LATTICE_NAME, SCREEN_NAME, SYSTEM_BY_GROUP,
+    ASSET_TYPES, CAMERA, CONTROLLER_TYPES, ELEMENT_TYPES, LATTICE_NAME, PSU, SCREEN_NAME, SYSTEM_BY_GROUP,
     infer_controller, infer_device, infer_ioc,
 )
 from app.packages.importers import requires
 from app.services import dns_convention
 from app.services.network_resolve import IPV4, NetworkIndex, short_host
 from app.services.relations import rebuild_asset_relations
+from app.services.visibility import live_assets_clause
 
 # The packages a workspace must have before an EPIK8s import (their `provides`).
 REQUIRES = requires("epik8s")
@@ -410,6 +411,7 @@ class _Importer:
             "addresses_unresolved": 0,
             "relations": 0,
             "inferred_controllers": 0, "linked_to_inventory": 0, "ports": 0,
+            "magnets_linked": 0, "magnets_unresolved": 0,
         }
         # What this run created, so re-reaching one is not counted as a match.
         self.created_access_points: set[str] = set()
@@ -469,6 +471,9 @@ class _Importer:
         if self.infer:
             for name in (*ASSET_TYPES, *ELEMENT_TYPES):
                 self.schemas[name] = self.db.get(Schema, usable[name])
+        # A channel's `magnets:` is stated, so its supply is made even when nothing is inferred.
+        if PSU in usable:
+            self.schemas[PSU] = self.db.get(Schema, usable[PSU])
         self.db.commit()
 
     # --- objects --------------------------------------------------------
@@ -669,6 +674,90 @@ class _Importer:
         self.counts["records_retired"] = retired
         return retired
 
+    def _elements_named(self, name: str) -> list[Asset]:
+        """The live beam elements of that name; those the beam model or a person recorded come first
+        and alone, since an element this import only inferred is a guess at the same thing."""
+        from app.ledger.registry import BEAM_ELEMENTS
+        rows = list(self.db.scalars(select(Asset).where(
+            Asset.workspace_id == self.workspace_id, Asset.deleted_at.is_(None), live_assets_clause(),
+            Asset.type.in_(BEAM_ELEMENTS), func.lower(Asset.name) == name.lower())))
+        recorded = [a for a in rows if str((a.attributes or {}).get("argus_source") or "").lower() != SOURCE]
+        return recorded or rows
+
+    def _recorded_element(self, identity: str, name: str) -> Optional[Asset]:
+        """The element the beam model or a person already recorded under this name, to link to instead of
+        inferring a twin of it. Kept under `identity`, where the rest of the run looks for this element."""
+        rows = self._elements_named(name)
+        if len(rows) != 1 or str((rows[0].attributes or {}).get("argus_source") or "").lower() == SOURCE:
+            return None
+        self.assets[identity] = rows[0]
+        return rows[0]
+
+    def _supply(self, control: Asset, device: dict, ioc: dict, name: str, controller: Optional[Asset]) -> bool:
+        """The supply behind a magnet channel and the magnets it powers: those the channel lists in `magnets:`,
+        and with no list the magnet of the channel's own name. True when that settled what the channel drives.
+
+        Magnets are found, never made: a name that matches nothing is reported. With a list, the file is the
+        whole truth about this supply, so a magnet taken off the list loses its link."""
+        stated = _as_list(device.get("magnets"))
+        if not stated and _s_lower(device.get("devgroup") or ioc.get("devgroup")) != "mag":
+            return False
+        magnets = []
+        for wanted in stated or [name]:
+            rows = self._elements_named(wanted)
+            if len(rows) == 1:
+                magnets.append(rows[0])
+            elif stated or rows:
+                self.counts["magnets_unresolved"] += 1
+                _note(self.job, self.db, f"{control.key} powers magnet “{wanted}”, but this workspace has "
+                                         f"{'several' if rows else 'no'} beam element{'s' if rows else ''} "
+                                         f"of that name: not linked.")
+        if not stated and not magnets:
+            return False                                # not a magnet this workspace knows: as before
+        if PSU not in self.schemas:
+            _note(self.job, self.db, f"{control.key}: no supply made, this workspace cannot use the "
+                                     f"{PSU} type. {_seed_hint(self.workspace_id)}")
+            return True
+        supply = self._supply_record(control, device, ioc, name)
+        self.relate(control, supply, "acts on")
+        self._acted_on[control.uid] = supply
+        if controller is not None:
+            self.relate(controller, supply, "powers")
+        for magnet in magnets:
+            self.relate(supply, magnet, "powers")
+            self.counts["magnets_linked"] += 1
+        if stated:
+            keep = {w.lower() for w in stated}
+            links = self.db.execute(select(Relation, Asset.key, Asset.name).join(
+                Asset, Asset.uid == Relation.to_asset_uid).where(
+                Relation.workspace_id == self.workspace_id, Relation.from_asset_uid == supply.uid,
+                Relation.relation_type == "powers")).all()
+            for link, key, target in links:
+                if target.lower() not in keep:
+                    self.db.delete(link)
+                    _note(self.job, self.db, f"{supply.key} no longer powers {key}: the file does not list it.")
+        return True
+
+    def _supply_record(self, control: Asset, device: dict, ioc: dict, name: str) -> Asset:
+        """The one the inventory or a person already holds under the channel's name, or else this import's."""
+        known = self._inventory_unit(control) if self.link else None
+        if known is not None:
+            self.counts["linked_to_inventory"] += 1
+            if known.type == PSU:
+                return known
+        held = [a for a in self.db.scalars(select(Asset).where(
+            Asset.workspace_id == self.workspace_id, Asset.deleted_at.is_(None), live_assets_clause(),
+            Asset.type == PSU, func.lower(Asset.name) == name.lower()))
+            if str((a.attributes or {}).get("argus_source") or "").lower() != SOURCE]
+        if len(held) == 1:
+            return held[0]
+        inference = infer_device(ioc, device)
+        attrs = inference.asset_attrs if inference is not None and inference.asset_type == PSU else {}
+        return self.upsert_inferred(
+            PSU, f"{self.tag}:AST:{ioc['name']}:{name}", f"{name} {PSU}",
+            _present({**attrs, "description": f"The supply behind channel {name} of IOC {ioc['name']}, "
+                                              f"from the control configuration."}))
+
     def _infer_from(self, inference, control: Asset, relation: str, key_stem: str,
                     label: str, source: dict, zones: list) -> Optional[Asset]:
         """The asset a channel or an IOC drives, and the lattice element it serves. Returns
@@ -690,11 +779,13 @@ class _Importer:
             self._timing.append((asset, inference.timing_role, inference.triggers_type))
         self._count_inferred("inferred_assets", f"inferred {inference.asset_type}", asset.key)
         if inference.element_type:
-            element = self.upsert_inferred(
-                inference.element_type, f"{self.tag}:ELM:{inference.element_name}",
-                inference.element_name,
-                _present({**inference.element_attrs, "argus_beamline": self.tag, "zone": zones,
-                          "description": note, "argus_keywords": ["inferred"]}))
+            identity = f"{self.tag}:ELM:{inference.element_name}"
+            element = self._recorded_element(identity, inference.element_name)
+            if element is None:
+                element = self.upsert_inferred(
+                    inference.element_type, identity, inference.element_name,
+                    _present({**inference.element_attrs, "argus_beamline": self.tag, "zone": zones,
+                              "description": note, "argus_keywords": ["inferred"]}))
             # A supply powers its magnet and a chiller cools its structure; the electronics of a BPM
             # are what realises it; a screen station or a mirror mount is assembled from its
             # actuator or axes.
@@ -759,11 +850,14 @@ class _Importer:
         note = (f"Inferred by the control-configuration import: {why}. Nobody has confirmed "
                 f"what this is or where it is installed.")
         upper = name.upper()
-        element = self.upsert_inferred(
-            element_type, f"{self.tag}:ELM:{upper}", upper,
-            _present({"lattice_name": upper if LATTICE_NAME.match(upper) else None,
-                      "argus_beamline": self.tag, "zone": zones, "description": note,
-                      "argus_keywords": ["inferred"]}))
+        identity = f"{self.tag}:ELM:{upper}"
+        element = self._recorded_element(identity, upper)
+        if element is None:
+            element = self.upsert_inferred(
+                element_type, identity, upper,
+                _present({"lattice_name": upper if LATTICE_NAME.match(upper) else None,
+                          "argus_beamline": self.tag, "zone": zones, "description": note,
+                          "argus_keywords": ["inferred"]}))
         self.relate(control, element, "acts on")
         self.relate(element, unit, "realized by")
         self._count_inferred("inferred_elements", f"inferred {element_type}", element.key)
@@ -1392,7 +1486,9 @@ class _Importer:
         self.relate(asset, ioc_asset, "provided by")
         self.relate(asset, self.cfg, "declared in")
 
-        if self.infer and unit is not None:
+        if (unit is None or device.get("magnets")) and self._supply(asset, device, ioc, device_name, controller):
+            pass
+        elif self.infer and unit is not None:
             # The IOC is one unit and its channels are its own; but where each channel is an
             # element (a Libera Spectra's BPMs), each one is made.
             if unit.channel_element:
