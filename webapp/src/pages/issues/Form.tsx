@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { isLive } from "../../lib/liveRecords";
 import {
   assetsApi,
   globalValuesApi,
@@ -232,7 +233,7 @@ export function IssueForm() {
           <label className="block text-sm font-medium text-slate-700">Objects</label>
           <div className="mt-1">
             <AssetMultiPicker
-              options={assets.data ?? []}
+              options={(assets.data ?? []).filter((a) => isLive(a) || assetUids.includes(a.uid))}
               value={assetUids}
               onChange={setAssetUids}
             />

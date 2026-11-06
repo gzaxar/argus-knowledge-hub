@@ -88,6 +88,8 @@ export interface Asset {
   inbound_relations: string[];
   outbound_relations: string[];
   is_global: boolean;
+  /** Provisional, Active, Retired or Merged. */
+  record_status?: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

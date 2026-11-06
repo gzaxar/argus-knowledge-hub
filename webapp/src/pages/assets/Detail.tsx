@@ -233,6 +233,12 @@ export function AssetDetail() {
                 </span>
               )}
               <OwnerBadge workspaceId={a.workspace_id} />
+              {(a.record_status === "Retired" || a.record_status === "Merged") && (
+                <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700"
+                      title="No longer in use: its history and links stay, but search, lists and Ask do not offer it.">
+                  {a.record_status}
+                </span>
+              )}
             </h1>
             <p className="text-sm text-slate-500">
               {showKeys && <>{a.key} · </>}{a.type} · schema:{" "}

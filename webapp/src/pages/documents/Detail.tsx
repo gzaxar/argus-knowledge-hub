@@ -25,6 +25,7 @@ import { ImageGallery } from "../../components/ImageLightbox";
 import { TransferItemAction } from "../../components/TransferItemAction";
 import { StepsEditor } from "../../components/StepsEditor";
 import { DocumentStep } from "../../api/types";
+import { isLive } from "../../lib/liveRecords";
 import { DocumentContextPanel } from "../../components/hub/ContextPanels";
 import { DocumentControlCard, SupersededBanner, VerifyAttachment } from "../../components/hub/DocumentControl";
 import { errorText } from "../../components/hub/LedgerPanels";
@@ -301,7 +302,7 @@ export function DocumentDetail() {
   const sheetsFor = (a: { uid: string }) => sheetsBySource.get(a.uid) ?? [];
 
   const linkOptions = {
-    asset: (linkAssets.data ?? []).map((a) => ({ uid: a.uid, label: a.name, sub: a.key })),
+    asset: (linkAssets.data ?? []).filter(isLive).map((a) => ({ uid: a.uid, label: a.name, sub: a.key })),
     issue: (allIssues.data ?? []).map((i) => ({
       uid: i.uid,
       label: i.title,

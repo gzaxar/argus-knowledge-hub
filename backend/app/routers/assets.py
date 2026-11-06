@@ -30,8 +30,8 @@ from app.services import asset_keys, markdown_export, pdf_export, versions
 from app.services.attribute_validation import validate_attributes
 from app.services.current_user_attrs import stamp_current_user_attributes
 from app.services.relations import rebuild_asset_relations, rebuild_asset_relations_with_neighbors
-from app.services.visibility import (asset_visible_in, hidden_fields, redacted_attributes, visible_assets_clause,
-                                     visible_uids)
+from app.services.visibility import (asset_visible_in, hidden_fields, live_assets_clause, redacted_attributes,
+                                     visible_assets_clause, visible_uids)
 
 router = APIRouter(prefix="/v1/assets", tags=["assets"])
 
@@ -100,8 +100,9 @@ def list_assets(
     order: str = Query("asc", pattern="^(asc|desc)$"),
     limit: Optional[int] = Query(None, ge=1, le=500,
                                  description="A page of at most this many, with the total in X-Total-Count. "
-                                             "Without it, every record (and deleted ones are not left out)."),
+                                             "Without it, every record (deleted and retired ones are not left out)."),
     offset: int = Query(0, ge=0),
+    include_retired: bool = Query(False, description="A page also holds retired and merged records."),
     workspace_id: str = Depends(require_permission("read")),
     grants=Depends(get_grants),
     db: Session = Depends(get_db),
@@ -119,8 +120,10 @@ def list_assets(
     if limit is None and not sort:
         return [asset_out(db, a) for a in db.scalars(stmt).all()]
     if limit is not None:
-        # A page is for browsing: what was deleted is not part of it.
+        # A page is for browsing: what was deleted is not part of it, nor what was retired unless asked.
         stmt = stmt.where(Asset.deleted_at.is_(None))
+        if not include_retired:
+            stmt = stmt.where(live_assets_clause())
         response.headers["X-Total-Count"] = str(db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
     column = _SORT[sort or "name"]
     stmt = stmt.order_by(column.desc().nulls_last() if order == "desc" else column.asc().nulls_last(), Asset.uid)
@@ -135,10 +138,11 @@ def asset_type_counts(
     grants=Depends(get_grants),
     db: Session = Depends(get_db),
 ):
-    """How many visible, not deleted records each type has (its own, not its subtypes'): what a type tree
+    """How many visible records in use (not deleted, retired or merged) each type has (its own, not its subtypes'): what a type tree
     shows beside each type."""
     rows = db.execute(select(Asset.schema_uid, func.count()).where(
-        visible_assets_clause(workspace_id, grants), Asset.deleted_at.is_(None)).group_by(Asset.schema_uid))
+        visible_assets_clause(workspace_id, grants), Asset.deleted_at.is_(None),
+        live_assets_clause()).group_by(Asset.schema_uid))
     return {uid: n for uid, n in rows if uid}
 
 

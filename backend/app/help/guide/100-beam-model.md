@@ -59,6 +59,15 @@ conversion warnings before relying on it.
 beam. The editor changes the model, its definitions and datasets, boundaries along paths, alignment, state
 mappings and value provenance; saving keeps a new revision.
 
+A component's id is what identifies it. Change the id, or remove the component, and the old record is **retired**
+and a new one made; change only its values and it stays the same record. A retired record keeps its history and
+opens from its link, marked **Retired**, but search, lists, the map and Ask no longer offer it. To see them, tick
+**Show retired** on the Assets page, or search for `status = Retired`.
+
+A save that would remove more than a tenth of the model (at least 10 records), or a record with tickets, documents
+or a confirmed installation, is not applied at once. The editor says so: approve it in the review queue, then save
+again.
+
 ## Remove a model
 
 On the **Beam model** page, **remove** beside a model's name takes the whole model out of the workspace:

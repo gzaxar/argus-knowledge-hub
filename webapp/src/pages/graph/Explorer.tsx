@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { assetsApi, documentsApi, graphApi, issuesApi } from "../../api/client";
 import type { FailureNode, FailureStep, ImpactResult, RootCauseCandidate } from "../../api/types";
 import { GraphCanvas, IN, OUT } from "../../components/graph/GraphCanvas";
+import { isLive } from "../../lib/liveRecords";
 import { KIND_STYLE, LAYER_STYLE, LOSS_LABEL, nodeId, place, bundleEdges, openBundle, STEP, type GEdge, type GNode, type Neighbour } from "../../components/graph/model";
 import { useBranches } from "../../components/graph/useBranches";
 import { DirectionLegend, RelationList } from "../../components/RelationGraph";
@@ -152,7 +153,7 @@ function StartPicker({
 
   const options = useMemo(() => {
     if (kind === "asset")
-      return (assets.data ?? []).map((a) => ({ uid: a.uid, label: a.name, sub: a.key }));
+      return (assets.data ?? []).filter(isLive).map((a) => ({ uid: a.uid, label: a.name, sub: a.key }));
     if (kind === "ticket")
       return (issues.data ?? []).map((i) => ({
         uid: i.uid,

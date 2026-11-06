@@ -52,7 +52,7 @@ the whole day: `created = 2026-10-01`.
 | Equipment | |
 |---|---|
 | `key` | the key, or a **former key** |
-| `name`, `type`, `category`, `status` | `status`: Active, Provisional, Retired |
+| `name`, `type`, `category`, `status` | `status`: Active, Provisional, Retired, Merged. Retired and merged records appear only when the query names a status (`status = Retired`) |
 | `label`, `labelType` | any label: QR code, barcode, former key, alias; `labelType = qrcode` |
 | `serial`, `inventory`, `inventory_number`, `mac`, `asset_tag` | |
 | `text` | key, name, labels, serial and every attribute |

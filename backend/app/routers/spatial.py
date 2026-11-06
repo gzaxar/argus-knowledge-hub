@@ -18,7 +18,7 @@ from app.models.workspace import Workspace
 from app.routers.ledger import actor_of
 from app.services import spatial
 from app.services.permissions import resolve_permission
-from app.services.visibility import asset_visible_in, visible_assets_clause
+from app.services.visibility import asset_visible_in, live_assets_clause, visible_assets_clause
 
 router = APIRouter(prefix="/v1", tags=["locations"])
 
@@ -310,6 +310,8 @@ def _scope(db: Session, identity, workspaces: list[str], types: Optional[str], s
         cond = cond & tf
     if status:
         cond = cond & Asset.record_status.in_([s.strip() for s in status.split(",") if s.strip()])
+    else:
+        cond = cond & live_assets_clause()
     return cond
 
 
