@@ -34,6 +34,7 @@ log = logging.getLogger(__name__)
 TICK_SECONDS = 60
 STALE_RUN = timedelta(hours=12)          # a run "running" this long died with its process
 MAX_FAILURES = 3
+ENDED_WELL = ("succeeded", "completed")  # an EPIK8s import ends "completed", the other sources "succeeded"
 KINDS = ("off", "hours", "daily", "weekly")
 _scheduler: Optional[threading.Thread] = None
 
@@ -230,7 +231,7 @@ def run_one(db: Session, uid: str) -> dict:
     db.expire_all()
     job = db.get(ImportJob, job.uid)
     config = db.get(ImportConfig, uid)
-    if job.status == "succeeded":
+    if job.status in ENDED_WELL:
         return _finish(db, config, "succeeded", job.progress or "Import complete", job.uid)
     return _finish(db, config, "failed", job.error or f"the import ended {job.status}", job.uid)
 
