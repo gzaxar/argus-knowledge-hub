@@ -129,8 +129,9 @@ def _file_of(source_ref: str) -> tuple[str, str]:
     return rest.rpartition("@")[0], path
 
 
-# Provenance, which a re-read always restates: it says where a value came from, and is not a value.
-_PROVENANCE = frozenset({"argus_source", "argus_source_ref"})
+# Provenance, which a re-read always restates: it says where and when a value came from, and is not
+# a value. The job records when each read ran.
+_PROVENANCE = frozenset({"argus_source", "argus_source_ref", "imported_at"})
 
 
 def _same_content(current: Optional[dict], incoming: dict) -> bool:
@@ -1291,7 +1292,8 @@ class _Importer:
 
             # An IOC that is one unit (a BPM's electronics, an LLRF chassis, a modulator): its
             # channels are that unit's, not more things.
-            unit = infer_ioc(merged) if self.infer else None
+            found = infer_ioc(merged)
+            unit = found if self.infer else None
             unit_asset = None
             if unit is not None:
                 unit_asset = self._infer_from(unit, ioc, "drives", name, name, merged,
@@ -1321,9 +1323,16 @@ class _Importer:
 
             devices = merged.get("devices") or []
             if not devices:
+                if found is not None and found.element_name:
+                    # A BPM IOC with no device list is one monitor, and its prefix is that monitor's
+                    # (`ACC:DIA:LIB02:BPSA31`). It needs a Control Device like any other channel,
+                    # because that is what a lookup of the machine's devices reads.
+                    self._device({"name": found.element_name}, merged, ioc, ioc_access, tag, beamline,
+                                 create_missing, unit=unit, unit_asset=unit_asset, controller=controller,
+                                 pv=_pv_prefix(merged, None))
                 # An IOC with no device list still drives something; the IOC
                 # is the only handle on it.
-                if self.infer and unit is None:
+                elif self.infer and unit is None:
                     self.not_inferred[self._kind_of(merged)] += 1
                 continue
 
@@ -1340,9 +1349,9 @@ class _Importer:
     def _device(self, device: dict, ioc: dict, ioc_asset: Asset,
                 ioc_access: Optional[Asset], tag: str, beamline: str,
                 create_missing: bool, unit=None, unit_asset: Optional[Asset] = None,
-                controller: Optional[Asset] = None) -> None:
+                controller: Optional[Asset] = None, pv: Optional[str] = None) -> None:
         device_name = str(device["name"]).strip()
-        pv = _pv_prefix(ioc, device_name)
+        pv = pv or _pv_prefix(ioc, device_name)
         key = f"{tag}:DEV:{ioc['name']}:{device_name}"
         zones = _as_list(device.get("zones")) or _as_list(ioc.get("zones"))
         address, port = _endpoint_of(device, {})
@@ -1389,6 +1398,10 @@ class _Importer:
             if unit.channel_element:
                 self._infer_channel_element(unit.channel_element, asset, unit_asset, device_name, zones,
                                             f"channel {device_name} of {unit.why}")
+            elif unit.element_name:
+                element = self.assets.get(f"{tag}:ELM:{unit.element_name}")
+                if element is not None:
+                    self.relate(asset, element, "acts on")
         elif self.infer:
             inference = infer_device(ioc, device)
             if inference is None:

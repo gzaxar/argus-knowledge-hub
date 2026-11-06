@@ -10,7 +10,7 @@ import pytest
 import yaml
 
 from app.db import Base, SessionLocal, engine
-from app.models.asset import Asset
+from app.models.asset import Asset, Relation
 from app.models.import_job import ImportJob
 from app.models.workspace import Workspace
 from app.services.element_inference import infer_ioc
@@ -340,3 +340,96 @@ def test_which_file_a_record_came_from_does_not_depend_on_the_revision(ref, expe
 
 def test_a_key_is_its_identity_with_hyphens():
     assert public_key("BTF:DEV:libera12:BPSA11") == "BTF-DEV-libera12-BPSA11"
+
+
+def _bpm_import(db, ws, tag, revision, text=LIBERA, infer=True):
+    job = ImportJob(uid=f"job-{secrets.token_hex(4)}", workspace_id=ws, source="epik8s")
+    db.add(job)
+    db.commit()
+    it = _Importer(db, job, ws, f"git@host:group/repo.git@{revision}:deploy/values.yaml", infer_elements=infer)
+    it.ensure_types()
+    it.run(yaml.safe_load(text.replace("BEAMLINE", tag)), True)
+    return it
+
+
+def test_a_bpm_ioc_with_no_device_list_is_one_control_device_on_its_own_prefix(db, split, tag):
+    """A lookup of the machine's devices reads Control Devices. A BPM whose IOC lists no devices
+    has to be one too, on the IOC's prefix and not on that prefix with its name added again."""
+    _, ws = split
+    _bpm_import(db, ws, tag, "r1")
+    db.commit()
+    device = db.get(Asset, _uid(ws, f"{tag}:DEV:libera10:BPSA32"))
+    assert device.key == f"{tag}-DEV-libera10-BPSA32"
+    assert device.type == "Control Device"
+    assert device.attributes["pv"] == device.attributes["pv_prefix"] == "ACC:DIA:LIB10:BPSA32"
+    assert device.attributes["ioc"] == "libera10"
+    assert device.attributes["system"] == "bpm"
+    element = db.get(Asset, _uid(ws, f"{tag}:ELM:BPSA32"))
+    made = {(r.from_asset_uid, r.relation_type, r.to_asset_uid) for r in db.query(Relation).filter(
+        Relation.workspace_id == ws, Relation.from_asset_uid == device.uid)}
+    assert (device.uid, "acts on", element.uid) in made
+    assert (device.uid, "provided by", _uid(ws, f"{tag}:IOC:libera10")) in made
+
+    # Nothing changed, so nothing is written, and clearing leaves it alone.
+    again = _bpm_import(db, ws, tag, "r2")
+    retired = again.clear_previous()
+    db.commit()
+    assert retired == 0
+    db.refresh(device)
+    assert device.deleted_at is None
+    assert device.attributes["argus_source_ref"].endswith("@r1:deploy/values.yaml")
+
+
+def test_the_device_of_an_older_release_is_corrected_not_retired(db, split, tag):
+    """A release moved the prefix and dropped the device list. The monitor is the same one, so its
+    record stays and takes the PV that answers now."""
+    _, ws = split
+    older = LIBERA.replace("iocprefix: ACC:DIA:LIB10:BPSA32", "iocprefix: OLD:LIB10\n      devices: [{name: BPSA32}]")
+    _bpm_import(db, ws, tag, "r1", older)
+    db.commit()
+    uid = _uid(ws, f"{tag}:DEV:libera10:BPSA32")
+    assert db.get(Asset, uid).attributes["pv"] == "OLD:LIB10:BPSA32"
+
+    _bpm_import(db, ws, tag, "r2").clear_previous()
+    db.commit()
+    device = db.get(Asset, uid)
+    db.refresh(device)
+    assert device.deleted_at is None
+    assert device.attributes["pv"] == "ACC:DIA:LIB10:BPSA32"
+
+
+def test_inference_off_still_makes_the_device_but_no_element(db, split, tag):
+    _, ws = split
+    _bpm_import(db, ws, tag, "r1", infer=False)
+    db.commit()
+    assert db.get(Asset, _uid(ws, f"{tag}:DEV:libera10:BPSA32")).attributes["pv"] == "ACC:DIA:LIB10:BPSA32"
+    assert db.get(Asset, _uid(ws, f"{tag}:ELM:BPSA32")) is None
+
+
+def test_only_a_bpm_ioc_gets_a_device_it_did_not_list(db, split, tag):
+    _, ws = split
+    text = """
+beamline: BEAMLINE
+iocDefaults:
+  libera-llrf: {devgroup: rf, devtype: llrf}
+epicsConfiguration:
+  iocs:
+    - {name: llrf1, template: libera-llrf, iocprefix: SPARC:LLRF1}
+    - {name: plain, iocprefix: SPARC:PLAIN}
+"""
+    _bpm_import(db, ws, tag, "r1", text)
+    db.commit()
+    assert db.query(Asset).filter(Asset.workspace_id == ws, Asset.type == "Control Device").count() == 0
+
+
+def test_the_time_of_a_read_is_not_a_change(ws, tag):
+    db, _ = run(ws, tag, "r1")
+    cfg = record(db, ws, tag, "CFG")
+    cfg.attributes = {**cfg.attributes, "imported_at": "2020-01-01T00:00:00+00:00"}
+    db.commit()
+    db.close()
+
+    db, again = run(ws, tag, "r2")
+    assert again.counts.get("records_updated", 0) == 0
+    assert record(db, ws, tag, "CFG").attributes["imported_at"] == "2020-01-01T00:00:00+00:00"
+    db.close()

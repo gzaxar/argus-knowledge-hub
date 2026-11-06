@@ -54,6 +54,9 @@ declares no IOC retires nothing. A ledger-only workspace retires records through
 Keys join their parts with `-` (`BTF-ELM-BPSA31`, `BTF-DEV-libera12-BPSA11`), so they don't read as PV names.
 The PV itself is on the record, under `pv`.
 
+A BPM whose IOC lists no devices is one monitor, so the import makes one Control Device for it on the IOC's own
+prefix (`BTF-DEV-libera02-BPSA31`, PV `ACC:DIA:LIB02:BPSA31`).
+
 ## Import an EPIK8s configuration, step by step
 
 1. The workspace has the **Accelerator catalogue** (its **Packages** page). Hanging from a catalogue
