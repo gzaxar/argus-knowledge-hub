@@ -38,6 +38,22 @@ before writing anything and says which package to install: install it on the wor
 own data names (a Jira issue type the workspace lacks), never a whole catalogue, and leaves the fields of
 the workspace's ticket and document types as they are.
 
+## A new release of an EPIK8s configuration
+
+Run the import again, or let its schedule do it. It compares what the file says now with what the hub
+holds: new records are made, only what really differs is updated, and everything else is left alone, still
+naming the revision that last changed it. The job says how many records were created, updated and left
+unchanged.
+
+What the file no longer declares, such as a renamed IOC or a changed prefix, stays unless you tick **Clear
+what this file no longer declares**. Those records are then retired, each one listed in the job's messages.
+Tickets and documents keep their links, and a record the file states again comes back as it was. Only records
+this file made are affected: never another file's, another source's, or one made by hand. A file that
+declares no IOC retires nothing. A ledger-only workspace retires records through a bulk change instead.
+
+Keys join their parts with `-` (`BTF-ELM-BPSA31`, `BTF-DEV-libera12-BPSA11`), so they don't read as PV names.
+The PV itself is on the record, under `pv`.
+
 ## Import an EPIK8s configuration, step by step
 
 1. The workspace has the **Accelerator catalogue** (its **Packages** page). Hanging from a catalogue

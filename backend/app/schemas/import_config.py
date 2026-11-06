@@ -59,6 +59,7 @@ class Epik8sImportConfigParams(BaseModel):
     # The chain the configuration implies (see Epik8sImportRequest).
     infer_elements: bool = False
     infer_controllers: bool = False
+    clear_previous: bool = False
     it_workspace: Optional[str] = None
     link_inventory: bool = False
     ai_unrecognised: bool = False

@@ -101,8 +101,8 @@ function causeGraph(c: RootCauseCandidate, symptoms: FailureNode[]) {
     if (nodes.has(id)) return nodes.get(id)!;
     const known = names.get(key);
     const taken = [...nodes.values()].filter((n) => n.col === col).length;
-    // A step in the middle of a path is known only by its key (SPARC:IOC:vac-gunvpc): its last part reads as a name.
-    const n: GNode = { id, kind: "asset", uid: known?.uid ?? key, label: known?.name ?? key.split(":").pop() ?? key,
+    // A step in the middle of a path is known only by its key (SPARC-IOC-vac-gunvpc): its last part reads as a name.
+    const n: GNode = { id, kind: "asset", uid: known?.uid ?? key, label: known?.name ?? key.replace(/^[^-:]+[-:][A-Z]+[-:]/, ""),
                        sub: known?.type ?? (known ? null : key),
                        col, y: taken * 58, parent, seq: seq.current++,
                        mark: key === c.key ? "cause" : symptomKeys.has(key) ? "symptom" : undefined };

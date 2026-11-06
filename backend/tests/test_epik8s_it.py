@@ -134,21 +134,21 @@ def test_a_port_of_a_converter_is_a_line_and_its_devices_are_on_it(db, world, ta
     _, _, (ws, _) = world
     run(db, ws, tag)
     objs, e = objects(db, ws), edges(db, ws)
-    line = f"{tag}:LINE:SCSPARCSIPMXA001:4003"
+    line = f"{tag}-LINE-SCSPARCSIPMXA001-4003"
     assert objs[line].type == "Serial Line" and objs[line].attributes["tcp_port"] == 4003
-    assert (line, "port of", "NET:" + ws + ":SCSPARCSIPMXA001") in e
+    assert (line, "port of", "NET-" + ws + "-SCSPARCSIPMXA001") in e
     for device in ("GUNSIP01", "GUNSIP02"):
-        assert (f"{tag}:DEV:vac-gunvpc:{device}", "on line", line) in e
+        assert (f"{tag}-DEV-vac-gunvpc-{device}", "on line", line) in e
     # another port of the same box is another line, and does not hold these devices
-    other = f"{tag}:LINE:SCSPARCSIPMXA001:4001"
-    assert (f"{tag}:DEV:vac-gunvpc:GUNSIP01", "on line", other) not in e
-    assert (f"{tag}:DEV:vac-kly01:W1KSIP03", "on line", other) in e
+    other = f"{tag}-LINE-SCSPARCSIPMXA001-4001"
+    assert (f"{tag}-DEV-vac-gunvpc-GUNSIP01", "on line", other) not in e
+    assert (f"{tag}-DEV-vac-kly01-W1KSIP03", "on line", other) in e
 
 
 def test_what_kind_of_line_it_is_comes_from_the_keys_its_devices_use(db, world, tag):
     _, _, (ws, _) = world
     run(db, ws, tag)
-    kinds = {k.rsplit(":", 2)[-2] + ":" + k.rsplit(":", 1)[-1]: o.attributes.get("line_kind")
+    kinds = {k.rsplit("-", 2)[-2] + ":" + k.rsplit("-", 1)[-1]: o.attributes.get("line_kind")
              for k, o in objects(db, ws).items() if o.type == "Serial Line"}
     assert kinds["SCSPARCSIPMXA001:4003"] == "Multi-channel controller"     # `channel:` on two devices
     assert kinds["SCSPARCSIPMXA001:4001"] == "Single device"
@@ -158,17 +158,17 @@ def test_what_kind_of_line_it_is_comes_from_the_keys_its_devices_use(db, world, 
 def test_a_serial_block_is_an_endpoint_and_gives_the_line_its_baud_rate(db, world, tag):
     _, _, (ws, _) = world
     run(db, ws, tag)
-    line = objects(db, ws)[f"{tag}:LINE:SCELIMXA16001:4005"]
+    line = objects(db, ws)[f"{tag}-LINE-SCELIMXA16001-4005"]
     assert line.attributes["baud"] == 9600
-    assert (f"{tag}:DEV:diag-tml:SCN01:MOT01", "on line", line.key) in edges(db, ws)
+    assert (f"{tag}-DEV-diag-tml-SCN01-MOT01", "on line", line.key) in edges(db, ws)
 
 
 def test_a_bare_ip_with_a_port_in_moxas_range_is_a_line_and_its_access_point_a_converter(db, world, tag):
     _, _, (ws, _) = world
     run(db, ws, tag)
-    line = f"{tag}:LINE:192.168.192.40:4001"
+    line = f"{tag}-LINE-192.168.192.40-4001"
     assert line in objects(db, ws)
-    ap = objects(db, ws)[f"NET:{ws}:192.168.192.40"]
+    ap = objects(db, ws)[f"NET-{ws}-192.168.192.40"]
     assert ap.attributes["endpoint_kind"] == "Serial converter"
     assert "4001-4999" in ap.attributes["endpoint_kind_source"]
 
@@ -185,28 +185,28 @@ def test_an_access_point_says_what_it_is_and_how_that_was_read(db, world, tag):
     _, _, (ws, _) = world
     run(db, ws, tag)
     objs = objects(db, ws)
-    moxa = objs[f"NET:{ws}:SCSPARCSIPMXA001"].attributes
+    moxa = objs[f"NET-{ws}-SCSPARCSIPMXA001"].attributes
     assert moxa["endpoint_kind"] == "Serial converter" and "`sc`" in moxa["endpoint_kind_source"]
-    assert objs[f"NET:{ws}:PLSPARCLLRFS001"].attributes["endpoint_kind"] == "Host"
+    assert objs[f"NET-{ws}-PLSPARCLLRFS001"].attributes["endpoint_kind"] == "Host"
 
 
 def test_a_kind_somebody_has_set_survives_a_re_read(db, world, tag):
     _, _, (ws, _) = world
     run(db, ws, tag)
-    ap = objects(db, ws)[f"NET:{ws}:SCSPARCSIPMXA001"]
+    ap = objects(db, ws)[f"NET-{ws}-SCSPARCSIPMXA001"]
     ap.attributes = {**ap.attributes, "endpoint_kind": "Instrument"}
     db.commit()
     run(db, ws, tag)
-    assert objects(db, ws)[f"NET:{ws}:SCSPARCSIPMXA001"].attributes["endpoint_kind"] == "Instrument"
+    assert objects(db, ws)[f"NET-{ws}-SCSPARCSIPMXA001"].attributes["endpoint_kind"] == "Instrument"
 
 
 def test_an_ioc_that_names_a_host_runs_on_it_and_one_that_names_a_server_only_connects(db, world, tag):
     _, _, (ws, _) = world
     run(db, ws, tag)
     e = edges(db, ws)
-    assert (f"{tag}:IOC:llrfs01", "runs on", f"NET:{ws}:PLSPARCLLRFS001") in e
-    assert (f"{tag}:IOC:vac-gunvpc", "connects to", f"NET:{ws}:SCSPARCSIPMXA001") in e
-    assert not [k for k in e if k[0] == f"{tag}:IOC:vac-gunvpc" and k[1] == "runs on"]
+    assert (f"{tag}-IOC-llrfs01", "runs on", f"NET-{ws}-PLSPARCLLRFS001") in e
+    assert (f"{tag}-IOC-vac-gunvpc", "connects to", f"NET-{ws}-SCSPARCSIPMXA001") in e
+    assert not [k for k in e if k[0] == f"{tag}-IOC-vac-gunvpc" and k[1] == "runs on"]
 
 
 # --- the IT equipment behind a hostname ------------------------------------------------------------
@@ -221,15 +221,15 @@ def test_a_converter_a_host_and_a_console_are_made_in_the_it_workspace_and_flagg
     cat, it, (ws, _) = world
     run(db, ws, tag, it=it)
     made = objects(db, it)
-    assert made["HOST:scsparcsipmxa001.lnf.infn.it"].type == "Serial Converter"
-    assert made["HOST:plsparcllrfs001.lnf.infn.it"].type == "Server"
-    assert made["HOST:pwsparcco001.lnf.infn.it"].type == "Workstation"
-    assert made["HOST:pwsparcco001.lnf.infn.it"].attributes["workstation_role"] == "Operator console"
-    assert made["HOST:scelimxa16001.int.eli-np.ro"].attributes["fqdn"] == "scelimxa16001.int.eli-np.ro"
+    assert made["HOST-scsparcsipmxa001.lnf.infn.it"].type == "Serial Converter"
+    assert made["HOST-plsparcllrfs001.lnf.infn.it"].type == "Server"
+    assert made["HOST-pwsparcco001.lnf.infn.it"].type == "Workstation"
+    assert made["HOST-pwsparcco001.lnf.infn.it"].attributes["workstation_role"] == "Operator console"
+    assert made["HOST-scelimxa16001.int.eli-np.ro"].attributes["fqdn"] == "scelimxa16001.int.eli-np.ro"
     assert all(a.is_global and a.workspace_id == it for a in made.values())
     assert all(a.attributes["argus_keywords"] == ["inferred"] for a in made.values())
     # the catalogue's types, from the shared set
-    assert made["HOST:scsparcsipmxa001.lnf.infn.it"].schema_uid == at.type_uid(cat, "Serial Converter")
+    assert made["HOST-scsparcsipmxa001.lnf.infn.it"].schema_uid == at.type_uid(cat, "Serial Converter")
 
 
 def test_a_bare_ip_names_nothing_so_no_equipment_is_invented_for_it(db, world, tag):
@@ -241,38 +241,38 @@ def test_a_bare_ip_names_nothing_so_no_equipment_is_invented_for_it(db, world, t
 def test_the_access_point_is_implemented_by_the_equipment_and_stays_a_beamline_object(db, world, tag):
     _, it, (ws, _) = world
     run(db, ws, tag, it=it)
-    assert (f"NET:{ws}:SCSPARCSIPMXA001", "implemented by", "HOST:scsparcsipmxa001.lnf.infn.it") in edges(db, ws)
-    assert objects(db, ws)[f"NET:{ws}:SCSPARCSIPMXA001"].workspace_id == ws
+    assert (f"NET-{ws}-SCSPARCSIPMXA001", "implemented by", "HOST-scsparcsipmxa001.lnf.infn.it") in edges(db, ws)
+    assert objects(db, ws)[f"NET-{ws}-SCSPARCSIPMXA001"].workspace_id == ws
 
 
 def test_a_host_two_beamlines_reach_is_one_object(db, world, tag):
     _, it, (a, b) = world
     run(db, a, tag, it=it)
     run(db, b, f"{tag}B", it=it)
-    converters = [o for o in objects(db, it).values() if o.key == "HOST:scsparcsipmxa001.lnf.infn.it"]
+    converters = [o for o in objects(db, it).values() if o.key == "HOST-scsparcsipmxa001.lnf.infn.it"]
     assert len(converters) == 1
     for ws in (a, b):
-        assert (f"NET:{ws}:SCSPARCSIPMXA001", "implemented by", "HOST:scsparcsipmxa001.lnf.infn.it") in edges(db, ws)
+        assert (f"NET-{ws}-SCSPARCSIPMXA001", "implemented by", "HOST-scsparcsipmxa001.lnf.infn.it") in edges(db, ws)
 
 
 def test_the_equipment_is_visible_from_every_beamline_and_editable_only_in_the_it_workspace(db, world, tag):
     from app.services.visibility import asset_visible_in
     _, it, (a, b) = world
     run(db, a, tag, it=it)
-    box = objects(db, it)["HOST:scsparcsipmxa001.lnf.infn.it"]
+    box = objects(db, it)["HOST-scsparcsipmxa001.lnf.infn.it"]
     assert asset_visible_in(box, a) and asset_visible_in(box, b)
 
 
 def test_running_it_twice_changes_nothing_and_keeps_what_a_person_added(db, world, tag):
     _, it, (ws, _) = world
     run(db, ws, tag, it=it)
-    box = objects(db, it)["HOST:scsparcsipmxa001.lnf.infn.it"]
+    box = objects(db, it)["HOST-scsparcsipmxa001.lnf.infn.it"]
     box.attributes = {**box.attributes, "serial": "MX-12345", "n_serial_ports": 16}
     db.commit()
     before = (set(objects(db, ws)), set(objects(db, it)), edges(db, ws))
     run(db, ws, tag, it=it)
     assert (set(objects(db, ws)), set(objects(db, it)), edges(db, ws)) == before
-    kept = objects(db, it)["HOST:scsparcsipmxa001.lnf.infn.it"].attributes
+    kept = objects(db, it)["HOST-scsparcsipmxa001.lnf.infn.it"].attributes
     assert kept["serial"] == "MX-12345" and kept["n_serial_ports"] == 16
 
 
@@ -303,31 +303,31 @@ def test_every_relation_the_it_layer_writes_means_something_to_a_failure(db, wor
 def test_a_stopped_converter_blinds_the_lines_and_devices_behind_it_and_no_more(db, world, tag):
     _, it, (ws, _) = world
     run(db, ws, tag, it=it)
-    result = impact_of(db, ws, "HOST:scsparcsipmxa001.lnf.infn.it")
+    result = impact_of(db, ws, "HOST-scsparcsipmxa001.lnf.infn.it")
     reached = {a["key"] for a in result["affected"]}
-    assert {f"{tag}:DEV:vac-gunvpc:GUNSIP01", f"{tag}:DEV:vac-kly01:W1KSIP03",
-            f"{tag}:LINE:SCSPARCSIPMXA001:4003"} <= reached
-    assert f"{tag}:DEV:diag-tml:SCN01:MOT01" not in reached           # another converter's
+    assert {f"{tag}-DEV-vac-gunvpc-GUNSIP01", f"{tag}-DEV-vac-kly01-W1KSIP03",
+            f"{tag}-LINE-SCSPARCSIPMXA001-4003"} <= reached
+    assert f"{tag}-DEV-diag-tml-SCN01-MOT01" not in reached           # another converter's
     assert set(result["by_loss"]) == {"control"}
 
 
 def test_two_lost_readouts_on_one_line_point_at_the_line_before_the_converter_when_a_neighbour_answers(db, world, tag):
     _, it, (ws, _) = world
     run(db, ws, tag, it=it)
-    one, two = f"{tag}:DEV:vac-gunvpc:GUNSIP01", f"{tag}:DEV:vac-gunvpc:GUNSIP02"
-    healthy = f"{tag}:DEV:vac-kly01:W1KSIP03"          # same converter, another port: it answers
+    one, two = f"{tag}-DEV-vac-gunvpc-GUNSIP01", f"{tag}-DEV-vac-gunvpc-GUNSIP02"
+    healthy = f"{tag}-DEV-vac-kly01-W1KSIP03"          # same converter, another port: it answers
     result = root_causes(db, ws, [one, two], healthy=[healthy], symptom_kind={one: "control", two: "control"})
     ranked = [c["key"] for c in result["candidates"] if c["fit"] == 1.0]
-    assert f"{tag}:LINE:SCSPARCSIPMXA001:4003" in ranked or f"{tag}:IOC:vac-gunvpc" in ranked
+    assert f"{tag}-LINE-SCSPARCSIPMXA001-4003" in ranked or f"{tag}-IOC-vac-gunvpc" in ranked
     refuted = {c["key"] for c in result["candidates"] if c["contradicted_by"]}
-    assert "HOST:scsparcsipmxa001.lnf.infn.it" in refuted or f"NET:{ws}:SCSPARCSIPMXA001" in refuted
+    assert "HOST-scsparcsipmxa001.lnf.infn.it" in refuted or f"NET-{ws}-SCSPARCSIPMXA001" in refuted
 
 
 def test_a_line_is_carried_by_the_converter_and_by_the_hops_a_person_adds(db, world, tag):
     _, it, (ws, _) = world
     run(db, ws, tag, it=it)
-    conv = "HOST:scsparcsipmxa001.lnf.infn.it"
-    line3, line1 = f"{tag}:LINE:SCSPARCSIPMXA001:4003", f"{tag}:LINE:SCSPARCSIPMXA001:4001"
+    conv = "HOST-scsparcsipmxa001.lnf.infn.it"
+    line3, line1 = f"{tag}-LINE-SCSPARCSIPMXA001-4003", f"{tag}-LINE-SCSPARCSIPMXA001-4001"
     e = edges(db, ws)
     assert (line3, "carried by", conv) in e and (line1, "carried by", conv) in e
 
@@ -346,8 +346,8 @@ def test_a_line_is_carried_by_the_converter_and_by_the_hops_a_person_adds(db, wo
                             relation_type="carried by"))
     db.flush()
     reached = {a["key"] for a in impact_of(db, ws, hops["SW"].key)["affected"]}
-    assert {line3, line1, f"{tag}:DEV:vac-gunvpc:GUNSIP01", f"{tag}:DEV:vac-kly01:W1KSIP03"} <= reached
-    assert f"{tag}:DEV:diag-tml:SCN01:MOT01" not in reached
-    one, two = f"{tag}:DEV:vac-gunvpc:GUNSIP01", f"{tag}:DEV:vac-kly01:W1KSIP03"
+    assert {line3, line1, f"{tag}-DEV-vac-gunvpc-GUNSIP01", f"{tag}-DEV-vac-kly01-W1KSIP03"} <= reached
+    assert f"{tag}-DEV-diag-tml-SCN01-MOT01" not in reached
+    one, two = f"{tag}-DEV-vac-gunvpc-GUNSIP01", f"{tag}-DEV-vac-kly01-W1KSIP03"
     top = root_causes(db, ws, [one, two], symptom_kind={one: "control", two: "control"})["candidates"]
     assert [c["key"] for c in top if c["fit"] == 1.0][0] in {conv, hops["SW"].key, hops["CAB"].key}

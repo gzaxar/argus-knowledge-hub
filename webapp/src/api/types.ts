@@ -499,6 +499,7 @@ export interface Epik8sImportConfigParams {
   create_missing_nodes?: boolean;
   infer_elements?: boolean;
   infer_controllers?: boolean;
+  clear_previous?: boolean;
   it_workspace?: string | null;
   link_inventory?: boolean;
   ai_unrecognised?: boolean;

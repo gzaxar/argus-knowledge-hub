@@ -96,7 +96,7 @@ Objects of the hub's own catalogue types, not types of its own. Seed them first 
 `backend/scripts/seed_asset_types.py`; `push` says so if the workspace has none.
 
 - **A device is a `Control Device`**, under the key the hub's import gives it
-  (`SPARC:DEV:histar:GUNQUA01`) and the same uid, so the two tools write to one object
+  (`SPARC-DEV-histar-GUNQUA01`) and the same uid, so the two tools write to one object
   instead of two trees nobody reconciles. The class of hardware is a value it carries
   (`device_class`), not a type. There is no `Power Supply` type made by this tool.
 - **A device the import already made** gains only what your review adds: `device_class`,

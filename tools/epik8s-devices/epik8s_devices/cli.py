@@ -130,16 +130,21 @@ IOC = "IOC"
 REVIEW_KEYS = ("device_class", "element", "vendor", "model_code", "argus_keywords")
 
 
-def object_key(row: dict) -> str:
-    """The key the hub's own configuration import gives the same thing, so the two
-    write to one object rather than building two trees nobody reconciles."""
+def object_identity(row: dict) -> str:
+    """What the hub's own configuration import derives the uid from, so the two write
+    to one object rather than building two trees nobody reconciles."""
     tag, ioc, name = row["beamline"], row["ioc"], row["name"]
     return f"{tag}:IOC:{ioc}" if _is_ioc_row(row) else f"{tag}:DEV:{ioc}:{name}"
 
 
-def object_uid(workspace: str, key: str) -> str:
+def object_key(row: dict) -> str:
+    """The key the hub's import shows for the same thing (services/epik8s_import.py, public_key)."""
+    return object_identity(row).replace(":", "-")
+
+
+def object_uid(workspace: str, identity: str) -> str:
     """Deterministic, and the same as the hub's import derives (services/epik8s_import.py)."""
-    return "epik8s-" + hashlib.sha1(f"{workspace}:{key}".encode()).hexdigest()[:24]
+    return "epik8s-" + hashlib.sha1(f"{workspace}:{identity}".encode()).hexdigest()[:24]
 
 
 def _is_ioc_row(row: dict) -> bool:
@@ -233,7 +238,7 @@ def cmd_push(args) -> int:
     created = updated = related = skipped = failed = 0
     for row in rows:
         key = object_key(row)
-        uid = object_uid(workspace, key)
+        uid = object_uid(workspace, object_identity(row))
         ioc_row = _is_ioc_row(row)
         try:
             existing = hub.get_asset(uid)

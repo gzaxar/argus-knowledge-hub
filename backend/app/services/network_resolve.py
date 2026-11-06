@@ -100,7 +100,7 @@ class NetworkIndex:
         self.by_ip: dict[str, list[Asset]] = {}
         self.by_mac: dict[str, list[Asset]] = {}
 
-        for asset in db.scalars(select(Asset).where(Asset.workspace_id == workspace_id)):
+        for asset in db.scalars(select(Asset).where(Asset.workspace_id == workspace_id, Asset.deleted_at.is_(None))):
             attributes = asset.attributes or {}
 
             names = {short_host(asset.name or "")}
