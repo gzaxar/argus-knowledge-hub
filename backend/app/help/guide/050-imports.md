@@ -71,7 +71,8 @@ with or without inference:
 - The channel gets a **Power Supply** record (one already held under the channel's name is reused), and each
   magnet is linked to it with `powers`. The magnet's page then shows its supply and channel.
 - With no list, a channel of a magnet IOC (`devgroup: mag`) powers the magnet of its own name, if the workspace
-  has one.
+  has one. Channels left with no magnet are listed together in the import's messages. A channel spelt differently
+  from its magnet (`CHHTL001`, `CHTL001`) needs a list, or the same name in both.
 - Magnets are found by name among the beam elements, the beam model's first. A name that matches nothing, or
   several, is reported in the import's messages and no magnet is invented.
 - With a list, the file decides: a magnet taken off the list loses its `powers` link at the next import.
