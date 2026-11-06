@@ -105,6 +105,7 @@ and evidence, not only fluency and speed.
 | Questions work, but nothing written is found | an embedding model is set and the index has been built |
 | A new document is not found | it is published; the index has run since (or press *Update the index*); you may read it; it is not *riservato* (unless allowed) |
 | Empty or cut-short answers | the endpoint's errors on this page, and the output-token limit |
+| Ask says the model *kept repeating* itself, or *had not finished* | ARGUS stops a model that repeats the same words, asks it once more at its own temperature with thinking off, and stops any answer past the model's time limit (280 s unless set). Reword the question, or choose another chat model |
 | A rework says the assistant *kept reasoning* | a model for structured work that does not reason, or that model's settings (*Test* it) |
 | Photos of nameplates fail | a vision model is set and the endpoint serves it |
 | Dictation fails | a speech model is set and the endpoint serves `/audio/transcriptions` |

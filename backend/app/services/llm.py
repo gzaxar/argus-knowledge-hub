@@ -270,6 +270,33 @@ class LLMOvertime(LLMError):
         self.model, self.reasoning_chars, self.limit_s = model, reasoning_chars, limit_s
 
 
+class LLMRepeating(LLMError):
+    """A model caught writing the same words over and over: it would go on until someone stopped it."""
+
+
+class _RepeatWatch:
+    """Notices a stream going round in circles: its end is the same block several times over, word for word.
+    A long table is not that (its rows differ). A loop longer than the window is left to the time limit."""
+
+    WINDOW, NEEDLE, COPIES, AT_LEAST, EVERY = 8000, 120, 4, 800, 200
+
+    def __init__(self) -> None:
+        self.tail, self.unread = "", 0
+
+    def feed(self, text: str) -> bool:
+        self.tail = (self.tail + text)[-self.WINDOW:]
+        self.unread += len(text)
+        if self.unread < self.EVERY or len(self.tail) < self.AT_LEAST:
+            return False
+        self.unread = 0
+        at = self.tail.rfind(self.tail[-self.NEEDLE:], 0, len(self.tail) - 1)
+        if at < 0:
+            return False
+        period = len(self.tail) - self.NEEDLE - at
+        copies = max(self.COPIES, -(-self.AT_LEAST // period))
+        return period * copies <= len(self.tail) and self.tail[-period * copies:] == self.tail[-period:] * copies
+
+
 def _collect(endpoint: Endpoint, resp, started: float, model: str,
              limit: int) -> tuple[str, Optional[str], Optional[str], Optional[dict], int]:
     """(content, finish reason, model that answered, usage, characters of reasoning) of a streamed answer — or of
@@ -475,31 +502,44 @@ def converse(endpoint: Endpoint, messages: list[dict], tools: Optional[list[dict
         raise LLMError("The endpoint's reply was not in the expected shape.") from e
 
 
-def converse_stream(endpoint: Endpoint, messages: list[dict], tools: Optional[list[dict]] = None) -> Iterator[tuple[str, object]]:
+def converse_stream(endpoint: Endpoint, messages: list[dict], tools: Optional[list[dict]] = None,
+                    fresh: bool = False) -> Iterator[tuple[str, object]]:
     """One turn of a tool-calling conversation, as it is written.
 
     Yields ("reasoning", text) while a reasoning model thinks, ("content", text) as the answer is
     written, and last ("message", message): the assistant message assembled from the pieces, in the shape
     `converse` returns, tool calls included. A tool call arrives in fragments (its name, then its
     arguments a few characters at a time) keyed by index, and is only usable once the stream ends.
+
+    Raises LLMRepeating when the model goes round in circles and LLMOvertime past the model's time limit, so
+    neither runs until someone presses Stop. `fresh`: the second try after a loop, at the model's own temperature
+    (a reasoning model's thinking runs on at 0) and told not to think, as its settings allow.
     """
     from app.services import usage
     # The tokens used come in a last chunk when asked for (OpenAI, vLLM); a provider that does not know the
     # option refuses it, and is asked again without.
     payload: dict = {"model": endpoint.model, "messages": messages, **endpoint.budget(),
-                     **endpoint.temperature(endpoint.model, 0), "stream": True,
+                     **endpoint.temperature(endpoint.model, None if fresh else 0), "stream": True,
                      "stream_options": {"include_usage": True}}
+    if fresh and endpoint.settings().no_thinking:
+        payload.update(NO_THINKING)
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
     started = time.monotonic()
+    limit = endpoint.settings().time_limit_s or STRUCTURED_DEADLINE_SECONDS
     try:
-        resp = _post("chat", endpoint.model, f"{endpoint.root}/chat/completions", headers=endpoint.headers(),
-                     json=payload, stream=True, timeout=COMPLETION_TIMEOUT_SECONDS)
-        if resp.status_code in (400, 422) and "stream_options" in (resp.text or ""):
-            payload.pop("stream_options")
+        for _ in range(3):                             # each option the provider refuses is dropped in turn
             resp = _post("chat", endpoint.model, f"{endpoint.root}/chat/completions", headers=endpoint.headers(),
                          json=payload, stream=True, timeout=COMPLETION_TIMEOUT_SECONDS)
+            if resp.status_code not in (400, 422):
+                break
+            if "stream_options" in payload and "stream_options" in (resp.text or ""):
+                payload.pop("stream_options")
+            elif "chat_template_kwargs" in payload:
+                payload.pop("chat_template_kwargs")
+            else:
+                break
     except requests.RequestException as e:
         raise LLMError(f"Could not reach {endpoint.root}: {e}") from e
     if resp.status_code >= 400:
@@ -511,8 +551,12 @@ def converse_stream(endpoint: Endpoint, messages: list[dict], tools: Optional[li
     thought: list[str] = []
     calls: dict[int, dict] = {}
     reported: Optional[dict] = None
+    thought_watch, content_watch = _RepeatWatch(), _RepeatWatch()
     try:
         for line in resp.iter_lines(decode_unicode=True):
+            if time.monotonic() - started > limit:
+                raise LLMOvertime(f"{endpoint.model} had not finished after {limit} s and was stopped",
+                                  endpoint.model, sum(map(len, thought)), limit)
             if not line or not line.startswith("data:"):
                 continue
             data = line[5:].strip()
@@ -532,9 +576,13 @@ def converse_stream(endpoint: Endpoint, messages: list[dict], tools: Optional[li
             if thinking:
                 thought.append(thinking)
                 yield "reasoning", thinking
+                if thought_watch.feed(thinking):
+                    raise LLMRepeating(f"{endpoint.model} kept repeating the same reasoning and was stopped")
             if delta.get("content"):
                 content.append(delta["content"])
                 yield "content", delta["content"]
+                if content_watch.feed(delta["content"]):
+                    raise LLMRepeating(f"{endpoint.model} kept repeating the same text and was stopped")
             for piece in delta.get("tool_calls") or []:
                 call = calls.setdefault(piece.get("index", 0),
                                         {"id": None, "type": "function", "function": {"name": "", "arguments": ""}})
