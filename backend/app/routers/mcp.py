@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.auth import Identity, PatIdentity, get_identity, grants_of, require_permission
 from app.db import get_db
 from app.models.workspace import Workspace
-from app.services.mcp_tools import call, catalogue
+from app.services.mcp_tools import LOOKUP_GUIDE, call, catalogue
 from app.services.notify import web_url
 from app.services.permissions import resolve_permission
 from app.services.visibility import set_current_grants
@@ -38,6 +38,7 @@ SERVER_INFO = {"name": "argus-knowledge-hub", "version": "1.0.0"}
 INSTRUCTIONS = (
     "The structured knowledge of an accelerator: equipment, the work done on it, and "
     "the documentation that covers it.\n\n"
+    + LOOKUP_GUIDE +
     "Prefer graph_neighbours for anything that spans records — what has gone wrong "
     "with a piece of equipment before, which procedure covers it, what it depends on. "
     "Searching text alone will miss those, because the answer is not in one document.\n"

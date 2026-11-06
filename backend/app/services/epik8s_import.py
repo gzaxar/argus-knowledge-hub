@@ -360,6 +360,8 @@ class _Importer:
         self._matcher = None
         # Key -> the identity that took it in this run, so two can't silently become one record.
         self._identities: dict = {}
+        # Magnet channels that end up powering no magnet: reported together once the file is read.
+        self._unlinked: list = []
         # Records this file states but the run reaches without writing them.
         self._declared: set = set()
         self._addresses: set = set()
@@ -411,7 +413,7 @@ class _Importer:
             "addresses_unresolved": 0,
             "relations": 0,
             "inferred_controllers": 0, "linked_to_inventory": 0, "ports": 0,
-            "magnets_linked": 0, "magnets_unresolved": 0,
+            "magnets_linked": 0, "magnets_unresolved": 0, "magnet_channels_unlinked": 0,
         }
         # What this run created, so re-reaching one is not counted as a match.
         self.created_access_points: set[str] = set()
@@ -713,7 +715,12 @@ class _Importer:
                                          f"{'several' if rows else 'no'} beam element{'s' if rows else ''} "
                                          f"of that name: not linked.")
         if not stated and not magnets:
-            return False                                # not a magnet this workspace knows: as before
+            # Not a magnet this workspace knows: the rules may still infer one. If not, the channel is left
+            # with no magnet, which is said rather than left for someone to notice.
+            inference = infer_device(ioc, device) if self.infer else None
+            if inference is None or not inference.element_type:
+                self._unlinked.append(name)
+            return False
         if PSU not in self.schemas:
             _note(self.job, self.db, f"{control.key}: no supply made, this workspace cannot use the "
                                      f"{PSU} type. {_seed_hint(self.workspace_id)}")
@@ -726,16 +733,18 @@ class _Importer:
         for magnet in magnets:
             self.relate(supply, magnet, "powers")
             self.counts["magnets_linked"] += 1
-        if stated:
-            keep = {w.lower() for w in stated}
-            links = self.db.execute(select(Relation, Asset.key, Asset.name).join(
-                Asset, Asset.uid == Relation.to_asset_uid).where(
-                Relation.workspace_id == self.workspace_id, Relation.from_asset_uid == supply.uid,
-                Relation.relation_type == "powers")).all()
-            for link, key, target in links:
-                if target.lower() not in keep:
-                    self.db.delete(link)
-                    _note(self.job, self.db, f"{supply.key} no longer powers {key}: the file does not list it.")
+        keep = {w.lower() for w in stated}
+        # This import's own links only: one a person asserted is the ledger's, and would come back.
+        links = self.db.execute(select(Relation, Asset.key, Asset.name, Asset.deleted_at).join(
+            Asset, Asset.uid == Relation.to_asset_uid).where(
+            Relation.workspace_id == self.workspace_id, Relation.from_asset_uid == supply.uid,
+            Relation.relation_type == "powers", Relation.derivation.is_(None))).all()
+        for link, key, target, removed in links:
+            if removed is not None:                     # what a supply powers is never a removed record
+                self.db.delete(link)
+            elif stated and target.lower() not in keep:
+                self.db.delete(link)
+                _note(self.job, self.db, f"{supply.key} no longer powers {key}: the file does not list it.")
         return True
 
     def _supply_record(self, control: Asset, device: dict, ioc: dict, name: str) -> Asset:
@@ -1186,6 +1195,11 @@ class _Importer:
             self._wire_plant(tag)
         self._gating(tag)
         self._cross_references(tag)
+        if self._unlinked:
+            self.counts["magnet_channels_unlinked"] = len(self._unlinked)
+            _note(self.job, self.db,
+                  f"{len(self._unlinked)} magnet channels power no magnet: no beam element has the channel's name "
+                  f"and no `magnets:` list names one: {', '.join(sorted(self._unlinked))}.")
 
         self.db.commit()
 

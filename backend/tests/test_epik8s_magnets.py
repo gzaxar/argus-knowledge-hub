@@ -176,3 +176,40 @@ def test_an_inferred_twin_goes_when_the_file_is_read_again_with_clear(db, split,
     assert twin.deleted_at is not None
     assert "QUAA301" in powered_by(db, db.get(Asset, _uid(ws, f"{tag}:AST:danfysik:QUAA301")))
     assert relates(db, db.get(Asset, _uid(ws, f"{tag}:AST:danfysik:QUAA301")), model, "powers")
+
+
+def test_channels_left_with_no_magnet_are_reported_together(db, split, tag):
+    _, ws = split
+    element(db, ws, "CHHA1002", "Corrector")
+    element(db, ws, "QUAA101")
+    it, job = run(db, ws, tag)
+    db.refresh(job)
+    assert it.counts["magnet_channels_unlinked"] == 1
+    said = [w for w in job.warnings if "power no magnet" in w]
+    assert len(said) == 1 and "NOMAGNET" in said[0] and "CHHA1002" not in said[0]
+
+
+def test_a_channel_the_rules_turn_into_a_magnet_is_not_reported(db, split, tag):
+    _, ws = split
+    text = CONFIG.replace("- {{name: NOMAGNET}}", "- {{name: QUATT001}}")
+    it, job = run(db, ws, tag, infer=True, text=text)
+    db.refresh(job)
+    assert not any("QUATT001" in w and "power no magnet" in w for w in job.warnings)
+
+
+def test_a_supply_loses_its_link_to_a_removed_record_and_keeps_a_persons(db, split, tag):
+    from datetime import datetime, timezone
+    _, ws = split
+    element(db, ws, "CHHA1002", "Corrector")
+    run(db, ws, tag)
+    supply = db.get(Asset, _uid(ws, f"{tag}:AST:danfysik:CHHA1002"))
+    twin = element(db, ws, "OLDTWIN", "Corrector")
+    asserted = element(db, ws, "ASSERTED", "Corrector")
+    twin_link = Relation(workspace_id=ws, from_asset_uid=supply.uid, to_asset_uid=twin.uid, relation_type="powers")
+    db.add_all([twin_link, Relation(workspace_id=ws, from_asset_uid=supply.uid, to_asset_uid=asserted.uid,
+                                    relation_type="powers", derivation="ledger")])
+    twin.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    run(db, ws, tag)
+    assert not relates(db, supply, twin, "powers")
+    assert relates(db, supply, asserted, "powers")

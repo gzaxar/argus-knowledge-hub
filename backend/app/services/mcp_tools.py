@@ -83,6 +83,9 @@ def _asset_summary(asset: Asset) -> dict:
     }
     if asset.record_status != "Active":       # said, so an answer never presents a retired record as current
         out["status"] = asset.record_status
+    model = (asset.attributes or {}).get("model_name")
+    if model:                                 # where a beam element sits: one model is one line or ring
+        out["model"] = model
     return out
 
 
@@ -121,6 +124,17 @@ def _singular(word: str) -> str:
     return w
 
 
+# Words a question is made of, not what it is about: "dipoles in the accumulator" asks about two things.
+_NOT_SEARCHED = frozenset({"the", "and", "for", "with", "from", "all", "any", "nel", "nella", "dell", "della", "del",
+                           "dei", "degli", "delle", "con", "per"})
+
+
+def _search_words(needle: str) -> list[str]:
+    """The words of a query that has several; none for a single word, which is matched as it is."""
+    words = [w for w in re.split(r"\s+", needle) if len(w) > 2 and w not in _NOT_SEARCHED]
+    return words if len(needle.split()) > 1 else []
+
+
 def _types(db: Session, workspace_id: str) -> list[dict]:
     from app.services.type_catalogue import catalogue as type_catalogue
     return type_catalogue(db, workspace_id, classes=False)["types"]
@@ -150,6 +164,27 @@ def _mentioning(types: list[dict], word: str) -> list[dict]:
     return [{"name": t["name"], "description": _first_sentence(t["description"]),
              "records": t["records_with_subtypes"]}
             for t in types if re.search(rf"\b{w}(e?s)?\b", _first_sentence(t["description"]), re.I)]
+
+
+# How to look equipment up and count it. Said to Ask ARGUS's model and to an MCP client's: the same records
+# have to give the same answer whoever asks.
+LOOKUP_GUIDE = (
+    "Names here are codes: equipment is called things like FI4-B-CAM-VIS-001, and the "
+    "word somebody uses ('camera', 'quadrupole') is usually the type rather than the "
+    "name. If a search finds nothing, try the word as a type, or a shorter fragment, "
+    "before concluding there is none.\n"
+    "A kind of equipment is often several types, organised in a tree, and none of them may "
+    "carry the word used in the question. When you are not sure which types a word means, "
+    "call list_types (with the word, or with nothing to see every type), choose the types "
+    "whose descriptions match, and search_objects with types=[...]. For a question about "
+    "what there is or how many, give the total and the count per type from by_type, not "
+    "just the objects listed. List at most 40 records; when there are more, say how many "
+    "more there are rather than stopping part way.\n"
+    "Count what was asked about. A magnet, its power supply and the control channel of that supply are three "
+    "different records, and one supply may power several magnets (the relation `powers`): how many dipoles "
+    "there are is the number of Dipole records, however few supplies feed them. A beam element's `model` says "
+    "which line or ring it belongs to.\n"
+)
 
 
 def search_objects(db: Session, workspace_id: str, query: str = "",
@@ -195,13 +230,20 @@ def search_objects(db: Session, workspace_id: str, query: str = "",
     # about cameras concludes there are none. So does a type above it: "vacuum pumps" are the ion,
     # turbo and primary pumps.
     single = _singular(needle)
+    # A query of several words: each must match, by name, key or type ("accumulator dipole"), or the whole of it.
+    words = [(w, _singular(w), _with_subtypes(catalogue, _named(catalogue, w))) for w in _search_words(needle)]
+
+    def is_of_kind(a: Asset, word_single: str, named: set) -> bool:
+        return word_single in (a.type or "").lower() or a.type in named
+
+    def matches(a: Asset, word: str, word_single: str, named: set) -> bool:
+        return word in (a.name or "").lower() or word in (a.key or "").lower() or is_of_kind(a, word_single, named)
+
     rows = [
         a for a in db.scalars(stmt)
         if not needle
-        or needle in (a.name or "").lower()
-        or needle in (a.key or "").lower()
-        or single in (a.type or "").lower()
-        or a.type in by_word
+        or matches(a, needle, single, by_word)
+        or (words and all(matches(a, *w) for w in words))
     ]
     # This workspace's own first: the shared catalogue's records are there to be referenced, not to bury
     # the answer about this beamline. Then by key, so that pages of the same query never overlap or skip.
@@ -216,7 +258,8 @@ def search_objects(db: Session, workspace_id: str, query: str = "",
     }
     if unknown:
         out["unknown_types"] = unknown
-    by_type = sum(1 for a in rows if a.type in by_word or single in (a.type or "").lower())
+    by_type = sum(1 for a in rows if is_of_kind(a, single, by_word)
+                  or any(is_of_kind(a, w[1], w[2]) for w in words))
     if needle and not by_type and wanted is None:
         # No object matched by its type, so what matched (if anything) matched by name only: the kind may
         # still be here under the names the catalogue uses ('magnet' → Quadrupole, "A focusing magnet"), and
@@ -559,12 +602,16 @@ TOOLS: list[dict[str, Any]] = [
         "name": "search_objects",
         "description": "Search equipment (objects) by name, key or type. A type includes the types "
                        "below it. Returns the total, the count per type (by_type) and the first "
-                       "objects (uid, key, name, type).",
+                       "objects (uid, key, name, type; a beam element also its model). Names are codes, so "
+                       "'dipole' is usually a type: for what there is or how many, search by type and answer "
+                       "from total and by_type, counting the records of that type and not the channel or "
+                       "the supply that drives them.",
         "handler": search_objects,
         "inputSchema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Text to look for in the name, key or type"},
+                "query": {"type": "string", "description": "Text to look for in the name, key or type. With "
+                                                           "several words each must match: 'accumulator dipole'"},
                 "type": {"type": "string", "description": "Restrict to one object type (and its subtypes)"},
                 "types": {"type": "array", "items": {"type": "string"},
                           "description": "Restrict to several object types (and their subtypes)"},
