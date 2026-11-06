@@ -472,7 +472,7 @@ export function Ask() {
         update((t) => ({ ...t, content: t.content + ev.text }));
         break;
       case "text_reset":
-        update((t) => ({ ...t, content: "" }));
+        update((t) => ({ ...t, content: "", thinking: "" }));
         break;
       case "step_start":
         update((t) => ({

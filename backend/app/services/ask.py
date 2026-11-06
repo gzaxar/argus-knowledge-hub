@@ -15,14 +15,17 @@ The tools are the MCP ones, called in process. The same eight tools an
 external assistant gets, so what is learned here is true there too.
 """
 import json
+import logging
 import re
 import time
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
-from app.services.llm import Endpoint, LLMError, converse, converse_stream
+from app.services.llm import Endpoint, LLMError, LLMRepeating, converse, converse_stream
 from app.services.mcp_tools import BY_NAME, catalogue
+
+log = logging.getLogger(__name__)
 
 # Enough hops for search → open → traverse, and a stop before a confused
 # model spends a workspace's quota going in circles.
@@ -271,10 +274,21 @@ def ask_events(db: Session, workspace_id: str, endpoint: Endpoint, question: str
         if not stream:
             message = converse(endpoint, messages, tools=tools if with_tools else None)
             return message
+        offered = tools if with_tools else None
+        try:
+            return (yield from written(converse_stream(endpoint, messages, tools=offered)))
+        except LLMRepeating as e:
+            # Nothing was looked up or proposed in this turn yet, so it can simply be asked again, once.
+            log.warning("Ask: %s; asking once more", e)
+            yield {"type": "text_reset"}
+            return (yield from written(converse_stream(endpoint, messages, tools=offered, fresh=True)))
+
+    def written(pieces):
+        """The events of one streamed model turn; returns the assistant message."""
         think = _ThinkFilter()
         message: dict = {}
         wrote = False
-        for kind, value in converse_stream(endpoint, messages, tools=tools if with_tools else None):
+        for kind, value in pieces:
             if kind == "reasoning":
                 yield {"type": "thinking", "text": value}
             elif kind == "content":
