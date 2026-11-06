@@ -35,7 +35,7 @@ export function MarkdownView({
 }: {
   markdown: string;
   className?: string;
-  /** Where an inline code span links to, when it names a record (`SPARC:ELM:SBNQUA01`). */
+  /** Where an inline code span links to, when it names a record (`SPARC-ELM-SBNQUA01`). */
   codeLink?: (text: string) => string | undefined;
 }) {
   if (!markdown?.trim()) {

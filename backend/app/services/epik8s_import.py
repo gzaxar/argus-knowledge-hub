@@ -55,6 +55,7 @@ from app.models.asset import Asset, Relation
 from app.models.import_job import ImportJob
 from app.models.import_snapshot import ImportSnapshot
 from app.models.schema import Schema
+from app.models.workspace import Workspace
 from app.services.import_merge import effective_strategy
 from app.services.git_import import (
     _get_file_github,
@@ -110,6 +111,32 @@ def _uid(workspace_id: str, key: str) -> str:
     """Deterministic, so a re-run updates a row instead of adding one."""
     digest = hashlib.sha1(f"{workspace_id}:{key}".encode()).hexdigest()[:24]
     return f"epik8s-{digest}"
+
+
+def public_key(identity: str) -> str:
+    """What people see and type. A `:` reads as a PV name, which a key is not, so the parts
+    of a key are joined with `-`: `BTF-ELM-BPSA31`, `BTF-DEV-libera12-BPSA11`.
+
+    The uid stays derived from the identity (`BTF:ELM:BPSA31`), not from this, so changing how
+    keys are written never changes a record's uid, or what links to it."""
+    return identity.replace(":", "-")
+
+
+def _file_of(source_ref: str) -> tuple[str, str]:
+    """(repository, path) of `repository@revision:path`: which file, whatever the revision.
+    The repository may hold an `@` and a `:` of its own (git@host:group/repo.git)."""
+    rest, _, path = source_ref.rpartition(":")
+    return rest.rpartition("@")[0], path
+
+
+# Provenance, which a re-read always restates: it says where and when a value came from, and is not
+# a value. The job records when each read ran.
+_PROVENANCE = frozenset({"argus_source", "argus_source_ref", "imported_at"})
+
+
+def _same_content(current: Optional[dict], incoming: dict) -> bool:
+    drop = lambda attrs: {k: v for k, v in (attrs or {}).items() if k not in _PROVENANCE}  # noqa: E731
+    return drop(current) == drop(incoming)
 
 
 def _note(job: ImportJob, db: Session, message: str) -> None:
@@ -330,6 +357,11 @@ class _Importer:
         # it, as a proposal to confirm, instead of getting an inferred twin.
         self.link = link_inventory
         self._matcher = None
+        # Key -> the identity that took it in this run, so two can't silently become one record.
+        self._identities: dict = {}
+        # Records this file states but the run reaches without writing them.
+        self._declared: set = set()
+        self._addresses: set = set()
         # Channels no rule recognised, for the AI to propose what they drive: (device, ioc, entry).
         self.unrecognised: list = []
         # The site-wide workspace that holds IT equipment, when there is one. A converter or a
@@ -441,8 +473,23 @@ class _Importer:
 
     # --- objects --------------------------------------------------------
 
-    def upsert(self, type_name: str, key: str, name: str, attributes: dict) -> Asset:
-        uid = _uid(self.workspace_id, key)
+    def _public_key(self, identity: str) -> str:
+        """The key for this identity, refusing two identities that would read the same: with `-`
+        as the separator, IOC `a-b` device `c` and IOC `a` device `b-c` would be one record."""
+        key = public_key(identity)
+        if self._identities.setdefault(key, identity) != identity:
+            raise ValueError(
+                f"“{self._identities[key]}” and “{identity}” would both have the key “{key}”. "
+                f"Rename one of them in the configuration.")
+        return key
+
+    def _count_write(self, changed: bool, restored: bool = False) -> None:
+        kind = "restored" if restored else "updated" if changed else "unchanged"
+        self.counts[f"records_{kind}"] = self.counts.get(f"records_{kind}", 0) + 1
+
+    def upsert(self, type_name: str, identity: str, name: str, attributes: dict) -> Asset:
+        key = self._public_key(identity)
+        uid = _uid(self.workspace_id, identity)
         asset = self.db.get(Asset, uid)
         if asset is None:
             # Object keys are unique across the installation, and these are
@@ -477,13 +524,22 @@ class _Importer:
             )
             self.db.add(asset)
             self.db.flush()
+            self.counts["records_created"] = self.counts.get("records_created", 0) + 1
         else:
-            asset.type = type_name
-            asset.schema_uid = self.schemas[type_name].uid
-            asset.name, asset.attributes = self._merge_stated(asset, name, stamped)
+            new_name, merged = self._merge_stated(asset, name, stamped)
+            restored = asset.deleted_at is not None
+            changed = (restored or asset.key != key or asset.type != type_name
+                       or asset.schema_uid != self.schemas[type_name].uid or asset.name != new_name
+                       or not _same_content(asset.attributes, merged))
+            # What did not change is not written, provenance included: the record then still
+            # names the revision that last changed it, and a new release touches only what it changed.
+            if changed:
+                asset.key, asset.type, asset.schema_uid = key, type_name, self.schemas[type_name].uid
+                asset.name, asset.attributes, asset.deleted_at = new_name, merged, None
+            self._count_write(changed, restored)
         self._snapshot(asset, name, stamped)
         self.db.flush()
-        self.assets[key] = asset
+        self.assets[identity] = asset
         return asset
 
     # Keys the importer owns outright: provenance, which a person never edits.
@@ -539,11 +595,12 @@ class _Importer:
             snap.values = values
             snap.source_ref = self.source_ref
 
-    def upsert_inferred(self, type_name: str, key: str, name: str, attributes: dict) -> Asset:
+    def upsert_inferred(self, type_name: str, identity: str, name: str, attributes: dict) -> Asset:
         """An object the configuration implies rather than states. A person's word outranks a
         guess: what is already on it stays, and inference only fills what is missing, so a
         serial number or a location entered by hand survives every later read."""
-        uid = _uid(self.workspace_id, key)
+        key = self._public_key(identity)
+        uid = _uid(self.workspace_id, identity)
         asset = self.db.get(Asset, uid)
         provenance = {"argus_facility": self.tag, "argus_source": SOURCE,
                       "argus_source_ref": self.source_ref}
@@ -557,11 +614,60 @@ class _Importer:
                           schema_uid=self.schemas[type_name].uid, key=key, name=name,
                           type=type_name, attributes={**attributes, **provenance})
             self.db.add(asset)
+            self.counts["records_created"] = self.counts.get("records_created", 0) + 1
         else:
-            asset.attributes = {**attributes, **(asset.attributes or {}), **provenance}
+            merged = {**attributes, **(asset.attributes or {}), **provenance}
+            restored = asset.deleted_at is not None
+            changed = restored or asset.key != key or not _same_content(asset.attributes, merged)
+            if changed:
+                asset.key, asset.attributes, asset.deleted_at = key, merged, None
+            self._count_write(changed, restored)
         self.db.flush()
-        self.assets[key] = asset
+        self.assets[identity] = asset
         return asset
+
+    def clear_previous(self) -> int:
+        """Retire what an earlier import of this same file made and this one no longer states: a
+        release renames an IOC or changes a prefix, and the old records would otherwise stay beside
+        the new ones. Retired, not erased: tickets and documents keep their links, and a record
+        the file states again comes back with its uid and its history.
+
+        Called only after the whole file was read. A file that yields no IOC at all is far more
+        likely a broken file than a beamline with nothing in it, so nothing is retired then."""
+        if not self.counts["iocs"]:
+            _note(self.job, self.db, "Nothing retired: this file declares no IOC, which looks like a mistake.")
+            return 0
+        workspace = self.db.get(Workspace, self.workspace_id)
+        if workspace is not None and workspace.ledger_only:
+            # There a record retires by a decision with a reason and a person behind it, not by an import.
+            _note(self.job, self.db, "Nothing retired: this workspace is ledger-only, where records "
+                                     "retire through a bulk change.")
+            return 0
+        kept = {asset.uid for asset in self.assets.values()} | self._declared
+        this_file = _file_of(self.source_ref)
+        retired = 0
+        rows = self.db.scalars(select(Asset).where(
+            Asset.workspace_id == self.workspace_id, Asset.deleted_at.is_(None)))
+        for asset in list(rows):
+            attrs = asset.attributes or {}
+            # Compared loosely: tools/epik8s-devices has written this source as `EPIK8s`.
+            if asset.uid in kept or str(attrs.get("argus_source") or "").lower() != SOURCE:
+                continue
+            if _file_of(str(attrs.get("argus_source_ref") or "")) != this_file:
+                continue
+            if asset.type == "Access Point" and str(attrs.get("address") or "").strip().lower() in self._addresses:
+                continue
+            # What this run was not asked to make says nothing about whether it still applies.
+            if not self.infer and "inferred" in (attrs.get("argus_keywords") or []):
+                continue
+            if not self.controllers and asset.type in CONTROLLER_TYPES:
+                continue
+            asset.deleted_at = datetime.now(timezone.utc)
+            retired += 1
+            _note(self.job, self.db, f"Retired {asset.key}: no longer declared by {this_file[1]}.")
+        self.db.flush()
+        self.counts["records_retired"] = retired
+        return retired
 
     def _infer_from(self, inference, control: Asset, relation: str, key_stem: str,
                     label: str, source: dict, zones: list) -> Optional[Asset]:
@@ -802,6 +908,8 @@ class _Importer:
     def relate(self, source: Asset, target: Asset, relation_type: str) -> None:
         if source is None or target is None or source.uid == target.uid:
             return
+        # Whatever this file links is declared by it, however the run reached it.
+        self._declared.update((source.uid, target.uid))
         exists = self.db.scalar(
             select(Relation).where(
                 Relation.workspace_id == self.workspace_id,
@@ -829,8 +937,11 @@ class _Importer:
         order and a location; a second one invented here would split the
         history of the same box in two.
         """
+        # Still used by this file, whichever way it resolves below: clear_previous must not retire it.
+        self._addresses.add(str(address).strip().lower())
         match = self.index.resolve(address)
         if match.found:
+            self._declared.add(match.asset.uid)
             if match.asset.uid in self.created_access_points:
                 self.counts["access_points_reused"] += 1
             else:
@@ -894,10 +1005,11 @@ class _Importer:
                 self.db.flush()
         self._it_equipment(asset, address)
 
-    def _upsert_it(self, type_name: str, key: str, name: str, attributes: dict) -> Asset:
+    def _upsert_it(self, type_name: str, identity: str, name: str, attributes: dict) -> Asset:
         """An object in the site-wide IT workspace. Made once whichever beamline reaches it first;
         what is on it stays, and this only fills what is missing, as for every inference."""
-        uid = _uid(self.it_workspace, key)
+        key = self._public_key(identity)
+        uid = _uid(self.it_workspace, identity)
         asset = self.db.get(Asset, uid)
         provenance = {"argus_source": SOURCE, "argus_source_ref": self.source_ref}
         if asset is None:
@@ -911,7 +1023,9 @@ class _Importer:
                           type=type_name, is_global=True, attributes={**attributes, **provenance})
             self.db.add(asset)
         else:
-            asset.attributes = {**attributes, **(asset.attributes or {}), **provenance}
+            merged = {**attributes, **(asset.attributes or {}), **provenance}
+            if asset.key != key or not _same_content(asset.attributes, merged):
+                asset.key, asset.attributes = key, merged
         self.db.flush()
         return asset
 
@@ -1178,7 +1292,8 @@ class _Importer:
 
             # An IOC that is one unit (a BPM's electronics, an LLRF chassis, a modulator): its
             # channels are that unit's, not more things.
-            unit = infer_ioc(merged) if self.infer else None
+            found = infer_ioc(merged)
+            unit = found if self.infer else None
             unit_asset = None
             if unit is not None:
                 unit_asset = self._infer_from(unit, ioc, "drives", name, name, merged,
@@ -1187,7 +1302,7 @@ class _Importer:
 
             if not merged.get("asset"):
                 _note(self.job, self.db,
-                      f"{tag}:IOC:{name} has no `asset:` link — the control layer does "
+                      f"{public_key(f'{tag}:IOC:{name}')} has no `asset:` link — the control layer does "
                       f"not say which physical unit it drives")
 
             ioc_access = None
@@ -1208,9 +1323,16 @@ class _Importer:
 
             devices = merged.get("devices") or []
             if not devices:
+                if found is not None and found.element_name:
+                    # A BPM IOC with no device list is one monitor, and its prefix is that monitor's
+                    # (`ACC:DIA:LIB02:BPSA31`). It needs a Control Device like any other channel,
+                    # because that is what a lookup of the machine's devices reads.
+                    self._device({"name": found.element_name}, merged, ioc, ioc_access, tag, beamline,
+                                 create_missing, unit=unit, unit_asset=unit_asset, controller=controller,
+                                 pv=_pv_prefix(merged, None))
                 # An IOC with no device list still drives something; the IOC
                 # is the only handle on it.
-                if self.infer and unit is None:
+                elif self.infer and unit is None:
                     self.not_inferred[self._kind_of(merged)] += 1
                 continue
 
@@ -1227,9 +1349,9 @@ class _Importer:
     def _device(self, device: dict, ioc: dict, ioc_asset: Asset,
                 ioc_access: Optional[Asset], tag: str, beamline: str,
                 create_missing: bool, unit=None, unit_asset: Optional[Asset] = None,
-                controller: Optional[Asset] = None) -> None:
+                controller: Optional[Asset] = None, pv: Optional[str] = None) -> None:
         device_name = str(device["name"]).strip()
-        pv = _pv_prefix(ioc, device_name)
+        pv = pv or _pv_prefix(ioc, device_name)
         key = f"{tag}:DEV:{ioc['name']}:{device_name}"
         zones = _as_list(device.get("zones")) or _as_list(ioc.get("zones"))
         address, port = _endpoint_of(device, {})
@@ -1276,6 +1398,10 @@ class _Importer:
             if unit.channel_element:
                 self._infer_channel_element(unit.channel_element, asset, unit_asset, device_name, zones,
                                             f"channel {device_name} of {unit.why}")
+            elif unit.element_name:
+                element = self.assets.get(f"{tag}:ELM:{unit.element_name}")
+                if element is not None:
+                    self.relate(asset, element, "acts on")
         elif self.infer:
             inference = infer_device(ioc, device)
             if inference is None:
@@ -1400,6 +1526,7 @@ def run_epik8s_import(
     link_inventory: bool = False,
     ai_unrecognised: bool = False,
     actor: str = "import",
+    clear_previous: bool = False,
 ):
     """Read one beamline's values.yaml and mirror what it describes."""
     db = SessionLocal()
@@ -1446,6 +1573,10 @@ def run_epik8s_import(
 
         _progress(db, job, "Walking the configuration")
         importer.run(values, create_missing_nodes)
+
+        if clear_previous:
+            _progress(db, job, "Retiring what this file no longer declares")
+            importer.clear_previous()
 
         for asset in importer.assets.values():
             rebuild_asset_relations(db, asset.uid)

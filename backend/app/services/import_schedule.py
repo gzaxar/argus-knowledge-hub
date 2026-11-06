@@ -146,7 +146,8 @@ def start_job(db: Session, config: ImportConfig, identity, add_task: Callable) -
         add_task(run_epik8s_import, job.uid, ws, p["provider"], p["repo_url"], pat, p.get("branch", "main"),
                  p.get("path", "deploy/values.yaml"), merge, p.get("create_missing_nodes", True),
                  p.get("infer_elements", False), p.get("it_workspace"), p.get("infer_controllers", False),
-                 p.get("link_inventory", False), p.get("ai_unrecognised", False), actor_name(identity))
+                 p.get("link_inventory", False), p.get("ai_unrecognised", False), actor_name(identity),
+                 p.get("clear_previous", False))
     else:
         add_task(run_git_import, job.uid, ws, p["provider"], p["repo_url"], pat, p.get("branch", "main"), merge)
     return job

@@ -5120,6 +5120,11 @@
             "title": "Branch",
             "type": "string"
           },
+          "clear_previous": {
+            "default": false,
+            "title": "Clear Previous",
+            "type": "boolean"
+          },
           "create_missing_nodes": {
             "default": true,
             "title": "Create Missing Nodes",
@@ -5208,6 +5213,11 @@
             "default": "main",
             "title": "Branch",
             "type": "string"
+          },
+          "clear_previous": {
+            "default": false,
+            "title": "Clear Previous",
+            "type": "boolean"
           },
           "create_missing_nodes": {
             "default": true,

@@ -91,7 +91,7 @@ class Slice:
         return self.rec(db, f"{self.fac}:POS:{name}")
 
     def dev(self, db, name="GUNSIP01"):
-        return self.rec(db, f"{self.fac}:DEV:vac-gunvpc:{name}")
+        return self.rec(db, f"{self.fac}-DEV-vac-gunvpc-{name}")
 
     def unit(self, db, serial="84321"):
         return self.rec(db, f"{self.fac}INV-{serial}")
