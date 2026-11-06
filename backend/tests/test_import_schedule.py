@@ -148,3 +148,30 @@ def test_someone_no_longer_allowed_to_import_does_not_import_by_a_schedule(wiki,
     _due_now(saved["uid"])
     [result] = sch.tick(SessionLocal)
     assert result["outcome"] == "failed" and "may no longer import here" in result["message"]
+
+
+def test_an_import_that_ended_completed_is_a_success_not_a_failure(wiki, world, monkeypatch):
+    """EPIK8s ends a good run "completed", the other sources "succeeded": neither is told as a failure."""
+    def finished(db, config, identity, add_task):
+        job = ImportJob(uid=str(uuid.uuid4()), workspace_id=config.workspace_id, source="epik8s", status="completed",
+                        progress="9 IOC(s) and 54 device(s)")
+        db.add(job)
+        db.commit()
+        return job
+
+    saved = _saved(world, kind="hours", every_hours=1)
+    db = SessionLocal()
+    db.get(ImportConfig, saved["uid"]).schedule_failures = sch.MAX_FAILURES - 1      # one more would switch it off
+    db.commit()
+    db.close()
+    monkeypatch.setattr(sch, "start_job", finished)
+    _due_now(saved["uid"])
+    [result] = sch.tick(SessionLocal)
+    assert result["outcome"] == "succeeded" and result["message"] == "9 IOC(s) and 54 device(s)"
+    c = _config(saved["uid"])
+    assert (c.last_outcome, c.schedule_failures, c.schedule_kind) == ("succeeded", 0, "hours")
+    db = SessionLocal()
+    told = list(db.scalars(select(Notification).where(Notification.recipient == world["writer"].id,
+                                                      Notification.kind == "import_failed")))
+    db.close()
+    assert told == []
