@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { assetsApi } from "../api/client";
 import { SchemaAttribute } from "../api/types";
+import { isLive } from "../lib/liveRecords";
 import { FilterValue } from "./AttributeFilters";
 
 export function AttributeFilterInput({
@@ -144,7 +145,7 @@ function ReferenceFilterSelect({
       }
       className="h-20 rounded border border-slate-300 px-2 py-1 text-sm"
     >
-      {targets.data?.map((a) => (
+      {targets.data?.filter((a) => isLive(a) || value.values.includes(a.uid)).map((a) => (
         <option key={a.uid} value={a.uid}>
           {a.name} ({a.key})
         </option>

@@ -30,7 +30,7 @@ from app.models.group import Group, GroupMember
 from app.models.issue import Issue, IssueLink
 from app.models.schema import Schema
 from app.models.user import User
-from app.services.visibility import can_see, visible_assets_clause, visible_issues_clause
+from app.services.visibility import can_see, live_assets_clause, visible_assets_clause, visible_issues_clause
 
 NodeKind = Literal["asset", "ticket", "document", "group", "person", "type"]
 
@@ -426,7 +426,8 @@ def graph_summary(db: Session, workspace_id: str) -> dict:
     def count(model, *where):
         return db.scalar(select(func.count()).select_from(model).where(*where)) or 0
 
-    assets = count(Asset, Asset.workspace_id == workspace_id, visible_assets_clause(workspace_id))
+    assets = count(Asset, Asset.workspace_id == workspace_id, visible_assets_clause(workspace_id),
+                   Asset.deleted_at.is_(None), live_assets_clause())
     tickets = count(Issue, Issue.workspace_id == workspace_id, visible_issues_clause())
     documents = count(Document, Document.workspace_id == workspace_id)
     types = count(Schema, Schema.workspace_id == workspace_id)

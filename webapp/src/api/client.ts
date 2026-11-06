@@ -282,8 +282,8 @@ export const assetsApi = {
     request<Asset[]>(`/v1/assets${schemaUid ? `?schema_uid=${schemaUid}` : ""}`),
   /** The uids of the records whose key, name, a label (QR code, barcode, former key, alias), serial,
    *  inventory number or MAC contains this. */
-  matching: (q: string) =>
-    request<{ uid: string }[]>(`/v1/assets?q=${encodeURIComponent(q)}&sort=key&limit=500`).then(
+  matching: (q: string, includeRetired = false) =>
+    request<{ uid: string }[]>(`/v1/assets?q=${encodeURIComponent(q)}&sort=key&limit=500${includeRetired ? "&include_retired=true" : ""}`).then(
       (rows) => new Set(rows.map((r) => r.uid)),
     ),
   get: (uid: string) => request<Asset>(`/v1/assets/${uid}`),

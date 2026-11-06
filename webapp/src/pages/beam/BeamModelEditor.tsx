@@ -207,13 +207,16 @@ function Upload({ onEdit }: { onEdit: (m: BeamModelV2) => void }) {
   );
 }
 
-function ImportReports({ reports }: { reports: BeamImportReport[] }) {
+export function ImportReports({ reports }: { reports: BeamImportReport[] }) {
   if (!reports.length) return null;
   return (
     <div className="rounded bg-emerald-50 p-3 text-sm text-emerald-900">
       {reports.map((r) => (
         <div key={r.model}>
-          <b>{r.model}</b>: {r.state} — {r.elements} elements, {r.values} dataset values
+          <b>{r.model}</b>: {r.state === "published"
+            ? <>{r.state} — {r.elements} elements, {r.values} dataset values</>
+            : <span className="text-amber-800">not applied yet — it removes records that need a person&apos;s approval,
+                so nothing has changed. <Link to="/review" className="underline">Approve it in the review queue</Link>, then import again.</span>}
           {r.awaiting_policy && <span className="text-amber-800"> · waiting for the authority policy to cover this source</span>}
         </div>
       ))}

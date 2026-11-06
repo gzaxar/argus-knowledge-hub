@@ -22314,7 +22314,7 @@
             }
           },
           {
-            "description": "A page of at most this many, with the total in X-Total-Count. Without it, every record (and deleted ones are not left out).",
+            "description": "A page of at most this many, with the total in X-Total-Count. Without it, every record (deleted and retired ones are not left out).",
             "in": "query",
             "name": "limit",
             "required": false,
@@ -22329,7 +22329,7 @@
                   "type": "null"
                 }
               ],
-              "description": "A page of at most this many, with the total in X-Total-Count. Without it, every record (and deleted ones are not left out).",
+              "description": "A page of at most this many, with the total in X-Total-Count. Without it, every record (deleted and retired ones are not left out).",
               "title": "Limit"
             }
           },
@@ -22342,6 +22342,18 @@
               "minimum": 0,
               "title": "Offset",
               "type": "integer"
+            }
+          },
+          {
+            "description": "A page also holds retired and merged records.",
+            "in": "query",
+            "name": "include_retired",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "A page also holds retired and merged records.",
+              "title": "Include Retired",
+              "type": "boolean"
             }
           },
           {
@@ -22661,7 +22673,7 @@
     },
     "/v1/assets/type-counts": {
       "get": {
-        "description": "How many visible, not deleted records each type has (its own, not its subtypes'): what a type tree\nshows beside each type.",
+        "description": "How many visible records in use (not deleted, retired or merged) each type has (its own, not its subtypes'): what a type tree\nshows beside each type.",
         "operationId": "asset_type_counts_v1_assets_type_counts_get",
         "parameters": [
           {

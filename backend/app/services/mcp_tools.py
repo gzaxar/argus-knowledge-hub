@@ -30,8 +30,8 @@ from app.services.alarm_symptoms import root_cause_from_alarms as _root_cause_fr
 from app.services.root_cause import blast_radius as _blast_radius
 from app.services.root_cause import impact_of as _impact_of
 from app.services.root_cause import root_causes as _root_causes
-from app.services.visibility import (can_see, redacted_attributes, restriction_clause, visible_assets_clause,
-                                     visible_issues_clause)
+from app.services.visibility import (can_see, live_assets_clause, redacted_attributes, restriction_clause,
+                                     visible_assets_clause, visible_issues_clause)
 
 # Enough to answer with, small enough not to bury the model.
 DEFAULT_LIMIT = 20
@@ -75,12 +75,15 @@ def _document_visible(workspace_id: str):
 
 
 def _asset_summary(asset: Asset) -> dict:
-    return {
+    out = {
         "uid": asset.uid,
         "key": asset.key,
         "name": asset.name,
         "type": asset.type,
     }
+    if asset.record_status != "Active":       # said, so an answer never presents a retired record as current
+        out["status"] = asset.record_status
+    return out
 
 
 def _issue_summary(issue: Issue) -> dict:
@@ -151,14 +154,18 @@ def _mentioning(types: list[dict], word: str) -> list[dict]:
 
 def search_objects(db: Session, workspace_id: str, query: str = "",
                    type: Optional[str] = None, types: Optional[list] = None,
-                   limit: int = DEFAULT_LIMIT, offset: int = 0, with_attributes: bool = False) -> dict:
+                   limit: int = DEFAULT_LIMIT, offset: int = 0, with_attributes: bool = False,
+                   include_retired: bool = False) -> dict:
     """Equipment by name, key or type. A type includes its subtypes; a word that names a type matches
     the objects of that type and of the types below it. Returns the total and the count per type, so a
     question about how many there are is answered from all of them, not from the first page.
 
     `offset` and `with_attributes` are for a client listing every object of a type (ARGUS reading a
     beamline's Control Devices): page after page in a stable order, each object with the attributes
-    get_object would give it, instead of one get_object call per object."""
+    get_object would give it, instead of one get_object call per object.
+
+    Retired and merged records are left out unless `include_retired` asks for them: they no longer exist as far
+    as a question about what is there goes."""
     needle = (query or "").strip().lower()
     catalogue = _types(db, workspace_id)
     asked = [x for x in ([type] if type else []) + list(types or []) if isinstance(x, str) and x.strip()]
@@ -179,6 +186,8 @@ def search_objects(db: Session, workspace_id: str, query: str = "",
     # The rule the REST API and the graph apply: this workspace's objects and the ones flagged shared. An
     # object of a shared *type* is not itself shared — every beamline's pumps are of the catalogue's type.
     stmt = select(Asset).where(visible_assets_clause(workspace_id), Asset.deleted_at.is_(None))
+    if not include_retired:
+        stmt = stmt.where(live_assets_clause())
     if wanted is not None:
         stmt = stmt.where(Asset.type.in_(wanted))
     # The type counts as a match. Equipment here is named FI4-B-CAM-VIS-001,
@@ -566,6 +575,10 @@ TOOLS: list[dict[str, Any]] = [
                 "with_attributes": {"type": "boolean",
                                     "description": "Return each object's attributes too, as get_object "
                                                    "would; default false"},
+                "include_retired": {"type": "boolean",
+                                    "description": "Also return retired and merged records, each with its "
+                                                   "status. Only for a question about what was removed or "
+                                                   "what used to exist; default false"},
             },
         },
     },

@@ -5,6 +5,7 @@ import { SchemaAttribute } from "../api/types";
 import { AssetPicker } from "./AssetPicker";
 import { IndexedStringInput } from "./IndexedStringInput";
 import { LabelInput } from "./LabelInput";
+import { isLive } from "../lib/liveRecords";
 import { findOption } from "../lib/schemaAttributes";
 import { UserPicker } from "./UserPicker";
 
@@ -166,6 +167,9 @@ function ReferenceInput({
     allowed.add(attribute.referenceSchemaUid);
     options = allAssets.data.filter((a) => allowed.has(a.schema_uid));
   }
+  // Not offered once retired, but a value already chosen stays readable.
+  const chosen = Array.isArray(value) ? value : [value];
+  options = options?.filter((a) => isLive(a) || chosen.includes(a.uid));
   const isLoading = attribute.includeChildren
     ? allSchemas.isLoading || allAssets.isLoading
     : targets.isLoading;
