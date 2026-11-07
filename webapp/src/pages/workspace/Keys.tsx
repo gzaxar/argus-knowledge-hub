@@ -50,7 +50,9 @@ export function WorkspaceKeys() {
         Workspace <span className="font-mono text-xs">{workspaceId}</span>. A record created without a key gets
         the next one from this pattern. Keys are unique across every workspace, so keep{" "}
         <span className="font-mono text-xs">{"{WS}"}</span> in it unless the rest is unique on its own. Changing
-        the pattern changes only new keys: existing ones stay, since labels and links carry them.
+        the pattern changes only new keys: existing ones stay, since labels and links carry them. Tickets take their
+        key from it too, with <span className="font-mono text-xs">TCK</span> as their type, and so do the records a
+        beam model brings.
       </p>
 
       <form

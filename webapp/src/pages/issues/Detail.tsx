@@ -323,6 +323,7 @@ export function IssueDetail() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs text-slate-500">
+            {i.key && <span className="mr-2 font-mono text-slate-600">{i.key}</span>}
             {sourceProject && <span>{sourceProject} / </span>}
             {sourceUrl && sourceKey ? (
               <a

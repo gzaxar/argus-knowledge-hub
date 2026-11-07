@@ -24,7 +24,7 @@ def ring(beamline):  # noqa: F811
                                         ("line/LDH01", "LDH01", "Dipole", "line"),
                                         ("ring_pa/RQU11", "RQU11", "Quadrupole", "ring_pa")):
         db.add(Asset(uid=f"{ws}-{name}", workspace_id=ws, schema_uid=f"{ws}:{type_name}", key=f"{ws}:{key}",
-                     name=name, type=type_name, attributes={"model_name": model}))
+                     name=name, type=type_name, attributes={"model_name": name, "beam_model": model}))
     db.commit()
     db.close()
     return beamline

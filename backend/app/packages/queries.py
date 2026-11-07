@@ -21,6 +21,7 @@ import yaml
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.issue import Issue
 from app.packages.model import Package
 
 
@@ -84,7 +85,9 @@ def run(db: Session, workspace_id: str, query: dict, grants=None) -> list[str]:
         found = jql.run(db, query["entity"], query["jql"], user_ids=[], workspaces=[workspace_id],
                         current_workspace=workspace_id, visible=lambda r: visibility.can_see(r, grants),
                         grants=grants, limit=500)
-        keys = [getattr(r, "key", None) or (r.attributes or {}).get("argus_source_key") for r in found["rows"]]
+        # A ticket is named by the key it came with (the package's INC-1), not the one this workspace gave it.
+        keys = [((r.attributes or {}).get("argus_source_key") or r.key) if isinstance(r, Issue)
+                else getattr(r, "key", None) or (r.attributes or {}).get("argus_source_key") for r in found["rows"]]
     return [k[len(prefix):] if k and k.startswith(prefix) else k for k in keys]
 
 

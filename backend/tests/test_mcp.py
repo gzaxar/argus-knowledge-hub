@@ -44,7 +44,7 @@ def world():
         "rack": f"rack-{suffix}",
         "ticket": f"tk-{suffix}",
         "document": f"doc-{suffix}",
-        "key": f"LNFT2-{secrets.randbelow(900000) + 100000}",
+        "key": f"LNFT2-{secrets.randbelow(9 * 10**11) + 10**11}",   # never one an earlier test left behind
     }
     db = SessionLocal()
     db.add(Workspace(id=ws, name="WS"))
@@ -471,7 +471,7 @@ def test_records_carry_the_address_of_their_page(world, monkeypatch):
     assert f"https://argus.example.org/assets/{ids['rack']}?ws={ids['ws']}" in json.dumps(obj["relations"])
     tickets = tool(raw, "search_tickets", {})
     assert all(t["url"].startswith("https://argus.example.org/tickets/") for t in tickets["tickets"])
-    assert any(t["link"] == f"[Camera drops frames]({t['url']})" for t in tickets["tickets"])
+    assert any(t["link"] == f"[{t['key']} — Camera drops frames]({t['url']})" for t in tickets["tickets"])
 
 
 def test_ask_argus_tools_give_no_addresses(world):

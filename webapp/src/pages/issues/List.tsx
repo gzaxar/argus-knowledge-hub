@@ -40,7 +40,7 @@ export function useTicketFilters() {
 /** Whether a ticket passes the filters the list and the board share. */
 export function ticketMatches(i: Issue, f: { q: string; family: Set<string> | null; state: string; assignee: string }): boolean {
   const n = f.q.trim().toLowerCase();
-  if (n && !i.title.toLowerCase().includes(n)) return false;
+  if (n && !i.title.toLowerCase().includes(n) && !(i.key ?? "").toLowerCase().includes(n)) return false;
   if (f.family && !(i.schema_uid && f.family.has(i.schema_uid))) return false;
   if (f.state === "open" && i.state === "closed") return false;
   if (f.state === "closed" && i.state !== "closed") return false;
@@ -208,7 +208,7 @@ export function IssueList() {
                              aria-label={`Select ${i.title}`} />
                     </td>
                     <td className="px-3 py-2">
-                      <Link to={`/tickets/${i.uid}`} className="block truncate font-medium text-slate-900 hover:underline" title={i.title}>{i.title}</Link>
+                      <Link to={`/tickets/${i.uid}`} className="block truncate font-medium text-slate-900 hover:underline" title={i.title}>{i.key && <span className="mr-1.5 font-mono text-xs font-normal text-slate-500">{i.key}</span>}{i.title}</Link>
                       <span className="mt-0.5 flex flex-wrap items-center gap-2 sm:hidden">
                         <StateBadge state={i.state} label={stateLabel} />
                         <PriorityBadge priority={i.priority} label={prioLabel} />

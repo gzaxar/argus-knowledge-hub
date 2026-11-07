@@ -1,8 +1,8 @@
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, event
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from app.db import Base
 from app.models.mixins import TimestampMixin, WorkspaceScopedMixin
@@ -25,6 +25,8 @@ class Issue(Base, WorkspaceScopedMixin, TimestampMixin):
         String, ForeignKey("schemas.uid", ondelete="CASCADE"), nullable=True, index=True
     )
     attributes: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # The ticket's key ({WS}-TCK-0042), from the workspace's Record keys pattern; given when it is created.
+    key: Mapped[Optional[str]] = mapped_column(String, nullable=True, unique=True, index=True)
     title: Mapped[str] = mapped_column(String)
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     # "new" | "in_progress" | "pending" | "resolved" | "closed" — see the
@@ -105,3 +107,14 @@ class IssueComment(Base, TimestampMixin):
     )
     author: Mapped[str] = mapped_column(String)
     body: Mapped[str] = mapped_column(String)
+
+
+@event.listens_for(Session, "before_flush")
+def _key_new_tickets(session, _context, _instances) -> None:
+    """Every new ticket gets its key, whatever made it: the form, an import, an e-mail, Ask ARGUS."""
+    new = [o for o in session.new if isinstance(o, Issue) and not o.key and o.workspace_id]
+    if not new:
+        return
+    from app.services.asset_keys import allocate, ticket_type
+    for issue in new:
+        issue.key = allocate(session, issue.workspace_id, ticket_type())

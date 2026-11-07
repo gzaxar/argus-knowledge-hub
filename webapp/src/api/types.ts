@@ -124,6 +124,8 @@ export interface Relation {
 
 export interface Issue {
   uid: string;
+  /** BTF-TCK-0042, from the workspace's Record keys pattern; none on a ticket made before tickets had keys. */
+  key?: string | null;
   workspace_id: string;
   asset_uid: string | null;
   schema_uid: string | null;
