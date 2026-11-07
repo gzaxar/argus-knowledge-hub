@@ -14,6 +14,7 @@ export function AdminShell() {
   const workspaceItems: { to: string; label: string }[] = [];
   if (currentWorkspaceId) {
     workspaceItems.push({ to: `/workspaces/${currentWorkspaceId}/access`, label: "Access" });
+    workspaceItems.push({ to: `/workspaces/${currentWorkspaceId}/groups`, label: "Groups" });
     workspaceItems.push({ to: `/workspaces/${currentWorkspaceId}/members`, label: "Members" });
     workspaceItems.push({ to: `/workspaces/${currentWorkspaceId}/packages`, label: "Packages" });
     workspaceItems.push({ to: `/workspaces/${currentWorkspaceId}/keys`, label: "Keys" });

@@ -267,6 +267,7 @@ export function AppShell() {
   const settingsItems = currentWorkspaceId
     ? [
         { to: `/workspaces/${currentWorkspaceId}/access`, label: "Access", hint: "Who may see and change what" },
+        { to: `/workspaces/${currentWorkspaceId}/groups`, label: "Groups", hint: "People given roles together" },
         { to: `/workspaces/${currentWorkspaceId}/members`, label: "Members" },
         { to: `/workspaces/${currentWorkspaceId}/packages`, label: "Packages", hint: "Types, kinds and workflows" },
         { to: "/catalogue/types", label: "Type catalogue", hint: "Object, ticket and document types" },

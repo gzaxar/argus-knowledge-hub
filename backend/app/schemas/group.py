@@ -15,6 +15,25 @@ class GroupOut(BaseModel):
     source: str
     active: bool
     member_count: int = 0
+    # The workspaces where it holds a role: who changes its members changes access there.
+    workspaces: list[str] = []
+
+
+class GroupCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+
+class GroupUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    active: Optional[bool] = None
+
+
+class GroupMembersIn(BaseModel):
+    emails: str
+    send_email: bool = True
+    message: Optional[str] = None
 
 
 class GroupMemberOut(BaseModel):

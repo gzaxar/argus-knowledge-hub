@@ -79,6 +79,7 @@ import type {
   Role,
   RoleBinding,
   RoleBindingInput,
+  InvitationResult,
   DirectoryGroup,
   DirectoryGroupMember,
   DirectoryStatus,
@@ -926,6 +927,9 @@ export const rolesApi = {
   list: () => request<Role[]>("/v1/roles"),
   listBindings: (workspaceId: string) =>
     request<RoleBinding[]>(`/v1/workspaces/${workspaceId}/bindings`),
+  invite: (workspaceId: string, input: { emails: string; role_id?: string; send_email: boolean; message?: string;
+                                          group_uid?: string; new_group?: string }) =>
+    request<InvitationResult>(`/v1/workspaces/${workspaceId}/invitations`, { method: "POST", body: json(input) }),
   createBinding: (workspaceId: string, input: RoleBindingInput) =>
     request<RoleBinding>(`/v1/workspaces/${workspaceId}/bindings`, {
       method: "POST",
@@ -941,6 +945,15 @@ export const directoryApi = {
   groups: (search?: string) =>
     request<DirectoryGroup[]>(`/v1/groups${search ? `?search=${encodeURIComponent(search)}` : ""}`),
   groupMembers: (uid: string) => request<DirectoryGroupMember[]>(`/v1/groups/${uid}/members`),
+  allGroups: () => request<DirectoryGroup[]>("/v1/groups?include_inactive=true"),
+  createGroup: (input: { name: string; description?: string }) =>
+    request<DirectoryGroup>("/v1/groups", { method: "POST", body: json(input) }),
+  updateGroup: (uid: string, input: { name?: string; description?: string; active?: boolean }) =>
+    request<DirectoryGroup>(`/v1/groups/${uid}`, { method: "PATCH", body: json(input) }),
+  addGroupMembers: (uid: string, input: { emails: string; send_email: boolean; message?: string }) =>
+    request<InvitationResult>(`/v1/groups/${uid}/members`, { method: "POST", body: json(input) }),
+  removeGroupMember: (uid: string, userId: string) =>
+    request<void>(`/v1/groups/${uid}/members/${encodeURIComponent(userId)}`, { method: "DELETE" }),
   status: () => request<DirectoryStatus>("/v1/directory/status"),
   sync: () => request<Record<string, unknown>>("/v1/directory/sync", { method: "POST" }),
 };
