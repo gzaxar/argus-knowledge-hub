@@ -163,6 +163,12 @@ export function WorkspaceAccess() {
                       inactive
                     </span>
                   )}
+                  {b.subject_pending && (
+                    <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700"
+                          title="Added by e-mail: the access waits for their first sign-in with that address">
+                      not signed in yet
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-2 text-slate-500">{b.subject_type}</td>
                 <td className="px-4 py-2 text-slate-700">{b.role_name}</td>
@@ -260,6 +266,11 @@ export function WorkspaceAccess() {
         )}
       </div>
 
+      <Invite workspaceId={workspaceId!} roles={roles.data ?? []} onDone={() => {
+        queryClient.invalidateQueries({ queryKey: ["bindings", workspaceId] });
+        queryClient.invalidateQueries({ queryKey: ["member-directory", workspaceId] });
+      }} />
+
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -324,6 +335,108 @@ export function WorkspaceAccess() {
           </table>
         )}
       </div>
+    </div>
+  );
+}
+
+
+/** People given a role here by their e-mail address, before they have ever signed in. */
+function Invite({ workspaceId, roles, onDone }: { workspaceId: string; roles: { id: string; name: string }[]; onDone: () => void }) {
+  const [emails, setEmails] = useState("");
+  const [roleId, setRoleId] = useState("viewer");
+  const [sendEmail, setSendEmail] = useState(true);
+  const [message, setMessage] = useState("");
+  // "" each person gets the role; a group's uid, or NEW for a new group: they join it, and the group gets the role.
+  const [into, setInto] = useState("");
+  const [newGroup, setNewGroup] = useState("");
+  const groups = useQuery({ queryKey: ["groups"], queryFn: () => directoryApi.groups() });
+  const local = (groups.data ?? []).filter((g) => g.source === "local" && g.active);
+  const invite = useMutation({
+    mutationFn: () => rolesApi.invite(workspaceId, {
+      emails, role_id: roleId, send_email: sendEmail, ...(message.trim() ? { message } : {}),
+      ...(into === "NEW" ? { new_group: newGroup } : into ? { group_uid: into } : {}),
+    }),
+    onSuccess: () => {
+      setEmails("");
+      onDone();
+    },
+  });
+  const out = invite.data;
+  return (
+    <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+      <h2 className="text-sm font-semibold text-slate-900">Invite by e-mail</h2>
+      <p className="mt-1 text-sm text-slate-500">
+        Give people a role here before they have ever signed in. Their first sign-in with the same address claims it.
+        A different address does not, so use the one they sign in with (for INFN AAI, the address AAI gives them).
+      </p>
+      <form onSubmit={(e) => { e.preventDefault(); if (emails.trim()) invite.mutate(); }} className="mt-3 space-y-2">
+        <textarea value={emails} onChange={(e) => setEmails(e.target.value)} rows={3} required
+                  aria-label="E-mail addresses"
+                  placeholder="name.surname@infn.it, another@lnf.infn.it — one or more, separated by commas or new lines"
+                  className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <label>Role{" "}
+            <select value={roleId} onChange={(e) => setRoleId(e.target.value)} className="rounded border border-slate-300 px-2 py-1">
+              {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          </label>
+          <label title="Into a group: they join it, and the group (not each person) gets the role here, so whoever joins it later has it too">
+            Given to{" "}
+            <select value={into} onChange={(e) => setInto(e.target.value)} className="rounded border border-slate-300 px-2 py-1">
+              <option value="">each person</option>
+              {local.map((g) => <option key={g.uid} value={g.uid}>the group {g.name}</option>)}
+              <option value="NEW">a new group…</option>
+            </select>
+          </label>
+          {into === "NEW" && (
+            <input value={newGroup} onChange={(e) => setNewGroup(e.target.value)} required placeholder="Group name"
+                   aria-label="New group name" className="w-44 rounded border border-slate-300 px-2 py-1" />
+          )}
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} />
+            send an invitation e-mail
+          </label>
+          <button type="submit" disabled={invite.isPending || !emails.trim()}
+                  className="rounded bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+            {invite.isPending ? "Inviting…" : "Invite"}
+          </button>
+        </div>
+        {sendEmail && (
+          <input value={message} onChange={(e) => setMessage(e.target.value)} aria-label="A line for the e-mail"
+                 placeholder="A line for the e-mail (optional)"
+                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
+        )}
+      </form>
+      {invite.isError && (
+        <p className="mt-2 text-sm text-red-600">{(invite.error as ApiError)?.detail ?? "Could not invite them."}</p>
+      )}
+      {out && (
+        <ul className="mt-3 space-y-1 text-sm">
+          {out.group_name && (
+            <li className="text-slate-700">
+              Group <span className="font-medium">{out.group_name}</span>
+              {out.role_name ? (out.group_granted ? ` now has ${out.role_name} here` : ` already had ${out.role_name} here`) : ""}
+            </li>
+          )}
+          {out.people.map((p) => (
+            <li key={p.email}>
+              <span className="font-medium">{p.email}</span>{" "}
+              <span className="text-slate-600">
+                {p.added ? "added" : "already known"}
+                {out.group_name
+                  ? (p.joined ? ` · joined ${out.group_name}` : ` · already in ${out.group_name}`)
+                  : (p.granted ? ` · ${out.role_name} granted` : ` · already ${out.role_name}`)}
+                {p.emailed ? " · e-mailed" : ""}
+                {!p.signed_in ? " · waiting for their first sign-in" : ""}
+              </span>
+              {p.error && <span className="text-amber-700"> · e-mail not sent: {p.error}</span>}
+            </li>
+          ))}
+          {out.not_addresses.length > 0 && (
+            <li className="text-red-600">Not e-mail addresses, left out: {out.not_addresses.join(", ")}</li>
+          )}
+        </ul>
+      )}
     </div>
   );
 }

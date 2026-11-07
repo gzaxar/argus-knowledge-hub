@@ -9,7 +9,7 @@ from typing import Literal, Optional, Union
 import jwt
 from fastapi import Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -174,7 +174,10 @@ def _resolve_oidc_user(db: Session, claims: dict) -> User:
     if user is None:
         user = db.get(User, sub)
     if user is None and email:
-        user = db.scalar(select(User).where(User.email == email))
+        # Someone invited by e-mail before they ever signed in: matched whatever the case of the address, and an
+        # account nobody has claimed yet comes first.
+        user = db.scalar(select(User).where(func.lower(User.email) == email.strip().lower())
+                         .order_by(User.oidc_sub.isnot(None), User.created_at).limit(1))
 
     if user is None:
         user = User(id=str(uuid.uuid4()), oidc_sub=sub, email=email, name=claims.get("name"),

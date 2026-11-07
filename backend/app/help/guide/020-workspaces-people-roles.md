@@ -54,6 +54,33 @@ Changing the pattern changes only new keys. Tickets made before tickets had keys
 the old rule (`btf:accumulator_pa/DHSA11`), get theirs when an administrator applies the pattern to them once; an
 old key stays as an alias, so a link or a note that names it still finds the record.
 
+## Invite people by e-mail
+
+You do not have to wait for someone's first sign-in to give them access.
+
+1. Open the workspace, then **Access** (**⚙ Workspace** menu).
+2. Under **Invite by e-mail**, type or paste one or more addresses (commas or new lines; `Name <address>` is fine),
+   choose the **Role**, and **Invite**.
+3. Leave **send an invitation e-mail** ticked to tell them, with a link to ARGUS and an optional line of your own.
+
+To give them the role **together**, choose **Given to** a group (one made here, or *a new group…*): they join
+it, and the group gets the role here, so whoever joins it later has it too.
+
+Each person not known yet is added, and gets the role at once. In **Granted roles** they show as *not signed in
+yet* until their first sign-in, which claims the account and the access, whatever the case of the letters.
+**Use the address they will sign in with**: with INFN AAI, the one AAI gives them (`name.surname@infn.it` may not be
+`name.surname@lnf.infn.it`). Signing in with another address makes a second account without that access. Invite
+the same people into each workspace they need; inviting someone again only adds what they lack.
+
+## Groups
+
+**Groups** (**⚙ Workspace** menu) lists the groups made here and, for reference, the directory's. Create a group,
+open it to add people by e-mail (told by e-mail if you like), take someone out, rename it, or deactivate it: a
+deactivated group keeps its members, and its roles stop applying. Give a group a role on **Access**.
+
+A group can hold roles in several workspaces, so its members are changed by an administrator, or by someone who
+manages every workspace where it holds one. A directory's group is changed in the directory.
+
 ## Give a person or a group a role
 
 1. The person **signs in once**, so ARGUS knows them. (An administrator can also add someone before their

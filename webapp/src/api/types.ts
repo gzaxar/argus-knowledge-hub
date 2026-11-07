@@ -873,9 +873,33 @@ export interface RoleBinding {
   subject_id: string;
   subject_label: string;
   subject_active: boolean;
+  /** A person added by e-mail who has not signed in yet: the access waits for them. */
+  subject_pending?: boolean;
   role_id: string;
   role_name: string;
   created_at: string | null;
+}
+
+export interface InvitedPerson {
+  email: string;
+  user_id: string;
+  added: boolean;
+  granted: boolean;
+  joined?: boolean;
+  signed_in: boolean;
+  emailed: boolean;
+  error: string | null;
+}
+
+export interface InvitationResult {
+  workspace_id: string;
+  role_id: string | null;
+  role_name: string | null;
+  group_uid?: string | null;
+  group_name?: string | null;
+  group_granted?: boolean;
+  people: InvitedPerson[];
+  not_addresses: string[];
 }
 
 export interface RoleBindingInput {
@@ -893,6 +917,8 @@ export interface DirectoryGroup {
   source: string;
   active: boolean;
   member_count: number;
+  /** The workspaces where it holds a role: changing its members changes access there. */
+  workspaces?: string[];
 }
 
 export interface DirectoryGroupMember {

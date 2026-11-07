@@ -473,6 +473,30 @@ def deliver_pending(db: Session, at: Optional[datetime] = None) -> int:
     return sent
 
 
+def send_plain(to: str, subject: str, body: str) -> None:
+    """One message to one address now, by whichever way this installation sends mail. MailError when it cannot."""
+    if not email_configured():
+        raise MailError("E-mail is not configured on this installation (SMTP_HOST or INFN mail client credentials).")
+    if not deliverable(to):
+        raise MailError(f"{to} is at a domain that cannot receive mail.")
+    from app.services import infn_mail
+    if infn_mail.configured():
+        infn_mail.send(to, subject, body)
+        return
+    if not os.environ.get("SMTP_HOST"):
+        raise MailError("Configure INFN_MAIL_URL, INFN_MAIL_TOKEN_URL and BACK_END_CLIENT_OAUTH.")
+    smtp = _connect()
+    try:
+        smtp.send_message(_message(to, subject, body))
+    except (OSError, smtplib.SMTPException) as exc:
+        raise MailError(f"The mail server did not take the message: {exc}") from exc
+    finally:
+        try:
+            smtp.quit()
+        except (OSError, smtplib.SMTPException):
+            pass
+
+
 def send_test(user: User) -> str:
     """A message to this person now, to check the mail server and their address."""
     if not email_configured():
