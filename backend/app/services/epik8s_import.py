@@ -73,7 +73,7 @@ from app.packages.importers import requires
 from app.services import dns_convention
 from app.services.network_resolve import IPV4, NetworkIndex, short_host
 from app.services.relations import rebuild_asset_relations
-from app.services.visibility import live_assets_clause
+from app.services.visibility import GONE, live_assets_clause
 
 # The packages a workspace must have before an EPIK8s import (their `provides`).
 REQUIRES = requires("epik8s")
@@ -735,12 +735,12 @@ class _Importer:
             self.counts["magnets_linked"] += 1
         keep = {w.lower() for w in stated}
         # This import's own links only: one a person asserted is the ledger's, and would come back.
-        links = self.db.execute(select(Relation, Asset.key, Asset.name, Asset.deleted_at).join(
+        links = self.db.execute(select(Relation, Asset.key, Asset.name, Asset.deleted_at, Asset.record_status).join(
             Asset, Asset.uid == Relation.to_asset_uid).where(
             Relation.workspace_id == self.workspace_id, Relation.from_asset_uid == supply.uid,
             Relation.relation_type == "powers", Relation.derivation.is_(None))).all()
-        for link, key, target, removed in links:
-            if removed is not None:                     # what a supply powers is never a removed record
+        for link, key, target, removed, status in links:
+            if removed is not None or status in GONE:   # what a supply powers is never a removed record
                 self.db.delete(link)
             elif stated and target.lower() not in keep:
                 self.db.delete(link)

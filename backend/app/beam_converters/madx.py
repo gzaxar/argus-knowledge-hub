@@ -11,10 +11,12 @@ reported, not guessed at. A TFS table brings the optics too (BETX, ALFX, DX, MUX
 from __future__ import annotations
 
 import re
+from dataclasses import replace
+from pathlib import PurePath
 from typing import Optional
 
 from app.beam_converters import ConversionError, Converter, Options, register
-from app.beam_converters.common import Evaluator, Placed, build, expand_line, hint, split_top
+from app.beam_converters.common import Evaluator, Placed, build, expand_line, hint, merge_paths, split_top
 
 KINDS = {
     "drift": "drift", "sbend": "dipole", "rbend": "dipole", "quadrupole": "quadrupole", "sextupole": "sextupole",
@@ -194,10 +196,20 @@ def _placed(lat: _Lattice, name: str, attrs: dict, s: float, length: float, opti
     # The family it was made from: `q1: qf` places q1, an instance of the user's qf (not a bare class).
     parent = lat.defs.get(name.lower(), (None,))[0]
     family = parent if parent and parent.lower() in lat.defs else None
+    element = _element_name(name, options)
     # MAD-X names are case-insensitive and MAD-X writes them in capitals: so does the native name.
-    return Placed(name=name.upper(), kind=kind, s=s, length=length, native_type=cls.upper(),
+    return Placed(name=element.upper(), kind=kind, s=s, length=length, native_type=cls.upper(),
                   native=_native(lat, attrs), physics=_physics(lat, base, attrs, length), capabilities=caps,
-                  family=family)
+                  family=family, label=name.upper() if element != name else None)
+
+
+def _element_name(label: str, options: Options) -> str:
+    """The element a label is: with `same_element_suffixes`, DHPTT001_IN and DHPTT001_OUT are DHPTT001."""
+    endings = (x.strip().lower() for x in (options.same_element_suffixes or "").split(","))
+    for suffix in sorted(endings, key=len, reverse=True):    # the longest first: _TL_IN before _IN
+        if suffix and label.endswith(suffix) and len(label) > len(suffix):
+            return label[:-len(suffix)]
+    return label
 
 
 def _from_sequence(lat: _Lattice, seq_name: str, options: Options) -> tuple[list[Placed], float]:
@@ -257,6 +269,8 @@ def convert_madx(text: str, filename: str, options: Options) -> dict:
     choice = (options.beamline or lat.use or "").lower()
     if choice and choice not in lat.sequences and choice not in lat.lines:
         raise ConversionError(f"{filename}: no sequence or line called {choice}")
+    if not choice and len(lat.sequences) > 1:
+        return _all_sequences(lat, filename, options)
     if not choice:
         candidates = list(lat.sequences) or list(lat.lines)
         if not candidates:
@@ -266,6 +280,34 @@ def convert_madx(text: str, filename: str, options: Options) -> dict:
     placed, total = (_from_sequence if choice in lat.sequences else _from_line)(lat, choice, options)
     doc = build(placed, source="madx", filename=filename, options=options, line_name=choice, total_length=total,
                 beam=_beam(lat))
+    if lat.skipped:
+        doc["conversion"]["not_executed"] = lat.skipped[:20]
+    if len(lat.sequences) > 1:
+        doc["conversion"]["sequences"] = list(lat.sequences)
+        doc["conversion"]["chosen"] = choice
+    return doc
+
+
+def _all_sequences(lat: _Lattice, filename: str, options: Options) -> dict:
+    """A file with several sequences and no USE saying which: all of them, a path each, in one model."""
+    stem = PurePath(filename or "model").stem
+    model_id = options.model_id or re.sub(r"[^A-Za-z0-9._-]+", "-", stem).strip("-").lower() or "model"
+    shared = replace(options, model_id=model_id, system_id=options.system_id or model_id,
+                     model_name=options.model_name or f"{stem} ({PurePath(filename).name})")
+    parts, empty = [], []
+    for name in lat.sequences:
+        placed, total = _from_sequence(lat, name, shared)
+        if not placed:
+            empty.append(name)
+            continue
+        parts.append(build(placed, source="madx", filename=filename, options=shared, line_name=name,
+                           total_length=total, beam=_beam(lat)))
+    if not parts:
+        raise ConversionError(f"{filename}: no elements on any of its sequences")
+    doc = merge_paths(parts, filename=filename)
+    doc["conversion"]["sequences"] = list(lat.sequences)
+    if empty:
+        doc["conversion"]["empty_sequences"] = empty
     if lat.skipped:
         doc["conversion"]["not_executed"] = lat.skipped[:20]
     return doc

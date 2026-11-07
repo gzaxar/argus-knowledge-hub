@@ -312,3 +312,107 @@ def test_accelerator_toolbox_reads_families_polynomials_and_apertures():
     v = d["datasets"][0]["values"]
     assert v["SF"]["physics"]["k2"] == pytest.approx(10.0)                    # PolynomB[2] is k2/2
     assert v["RF"]["physics"]["harmonic"] == 400 and d["beams"][0]["reference_energy"] == pytest.approx(3.0)
+
+
+# --- A file with several sequences: one model, a path each, an element once --------------------------------
+
+MULTI = """
+Q1: QUADRUPOLE, L=0.2, K1=1.5;
+B_IN: SBEND, L=1.0, ANGLE=-PI/4;
+B_OUT: SBEND, L=1.0, ANGLE=+PI/4;
+M1: MARKER;
+CLASH: QUADRUPOLE, L=0.2;
+INJ: SEQUENCE, L=5, REFER=CENTRE;
+  START_I: MARKER, AT=0;
+  Q1, AT=1;
+  B_IN, AT=2;
+  M1, AT=3;
+ENDSEQUENCE;
+EXT: SEQUENCE, L=4, REFER=CENTRE;
+  START_E: MARKER, AT=0;
+  B_OUT, AT=1;
+  Q1, AT=3;
+ENDSEQUENCE;
+"""
+
+
+def test_every_sequence_becomes_a_path_and_an_element_stays_one_component():
+    d = bc.convert("transfer.seq", MULTI)
+    report = d.pop("conversion")
+    valid(d)
+    assert d["model"]["id"] == "transfer" and len(d["systems"]) == 1
+    assert [p["id"] for p in d["paths"]] == ["inj", "ext"] and {p["system"] for p in d["paths"]} == {"transfer"}
+    ids = [c["id"] for c in d["components"]]
+    assert len(ids) == len(set(ids)) and ids.count("Q1") == 1
+    assert report["sequences"] == ["inj", "ext"] and report["elements"] == len(ids) and report["placements"] == 7
+    values = {x["path"]: x["values"] for x in d["datasets"]}
+    assert values["inj"]["Q1"]["s"] == pytest.approx(0.9) and values["ext"]["Q1"]["s"] == pytest.approx(2.9)
+    assert report["differs"] == [] and report["conflicts"] == []
+
+
+def test_name_endings_make_one_magnet_that_keeps_its_angle_on_each_path():
+    apart = comps(bc.convert("transfer.seq", MULTI))
+    assert "B_IN" in apart and "B_OUT" in apart and "B" not in apart, "only when asked"
+    d = bc.convert("transfer.seq", MULTI, bc.Options(same_element_suffixes="_IN, _OUT"))
+    report = d.pop("conversion")
+    valid(d)
+    by = comps(d)
+    assert "B" in by and "B_IN" not in by and "B_OUT" not in by
+    values = {x["path"]: x["values"]["B"] for x in d["datasets"]}
+    assert values["inj"]["physics"]["angle"] == pytest.approx(-math.pi / 4)
+    assert values["ext"]["physics"]["angle"] == pytest.approx(math.pi / 4)
+    assert values["inj"]["native"]["name"] == "B_IN", "the label in the file can still be found"
+    assert [(x["component"], x["parameter"]) for x in report["differs"]] == [("B", "angle")]
+
+
+def test_the_longest_ending_is_taken_first():
+    text = "D_TL_IN: SBEND, L=1, ANGLE=0.1; D_TR_OUT: SBEND, L=1, ANGLE=0.2;" \
+           "A: SEQUENCE, L=2; D_TL_IN, AT=1; ENDSEQUENCE; B: SEQUENCE, L=2; D_TR_OUT, AT=1; ENDSEQUENCE;"
+    d = bc.convert("t.seq", text, bc.Options(same_element_suffixes="_IN, _OUT, _TL_IN, _TR_OUT"))
+    assert [c["id"] for c in d["components"]] == ["D"]
+
+
+def test_a_name_with_two_types_is_reported_and_the_first_stays():
+    text = MULTI + """
+    A1: QUADRUPOLE, L=0.2;
+    A1_X: SBEND, L=0.2, ANGLE=0.1;
+    TWO: SEQUENCE, L=1; A1, AT=0.5; ENDSEQUENCE;
+    THREE: SEQUENCE, L=1; A1_X, AT=0.5; ENDSEQUENCE;
+    """
+    d = bc.convert("transfer.seq", text, bc.Options(same_element_suffixes="_X"))
+    report = d.pop("conversion")
+    assert report["conflicts"] == [{"component": "A1", "kept": "quadrupole", "also": "dipole", "path": "three"}]
+    assert comps(d)["A1"]["type"] == "quadrupole"
+
+
+def test_one_sequence_can_still_be_chosen_and_use_still_chooses():
+    only = bc.convert("transfer.seq", MULTI, bc.Options(beamline="inj"))
+    assert [p["id"] for p in only["paths"]] == ["inj"]
+    assert only["conversion"]["sequences"] == ["inj", "ext"] and only["conversion"]["chosen"] == "inj"
+    used = bc.convert("transfer.seq", MULTI + "USE, SEQUENCE=EXT;")
+    assert [p["id"] for p in used["paths"]] == ["ext"]
+
+
+def test_a_file_with_one_sequence_reads_as_before():
+    d = bc.convert("tl.seq", "Q: QUADRUPOLE, L=1; S: SEQUENCE, L=2; Q, AT=1; ENDSEQUENCE;")
+    assert [p["id"] for p in d["paths"]] == ["s"] and "sequences" not in d["conversion"]
+    assert d["systems"][0]["id"] == "s"
+
+
+def test_a_multi_sequence_file_imports_as_one_record_per_element(db_world):
+    from tests.test_beam_model import client
+    h = db_world
+    out = client.post("/v1/beam-model/convert", headers=h, json={
+        "filename": "transfer.seq", "content": MULTI, "options": {"same_element_suffixes": "_IN,_OUT"}}).json()
+    assert out["check"]["ok"], out["check"]
+    done = client.post("/v1/beam-model/import", headers=h, json=out["model"])
+    assert done.status_code == 200, done.text
+    paths = [p for p in client.get("/v1/beam-paths", headers=h).json() if p["name"] in ("INJ", "EXT")]
+    assert len(paths) == 2
+    nodes = {p["name"]: {n["name"]: n for n in client.get(f"/v1/beam-paths/{p['uid']}/graph", headers=h).json()["nodes"]}
+             for p in paths}
+    assert nodes["INJ"]["Q1"]["uid"] == nodes["EXT"]["Q1"]["uid"], "one record on both paths"
+    assert nodes["INJ"]["B"]["uid"] == nodes["EXT"]["B"]["uid"]
+    assert nodes["INJ"]["B"]["angle"] == pytest.approx(-math.pi / 4)
+    assert nodes["EXT"]["B"]["angle"] == pytest.approx(math.pi / 4)
+    assert nodes["EXT"]["Q1"]["s"] == pytest.approx(2.9)

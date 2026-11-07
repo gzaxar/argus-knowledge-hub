@@ -213,3 +213,17 @@ def test_a_supply_loses_its_link_to_a_removed_record_and_keeps_a_persons(db, spl
     run(db, ws, tag)
     assert not relates(db, supply, twin, "powers")
     assert relates(db, supply, asserted, "powers")
+
+
+def test_a_supply_loses_its_link_to_a_retired_record(db, split, tag):
+    """Seen in production: a beam model removed, and its quadrupoles still shown as powered."""
+    _, ws = split
+    element(db, ws, "CHHA1002", "Corrector")
+    run(db, ws, tag)
+    supply = db.get(Asset, _uid(ws, f"{tag}:AST:danfysik:CHHA1002"))
+    gone = element(db, ws, "GONE", "Corrector")
+    db.add(Relation(workspace_id=ws, from_asset_uid=supply.uid, to_asset_uid=gone.uid, relation_type="powers"))
+    gone.record_status = "Retired"
+    db.commit()
+    run(db, ws, tag)
+    assert not relates(db, supply, gone, "powers")
