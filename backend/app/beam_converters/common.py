@@ -170,6 +170,7 @@ class Placed:
     family: Optional[str] = None
     location: Optional[str] = None
     component: dict = field(default_factory=dict)      # more v2 component fields: boundaries, aliases…
+    label: Optional[str] = None                        # its label in the file, when not its name
 
 
 def hint(name: str, kind: str, options: Options) -> str:
@@ -250,7 +251,8 @@ def build(placed: list[Placed], *, source: str, filename: str, options: Options,
         order.append(ident)
         values[ident] = {"s": round(p.s, 9), "geometry": g, "physics": {"length": p.length, **p.physics},
                          **({"optics": p.optics} if p.optics else {}),
-                         "native": {"source": source, "type": p.native_type, "parameters": p.native}}
+                         "native": {"source": source, "type": p.native_type, "parameters": p.native,
+                                    **({"name": p.label} if p.label else {})}}
     system_id = options.system_id or line_name.lower()
     kind = options.system_kind or ("Storage ring" if ring else "Other")
     species = options.species or beam.get("species")
@@ -279,6 +281,56 @@ def build(placed: list[Placed], *, source: str, filename: str, options: Options,
                        "survey_closure_m": round(closure, 6) if ring else None},
     }
     return v1 if options.output == "1" else to_v2(v1, placed, source=source, filename=filename)
+
+
+def _by_id(existing: list, incoming: list) -> None:
+    known = {x.get("id") for x in existing}
+    existing.extend(x for x in incoming if x.get("id") not in known)
+
+
+def merge_paths(parts: list[dict], *, filename: str) -> dict:
+    """One model from documents converted from one file, each with a single path: their paths and datasets side
+    by side and each component once, however many paths place it. What the file says differently about one
+    component is reported: the type in `conflicts` (the first stays), a value in `differs` (each dataset keeps
+    its own, so a magnet can bend one way on the way in and the other on the way out)."""
+    doc = parts[0]
+    reports = [p.pop("conversion", {}) for p in parts]
+    types = {c["id"]: c.get("type") for c in doc["components"]}
+    conflicts: list[dict] = []
+    for part in parts[1:]:
+        for c in part["components"]:
+            if c["id"] in types and c.get("type") != types[c["id"]]:
+                conflicts.append({"component": c["id"], "kept": types[c["id"]], "also": c.get("type"),
+                                  "path": part["paths"][0]["id"]})
+        for key in ("systems", "components", "definitions", "observables", "connections"):
+            if part.get(key):
+                doc[key] = doc.get(key) or []
+                _by_id(doc[key], part[key])
+                types = {c["id"]: c.get("type") for c in doc["components"]}
+        doc["paths"].extend(part["paths"])
+        doc["datasets"].extend(part["datasets"])
+    seen: dict[str, dict[str, dict]] = {}
+    for d in doc["datasets"]:
+        for ident, values in d["values"].items():
+            for key, value in (values.get("physics") or {}).items():
+                seen.setdefault(ident, {}).setdefault(key, {})[d["path"]] = value
+    differs = [{"component": ident, "parameter": key, "values": by_path}
+               for ident, parameters in sorted(seen.items()) for key, by_path in sorted(parameters.items())
+               if len({json_key(v) for v in by_path.values()}) > 1]
+    doc["conversion"] = {
+        "converter": reports[0].get("converter"), "file": PurePath(filename).name, "elements": len(doc["components"]),
+        "placements": sum(r.get("elements", 0) for r in reports),
+        "total_bend": sum(r.get("total_bend", 0.0) for r in reports), "ring": False, "survey_closure_m": None,
+        "paths": [{"id": p["id"], "elements": r.get("elements"), "ring": r.get("ring"),
+                   "total_bend": r.get("total_bend")} for p, r in zip(doc["paths"], reports)],
+        "conflicts": conflicts, "differs": differs,
+    }
+    return doc
+
+
+def json_key(value) -> str:
+    """A value to compare by: numbers to the precision a lattice file means."""
+    return f"{value:.9g}" if isinstance(value, float) else repr(value)
 
 
 # Normalised physics key → the native parameter it comes from (case-insensitive), for value provenance.

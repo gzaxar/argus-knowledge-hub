@@ -1615,6 +1615,15 @@ export interface BeamConversionReport {
   survey_closure_m: number | null;
   not_executed?: string[];
   tunes?: Record<string, string>;
+  /** Every sequence in the file, when it has several; `chosen` when only one was read. */
+  sequences?: string[];
+  chosen?: string;
+  placements?: number;
+  paths?: { id: string; elements: number; ring: boolean; total_bend: number }[];
+  /** One name given two different types: the first stays. */
+  conflicts?: { component: string; kept: string; also: string; path: string }[];
+  /** One component with different values per path: each path keeps its own. */
+  differs?: { component: string; parameter: string; values: Record<string, unknown> }[];
 }
 
 export interface BeamValues {

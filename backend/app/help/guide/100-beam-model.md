@@ -27,6 +27,21 @@ optics. It is independent of any simulation code, and linked to the real equipme
 3. ARGUS checks it and says how complete it is, level by level (topology, lattice, geometry, optics, physical,
    integrated) and what is missing for the next level.
 
+## A file with several sequences
+
+A MAD-X file with several sequences and no `USE` becomes **one model with one path per sequence**. An element
+that several sequences place is one component on all those paths, so it is one record, with one supply and one
+history; each path keeps its own positions and values. Below the file, the upload says how many times the elements
+were placed on how many paths, which elements have different values from path to path, and any name given two
+different types (the first stays). **Sequences** can read just one of them. With `USE`, the file has already chosen.
+
+When a simulator needs one label per configuration, as `DHPTT001_IN` and `DHPTT001_OUT` for one magnet bending
+either way, put the endings in **Same element, name endings** (`_IN, _OUT`): they become `DHPTT001`, on both paths,
+each keeping its own angle. It is off unless you ask, since an ending does not mean this in every file.
+
+Do not import each sequence as its own model: the same magnet would then be several records, and a control channel
+of that name could not tell which one it powers.
+
 ## Markers, and what a simulation does not compute
 
 A lattice places with **markers** what its simulation computes nothing for: a vacuum pump, a valve, a gauge,
