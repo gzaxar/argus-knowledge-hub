@@ -97,7 +97,7 @@ def resolve(db: Session, identifier: str, workspace_ids: Optional[Iterable[str]]
         if in_scope(issue.workspace_id):
             return {"kind": "ticket", "uid": issue.uid, "key": key, "name": issue.title,
                     "workspace_id": issue.workspace_id, "path": f"/tickets/{issue.uid}", "via": "jira key"}
-    issue = db.get(Issue, key)
+    issue = db.get(Issue, key) or db.scalar(select(Issue).where(Issue.key == key))
     if issue is not None and in_scope(issue.workspace_id):
         return {"kind": "ticket", "uid": issue.uid, "key": key, "name": issue.title,
                 "workspace_id": issue.workspace_id, "path": f"/tickets/{issue.uid}", "via": "uid"}

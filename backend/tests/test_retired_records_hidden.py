@@ -21,9 +21,15 @@ def renamed(db, ws):  # noqa: F811
         p["elements"] = ["ACC02B" if x == "ACC02" else x for x in p["elements"]]
     assert bm.import_canonical(db, ws, doc, "test")["state"] == "published"
     db.commit()
-    old = db.scalar(select(Asset).where(Asset.key == f"{ws}:linac-demo/ACC02"))
+    old = record(db, ws, "ACC02")
     assert old.record_status == "Retired"
     return old
+
+
+def record(db, ws, ident):  # noqa: F811
+    """A beam record by its id in the model: its key follows the workspace's Record keys pattern."""
+    uid = next(u for u, i in bm.model_ids(db, ws, "linac-demo", "element").items() if i == ident)
+    return db.get(Asset, uid)
 
 
 def keys(result):
@@ -34,7 +40,7 @@ def test_ask_does_not_find_a_retired_record_unless_asked(world, db):  # noqa: F8
     ws = world["ws"]
     old = renamed(db, ws)
     found = mcp_tools.search_objects(db, ws, types=[old.type])
-    assert f"{ws}:linac-demo/ACC02B" in keys(found) and old.key not in keys(found)
+    assert record(db, ws, "ACC02B").key in keys(found) and old.key not in keys(found)
     assert found["by_type"][old.type] == found["total"]
     assert mcp_tools.search_objects(db, ws, query="ACC02")["total"] == 1
     asked = mcp_tools.search_objects(db, ws, query="ACC02", include_retired=True)
@@ -43,7 +49,7 @@ def test_ask_does_not_find_a_retired_record_unless_asked(world, db):  # noqa: F8
     # Opened by its key it is still there, and says what it is.
     opened = mcp_tools.get_object(db, ws, old.key)
     assert opened["found"] and opened["status"] == "Retired"
-    assert "status" not in mcp_tools.get_object(db, ws, f"{ws}:linac-demo/ACC02B")
+    assert "status" not in mcp_tools.get_object(db, ws, record(db, ws, "ACC02B").key)
 
 
 def test_a_page_of_records_and_the_type_counts_leave_it_out(world, db):  # noqa: F811
@@ -51,7 +57,7 @@ def test_a_page_of_records_and_the_type_counts_leave_it_out(world, db):  # noqa:
     old = renamed(db, ws)
     h = world["h"]
     page = client.get("/v1/assets", headers=h, params={"limit": 500, "q": "ACC02"}).json()
-    assert {a["key"] for a in page} == {f"{ws}:linac-demo/ACC02B"}
+    assert {a["key"] for a in page} == {record(db, ws, "ACC02B").key}
     both = client.get("/v1/assets", headers=h, params={"limit": 500, "q": "ACC02", "include_retired": True}).json()
     assert {a["key"]: a["record_status"] for a in both}[old.key] == "Retired"
     # The whole list stays whole: it is what resolves a link to a retired record into its name.
@@ -69,10 +75,10 @@ def test_search_finds_it_only_by_naming_a_status(world, db):  # noqa: F811
     def query(text):
         return {r.key for r in jql.run(db, "assets", text, user_ids=[], workspaces=[ws], current_workspace=ws,
                                        visible=lambda r: True)["rows"]}
-    assert query('name ~ "ACC02"') == {f"{ws}:linac-demo/ACC02B"}
+    assert query('name ~ "ACC02"') == {record(db, ws, "ACC02B").key}
     assert query("status = Retired") == {old.key}
     assert old.key in query('name ~ "ACC02" AND status != Active')
     hub = knowledge_hub.unified_search(db, ws, knowledge_hub.Access(assets=True, tickets=False, documents=False),
                                        "ACC02")
     found = {a["key"] for a in hub["assets"]}
-    assert f"{ws}:linac-demo/ACC02B" in found and old.key not in found
+    assert record(db, ws, "ACC02B").key in found and old.key not in found

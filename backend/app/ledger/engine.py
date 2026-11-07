@@ -675,6 +675,10 @@ def resolve_ref(db: Session, source_ref: str) -> Optional[str]:
     return b.uid if b else None
 
 
+# Streams whose new records take the workspace's Record keys pattern.
+PATTERN_KEYED_STREAMS = ("beam-model:",)
+
+
 def _ensure_record(db: Session, stream: LedgerStream, source_ref: str, exists: Optional[ParsedClaim],
                    cause: str) -> Optional[str]:
     if source_ref.startswith("uid:"):
@@ -696,14 +700,21 @@ def _ensure_record(db: Session, stream: LedgerStream, source_ref: str, exists: O
     if type_name is None or ("*" not in allowed and type_name not in allowed):
         return None
     prefix = {INSTALLATION: "INS", ACCESS_POINT: "AP"}.get(type_name, "REC")
-    key = exists.value.get("key") or f"{prefix}-{ulid()}"
-    existing = db.scalar(select(Asset).where(Asset.key == key))
-    if existing is not None:
-        if existing.workspace_id != stream.workspace_id or existing.type != type_name:
-            raise LedgerError(f"key {key!r} already belongs to another record")
-        bind(db, source_ref, existing.uid, "adopted by key")
-        return existing.uid
+    # A beam model's records are keyed by the workspace's Record keys pattern ({WS}-QUA-0007), not by the name
+    # the model file gives them: the record is found again by its identity binding, never by its key.
+    patterned = stream.id.startswith(PATTERN_KEYED_STREAMS)
+    key = None if patterned else (exists.value.get("key") or f"{prefix}-{ulid()}")
+    if key is not None:
+        existing = db.scalar(select(Asset).where(Asset.key == key))
+        if existing is not None:
+            if existing.workspace_id != stream.workspace_id or existing.type != type_name:
+                raise LedgerError(f"key {key!r} already belongs to another record")
+            bind(db, source_ref, existing.uid, "adopted by key")
+            return existing.uid
     schema = ensure_type(db, stream.workspace_id, type_name)
+    if key is None:
+        from app.services.asset_keys import allocate
+        key = allocate(db, stream.workspace_id, schema)
     uid = str(uuid.uuid4())
     db.add(Asset(uid=uid, workspace_id=stream.workspace_id, schema_uid=schema.uid, key=key,
                  name=exists.value.get("name") or key, type=type_name, attributes={},

@@ -83,7 +83,7 @@ def _asset_summary(asset: Asset) -> dict:
     }
     if asset.record_status != "Active":       # said, so an answer never presents a retired record as current
         out["status"] = asset.record_status
-    model = (asset.attributes or {}).get("model_name")
+    model = (asset.attributes or {}).get("beam_model")
     if model:                                 # where a beam element sits: one model is one line or ring
         out["model"] = model
     return out
@@ -93,6 +93,7 @@ def _issue_summary(issue: Issue) -> dict:
     attributes = issue.attributes or {}
     return {
         "uid": issue.uid,
+        "key": issue.key,
         "title": issue.title,
         "state": issue.state,
         "source_key": attributes.get("argus_source_key"),
@@ -291,11 +292,19 @@ def list_types(db: Session, workspace_id: str, query: Optional[str] = None) -> d
     }
 
 
+def _by_former_key(db: Session, key: str) -> Optional[Asset]:
+    """A record found by a key it had before (a beam element's btf:accumulator_pa/DHSA11)."""
+    from app.models.asset_subresources import AssetLabel
+    uid = db.scalar(select(AssetLabel.asset_uid).where(AssetLabel.type == "former_key", AssetLabel.value == key)
+                    .limit(1))
+    return db.get(Asset, uid) if uid else None
+
+
 def get_object(db: Session, workspace_id: str, uid_or_key: str) -> dict:
     """One object: its attributes, and what it is physically connected to."""
     asset = db.scalar(select(Asset).where(Asset.uid == uid_or_key)) or db.scalar(
         select(Asset).where(Asset.key == uid_or_key)
-    )
+    ) or _by_former_key(db, uid_or_key)
     if asset is None or not _asset_visible(db, asset, workspace_id):
         return {"found": False, "looked_for": uid_or_key}
 
@@ -335,6 +344,7 @@ def search_tickets(db: Session, workspace_id: str, query: str = "",
         if not needle
         or needle in (i.title or "").lower()
         or needle in (i.description or "").lower()
+        or needle in (i.key or "").lower()
     ]
     return {
         "total": len(rows),
@@ -345,7 +355,8 @@ def search_tickets(db: Session, workspace_id: str, query: str = "",
 def get_ticket(db: Session, workspace_id: str, uid: str) -> dict:
     """One ticket, including the ARGUS fields: cause, cure, downtime."""
     issue = db.scalar(
-        select(Issue).where(Issue.workspace_id == workspace_id, Issue.uid == uid, visible_issues_clause())
+        select(Issue).where(Issue.workspace_id == workspace_id, (Issue.uid == uid) | (Issue.key == uid),
+                            visible_issues_clause())
     )
     if issue is None:
         return {"found": False, "looked_for": uid}
@@ -672,12 +683,12 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "get_ticket",
-        "description": "One ticket by uid, including root cause, corrective action, "
+        "description": "One ticket by uid or key (BTF-TCK-0042), including root cause, corrective action, "
                        "affected system and downtime where they are recorded.",
         "handler": get_ticket,
         "inputSchema": {
             "type": "object",
-            "properties": {"uid": {"type": "string"}},
+            "properties": {"uid": {"type": "string", "description": "The ticket's uid or its key"}},
             "required": ["uid"],
         },
     },
@@ -1120,7 +1131,7 @@ def _link_text(o: dict) -> str:
 def add_links(result: Any, workspace_id: str, base: str) -> Any:
     """Give every record in a result the address of its page in the web app, so an
     assistant outside ARGUS (LibreChat, Claude) can link what it cites. The same records
-    the web's Ask page links: a code is a document, a key an asset, a source_key a ticket;
+    the web's Ask page links: a code is a document, a source_key a ticket, a key an asset;
     a graph node says its kind. `?ws=` opens the page in the workspace that was asked."""
     from urllib.parse import quote
 
@@ -1132,10 +1143,10 @@ def add_links(result: Any, workspace_id: str, base: str) -> Any:
             return None
         if "code" in o:
             return "documents"
+        if "source_key" in o:                 # a ticket has a key now too, and always a source_key
+            return "tickets"
         if "key" in o:
             return "assets"
-        if "source_key" in o:
-            return "tickets"
         return None
 
     def walk(v: Any) -> None:

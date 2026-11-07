@@ -653,6 +653,12 @@ def _load(db: Session, b: Bundle, rep: Report, new_ws: str, name: str, actor: Op
                 rep.renamed.append({"family": fname, "from": v, "to": f"{v}-{new_ws}",
                                     "why": f"{field_} used in this installation"})
 
+    # A ticket's key is in use here (the same bundle applied again, or the workspace it came from): it takes the
+    # next key of the new workspace instead, as any new ticket does.
+    from app.models.issue import Issue as _Issue
+    ticket_keys = [r["key"] for r in rows.get("tickets", []) if r.get("key")]
+    taken_ticket_keys = set(db.scalars(select(_Issue.key).where(_Issue.key.in_(ticket_keys)))) if ticket_keys else set()
+
     # ---- rows, in order
     obs_map: dict[int, int] = {}
     deferred: list[tuple[Any, str, Any]] = []
@@ -682,6 +688,10 @@ def _load(db: Session, b: Bundle, rep: Report, new_ws: str, name: str, actor: Op
                 if col == "workspace_id" and v is None:
                     v = new_ws
                 values[col] = v
+            if fname == "tickets" and values.get("key") in taken_ticket_keys:
+                rep.renamed.append({"family": fname, "from": values["key"], "to": "the next key here",
+                                    "why": "key used in this installation"})
+                values["key"] = None
             if fname in unique_new:
                 field_ = unique_cols[fname][1]
                 if values.get(field_) in unique_new[fname]:

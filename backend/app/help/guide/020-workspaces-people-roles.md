@@ -40,6 +40,20 @@ You need to be an administrator.
    **Administration → Settings**; it is used in URLs and record keys and **cannot be changed later**.
 3. Create it. You are its first member with full rights. Give others access next.
 
+## Record keys
+
+**Record keys** (**⚙ Workspace** menu) is the pattern a new record's key is made from, by default
+`{WS}-{TYPE}-{SEQ:4}` (`BTF-QUA-0007`). The same pattern gives:
+
+- **tickets** their key, with `TCK` as their type: `BTF-TCK-0042`. Search a ticket by its key, in the list or in
+  Ask ARGUS;
+- the records a **beam model** brings, instead of the name in the model file. The element keeps that name, and
+  says which model it belongs to (`beam_model`).
+
+Changing the pattern changes only new keys. Tickets made before tickets had keys, and beam model records keyed by
+the old rule (`btf:accumulator_pa/DHSA11`), get theirs when an administrator applies the pattern to them once; an
+old key stays as an alias, so a link or a note that names it still finds the record.
+
 ## Give a person or a group a role
 
 1. The person **signs in once**, so ARGUS knows them. (An administrator can also add someone before their

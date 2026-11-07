@@ -36,6 +36,7 @@ class IssueOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     uid: str
+    key: Optional[str] = None
     workspace_id: str
     asset_uid: Optional[str]
     schema_uid: Optional[str]

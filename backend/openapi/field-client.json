@@ -3538,6 +3538,17 @@
             ],
             "title": "Due Date"
           },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
           "labels": {
             "items": {
               "type": "string"

@@ -74,9 +74,11 @@ def candidate_assets(db: Session, workspace_id: str) -> list[dict]:
 
 
 def _component_uids(db: Session, workspace_id: str, model_id: str) -> dict[str, str]:
-    prefix = f"{workspace_id}:{model_id}/"
-    return {a.key[len(prefix):]: a.uid for a in db.scalars(select(Asset).where(
-        Asset.workspace_id == workspace_id, Asset.key.like(f"{prefix}%"))) if a.key and "/" not in a.key[len(prefix):]}
+    """A model's components by their id in it, from the import's identity bindings (not from their keys, which
+    follow the workspace's Record keys pattern)."""
+    from app.services.beam_model import model_ids
+    live = {a.uid for a in db.scalars(select(Asset).where(Asset.workspace_id == workspace_id))}
+    return {ident: uid for uid, ident in model_ids(db, workspace_id, model_id, "element").items() if uid in live}
 
 
 def existing_bindings(db: Session, workspace_id: str, model_id: str, comp_uids: dict[str, str]) -> list[dict]:

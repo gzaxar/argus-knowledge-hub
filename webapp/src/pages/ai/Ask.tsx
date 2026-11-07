@@ -105,7 +105,9 @@ function recordLinks(steps: AskStep[]): Map<string, string> {
     if (!v || typeof v !== "object") return;
     const o = v as Record<string, unknown>;
     if (typeof o.uid === "string") {
-      if (typeof o.key === "string") links.set(o.key, `/assets/${encodeURIComponent(o.uid)}`);
+      // A ticket carries a source_key (even an empty one) beside its key; an object only a key.
+      const ticket = "source_key" in o;
+      if (typeof o.key === "string") links.set(o.key, `/${ticket ? "tickets" : "assets"}/${encodeURIComponent(o.uid)}`);
       if (typeof o.code === "string") links.set(o.code, `/documents/${encodeURIComponent(o.uid)}`);
       if (typeof o.source_key === "string") links.set(o.source_key, `/tickets/${encodeURIComponent(o.uid)}`);
     }

@@ -39,6 +39,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.ledger import engine
+from app.models.ledger import IdentityBinding
 from app.models.asset import Asset, Relation
 from app.models.beam_model import BeamModelValue
 
@@ -699,18 +700,16 @@ class _Graph:
         seq = (path.attributes or {}).get("sequence") if path is not None else None
         if not seq:
             return None
-        if not hasattr(self, "_by_key"):
-            self._by_key = {}
-            for uid in {*self.member, *self.placed}:
-                a = self.asset(uid)
-                if a is not None and a.key:
-                    self._by_key[a.key] = uid
-        prefix = path.key.rsplit("/path/", 1)[0] if path.key and "/path/" in path.key else None
-        if prefix is None:
+        # The path's model, and its components by their id in it, from the identity bindings of the import.
+        ref = self.db.scalar(select(IdentityBinding.source_ref).where(IdentityBinding.uid == path_uid,
+                                                                      IdentityBinding.source_ref.like("beam-model:%")))
+        if ref is None:
             return None
+        _, ws, model, _rest = ref.split(":", 3)
+        by_id = {ident: uid for uid, ident in model_ids(self.db, ws, model, "element").items()}
         out = []
         for pid in seq:
-            uid = self._by_key.get(f"{prefix}/{pid.split('#', 1)[0]}")
+            uid = by_id.get(pid.split('#', 1)[0])
             if uid is not None:
                 out.append(uid)
         return out
@@ -1130,8 +1129,25 @@ def check_all(docs: list[dict]) -> list[dict]:
     return out
 
 
-def _local(a: Asset, ws: str, model: str, prefix: str = "") -> str:
-    """A record's id in its model, read back from the key the import gave it."""
+def model_ids(db: Session, workspace_id: str, model_id: str, kind: Optional[str] = None) -> dict[str, str]:
+    """uid -> the record's id in its model (of one kind: element, path, system…), from the identity binding the
+    import made: what it was called in the model, whatever its key now says."""
+    head = f"beam-model:{workspace_id}:{model_id}:" + (f"{kind}:" if kind else "")
+    out = {}
+    for ref, uid in db.execute(select(IdentityBinding.source_ref, IdentityBinding.uid)
+                               .where(IdentityBinding.source_ref.like(head + "%"))):
+        if not ref.startswith(head):          # `_` in a LIKE matches any character
+            continue
+        rest = ref[len(head):]
+        out[uid] = rest if kind else rest.split(":", 1)[-1]
+    return out
+
+
+def _local(db: Session, a: Asset, ws: str, model: str, prefix: str = "") -> str:
+    """A record's id in its model: from its identity binding, else from a key of the old form (ws:model/id)."""
+    ident = model_ids(db, ws, model).get(a.uid)
+    if ident:
+        return ident
     head = f"{ws}:{model}/{prefix}"
     return a.key[len(head):] if a.key and a.key.startswith(head) else (a.attributes or {}).get("model_name") or a.name
 
@@ -1205,14 +1221,14 @@ def export_canonical(db: Session, workspace_id: str, model_id: str, fmt: Optiona
     for s in systems:
         beams = []
         for b in bm_sources(db, "beam of", s.uid):
-            beams.append({"id": _local(b, ws, mid, "beam/"), **({"name": b.name} if b.name != _local(b, ws, mid, "beam/") else {}),
+            beams.append({"id": _local(db, b, ws, mid, "beam/"), **({"name": b.name} if b.name != _local(db, b, ws, mid, "beam/") else {}),
                           "kind": "photon" if b.type == "Photon Beam" else "particle", "parameters": clean(b.attributes)})
-        sid = _local(s, ws, mid)
+        sid = _local(db, s, ws, mid)
         out_systems.append({"id": sid, **({"name": s.name} if s.name != sid else {}),
                             "kind": (s.attributes or {}).get("system_kind") or "Other", "beams": beams})
     paths = sorted(of_type("Beam Path"), key=lambda a: a.key)
-    path_id = {p.uid: _local(p, ws, mid, "path/") for p in paths}
-    system_id = {s.uid: _local(s, ws, mid) for s in systems}
+    path_id = {p.uid: _local(db, p, ws, mid, "path/") for p in paths}
+    system_id = {s.uid: _local(db, s, ws, mid) for s in systems}
     elements, out_paths, observed = [], [], {}
     for p in paths:
         order = [u for u in ordered_elements(g, p.uid) if _live(g.asset(u))]
@@ -1271,7 +1287,7 @@ def export_canonical(db: Session, workspace_id: str, model_id: str, fmt: Optiona
             values[(el.attributes or {}).get("model_name")] = {
                 k: x for k, x in (("s", view["s"]), ("geometry", view["geometry"]), ("physics", view["physics"]),
                                   ("optics", view["optics"]), ("native", view["native"])) if x not in (None, {}, [])}
-        did = _local(d, ws, mid, "dataset/")
+        did = _local(db, d, ws, mid, "dataset/")
         datasets.append({"id": did, **({"name": d.name} if d.name != did else {}),
                          "kind": attrs.get("dataset_kind") or "other", "path": path_id[target.uid],
                          **{k: attrs[k] for k in ("source", "version", "git_commit", "simulator", "simulator_version",
@@ -1321,3 +1337,29 @@ def canonical_json(model: CanonicalModel) -> str:
 __all__ = ["import_canonical", "validate", "propose_bindings", "bindings", "path_graph", "ordered_elements",
            "neighbours", "between", "diagnostics", "correctors_upstream", "observables_of", "signals_for",
            "equipment", "controls", "context", "dataset_view", "ensure_signal", "BeamModelError", "ELEMENT_TYPES"]
+
+
+def rekey_records(db: Session, workspace_id: str, actor: str) -> list[tuple[str, str]]:
+    """Give the records the beam models of a workspace made before Record keys applied to them a key from the
+    workspace's pattern, keeping the old one (btf:accumulator_pa/DHSA11) as a `former_key` alias, so a link, a
+    note or a bookmark that names it still finds the record. Retired ones too: importing the model again brings
+    them back. (old key, new key) of each, by model then type then name; the caller commits."""
+    from app.ledger.identity import add_label
+    from app.models.ledger import IdentityBinding, RecordEvent
+    from app.models.schema import Schema
+    from app.services.asset_keys import allocate
+    bound = select(IdentityBinding.uid).where(IdentityBinding.source_ref.like(f"beam-model:{workspace_id}:%"))
+    rows = [a for a in db.scalars(select(Asset).where(Asset.workspace_id == workspace_id, Asset.uid.in_(bound),
+                                                      Asset.deleted_at.is_(None)))
+            if re.match(rf"^{re.escape(workspace_id)}:[^/]+/", a.key or "")]
+    rows.sort(key=lambda a: (a.key.split("/", 1)[0], a.type or "", a.name or "", a.key))
+    done = []
+    for a in rows:
+        new = allocate(db, workspace_id, db.get(Schema, a.schema_uid))
+        add_label(db, a.uid, "former_key", a.key, "beam-model")
+        db.add(RecordEvent(uid=a.uid, kind="rekeyed", before={"key": a.key}, after={"key": new},
+                           cause=f"Record keys applied to beam model records by {actor}", at=engine.now()))
+        done.append((a.key, new))
+        a.key = new
+    db.flush()
+    return done
