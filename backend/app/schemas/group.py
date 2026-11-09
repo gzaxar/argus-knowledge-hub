@@ -47,6 +47,16 @@ class GroupMemberOut(BaseModel):
     source: str
 
 
+class GroupAdministratorOut(BaseModel):
+    user_id: str
+    email: str
+    name: Optional[str] = None
+
+
+class GroupAdministratorIn(BaseModel):
+    email: str
+
+
 class DirectoryStatusOut(BaseModel):
     provider: str
     is_test_data: bool

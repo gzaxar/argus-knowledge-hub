@@ -136,3 +136,40 @@ def add_member(db: Session, group, user: User) -> bool:
     db.add(GroupMember(group_uid=group.uid, user_id=user.id, source="local"))
     db.flush()
     return True
+
+
+def invite_group_only(db: Session, group, text: str, *, inviter: Optional[str],
+                      send_email: bool, note: Optional[str] = None) -> dict:
+    """Maintain a local group before it has any workspace role.
+
+    No workspace access is granted here. The caller authorizes group membership and commits.
+    """
+    from app.services import notify
+    found, bad = addresses(text)
+    if not found:
+        raise InviteError("No e-mail address in what was given.")
+    if len(found) > MAX_AT_ONCE:
+        raise InviteError(f"At most {MAX_AT_ONCE} addresses at a time.")
+    results = []
+    for email in found:
+        user, made = person(db, email)
+        joined = add_member(db, group, user)
+        row = {"email": email, "user_id": user.id, "added": made, "granted": joined, "joined": joined,
+               "signed_in": user.oidc_sub is not None or user.last_login_at is not None,
+               "emailed": False, "error": None}
+        if send_email:
+            by = inviter or "A group administrator"
+            body = f"{by} added you to the ARGUS group {group.name}.\n"
+            if note and note.strip():
+                body += f"\n{note.strip()}\n"
+            body += f"\nSign in with {email}: {notify.web_url() or '(ask for the ARGUS address)'}\n"
+            try:
+                notify.send_plain(email, f"[ARGUS] Added to {group.name}", body)
+                row["emailed"] = True
+            except notify.MailError as e:
+                row["error"] = str(e)
+        results.append(row)
+    db.flush()
+    return {"workspace_id": "", "role_id": None, "role_name": None,
+            "group_uid": group.uid, "group_name": group.name, "group_granted": False,
+            "people": results, "not_addresses": bad}

@@ -1,20 +1,44 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.auth import Identity, OidcIdentity, get_identity, require_permission
+from app.auth import Identity, OidcIdentity, PatIdentity, get_identity, require_permission
 from app.db import get_db
-from app.models.group import Group, GroupMember
+from app.models.group import Group, GroupMember, GroupAdministrator
 from app.models.user import User
 from app.schemas.group import (DirectoryStatusOut, GroupCreate, GroupMemberOut, GroupMembersIn, GroupOut,
-                               GroupUpdate)
+                               GroupUpdate, GroupAdministratorOut, GroupAdministratorIn)
 from app.services import local_groups
 from app.services.directory import provider_name
 from app.services.directory_sync import sync_directory
+from app.services.permissions import resolve_permission
 
 router = APIRouter(prefix="/v1", tags=["directory"])
+
+
+def _may_read_group(db: Session, identity: Identity, group: Group, workspace_id: Optional[str]) -> None:
+    if local_groups.is_group_administrator(db, identity, group) and getattr(identity, "token", None) is None:
+        return
+    if isinstance(identity, PatIdentity):
+        if identity.workspace_id == workspace_id and identity.may("read"):
+            return
+    elif workspace_id and (identity.token is None or
+                           identity.token.workspace_id in (None, workspace_id)) and \
+            (identity.token is None or identity.token.may("read")) and \
+            resolve_permission(db, identity.user, workspace_id, "read", "objects"):
+        return
+    raise HTTPException(status_code=403, detail="Not permitted")
+
+
+@router.get("/groups/mine", response_model=list[GroupOut])
+def my_groups(identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    if not isinstance(identity, OidcIdentity) or identity.token is not None:
+        raise HTTPException(status_code=403, detail="Sign in to manage groups")
+    groups = db.scalars(select(Group).join(GroupAdministrator, GroupAdministrator.group_uid == Group.uid).where(
+        GroupAdministrator.user_id == identity.user.id, Group.source == "local").order_by(Group.name)).all()
+    return [_out(db, g) for g in groups]
 
 
 @router.get("/groups", response_model=list[GroupOut])
@@ -70,8 +94,53 @@ def create_group(body: GroupCreate, workspace_id: str = Depends(require_permissi
     from app.routers.workspaces import _require_owner_or_admin
     _require_owner_or_admin(workspace_id, identity, db)
     group = local_groups.create(db, body.name, body.description)
+    if isinstance(identity, OidcIdentity):
+        db.add(GroupAdministrator(group_uid=group.uid, user_id=identity.user.id))
     db.commit()
     return _out(db, group)
+
+
+@router.get("/groups/{uid}/administrators", response_model=list[GroupAdministratorOut])
+def list_group_administrators(uid: str, workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
+                              identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    _may_read_group(db, identity, _group(db, uid), workspace_id)
+    rows = db.execute(select(User).join(GroupAdministrator, GroupAdministrator.user_id == User.id).where(
+        GroupAdministrator.group_uid == uid).order_by(User.email)).scalars().all()
+    return [GroupAdministratorOut(user_id=u.id, email=u.email, name=u.name) for u in rows]
+
+
+@router.post("/groups/{uid}/administrators", response_model=GroupAdministratorOut, status_code=201)
+def add_group_administrator(uid: str, body: GroupAdministratorIn,
+                            workspace_id: str = Depends(require_permission("read")),
+                            identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    group = _group(db, uid)
+    local_groups.require_manage(db, identity, group, workspace_id)
+    from app.services.invitations import person
+    email = body.email.strip().lower()
+    from app.services.invitations import ADDRESS
+    if not ADDRESS.match(email):
+        raise HTTPException(status_code=422, detail="Enter a valid email address")
+    user, _ = person(db, email)
+    if db.scalar(select(GroupAdministrator.id).where(
+        GroupAdministrator.group_uid == uid, GroupAdministrator.user_id == user.id)):
+        raise HTTPException(status_code=409, detail="Already a group administrator")
+    db.add(GroupAdministrator(group_uid=uid, user_id=user.id))
+    db.commit()
+    return GroupAdministratorOut(user_id=user.id, email=user.email, name=user.name)
+
+
+@router.delete("/groups/{uid}/administrators/{user_id}", status_code=204)
+def remove_group_administrator(uid: str, user_id: str,
+                               workspace_id: str = Depends(require_permission("read")),
+                               identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    group = _group(db, uid)
+    local_groups.require_manage(db, identity, group, workspace_id)
+    row = db.scalar(select(GroupAdministrator).where(
+        GroupAdministrator.group_uid == uid, GroupAdministrator.user_id == user_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Group administrator not found")
+    db.delete(row)
+    db.commit()
 
 
 @router.patch("/groups/{uid}", response_model=GroupOut)
@@ -91,18 +160,25 @@ def update_group(uid: str, body: GroupUpdate, workspace_id: str = Depends(requir
 
 
 @router.post("/groups/{uid}/members")
-def add_group_members(uid: str, body: GroupMembersIn, workspace_id: str = Depends(require_permission("read")),
+def add_group_members(uid: str, body: GroupMembersIn, workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
                       identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
     """People into a local group by e-mail address, added first when nobody knows them yet; told by e-mail when
     asked. They have, here and wherever the group holds a role, what the group has."""
     from app.services import invitations
     group = _group(db, uid)
-    local_groups.require_manage(db, identity, group, workspace_id)
+    local_groups.require_manage_members(db, identity, group, workspace_id)
+    bound_workspaces = local_groups.workspaces_of(db, uid)
+    invite_workspace = workspace_id if workspace_id in bound_workspaces else next(iter(bound_workspaces), None)
     user = identity.user if isinstance(identity, OidcIdentity) else None
     try:
-        out = invitations.invite(db, workspace_id, body.emails, None, created_by=user.id if user else None,
-                                 inviter=(user.name or user.email) if user else None, send_email=body.send_email,
-                                 note=body.message, group=group)
+        if invite_workspace:
+            out = invitations.invite(db, invite_workspace, body.emails, None, created_by=user.id if user else None,
+                                     inviter=(user.name or user.email) if user else None, send_email=body.send_email,
+                                     note=body.message, group=group)
+        else:
+            out = invitations.invite_group_only(db, group, body.emails,
+                                                inviter=(user.name or user.email) if user else None,
+                                                send_email=body.send_email, note=body.message)
     except invitations.InviteError as e:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(e)) from e
@@ -111,10 +187,10 @@ def add_group_members(uid: str, body: GroupMembersIn, workspace_id: str = Depend
 
 
 @router.delete("/groups/{uid}/members/{user_id}", status_code=204)
-def remove_group_member(uid: str, user_id: str, workspace_id: str = Depends(require_permission("read")),
+def remove_group_member(uid: str, user_id: str, workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
                         identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
     group = _group(db, uid)
-    local_groups.require_manage(db, identity, group, workspace_id)
+    local_groups.require_manage_members(db, identity, group, workspace_id)
     if not local_groups.remove_member(db, group, user_id):
         raise HTTPException(status_code=404, detail="Not a member of this group")
     db.commit()
@@ -123,11 +199,11 @@ def remove_group_member(uid: str, user_id: str, workspace_id: str = Depends(requ
 @router.get("/groups/{uid}/members", response_model=list[GroupMemberOut])
 def list_group_members(
     uid: str,
-    workspace_id: str = Depends(require_permission("read")),
+    workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
+    identity: Identity = Depends(get_identity),
     db: Session = Depends(get_db),
 ):
-    if db.get(Group, uid) is None:
-        raise HTTPException(status_code=404, detail="Group not found")
+    _may_read_group(db, identity, _group(db, uid), workspace_id)
     rows = db.execute(
         select(User, GroupMember)
         .join(GroupMember, GroupMember.user_id == User.id)

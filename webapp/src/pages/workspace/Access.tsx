@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ApiError, directoryApi, membersApi, rolesApi } from "../../api/client";
+import { ApiError, directoryApi, membersApi, rolesApi, sitesApi, workspacesApi } from "../../api/client";
 import { Role } from "../../api/types";
 
 const RESOURCE_LABELS: [string, string][] = [
@@ -44,6 +44,8 @@ export function WorkspaceAccess() {
   const roles = useQuery({ queryKey: ["roles"], queryFn: rolesApi.list });
   const groups = useQuery({ queryKey: ["groups"], queryFn: () => directoryApi.groups() });
   const directory = useQuery({ queryKey: ["directory-status"], queryFn: directoryApi.status });
+  const mine = useQuery({ queryKey: ["my-workspaces"], queryFn: workspacesApi.listMine });
+  const isSite = mine.data?.find((w) => w.id === workspaceId)?.role === "site";
   const people = useQuery({
     queryKey: ["member-directory", workspaceId],
     queryFn: membersApi.directory,
@@ -271,6 +273,8 @@ export function WorkspaceAccess() {
         queryClient.invalidateQueries({ queryKey: ["member-directory", workspaceId] });
       }} />
 
+      {isSite && <SiteAdministrators siteId={workspaceId!} />}
+
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -337,6 +341,38 @@ export function WorkspaceAccess() {
       </div>
     </div>
   );
+}
+
+
+function SiteAdministrators({ siteId }: { siteId: string }) {
+  const qc = useQueryClient();
+  const [email, setEmail] = useState("");
+  const admins = useQuery({ queryKey: ["site-administrators", siteId], queryFn: () => sitesApi.administrators(siteId) });
+  const refresh = () => { void qc.invalidateQueries({ queryKey: ["site-administrators", siteId] });
+                        void qc.invalidateQueries({ queryKey: ["my-workspaces"] }); };
+  const add = useMutation({ mutationFn: () => sitesApi.addAdministrator(siteId, email),
+    onSuccess: () => { setEmail(""); refresh(); } });
+  const remove = useMutation({ mutationFn: (userId: string) => sitesApi.removeAdministrator(siteId, userId),
+    onSuccess: refresh });
+  return <section className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+    <h2 className="text-sm font-semibold text-slate-900">Site administrators</h2>
+    <p className="mt-1 text-sm text-slate-500">These people can manage access to this site and every workspace currently at it. They can grant roles to people and groups.</p>
+    <ul className="mt-3 divide-y divide-slate-100 text-sm">
+      {(admins.data ?? []).map((a) => <li key={a.user_id} className="flex justify-between gap-3 py-2">
+        <span>{a.name || a.email} {a.name && <span className="text-slate-500">{a.email}</span>}</span>
+        <button type="button" onClick={() => remove.mutate(a.user_id)} className="text-xs text-red-600">Remove</button>
+      </li>)}
+      {admins.data?.length === 0 && <li className="py-2 text-slate-500">No site administrator assigned.</li>}
+    </ul>
+    <form onSubmit={(e) => { e.preventDefault(); if (email.trim()) add.mutate(); }} className="mt-3 flex flex-wrap gap-2">
+      <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+             aria-label="Site administrator email" placeholder="Administrator email"
+             className="min-w-48 flex-1 rounded border border-slate-300 px-2 py-1.5 text-sm" />
+      <button type="submit" disabled={add.isPending} className="rounded bg-slate-900 px-3 py-1.5 text-sm text-white">Add administrator</button>
+    </form>
+    {(add.error || remove.error) && <p className="mt-2 text-sm text-red-600">
+      {((add.error || remove.error) as ApiError)?.detail ?? "Could not update site administrators."}</p>}
+  </section>;
 }
 
 

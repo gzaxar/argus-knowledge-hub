@@ -930,6 +930,12 @@ export interface DirectoryGroupMember {
   source: string;
 }
 
+export interface ScopedAdministrator {
+  user_id: string;
+  email: string;
+  name: string | null;
+}
+
 export interface DirectoryStatus {
   provider: string;
   is_test_data: boolean;

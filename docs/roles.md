@@ -8,11 +8,15 @@ groups. Everything a person may do is held in ARGUS and granted there.
 
 | | What it is | Where it is set |
 |---|---|---|
-| **Administrator** | A flag on a person: everything, in every workspace, plus creating workspaces and managing people | `ARGUS_BOOTSTRAP_ADMINS` for the first ones; then *Administration → Users*, or `argus_admin.py user admin <email> on` |
+| **Instance administrator** | A flag on a person: everything, in every workspace, plus creating workspaces and managing people | `ARGUS_BOOTSTRAP_ADMINS` for the first ones; then *Administration → Users*, or `argus_admin.py user admin <email> on` |
+| **Site administrator** | A person who manages access to one site and its current facility workspaces | the site's *Access* page |
+| **Group administrator** | A person who manages the membership of one local group | *Groups* or *My groups* in Administration |
 | **Role** | A named set of permissions | built in (below), or a template installed in the workspace |
-| **Grant** (role binding) | A role given to a person **or a group** in **one workspace** | the workspace's *Members* page, `tools/argus-admin grant`, or `POST /v1/workspaces/{id}/bindings` |
-| **Group** | People granted together; synchronised from the directory | the workspace's *Access* page, *Directory* (`POST /v1/directory/sync`) |
+| **Grant** (role binding) | A role given to a person **or a group** in **one workspace** | the workspace's *Access* page, `tools/argus-admin grant`, or `POST /v1/workspaces/{id}/bindings` |
+| **Group** | People granted together; created locally or synchronised from a directory | *Groups* in Administration, or directory sync (`POST /v1/directory/sync`) |
 | **Workspace defaults** | What anyone signed in may do in a workspace where they hold no grant at all | the workspace's settings (`default_can_…`) |
+
+Site-owned local groups and site-wide group grants are specified in [Administration scopes](administration-scopes.md#proposed-site-level-groups-and-group-access). They are **proposed**, not part of the current permission calculation; grants in this section still name one workspace.
 
 A person can hold **several roles**, in the same workspace and in different ones: owner of SPARC and
 viewer of BTF, or both reporter and approver in SPARC. Their permissions add up, with those of every
@@ -46,6 +50,7 @@ Present in every instance (`tools/argus-admin role list`), and kept current by e
 | `approver` | read | read | read, approve | approves and publishes controlled documents |
 | `contributor` | read, create, modify | read, create, modify | read, create, modify | never deletes |
 | `curator` | all but approve | all but approve | all but approve | types, global values and imports |
+| `workspace_admin` | read | read | read | manages access in this workspace |
 | `owner` | all but approve | all but approve | all | grants and revokes roles in the workspace |
 
 ## Domain roles (templates)
@@ -76,14 +81,14 @@ For a person, an action and a resource in a workspace, in order:
 
 1. **A workspace being imported** (portability staging) is closed to everyone until it is finalized; an
    evidence import is read-only.
-2. **An administrator** may.
-3. **The person's grants** are added together: roles given to them, roles given to any group they are
+2. **An instance administrator** may. A site administrator has read access and can manage members in the site and its current facilities.
+3. **The person's grants** are added together: roles given to them, roles given to any active group they are
    in, and the per-person flags of workspaces created before roles existed. If any of them has the
    action, they may. Grants only add; nothing subtracts.
 4. **Held something here, but not this:** no. A viewer is not given `create` by an open workspace.
 5. **Held nothing here at all:** the workspace's defaults decide. They are all off unless set.
 
-Who may grant: an administrator, or someone with `manage_members` on that workspace (an owner).
+Who may grant: an instance administrator, a site administrator for the site or its facility, or someone with `manage_members` on that workspace (an Owner or Workspace administrator).
 Installing the templates and running access reviews needs `approve` on objects (an administrator, or
 an inventory or IT steward).
 

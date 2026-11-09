@@ -52,3 +52,15 @@ class GroupMember(Base):
     )
     source: Mapped[str] = mapped_column(String, default="local")
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class GroupAdministrator(Base):
+    """A person entrusted with membership of one locally managed group."""
+
+    __tablename__ = "group_administrators"
+    __table_args__ = (UniqueConstraint("group_uid", "user_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    group_uid: Mapped[str] = mapped_column(String, ForeignKey("groups.uid", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
