@@ -48,13 +48,13 @@ from app.models.ledger import (Claim, ClaimEvent, Conflict, ConflictEvent, Decis
 from app.models.beam_model import BeamAssetBinding, BeamModelDocument, BeamModelValue
 from app.models.equipment_class import EquipmentClass, EquipmentClassReview
 from app.models.global_value import GlobalValue
-from app.models.group import Group, GroupMember
+from app.models.group import Group, GroupMember, GroupAdministrator
 from app.models.membership import Membership
 from app.models.role import Role, RoleBinding
 from app.models.schema import Schema
 from app.models.user import User
 from app.models.workflow import TicketWatcher, Workflow
-from app.models.workspace import Workspace
+from app.models.workspace import Workspace, SiteAdministrator
 
 # Columns that describe this instance, not the history: never exported, set locally on import.
 LOCAL_COLUMNS = ("recorded_at",)
@@ -216,6 +216,9 @@ def _users(db, sc):
     ids |= {u for u in db.scalars(select(Document.owner_user_id).where(Document.workspace_id.in_(sc.workspaces))) if u}
     ids |= set(db.scalars(select(GroupMember.user_id).where(GroupMember.group_uid.in_(
         _groups(db, sc).with_only_columns(Group.uid)))))
+    ids |= set(db.scalars(select(GroupAdministrator.user_id).where(GroupAdministrator.group_uid.in_(
+        _groups(db, sc).with_only_columns(Group.uid)))))
+    ids |= set(db.scalars(select(SiteAdministrator.user_id).where(SiteAdministrator.site_id.in_(sc.workspaces))))
     for col in ("authored_by", "approved_by"):
         ids |= {u for u in db.scalars(select(getattr(DocumentRevision, col)).where(
             DocumentRevision.document_uid.in_(sc.documents()))) if u}
@@ -260,6 +263,13 @@ FAMILIES: list[Family] = [
            lambda db, sc: select(GroupMember).where(GroupMember.group_uid.in_(
                _groups(db, sc).with_only_columns(Group.uid))).order_by(GroupMember.id),
            exclude=("id",), replace_set=True),
+    Family("group_administrators", "access", GroupAdministrator, ("group_uid", "user_id"),
+           lambda db, sc: select(GroupAdministrator).where(GroupAdministrator.group_uid.in_(
+               _groups(db, sc).with_only_columns(Group.uid))).order_by(GroupAdministrator.id),
+           exclude=("id",), replace_set=True),
+    Family("site_administrators", "access", SiteAdministrator, ("site_id", "user_id"),
+           lambda db, sc: select(SiteAdministrator).where(SiteAdministrator.site_id.in_(sc.workspaces))
+               .order_by(SiteAdministrator.id), exclude=("id",), replace_set=True),
     # Shared value lists (statuses, priorities…) per workspace.
     Family("global_values", "access", GlobalValue, ("uid",), _ws(GlobalValue, (GlobalValue.uid,))),
     Family("memberships", "access", Membership, ("workspace_id", "user_id"), _ws(Membership, (Membership.id,)),

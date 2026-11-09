@@ -82,6 +82,7 @@ import type {
   InvitationResult,
   DirectoryGroup,
   DirectoryGroupMember,
+  ScopedAdministrator,
   DirectoryStatus,
   EffectivePermissions,
   Graph,
@@ -942,9 +943,15 @@ export const rolesApi = {
 };
 
 export const directoryApi = {
+  myGroups: () => request<DirectoryGroup[]>("/v1/groups/mine"),
   groups: (search?: string) =>
     request<DirectoryGroup[]>(`/v1/groups${search ? `?search=${encodeURIComponent(search)}` : ""}`),
   groupMembers: (uid: string) => request<DirectoryGroupMember[]>(`/v1/groups/${uid}/members`),
+  groupAdministrators: (uid: string) => request<ScopedAdministrator[]>(`/v1/groups/${uid}/administrators`),
+  addGroupAdministrator: (uid: string, email: string) =>
+    request<ScopedAdministrator>(`/v1/groups/${uid}/administrators`, { method: "POST", body: json({ email }) }),
+  removeGroupAdministrator: (uid: string, userId: string) =>
+    request<void>(`/v1/groups/${uid}/administrators/${encodeURIComponent(userId)}`, { method: "DELETE" }),
   allGroups: () => request<DirectoryGroup[]>("/v1/groups?include_inactive=true"),
   createGroup: (input: { name: string; description?: string }) =>
     request<DirectoryGroup>("/v1/groups", { method: "POST", body: json(input) }),
@@ -3134,6 +3141,14 @@ export interface PlacementEnding {
 
 /** Sites: laboratories whose places their facility workspaces use (administrators). */
 export const sitesApi = {
+  administrators: (siteId: string) =>
+    request<ScopedAdministrator[]>(`/v1/admin/sites/${encodeURIComponent(siteId)}/administrators`),
+  addAdministrator: (siteId: string, email: string) =>
+    request<ScopedAdministrator>(`/v1/admin/sites/${encodeURIComponent(siteId)}/administrators`,
+      { method: "POST", body: json({ email }) }),
+  removeAdministrator: (siteId: string, userId: string) =>
+    request<void>(`/v1/admin/sites/${encodeURIComponent(siteId)}/administrators/${encodeURIComponent(userId)}`,
+      { method: "DELETE" }),
   list: () => request<{ id: string; name: string; facilities: string[]; shared_places: number; withheld: number }[]>(
     "/v1/admin/sites"),
   setRole: (workspaceId: string, site: boolean) =>

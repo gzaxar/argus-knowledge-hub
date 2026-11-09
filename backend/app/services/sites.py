@@ -15,12 +15,12 @@ from __future__ import annotations
 
 from typing import Iterable, Optional
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models.asset import Asset
 from app.models.schema import Schema
-from app.models.workspace import Workspace
+from app.models.workspace import Workspace, SiteAdministrator
 
 ROLE = "site"
 PLACE_ROOT = "Location"
@@ -67,6 +67,8 @@ def set_role(db: Session, workspace_id: str, site: bool) -> list[str]:
         raise SiteProblem(f"{workspace_id} has facilities ({', '.join(facilities(db, workspace_id))}): "
                           f"set them at another site, or at none, first")
     ws.role = None
+    # A later return to site status must not silently revive old administrators.
+    db.execute(delete(SiteAdministrator).where(SiteAdministrator.site_id == workspace_id))
     db.flush()
     return refresh(db, workspace_id)
 

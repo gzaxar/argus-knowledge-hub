@@ -12,7 +12,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.group import Group, GroupMember
+from app.models.group import Group, GroupMember, GroupAdministrator
 from app.models.role import RoleBinding
 
 
@@ -38,6 +38,20 @@ def require_manage(db: Session, identity, group: Group, workspace_id: Optional[s
         except HTTPException:
             raise HTTPException(status_code=403, detail=f"{group.name} holds a role in workspace {ws}, which you do "
                                                         "not manage: an administrator can change it")
+
+
+def is_group_administrator(db: Session, identity, group: Group) -> bool:
+    user = getattr(identity, "user", None)
+    return user is not None and db.scalar(select(GroupAdministrator.id).where(
+        GroupAdministrator.group_uid == group.uid, GroupAdministrator.user_id == user.id)) is not None
+
+
+def require_manage_members(db: Session, identity, group: Group, workspace_id: Optional[str]) -> None:
+    if group.source != "local":
+        raise HTTPException(status_code=409, detail=f"{group.name} is directory-managed: change its members there")
+    if getattr(identity, "token", None) is None and is_group_administrator(db, identity, group):
+        return
+    require_manage(db, identity, group, workspace_id)
 
 
 def create(db: Session, name: str, description: Optional[str]) -> Group:

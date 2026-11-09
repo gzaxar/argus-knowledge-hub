@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { directoryApi, membersApi, rolesApi } from "../api/client";
+import { directoryApi, membersApi, rolesApi, workspacesApi } from "../api/client";
 import type { DirectoryGroup } from "../api/types";
 import { WorkspaceAccess } from "../pages/workspace/Access";
 import { WorkspaceGroups } from "../pages/workspace/Groups";
@@ -60,6 +60,9 @@ describe("groups", () => {
     const add = vi.spyOn(directoryApi, "addGroupMembers").mockResolvedValue({
       workspace_id: "btf", role_id: null, role_name: null, people: [], not_addresses: [] });
     const create = vi.spyOn(directoryApi, "createGroup").mockResolvedValue(group("Vacuum"));
+    vi.spyOn(workspacesApi, "me").mockResolvedValue({ user_id: "me", email: "me@infn.it", is_admin: false } as never);
+    vi.spyOn(rolesApi, "myPermissions").mockResolvedValue({ workspace: ["manage_members"] } as never);
+    vi.spyOn(directoryApi, "groupAdministrators").mockResolvedValue([]);
     renderWith(<WorkspaceGroups />, { path: "/workspaces/btf/groups" });
     fireEvent.click(await screen.findByText("Shift crew"));
     expect(await screen.findByText("ann@infn.it")).toBeInTheDocument();

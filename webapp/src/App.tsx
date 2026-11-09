@@ -193,6 +193,7 @@ export function App() {
           <Route path="/workspaces/:workspaceId/integrity" element={<WorkspaceIntegrity />} />
           <Route path="/workspaces/:workspaceId/keys" element={<WorkspaceKeys />} />
           <Route path="/workspaces/:workspaceId/groups" element={<WorkspaceGroups />} />
+          <Route path="/admin/my-groups" element={<WorkspaceGroups />} />
           <Route path="/workspaces/:workspaceId/packages" element={<WorkspacePackages />} />
           <Route path="/workspaces/:workspaceId/glpi" element={<GlpiPage />} />
           <Route path="/workspaces/:workspaceId/icons" element={<IconLibrary />} />

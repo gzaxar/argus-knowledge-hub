@@ -278,6 +278,8 @@ NOT_CARRIED = {
        for t in ("type_migrations", "type_migration_items")},
     "groups": "directory groups belong to the installation's directory: role bindings to a group need it there",
     "group_members": "directory groups belong to the installation's directory",
+    "group_administrators": "who administers a group is decided in each installation, not carried by a workspace",
+    "site_administrators": "who administers a site is decided in each installation, not carried by a workspace",
     "alembic_version": "the database's own schema revision",
     "spatial_ref_sys": "PostGIS's catalogue of coordinate systems, the same in every installation",
     **{t: "the meaning-search index is built from the records with the target's own embedding model "

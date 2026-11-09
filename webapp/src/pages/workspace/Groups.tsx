@@ -1,14 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ApiError, directoryApi } from "../../api/client";
+import { ApiError, directoryApi, rolesApi, workspacesApi } from "../../api/client";
 import type { DirectoryGroup } from "../../api/types";
 
 /** The groups people are put in, to give them roles together: those made here, and the directory's (read only). */
 export function WorkspaceGroups() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const qc = useQueryClient();
-  const groups = useQuery({ queryKey: ["groups", "all"], queryFn: directoryApi.allGroups });
+  const groups = useQuery({ queryKey: ["groups", workspaceId ? "all" : "mine"],
+    queryFn: workspaceId ? directoryApi.allGroups : directoryApi.myGroups });
+  const me = useQuery({ queryKey: ["me"], queryFn: workspacesApi.me });
+  const access = useQuery({ queryKey: ["my-permissions", workspaceId],
+    queryFn: () => rolesApi.myPermissions(workspaceId!), enabled: !!workspaceId });
   const [open, setOpen] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -29,13 +33,13 @@ export function WorkspaceGroups() {
     <div className="max-w-4xl">
       <h1 className="text-2xl font-semibold text-slate-900">Groups</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Put people in a group and give the group a role on{" "}
-        <Link to={`/workspaces/${workspaceId}/access`} className="text-indigo-600 hover:underline">Access</Link>: whoever
-        joins it later has the role too. A group can hold roles in several workspaces, so its members are changed by
-        an administrator, or by someone who manages every workspace where it holds one. The directory&apos;s groups are
-        shown for reference and are changed in the directory.
+        {workspaceId ? <>Put people in a group and give the group a role on{" "}
+          <Link to={`/workspaces/${workspaceId}/access`} className="text-indigo-600 hover:underline">Access</Link>: whoever
+          joins it later has the role too. </> : <>Groups assigned to you as an administrator. </>}
+        A group can hold roles in several workspaces. Its named administrators manage members; directory groups are changed in the directory.
       </p>
 
+      {workspaceId && (me.data?.is_admin || access.data?.workspace.includes("manage_members")) &&
       <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) create.mutate(); }}
             className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New group name" required
@@ -47,34 +51,36 @@ export function WorkspaceGroups() {
           Create group
         </button>
         {create.isError && <span className="text-red-600">{(create.error as ApiError)?.detail ?? "Could not create it."}</span>}
-      </form>
+      </form>}
 
       <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find a group"
              aria-label="Find a group" className="mt-4 w-64 rounded border border-slate-300 px-2 py-1.5 text-sm" />
 
-      <h2 className="mt-5 text-sm font-semibold text-slate-900">Made here ({local.length})</h2>
+      <h2 className="mt-5 text-sm font-semibold text-slate-900">{workspaceId ? "Made here" : "Assigned to me"} ({local.length})</h2>
       <ul className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
         {local.map((g) => (
           <GroupRow key={g.uid} group={g} open={open === g.uid} onToggle={() => setOpen(open === g.uid ? null : g.uid)}
-                    onChanged={refresh} editable />
+                    onChanged={refresh} editable canAppoint={!!workspaceId && (!!me.data?.is_admin || !!access.data?.workspace.includes("manage_members"))}
+                    currentUserId={me.data?.user_id} />
         ))}
         {local.length === 0 && <li className="px-4 py-3 text-sm text-slate-400">None yet.</li>}
       </ul>
 
-      <h2 className="mt-5 text-sm font-semibold text-slate-900">From the directory ({directory.length})</h2>
+      {workspaceId && <><h2 className="mt-5 text-sm font-semibold text-slate-900">From the directory ({directory.length})</h2>
       <ul className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
         {directory.map((g) => (
           <GroupRow key={g.uid} group={g} open={open === g.uid} onToggle={() => setOpen(open === g.uid ? null : g.uid)}
-                    onChanged={refresh} editable={false} />
+                    onChanged={refresh} editable={false} canAppoint={false} currentUserId={me.data?.user_id} />
         ))}
         {directory.length === 0 && <li className="px-4 py-3 text-sm text-slate-400">None.</li>}
-      </ul>
+      </ul></>}
     </div>
   );
 }
 
-function GroupRow({ group: g, open, onToggle, onChanged, editable }: {
+function GroupRow({ group: g, open, onToggle, onChanged, editable, canAppoint, currentUserId }: {
   group: DirectoryGroup; open: boolean; onToggle: () => void; onChanged: () => void; editable: boolean;
+  canAppoint: boolean; currentUserId?: string | null;
 }) {
   return (
     <li className="px-4 py-2">
@@ -89,14 +95,22 @@ function GroupRow({ group: g, open, onToggle, onChanged, editable }: {
           {!g.active && " · inactive"}
         </span>
       </button>
-      {open && <GroupDetail group={g} onChanged={onChanged} editable={editable} />}
+      {open && <GroupDetail group={g} onChanged={onChanged} editable={editable}
+                            canAppoint={canAppoint} currentUserId={currentUserId} />}
     </li>
   );
 }
 
-function GroupDetail({ group: g, onChanged, editable }: { group: DirectoryGroup; onChanged: () => void; editable: boolean }) {
+function GroupDetail({ group: g, onChanged, editable, canAppoint, currentUserId }: {
+  group: DirectoryGroup; onChanged: () => void; editable: boolean;
+  canAppoint: boolean; currentUserId?: string | null;
+}) {
   const qc = useQueryClient();
   const members = useQuery({ queryKey: ["group-members", g.uid], queryFn: () => directoryApi.groupMembers(g.uid) });
+  const administrators = useQuery({ queryKey: ["group-administrators", g.uid],
+    queryFn: () => directoryApi.groupAdministrators(g.uid), enabled: editable });
+  const canEditMembers = editable && (canAppoint || !!administrators.data?.some((a) => a.user_id === currentUserId));
+  const [administratorEmail, setAdministratorEmail] = useState("");
   const [emails, setEmails] = useState("");
   const [sendEmail, setSendEmail] = useState(true);
   const [rename, setRename] = useState(g.name);
@@ -110,15 +124,37 @@ function GroupDetail({ group: g, onChanged, editable }: { group: DirectoryGroup;
     mutationFn: (input: { name?: string; active?: boolean }) => directoryApi.updateGroup(g.uid, input),
     onSuccess: done,
   });
-  const error = [add, remove, update].find((m) => m.isError)?.error as ApiError | undefined;
+  const appoint = useMutation({ mutationFn: () => directoryApi.addGroupAdministrator(g.uid, administratorEmail),
+    onSuccess: () => { setAdministratorEmail(""); void qc.invalidateQueries({ queryKey: ["group-administrators", g.uid] }); } });
+  const revoke = useMutation({ mutationFn: (userId: string) => directoryApi.removeGroupAdministrator(g.uid, userId),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["group-administrators", g.uid] }) });
+  const error = [add, remove, update, appoint, revoke].find((m) => m.isError)?.error as ApiError | undefined;
   return (
     <div className="mt-2 space-y-3 rounded bg-slate-50 p-3 text-sm">
+      {editable && <section className="rounded border border-slate-200 bg-white p-3">
+        <h3 className="font-medium text-slate-900">Group administrators</h3>
+        <p className="mt-1 text-xs text-slate-500">They manage this group&apos;s members. Membership changes affect every workspace listed above.</p>
+        <ul className="mt-2 space-y-1">
+          {(administrators.data ?? []).map((a) => <li key={a.user_id} className="flex justify-between gap-2">
+            <span>{a.name || a.email} <span className="text-slate-500">{a.name ? a.email : ""}</span></span>
+            {canAppoint && <button type="button" className="text-xs text-red-600" onClick={() => revoke.mutate(a.user_id)}>Remove</button>}
+          </li>)}
+          {administrators.data?.length === 0 && <li className="text-slate-500">No group administrator assigned.</li>}
+        </ul>
+        {canAppoint && <form onSubmit={(e) => { e.preventDefault(); if (administratorEmail.trim()) appoint.mutate(); }}
+                               className="mt-2 flex gap-2">
+          <input type="email" required value={administratorEmail} onChange={(e) => setAdministratorEmail(e.target.value)}
+                 placeholder="Administrator email" aria-label="Group administrator email"
+                 className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1" />
+          <button type="submit" disabled={appoint.isPending} className="rounded border border-slate-300 px-3 py-1">Add administrator</button>
+        </form>}
+      </section>}
       <ul className="space-y-1">
         {(members.data ?? []).map((m) => (
           <li key={m.user_id} className="flex items-center justify-between gap-2">
             <span>{m.name ? `${m.name} · ` : ""}<span className="text-slate-600">{m.email}</span>
               {!m.active && <span className="ml-2 text-xs text-slate-400">inactive</span>}</span>
-            {editable && (
+            {canEditMembers && (
               <button type="button" className="text-xs text-red-500 hover:text-red-700"
                       onClick={() => { if (confirm(`Take ${m.email} out of ${g.name}?`)) remove.mutate(m.user_id); }}>
                 Remove
@@ -128,7 +164,7 @@ function GroupDetail({ group: g, onChanged, editable }: { group: DirectoryGroup;
         ))}
         {members.data?.length === 0 && <li className="text-slate-400">Nobody in it yet.</li>}
       </ul>
-      {editable && (
+      {canEditMembers && (
         <>
           <form onSubmit={(e) => { e.preventDefault(); if (emails.trim()) add.mutate(); }} className="space-y-2">
             <textarea value={emails} onChange={(e) => setEmails(e.target.value)} rows={2} aria-label="Addresses to add"
@@ -152,7 +188,7 @@ function GroupDetail({ group: g, onChanged, editable }: { group: DirectoryGroup;
               {add.data.not_addresses.length > 0 && <li className="text-red-600">Not addresses: {add.data.not_addresses.join(", ")}</li>}
             </ul>
           )}
-          <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2">
+          {canAppoint && <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2">
             <input value={rename} onChange={(e) => setRename(e.target.value)} aria-label="Group name"
                    className="w-56 rounded border border-slate-300 px-2 py-1" />
             <button type="button" disabled={!rename.trim() || rename === g.name} onClick={() => update.mutate({ name: rename })}
@@ -162,7 +198,7 @@ function GroupDetail({ group: g, onChanged, editable }: { group: DirectoryGroup;
               {g.active ? "Deactivate" : "Reactivate"}
             </button>
             <span className="text-xs text-slate-500">A deactivated group keeps its members; its roles stop applying.</span>
-          </div>
+          </div>}
         </>
       )}
       {error && <p className="text-red-600">{error.detail ?? "Could not do that."}</p>}

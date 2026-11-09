@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { workspacesApi } from "../api/client";
+import { directoryApi, workspacesApi } from "../api/client";
 import { useCurrentWorkspaceId } from "../api/useCurrentWorkspaceId";
 
 export function AdminShell() {
@@ -8,6 +8,8 @@ export function AdminShell() {
   const currentWorkspaceId = useCurrentWorkspaceId();
 
   const mine = useQuery({ queryKey: ["my-workspaces"], queryFn: workspacesApi.listMine });
+  const managedGroups = useQuery({ queryKey: ["groups", "mine"], queryFn: directoryApi.myGroups,
+    enabled: me.data?.auth_type === "oidc" });
   const location = useLocation();
 
   // Two kinds of page: those about the current workspace only, and those about the whole installation.
@@ -41,6 +43,7 @@ export function AdminShell() {
   } else if (me.data?.catalogue_maintainer) {
     globalItems.push({ to: "/admin/catalogue", label: "Catalogue" });
   }
+  if ((managedGroups.data?.length ?? 0) > 0) globalItems.push({ to: "/admin/my-groups", label: "My groups" });
 
   const pageWorkspace = location.pathname.match(/^\/workspaces\/([^/]+)/)?.[1]
     ?? (location.pathname.startsWith("/admin/migration") ? currentWorkspaceId : null);
@@ -81,8 +84,8 @@ export function AdminShell() {
           )}
           {globalItems.length > 0 && (
             <div className="space-y-1">
-              <p className="px-3 pt-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">Whole installation</p>
-              <p className="px-3 pb-1 text-xs text-slate-500">Every workspace, administrators only</p>
+              <p className="px-3 pt-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">Administration</p>
+              <p className="px-3 pb-1 text-xs text-slate-500">Instance settings and your assigned groups</p>
               {globalItems.map(link)}
             </div>
           )}
@@ -96,6 +99,10 @@ export function AdminShell() {
           <p className="mb-4 rounded border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-900">
             Workspace <span className="font-semibold">{workspaceName(pageWorkspace)}</span>{" "}
             <code className="rounded bg-sky-100 px-1">{pageWorkspace}</code> — what you change here applies to this workspace only.
+          </p>
+        ) : location.pathname === "/admin/my-groups" ? (
+          <p className="mb-4 rounded border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-900">
+            Group membership changes apply wherever the group has a role.
           </p>
         ) : location.pathname.startsWith("/admin/") ? (
           <p className="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900">

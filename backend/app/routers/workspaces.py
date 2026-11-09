@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import Identity, PatIdentity, get_identity, require_permission
 from app.db import get_db
-from app.models.group import GroupMember
+from app.models.group import Group, GroupMember
 from app.models.role import RoleBinding
 from app.services.permissions import effective_permissions, has_permission, user_group_uids
 from app.models.global_value import GlobalValue
@@ -154,6 +154,14 @@ def list_my_workspaces(identity: Identity = Depends(get_identity), db: Session =
             (RoleBinding.subject_type == "group") & (RoleBinding.subject_id.in_(group_uids))
         )
     granted_ws_ids |= set(db.scalars(select(RoleBinding.workspace_id).where(binding_clause)))
+    from app.models.workspace import SiteAdministrator
+    site_ids = list(db.scalars(select(SiteAdministrator.site_id).join(
+        Workspace, Workspace.id == SiteAdministrator.site_id).where(
+        SiteAdministrator.user_id == user.id, Workspace.role == "site")))
+    if site_ids:
+        granted_ws_ids |= set(db.scalars(select(Workspace.id).where(
+            (Workspace.id.in_(site_ids) & (Workspace.role == "site")) |
+            Workspace.site_id.in_(site_ids))))
 
     result = []
     for ws in db.scalars(select(Workspace).where(Workspace.id.in_(granted_ws_ids), NOT_STAGED)) if granted_ws_ids else []:
@@ -528,7 +536,8 @@ def list_member_directory(
     if bound_group_uids:
         user_ids |= set(
             db.scalars(
-                select(GroupMember.user_id).where(GroupMember.group_uid.in_(bound_group_uids))
+                select(GroupMember.user_id).join(Group, Group.uid == GroupMember.group_uid).where(
+                    GroupMember.group_uid.in_(bound_group_uids), Group.active.is_(True))
             )
         )
     if not user_ids:
