@@ -1,7 +1,8 @@
 ---
 title: EuPRAXIA Document Creation Guide
 summary: Instructions for creating standardized EuPRAXIA documents using ARGUS native types and templates.
-keywords: ["eupraxia", "documentation", "templates", "how-to", "guide"]
+keywords: [eupraxia, documentation, templates, how-to, guide, work package, WP, subsystem, hierarchy, document type]
+order: 190
 ---
 
 # Guide: Creating EuPRAXIA Documents in ARGUS
@@ -28,6 +29,25 @@ This guide explains how to create standardized EuPRAXIA documents in ARGUS using
 Represent information with the appropriate ARGUS field type when available, rather than putting all data into free text. For example, use date fields for dates, person or organization fields for ownership, status fields for workflow state, and relationship fields to connect related project records. Use text fields for narrative content and attachment fields for supporting files.
 
 Choose values from controlled lists where provided. Follow the prescribed formats for identifiers, dates, and units. Link to existing ARGUS records instead of creating duplicates. Ensure access permissions are suitable before adding sensitive information or attachments.
+
+## Place the document in the project hierarchy
+
+The document's **type** (for example Design Report or Work Instruction), **navigation location** (a WP page or
+folder) and **equipment relationships** are separate choices. Selecting one does not fill in the others.
+
+1. In **Documents → Hierarchy**, find the agreed WP or subsystem overview page. WP-numbered root pages can
+   appear directly at the top level; do not add another Subsystems folder merely to reproduce the old layout.
+2. To create a document there, select the overview and use **+ Add child document**, then complete the normal
+   form and save the draft. To organise an existing document, select it and use **Move in hierarchy**; do not
+   create a second copy.
+3. Set the actual document type and choose its appropriate template. Link the document to every relevant asset
+   through the normal document relationships. A place beneath WP02 alone is not an equipment link.
+4. Check the preview's state and **Revision** before use. A move does not approve or publish the text.
+
+EuPRAXIA work packages and technical subsystems may describe different structures. Follow the agreed project
+organisation; the browser's recognition of a WP title does not decide the work breakdown or replace document
+control. Confirm any SharePoint location or external filename with the project's naming rules: ARGUS navigation
+does not rename or move an external SharePoint file. See *Document hierarchy and subsystem pages*.
 
 ## Prepare the content
 

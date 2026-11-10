@@ -1,7 +1,7 @@
 ---
 title: Importing data
 summary: Bringing equipment, tickets and documents in from EPIK8s, Jira, Confluence, DokuWiki, Git and Markdown; re-running imports, by hand or on a schedule; mapping imported records.
-keywords: [dokuwiki, wiki, wiki.infn.it, namespace, schedule, scheduled, nightly, every day, every week, run by itself, confluence page link, share link, short link, prerequisite, missing package, install the catalogue, import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
+keywords: [confluence authentication, source metadata, source version, file viewer, missing attachment, imported parent, published import, dokuwiki, wiki, wiki.infn.it, namespace, schedule, scheduled, nightly, every day, every week, run by itself, confluence page link, share link, short link, prerequisite, missing package, install the catalogue, import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
 order: 50
 ---
 
@@ -112,9 +112,14 @@ Notes:
 
 ## Import Confluence pages
 
-**Imports → New → Confluence**. Name the configuration, give a **personal access token** (made on
-Confluence under your profile, **Personal Access Tokens**): the import reads only what that account may
-open. Then say which pages:
+**Imports → New → Confluence**. Name the configuration and provide credentials for the source. The importer
+supports personal-access-token authentication and an email/token mode; use the mode appropriate to your
+Confluence installation. A server personal access token and a Cloud email/API-token pair are not
+interchangeable. The source account must be able to read the pages and files you select. ARGUS workspace
+access does not grant access to Confluence.
+
+For a personal access token, create one in the source account's **Personal Access Tokens** settings where
+available. Do not paste credentials into a document body or an Ask ARGUS question. Then say which pages:
 
 - **A page link**: the short link from the page's **Share** button (`https://confluence.infn.it/x/YwX6AQ`)
   or the page's address. It imports that page and, with **And every page under it**, its whole subtree.
@@ -122,8 +127,55 @@ open. Then say which pages:
 - **A space key** (`LNF`): every page and blog post of the space.
 - **A CQL query**: whatever it selects.
 
-Pages become documents typed from their labels; the page tree becomes *child of* links. Running the
-configuration again adds a revision only to pages whose version changed.
+The server address must include its context path when required, such as `/wiki` or `/confluence`. If a browser
+link works but the import returns a login page, check the authentication mode, source account permissions and
+server address; being signed in in your browser does not authenticate the importer.
+
+Pages become ARGUS documents. Type selection checks recognised labels first, then recognised title prefixes,
+then uses a fallback type. Inspect the actual assigned type after import: a folder or WP prefix is not an
+automatic Work Instruction classification. The page tree becomes *child of* links between available pages.
+
+Imported revisions arrive **Published** as copies of source material. This is not a record of a local ARGUS
+review/approval decision. Check the document's source, authority and applicability before treating it as a
+controlled operating instruction.
+
+## Check imported Confluence content and files
+
+1. Open a representative imported page in **Documents**, then **Open full document** if you need its complete
+   metadata and file controls.
+2. Check its title, actual document type, body, state and revision. The importer records the source page ID,
+   link, space, version, author, update time and labels where the source provides them. The browser shows
+   source-space information and **From Confluence** when available.
+3. Check the summary against the body. A summary is introductory text, not a replacement for the complete
+   source. A page with no introductory prose can have no summary; read the import's warnings.
+4. Open a sample image and linked PDF or other attachment. Supported Confluence file-viewer macros are
+   converted into attachment links; interactive source viewers are not copied as running applications.
+5. Check the run report for attachment-list, download, size-limit and conversion warnings. A page can import
+   while a file needs attention. Do not infer that every source file was copied from the job's completion alone.
+
+Files copied into ARGUS use ARGUS attachment links and the document's normal access checks. Open them while
+signed in to ARGUS. A source-only link can still need Confluence access. If a link fails, distinguish these two
+destinations and report the document code, revision and filename to the administrator; do not share tokens.
+
+## Re-import Confluence without losing the navigation layout
+
+Run the saved configuration again to update the same source. An unchanged source version is skipped rather
+than receiving an identical new revision; changed source pages receive another imported revision. Source
+titles and type selection are refreshed during import, so review any locally edited classification rather
+than assuming it is protected by manual folder placement.
+
+The browser's **Move in hierarchy** stores navigation separately from imported parent relationships. A manual
+folder or parent-page placement is retained across re-imports; **Use relationship / imported parent** removes
+that override. Preserving navigation does not promise that imported body text or metadata is protected from
+source updates. Keep controlled local work in the normal revision workflow and check the import strategy.
+
+If only a subtree was imported, a parent outside that selection is not invented. Ordinary pages without a
+usable parent appear under **Unfiled documents**; root WP overview pages follow the workspace's WP naming
+convention. See *Document hierarchy and subsystem pages*.
+
+Re-running an unchanged source page is not a general attachment-repair command: the version check can skip
+its content and files. If an older import has a broken file link or conversion, give an administrator its
+document code, source page, revision, filename and run warning so the appropriate repair can be assessed.
 
 ## Import DokuWiki pages
 

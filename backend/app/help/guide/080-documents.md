@@ -1,12 +1,22 @@
 ---
 title: Documents and the knowledge base
-summary: Writing procedures, manuals and reports; the first revision and later ones, review, approval and publication; confidentiality, sharing, retention and where a document applies.
-keywords: [document, documents, logbook, log, running log, shift log, days, rework, raw text, notes, email, e-mail, transcript, minutes, template, templates, variant, rielabora, testo grezzo, procedure, manual, report, knowledge base, revision, draft, submit, review, reject, approval, approve, publish, new revision, edit, retire, confidentiality, riservato, shared, global, retention, markdown, controlled document, attachment, related by meaning, export, pdf, print, download, markdown file, .md, save as pdf]
+summary: Browsing, writing and importing procedures, manuals and reports; document hierarchy, previews, revisions, review, publication, confidentiality, sharing and retention.
+keywords: [hierarchy, folder, preview, subsystem, WP, unfiled, full table, document, documents, logbook, log, running log, shift log, days, rework, raw text, notes, email, e-mail, transcript, minutes, template, templates, variant, rielabora, testo grezzo, procedure, manual, report, knowledge base, revision, draft, submit, review, reject, approval, approve, publish, new revision, edit, retire, confidentiality, riservato, shared, global, retention, markdown, controlled document, attachment, related by meaning, export, pdf, print, download, markdown file, .md, save as pdf]
 order: 80
 ---
 
 The **Knowledge base** holds what is written: procedures, manuals, design and commissioning reports,
 drawings, notes. A document is linked to the equipment, types and other documents it applies to.
+
+## Browse documents before creating another one
+
+Open **Documents** to browse **Hierarchy** or **Document types**. Select a page for its preview, use **List**
+for the selected branch, or **Full table** for advanced filters and bulk operations. Search first to avoid
+creating a second copy of an existing document.
+
+Root WP overview pages, folders, imported child pages, icons and counters are explained in *Document hierarchy
+and subsystem pages*. In the preview, check **Revision** and the state badge: an open draft can be displayed
+before the published version. Use **Open full document** to work on the selected revision.
 
 ## Write a document
 
@@ -127,8 +137,12 @@ Every revision, the first one included, goes the same way:
 4. **Approved**: **Publish** makes it the revision to work from. Approving does not publish: the two are
    separate steps, and publishing needs the right to approve.
 
-Saving never publishes. A document with no published revision is shown as not published, and is never
-presented as something to work from.
+Saving a manually created draft never publishes it. A document with no published revision is shown as not
+published and is not a released instruction.
+
+Imported Confluence pages are a separate case: the importer records them as published source copies. That
+imported state is not evidence that a local author/reviewer approval workflow was completed. Check the source,
+authority, scope and revision, and follow your facility's document-control process before operational use.
 
 ## Later revisions
 
@@ -185,8 +199,10 @@ retention runs out, only retired. A document never released (only drafts) can be
 
 ## Find what is written
 
-- **Documents** (by type, status, text and the type's fields), or the search box at the top. On the phone: the **Docs** tab, searched, sorted
-  and narrowed to a type.
+- **Documents → Hierarchy** for parent pages and folders, **Document types** for assigned types, or **Full
+  table** for status, text and type-field filters. The browser's local search finds titles and codes; it does
+  not search the whole body. The search box at the top searches across records. On the phone: the **Docs** tab,
+  searched, sorted and narrowed to a type.
 - **Ask ARGUS** searches documents, tickets, comments and the text of attached files (page by page) by meaning,
   in any language.
 - **Related by meaning** on a document lists the equipment, tickets and other documents whose written knowledge

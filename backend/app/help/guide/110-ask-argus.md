@@ -1,7 +1,7 @@
 ---
 title: Ask ARGUS
-summary: Asking questions in your own words, checking the answers, following up, letting the assistant propose changes you confirm, and using it on the phone.
-keywords: [ask, ask argus, attach, attachment, file, screenshot, upload, paperclip, rate, rating, feedback, thumbs up, thumbs down, not useful, wrong answer, chat, voice, speak, microphone, hands-free, orb, repeat, slower, show the source, interrupt, read aloud, phone, mobile, assistant, ai, question, answer, conversation, propose, proposal, apply, discard, create with ai, help, how to, register from a photo, dictate, transcribe, document from a photo]
+summary: Asking questions from records and the user guide; document hierarchy and import walkthroughs, checking revision/source evidence, confirmed proposals and mobile use.
+keywords: [hierarchy help, document navigation, WP, unfiled, confluence import, folder, revision preview, search help, ask, ask argus, attach, attachment, file, screenshot, upload, paperclip, rate, rating, feedback, thumbs up, thumbs down, not useful, wrong answer, chat, voice, speak, microphone, hands-free, orb, repeat, slower, show the source, interrupt, read aloud, phone, mobile, assistant, ai, question, answer, conversation, propose, proposal, apply, discard, create with ai, help, how to, register from a photo, dictate, transcribe, document from a photo]
 order: 110
 ---
 
@@ -78,6 +78,47 @@ need.
 "How do I import an EPIK8s configuration?", "step by step, how do I move local workspaces to production?": it
 answers from this guide, one step at a time if you like. The **Ask ARGUS to walk me through this** links in Help
 start the same.
+
+## Ask for help with document hierarchy and Confluence
+
+Ask a question about the task, and name the workspace, page and exact control you see. For example:
+
+- "In the ELI workspace, how do I put this how-to page under WP02 without copying it?"
+- "WP01 and WP02 are our subsystem overview pages. Why is there an empty Subsystems folder?"
+- "What does Unfiled documents mean, and how do I restore the imported parent?"
+- "Why does WP02 show (2), but the total includes three documents?"
+- "How do I open the published revision when the preview shows a draft?"
+- "How do I check that the Confluence PDF was copied into ARGUS?"
+
+These are questions about using ARGUS. The assistant reads *Document hierarchy and subsystem pages*,
+*Documents and the knowledge base* or *Importing data* and gives the documented steps. If your screen differs,
+say which buttons are missing and check workspace, role, ownership and the deployed version. A feature in a
+development branch is not necessarily available on the hub you opened.
+
+The guide describes the interface; it does not tell the assistant which real document belongs to a subsystem.
+For that decision, provide the document code and verify its scope, equipment links and source. A navigation
+parent is not evidence that a procedure applies to every asset under the same name.
+
+## Guidance is different from a change made in chat
+
+The proposal tools described in *Let it make changes for you* concern equipment objects and their relations.
+In this version, chat proposals do not create navigation folders, move document pages, run Confluence imports
+or approve/publish document revisions. For those tasks, Ask ARGUS can explain the steps; use the relevant page
+and its controls with your own permissions. An explanation or a chat reply saying "done" is not evidence of a
+saved navigation change: reopen the document and check its location.
+
+## Check document sources and revisions in an answer
+
+For an answer about an operating procedure, ask: "Give the document code, source and revision/state supporting
+each step, and say what you could not verify." Open the cited document to check its current published version
+and installed-equipment scope. A record link opens a document; it is not by itself a link pinned to the exact
+revision or passage used in the answer.
+
+The document browser can preview a newer unpublished revision, while a Confluence import can have the state
+Published without a local ARGUS approval decision. Ask ARGUS must not be used as a substitute for checking
+that distinction. If the lookup does not identify a revision, ask for clarification and verify it on the
+document page before relying on the instruction. Missing or unreadable records must remain an explicit gap,
+not a reason to infer their contents from a WP title, icon or counter.
 
 ## On the phone (ARGUS Field)
 
