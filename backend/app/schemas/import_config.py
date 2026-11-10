@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.import_job import ConfluencePageLink, MergeStrategy
 from app.services.import_merge import MERGE_STRATEGIES
@@ -25,6 +25,18 @@ class JiraIssueImportConfigParams(BaseModel):
 
 class ConfluenceImportConfigParams(ConfluencePageLink):
     source: Literal["confluence"]
+    auth_mode: Literal["pat", "cloud_basic"] = "pat"
+    email: str = ""
+
+    @model_validator(mode="after")
+    def cloud_requires_email(self):
+        self.email = self.email.strip()
+        if self.auth_mode == "cloud_basic" and (
+            "@" not in self.email or ":" in self.email or any(c.isspace() for c in self.email)
+        ):
+            raise ValueError("Confluence Cloud requires your Atlassian account email.")
+        return self
+
     space_key: Optional[str] = None
     cql: Optional[str] = None
     link_assets: bool = True

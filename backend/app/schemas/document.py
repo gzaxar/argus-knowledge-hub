@@ -23,6 +23,9 @@ class DocumentCreate(BaseModel):
     is_global: bool = False
     source: str = "manual"
     retention_class: str = "5y"
+    # Optional location, written atomically with the new draft.
+    navigation_parent_document_uid: Optional[str] = None
+    navigation_folder_uid: Optional[str] = None
     # Seeds the first Draft revision.
     body_markdown: Optional[str] = None
     steps: list = []

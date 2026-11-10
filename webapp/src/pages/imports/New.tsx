@@ -41,6 +41,8 @@ export function ImportConfigForm() {
 
   const [baseUrl, setBaseUrl] = useState("");
   const [jiraPat, setJiraPat] = useState("");
+  const [confluenceAuthMode, setConfluenceAuthMode] = useState<"pat" | "cloud_basic">("pat");
+  const [confluenceEmail, setConfluenceEmail] = useState("");
   const [jiraSchemaId, setJiraSchemaId] = useState("");
 
   const [jql, setJql] = useState("");
@@ -87,6 +89,8 @@ export function ImportConfigForm() {
       setBaseUrl(param("base_url"));
       setJiraSchemaId(param("jira_schema_id"));
     } else if (existing.data.source === "confluence") {
+      setConfluenceAuthMode(param("auth_mode") === "cloud_basic" ? "cloud_basic" : "pat");
+      setConfluenceEmail(param("email"));
       setBaseUrl(param("base_url"));
       setSpaceKey(param("space_key"));
       setCql(param("cql"));
@@ -131,6 +135,8 @@ export function ImportConfigForm() {
           : source === "confluence"
           ? {
               source: "confluence" as const,
+              auth_mode: confluenceAuthMode,
+              email: confluenceAuthMode === "cloud_basic" ? confluenceEmail.trim() : "",
               base_url: baseUrl.replace(/\/+$/, "") || undefined,
               ...(pageUrl.trim()
                 ? { page_url: pageUrl.trim(), include_children: includeChildren }
@@ -288,6 +294,30 @@ export function ImportConfigForm() {
           </div>
         ) : source === "jira" || source === "jira-issues" || source === "confluence" ? (
           <>
+            {source === "confluence" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Authentication</label>
+                  <select value={confluenceAuthMode} onChange={(e) => {
+                    setConfluenceAuthMode(e.target.value as "pat" | "cloud_basic");
+                    setJiraPat("");
+                  }} className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                    <option value="pat">Data Center / Server — personal access token</option>
+                    <option value="cloud_basic">Confluence Cloud — email and API token</option>
+                  </select>
+                  {isEdit && <p className="mt-1 text-xs text-slate-500">Enter a new token when changing authentication method.</p>}
+                </div>
+                {confluenceAuthMode === "cloud_basic" && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Atlassian account email</label>
+                    <input type="email" required value={confluenceEmail}
+                      onChange={(e) => setConfluenceEmail(e.target.value)} autoComplete="username"
+                      className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+                    <p className="mt-1 text-xs text-slate-500">Use an API token without scopes, created by this account. Scoped tokens and service-account tokens are not supported by this mode.</p>
+                  </div>
+                )}
+              </>
+            )}
             <div>
               <label className="block text-sm font-medium text-slate-700">
                 {source === "confluence" ? "Confluence server URL" : "Jira server URL"}
@@ -297,7 +327,7 @@ export function ImportConfigForm() {
                 onChange={(e) => setBaseUrl(e.target.value)}
                 placeholder={
                   source === "confluence"
-                    ? "https://wiki.example.org/confluence"
+                    ? (confluenceAuthMode === "cloud_basic" ? "https://your-site.atlassian.net/wiki" : "https://wiki.example.org/confluence")
                     : source === "jira-issues"
                       ? "https://issues.example.org/jira"
                       : "https://servicedesk.example.org"
@@ -307,13 +337,15 @@ export function ImportConfigForm() {
               />
               <p className="mt-1 text-xs text-slate-500">
                 {source === "confluence"
-                  ? "Include the context path if the server has one — Confluence is often published under /confluence or /wiki rather than at the site root. The import checks both. Leave it empty when you give a page link below."
+                  ? (confluenceAuthMode === "cloud_basic"
+                    ? "Use the site address ending in /wiki, without /spaces or a page title. Leave empty to use the server from the page link."
+                    : "Include the context path if the server has one — Confluence is often published under /confluence or /wiki rather than at the site root. The import checks both. Leave it empty when you give a page link below.")
                   : "Include the context path if the server has one — many Jira installations live under /jira rather than at the site root. The import checks both."}
               </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700">
-                Personal access token{isEdit && " (leave blank to keep the saved one)"}
+                {source === "confluence" && confluenceAuthMode === "cloud_basic" ? "API token (without scopes)" : "Personal access token"}{isEdit && " (leave blank to keep the saved one)"}
               </label>
               <input
                 type="password"

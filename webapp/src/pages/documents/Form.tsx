@@ -18,6 +18,8 @@ export function DocumentForm() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const relateAsset = searchParams.get("relate_asset");
+  const navigationParent = searchParams.get("parent_document") || undefined;
+  const navigationFolder = searchParams.get("folder") || undefined;
   const schemas = useQuery({ queryKey: ["schemas"], queryFn: schemasApi.list });
   const documentSchemas = (schemas.data ?? []).filter((s) => s.applies_to === "documents");
 
@@ -91,6 +93,8 @@ export function DocumentForm() {
     }
     const created = await documentsApi.create({
       uid: documentUid,
+      navigation_parent_document_uid: navigationParent,
+      navigation_folder_uid: navigationFolder,
       code: code.trim() || null,
       title: title.trim(),
       document_type_uid: documentTypeUid || null,
@@ -104,6 +108,7 @@ export function DocumentForm() {
     setCreatedUid(documentUid);
     setAssignedCode(created!.code);
     queryClient.invalidateQueries({ queryKey: ["documents"] });
+    queryClient.invalidateQueries({ queryKey: ["document-navigation"] });
     return documentUid;
   };
 
@@ -159,6 +164,8 @@ export function DocumentForm() {
       }
       const created = await documentsApi.create({
         uid: documentUid,
+      navigation_parent_document_uid: navigationParent,
+      navigation_folder_uid: navigationFolder,
         code: code.trim() || null,
         title: title.trim(),
         document_type_uid: documentTypeUid || null,
@@ -172,6 +179,7 @@ export function DocumentForm() {
       setCreatedUid(documentUid);
       setAssignedCode(created!.code);
       queryClient.invalidateQueries({ queryKey: ["documents"] });
+    queryClient.invalidateQueries({ queryKey: ["document-navigation"] });
       await finishConfluenceImport(documentUid);
       return created;
     },
@@ -196,6 +204,7 @@ export function DocumentForm() {
         queryClient.invalidateQueries({ queryKey: ["hub-asset", relateAsset] });
       }
       queryClient.invalidateQueries({ queryKey: ["documents"] });
+      queryClient.invalidateQueries({ queryKey: ["document-navigation"] });
       navigate(`/documents/${doc!.uid}`);
     },
   });
@@ -203,6 +212,9 @@ export function DocumentForm() {
   return (
     <div className="max-w-7xl">
       <h1 className="text-2xl font-semibold text-slate-900">New document</h1>
+      {(navigationParent || navigationFolder) && <p className="mt-2 rounded border border-indigo-100 bg-indigo-50 p-3 text-sm text-indigo-800">
+        {navigationParent ? "This document will be added under the parent page selected in the document browser." : "This document will be added to the folder selected in the document browser."}
+      </p>}
       <p className="mt-1 text-sm text-slate-500">
         Paste the document's text or add its file, then rework it with the type&apos;s template or keep it as it is;
         the file is attached to the document. The checklist catches duplicates and anything that must not be stored.

@@ -202,6 +202,18 @@ def new_document(db: Session, body: DocumentCreate, workspace_id: str, identity:
         next_review_due=body.next_review_due, authored_by=_actor_user_id(identity),
     )
     db.add(revision)
+    if body.navigation_parent_document_uid or body.navigation_folder_uid:
+        from app.services import document_navigation as nav
+        if body.navigation_parent_document_uid:
+            parent = _get_visible_document(body.navigation_parent_document_uid, workspace_id, identity, db)
+            if parent.workspace_id != workspace_id:
+                raise HTTPException(422, detail="The navigation parent must belong to this workspace")
+        try:
+            nav.lock_workspace(db, workspace_id)
+            nav.set_document_location(db, workspace_id, doc.uid, body.navigation_folder_uid,
+                                      body.navigation_parent_document_uid)
+        except ValueError as exc:
+            raise HTTPException(422, detail=str(exc)) from exc
     notify.follow(db, "document", doc.uid, _actor_user_id(identity))
     if doc.confidentiality != "riservato":
         notify.announce(db, workspace_id, "documents", "new_document", f"New document: {doc.code} {doc.title}",

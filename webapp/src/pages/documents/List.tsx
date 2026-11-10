@@ -15,6 +15,9 @@ import { countBy, TypeExplorer, typeFamily } from "../../components/browse/TypeE
 import { BulkActionsBar } from "../../components/BulkActionsBar";
 import { ListDate, SortHeader, useSort } from "../../components/SortableTable";
 import { effectiveAttributes } from "../../lib/schemaAttributes";
+import { DocumentBrowser } from "../../components/DocumentBrowser";
+import { DocumentTypeIcon } from "../../components/DocumentTypeIcon";
+import { useSearchParams } from "react-router-dom";
 import { useRights } from "../../lib/permissions";
 
 const AUTHORITY_STYLES: Record<string, string> = {
@@ -35,6 +38,20 @@ const COLUMNS = [
 ];
 
 export function DocumentList() {
+  const [params, setParams] = useSearchParams();
+  const changeMode = (table: boolean) => {
+    const next = new URLSearchParams(params);
+    if (table) next.set("browse", "table"); else next.delete("browse");
+    setParams(next);
+  };
+  if (params.get("browse") === "table") return <div className="space-y-3">
+    <button type="button" onClick={() => changeMode(false)} className="rounded border bg-white px-3 py-2 text-sm">← Document browser</button>
+    <DocumentTable />
+  </div>;
+  return <DocumentBrowser onFullTable={() => changeMode(true)} />;
+}
+
+function DocumentTable() {
   const showKeys = useShowKeys();
   const queryClient = useQueryClient();
   const rights = useRights();
@@ -54,6 +71,7 @@ export function DocumentList() {
   const schemas = useQuery({ queryKey: ["schemas"], queryFn: schemasApi.list, staleTime: 60_000 });
   const documentSchemas = useMemo(() => (schemas.data ?? []).filter((s) => s.applies_to === "documents"), [schemas.data]);
   const typeName = useMemo(() => new Map(documentSchemas.map((s) => [s.uid, s.name])), [documentSchemas]);
+  const typeIcons = useMemo(() => new Map(documentSchemas.map((s) => [s.uid, s.icon_uid])), [documentSchemas]);
   const family = useMemo(() => typeFamily(documentSchemas, typeUid), [documentSchemas, typeUid]);
   const schema = documentSchemas.find((s) => s.uid === typeUid);
   const attrDefs = effectiveAttributes(schema, schemas.data);
@@ -82,7 +100,7 @@ export function DocumentList() {
   const retype = useMutation({
     mutationFn: () => documentsApi.retype([...selection.selected], target || null),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      queryClient.invalidateQueries({ queryKey: ["documents"] }); queryClient.invalidateQueries({ queryKey: ["document-navigation"] });
       selection.clear();
       if (result!.not_found.length) alert(`Moved ${result!.moved}. ${result!.not_found.length} could not be found.`);
     },
@@ -109,7 +127,7 @@ export function DocumentList() {
   return (
     <BrowsePage
       title="Documents"
-      count={documents.data ? `${matched.length}${matched.length !== documents.data.length ? ` of ${documents.data.length}` : ""}` : undefined}
+      count={documents.data ? `(${matched.length}${matched.length !== documents.data.length ? ` of ${documents.data.length}` : ""})` : undefined}
       storageKey="documents"
       primary={rights.can_create_documents && (
         <Link to="/documents/new" className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800">New document</Link>
@@ -179,7 +197,7 @@ export function DocumentList() {
         label="documents"
         canTransfer={rights.can_create_documents}
         bulkDelete={rights.can_delete_documents ? documentsApi.bulkDelete : undefined}
-        onStarted={() => { queryClient.invalidateQueries({ queryKey: ["documents"] }); selection.clear(); }}
+        onStarted={() => { queryClient.invalidateQueries({ queryKey: ["documents"] }); queryClient.invalidateQueries({ queryKey: ["document-navigation"] }); selection.clear(); }}
         onClear={selection.clear}
         extra={rights.can_modify_documents && (
           <span className="flex flex-wrap items-center gap-2">
@@ -239,7 +257,7 @@ export function DocumentList() {
                       <Clip className="text-xs text-slate-500 sm:hidden">{`${type} · ${d.current_revision_uid ? "published" : "not published"}`}</Clip>
                     </td>
                     {columns.show("code") && <td className="hidden px-3 py-2 font-mono text-xs text-slate-500 lg:table-cell"><Clip>{d.code}</Clip></td>}
-                    {columns.show("type") && <td className="hidden px-3 py-2 text-slate-600 sm:table-cell"><Clip>{type}</Clip></td>}
+                    {columns.show("type") && <td className="hidden px-3 py-2 text-slate-600 sm:table-cell"><span className="flex min-w-0 items-center gap-1.5"><DocumentTypeIcon iconUid={typeIcons.get(d.document_type_uid ?? "")} /><Clip>{type}</Clip></span></td>}
                     {columns.show("status") && (
                       <td className="hidden px-3 py-2 md:table-cell">
                         {d.current_revision_uid

@@ -811,3 +811,52 @@ def test_a_request_needs_a_server_or_a_page_link():
         ConfluenceImportConfigParams(source="confluence", space_key="LNF")
     with pytest.raises(ValidationError, match="not a link to a Confluence page"):
         ConfluenceImportConfigParams(source="confluence", page_url="https://confluence.infn.it/")
+
+
+def test_cloud_authentication_imports_pages_through_the_existing_pipeline(confluence_stub, monkeypatch):
+    """Real Basic headers, page conversion and revisions, using a local server.
+
+    Translate only the synthetic HTTPS transport address; never contact Atlassian.
+    """
+    import base64
+    import app.services.confluence_import as importer
+
+    original_session = importer._TimeoutSession
+    sent = []
+    cloud_site = "https://cloud-test.atlassian.net/wiki"
+
+    class CloudSession(original_session):
+        def request(self, method, url, **kwargs):
+            sent.append(self.headers.get("Authorization"))
+            if url.startswith(cloud_site):
+                url = confluence_stub + url[len(cloud_site):]
+            assert url.startswith(confluence_stub), "test must never reach a live site"
+            return super().request(method, url, **kwargs)
+
+    monkeypatch.setattr(importer, "_TimeoutSession", CloudSession)
+    ws = _workspace()
+    status, error, counts = _run(ws, cloud_site, auth_mode="cloud_basic", email="reader@example.org")
+    assert status == "succeeded", error
+    assert counts
+    expected = "Basic " + base64.b64encode(b"reader@example.org:pat").decode("ascii")
+    assert sent and all(value == expected for value in sent)
+    db = SessionLocal()
+    assert _document(db, ws, PAGES[0]["id"]) is not None
+    db.close()
+
+
+def test_existing_pat_pipeline_keeps_bearer_authentication(confluence_stub, monkeypatch):
+    import app.services.confluence_import as importer
+
+    original_session = importer._TimeoutSession
+    sent = []
+
+    class PatSession(original_session):
+        def request(self, method, url, **kwargs):
+            sent.append(self.headers.get("Authorization"))
+            return super().request(method, url, **kwargs)
+
+    monkeypatch.setattr(importer, "_TimeoutSession", PatSession)
+    status, error, _ = _run(_workspace(), confluence_stub)
+    assert status == "succeeded", error
+    assert sent and all(value == "Bearer pat" for value in sent)

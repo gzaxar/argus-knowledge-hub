@@ -138,7 +138,8 @@ def start_job(db: Session, config: ImportConfig, identity, add_task: Callable) -
                  p.get("link_assets", True))
     elif config.source == "confluence":
         add_task(run_confluence_import, job.uid, ws, p.get("base_url"), pat, p.get("space_key"), p.get("cql"), merge,
-                 p.get("link_assets", True), p.get("page_url"), p.get("include_children", True))
+                 p.get("link_assets", True), p.get("page_url"), p.get("include_children", True),
+                 auth_mode=p.get("auth_mode", "pat"), email=p.get("email", ""))
     elif config.source == "dokuwiki":
         add_task(run_dokuwiki_import, job.uid, ws, p["page_url"], p.get("include_children", True), merge,
                  p.get("link_assets", True))

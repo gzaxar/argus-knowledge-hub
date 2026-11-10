@@ -63,7 +63,9 @@ def create_config(
     if not body.config.pat and body.config.source not in PUBLIC_CAPABLE_SOURCES:
         raise HTTPException(
             status_code=422,
-            detail=f"A personal access token is required for a {body.config.source} import.",
+            detail=("An API token is required for a Confluence Cloud import."
+                    if body.config.source == "confluence" and body.config.auth_mode == "cloud_basic"
+                    else f"A personal access token is required for a {body.config.source} import."),
         )
     params = body.config.model_dump(exclude={"pat", "source"})
     config = ImportConfig(
@@ -98,6 +100,10 @@ def update_config(
     if body.config is not None:
         if body.config.source != config.source:
             raise HTTPException(status_code=422, detail="Cannot change an import config's source")
+        if config.source == "confluence":
+            old_mode = (config.params or {}).get("auth_mode", "pat")
+            if body.config.auth_mode != old_mode and not body.config.pat:
+                raise HTTPException(status_code=422, detail="Enter a new token when changing Confluence authentication method.")
         params = body.config.model_dump(exclude={"pat", "source"})
         config.params = params
         if body.config.pat:
