@@ -147,6 +147,13 @@ def _workspace_view(db: Session, user: User, ws: Workspace, group_names: dict[st
                                     .where(RoleBinding.workspace_id == ws.id, clause)):
         via = "direct" if binding.subject_type == "user" else f"group:{group_names.get(binding.subject_id)}"
         roles.append({"id": role.id, "name": role.name, "via": via})
+    # Site-wide grants of its current site, and administering that site (issue #26).
+    from app.services.permissions import explain
+    for src in explain(db, user, ws.id):
+        if src["source"] == "site":
+            roles.append({"id": src["role"].lower(), "name": src["role"], "via": f"site:{src['site']}:{src['group']}"})
+        elif src["source"] == "site_administrator":
+            roles.append({"id": "site_administrator", "name": "Site administrator", "via": f"site:{src['site']}"})
     from app.models.membership import Membership
     if db.scalar(select(Membership.id).where(Membership.workspace_id == ws.id, Membership.user_id == user.id)):
         roles.append({"id": "membership", "name": "Membership (before roles)", "via": "membership"})

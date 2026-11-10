@@ -73,6 +73,9 @@ class RoleBindingOut(BaseModel):
 class EffectivePermissionsOut(BaseModel):
     workspace_id: str
     is_admin: bool
+    # Where they come from: a role of one's own, a group's, a group's site-wide at this workspace's site, a legacy
+    # membership, administering the site (issue #26).
+    sources: list[dict] = []
     objects: list[str]
     tickets: list[str]
     documents: list[str]

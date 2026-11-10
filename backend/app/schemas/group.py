@@ -29,6 +29,13 @@ class GroupCreate(BaseModel):
     home_site_id: Optional[str] = None
 
 
+class GroupHomeIn(BaseModel):
+    # The site it is to belong to; null: the installation.
+    home_site_id: Optional[str] = None
+    # false: only the preview, nothing changes.
+    confirm: bool = False
+
+
 class GroupUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None

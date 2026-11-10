@@ -65,3 +65,42 @@ describe("site-wide group access", () => {
     expect(screen.queryByRole("button", { name: "Revoke" })).not.toBeInTheDocument();
   });
 });
+
+describe("second part of #26", () => {
+  it("says in words where a role comes from", async () => {
+    const { viaText } = await import("../pages/account/Account");
+    expect(viaText("group:Operations")).toBe("via Operations");
+    expect(viaText("site:lnf:Operations")).toBe("site-wide at lnf, via Operations");
+    expect(viaText("site:lnf")).toBe("as administrator of the site lnf");
+  });
+
+  it("shows who loses access before a facility moves, and holds the move while grants block it", async () => {
+    const { AdminWorkspaces } = await import("../pages/admin/Workspaces");
+    vi.spyOn(workspacesApi, "listMine").mockResolvedValue([
+      { id: "lnf", name: "LNF", role: "site", site_id: null }, { id: "lnl", name: "LNL", role: "site", site_id: null },
+      { id: "btf", name: "BTF", role: null, site_id: "lnf" }] as never);
+    const move = vi.spyOn(sitesApi, "setSite").mockResolvedValue({ workspace_id: "btf", site_id: "lnf", preview: true,
+      would_end: [], access: { workspace_id: "btf", from_site: "lnf", to_site: "lnl",
+        loses: [{ ...granted, people: ["ann@infn.it", "bob@infn.it"] }], gains: [],
+        blocked: [{ binding_id: 1, group_uid: "ops", group_name: "Operations", home_site_id: "lnf", role_id: "viewer" }] } });
+    renderWith(<AdminWorkspaces />);
+    fireEvent.change(await screen.findByLabelText("Site of BTF"), { target: { value: "lnl" } });
+    await waitFor(() => expect(move).toHaveBeenCalledWith("btf", "lnl", false));
+    expect(await screen.findByText(/stops inheriting from lnf: Operations \(Reporter\): 2 people/)).toBeInTheDocument();
+    expect(screen.getByText(/Settle first/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Move it" })).toBeDisabled();
+  });
+
+  it("lists the recorded changes to access", async () => {
+    here = "btf";
+    page();
+    vi.spyOn(rolesApi, "inherited").mockResolvedValue([]);
+    vi.spyOn(rolesApi, "accessEvents").mockResolvedValue([{ id: 1, at: "2026-11-10T10:00:00Z", actor: "Ada", kind: "site_role.granted",
+      workspace_id: null, site_id: "lnf", group_uid: "ops", subject_type: "group", subject: "Operations", role_id: "reporter",
+      detail: {} }]);
+    renderWith(<WorkspaceAccess />);
+    fireEvent.click(await screen.findByRole("button", { name: /Changes to access/ }));
+    expect(await screen.findByText(/given site-wide · reporter · lnf/)).toBeInTheDocument();
+    expect(screen.getByText(/by Ada/)).toBeInTheDocument();
+  });
+});

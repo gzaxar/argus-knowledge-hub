@@ -96,6 +96,14 @@ On **Groups**, a site's administrators can make a group **owned by the site** (t
 have roles only at that site and its facilities. A site keeps its site role while it gives roles site-wide or owns
 active groups; a facility cannot leave while it gives roles to its site's groups: remove those first.
 
+- **Moving a facility:** in **Administration › Workspaces**, choosing another site first shows who stops and who
+  starts inheriting access, and what must be settled. **Move it** does it.
+- **Moving a group:** on **Groups**, a local group can be given to the site (or back to the installation, by an
+  administrator of the installation). It is previewed first, and held while it has roles outside the new scope.
+- **Changes to access:** at the bottom of **Access**, these list who gave or took away which role, who joined or
+  left which group, and which facility moved, with when and by whom.
+- **My account:** says where each role comes from, including *site-wide at LNF, via Operations*.
+
 ## Give a person or a group a role
 
 1. The person **signs in once**, so ARGUS knows them. (An administrator can also add someone before their

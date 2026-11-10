@@ -130,7 +130,7 @@ def test_an_access_review_captures_every_grant_and_needs_two_distinct_signers(ws
     first = client.post("/v1/access-reviews", headers=headers, json={"required_signers": 2}).json()
     people = {p["email"]: p for p in first["snapshot"]["people"]}
     assert people[alice.email]["permissions"]["restricted"] == ["safety_investigation", "security_incident"]
-    assert people[bob.email]["roles"] == [f"Service desk agent (via group {group.uid})"]
+    assert people[bob.email]["roles"] == [f"Service desk agent (via group {group.name})"]   # named, not by uid
     assert any(t["restricted_grants"] == ["costs"] for t in first["snapshot"]["tokens"])
     sign = lambda rid, who: client.post(f"/v1/access-reviews/{rid}/sign", headers=headers, json={"signer": who})
     assert sign(first["id"], "owner-a").json()["completed_at"] is None
