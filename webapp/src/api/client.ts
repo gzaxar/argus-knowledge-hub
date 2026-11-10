@@ -82,6 +82,9 @@ import type {
   InvitationResult,
   SiteGroupGrant,
   SiteGroupGrantPreview,
+  AccessEvent,
+  SiteMoveAccess,
+  GroupMovePreview,
   DirectoryGroup,
   DirectoryGroupMember,
   ScopedAdministrator,
@@ -931,6 +934,7 @@ export const rolesApi = {
   listBindings: (workspaceId: string) =>
     request<RoleBinding[]>(`/v1/workspaces/${workspaceId}/bindings`),
   inherited: (workspaceId: string) => request<SiteGroupGrant[]>(`/v1/workspaces/${workspaceId}/inherited-grants`),
+  accessEvents: (workspaceId: string) => request<AccessEvent[]>(`/v1/workspaces/${workspaceId}/access-events`),
   invite: (workspaceId: string, input: { emails: string; role_id?: string; send_email: boolean; message?: string;
                                           group_uid?: string; new_group?: string }) =>
     request<InvitationResult>(`/v1/workspaces/${workspaceId}/invitations`, { method: "POST", body: json(input) }),
@@ -962,6 +966,8 @@ export const directoryApi = {
     request<DirectoryGroup>(`/v1/groups/${uid}`, { method: "PATCH", body: json(input) }),
   addGroupMembers: (uid: string, input: { emails: string; send_email: boolean; message?: string }) =>
     request<InvitationResult>(`/v1/groups/${uid}/members`, { method: "POST", body: json(input) }),
+  moveGroup: (uid: string, homeSiteId: string | null, confirm: boolean) =>
+    request<GroupMovePreview>(`/v1/groups/${uid}/home`, { method: "PUT", body: json({ home_site_id: homeSiteId, confirm }) }),
   removeGroupMember: (uid: string, userId: string) =>
     request<void>(`/v1/groups/${uid}/members/${encodeURIComponent(userId)}`, { method: "DELETE" }),
   status: () => request<DirectoryStatus>("/v1/directory/status"),
@@ -3170,7 +3176,8 @@ export const sitesApi = {
       `/v1/admin/sites/${encodeURIComponent(workspaceId)}/role`, { method: "PUT", body: json({ site }) }),
   /** Without `confirm`, leaving a site answers with the placements that would end, and changes nothing. */
   setSite: (workspaceId: string, siteId: string | null, confirm = false) =>
-    request<{ workspace_id: string; site_id: string | null; preview?: boolean; would_end?: PlacementEnding[]; ended?: string[] }>(
+    request<{ workspace_id: string; site_id: string | null; preview?: boolean; would_end?: PlacementEnding[]; ended?: string[];
+              access?: SiteMoveAccess }>(
       `/v1/admin/sites/${encodeURIComponent(workspaceId)}/site`, { method: "PUT", body: json({ site_id: siteId, confirm }) }),
   /** A site's place: shared with the facilities, or withheld (with what is inside it). */
   sharing: (assetUid: string) =>

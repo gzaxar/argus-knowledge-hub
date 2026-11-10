@@ -138,3 +138,38 @@ def resolve_permission(db: Session, user: User, workspace_id: str, action: str, 
     workspace = db.get(Workspace, workspace_id)
     default_flag_name = f"default_can_{action}{RESOURCE_SUFFIX[resource]}"
     return workspace is not None and bool(getattr(workspace, default_flag_name, False))
+
+
+def explain(db: Session, user: User, workspace_id: str) -> list[dict]:
+    """Where each right a person has in a workspace comes from: a role of their own, a group's role here, a group's
+    role site-wide at the workspace's current site, a legacy membership, or administering the site. For My
+    permissions and access reviews: "why may I?" answered without reading the database."""
+    out: list[dict] = []
+    if user.is_admin:
+        out.append({"source": "instance_administrator", "label": "administrator of the installation"})
+    for role in db.scalars(select(Role).join(RoleBinding, RoleBinding.role_id == Role.id).where(
+            RoleBinding.workspace_id == workspace_id, RoleBinding.subject_type == "user",
+            RoleBinding.subject_id == user.id)):
+        out.append({"source": "direct", "role": role.name, "label": role.name})
+    group_uids = user_group_uids(db, user.id)
+    if group_uids:
+        for role, group in db.execute(select(Role, Group).join(RoleBinding, RoleBinding.role_id == Role.id).join(
+                Group, Group.uid == RoleBinding.subject_id).where(
+                RoleBinding.workspace_id == workspace_id, RoleBinding.subject_type == "group",
+                RoleBinding.subject_id.in_(group_uids))):
+            out.append({"source": "group", "role": role.name, "group": group.name, "group_uid": group.uid,
+                        "label": f"{role.name} (via group {group.name})"})
+        site_id = current_site(db, workspace_id)
+        if site_id:
+            for role, group in db.execute(select(Role, Group).join(
+                    SiteGroupRoleBinding, SiteGroupRoleBinding.role_id == Role.id).join(
+                    Group, Group.uid == SiteGroupRoleBinding.group_uid).where(
+                    SiteGroupRoleBinding.site_id == site_id, SiteGroupRoleBinding.group_uid.in_(group_uids))):
+                out.append({"source": "site", "role": role.name, "group": group.name, "group_uid": group.uid,
+                            "site": site_id, "label": f"{role.name} (site-wide at {site_id}, via group {group.name})"})
+    if db.scalar(select(Membership.id).where(Membership.workspace_id == workspace_id, Membership.user_id == user.id)):
+        out.append({"source": "legacy", "label": "legacy membership"})
+    if administers_site(db, user.id, workspace_id):
+        out.append({"source": "site_administrator", "site": current_site(db, workspace_id),
+                    "label": f"administrator of the site {current_site(db, workspace_id)}"})
+    return out

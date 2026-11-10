@@ -92,6 +92,19 @@ def _pending(db: Session, binding: RoleBinding) -> bool:
     return user is not None and user.oidc_sub is None and user.last_login_at is None and user.source == "oidc"
 
 
+@router.get("/workspaces/{workspace_id}/access-events")
+def access_events(
+    workspace_id: str,
+    limit: int = 100,
+    identity: Identity = Depends(get_identity),
+    db: Session = Depends(get_db),
+):
+    """The recorded changes to access here, with those at this workspace's site that reach it (issue #26)."""
+    from app.services import access_log
+    _require_manage_members(workspace_id, identity, db)
+    return access_log.for_workspace(db, workspace_id, limit)
+
+
 @router.get("/workspaces/{workspace_id}/inherited-grants")
 def inherited_grants(
     workspace_id: str,
@@ -138,6 +151,21 @@ def invite_people(
     except invitations.InviteError as e:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(e)) from e
+    from app.services import access_log
+    actor = access_log.actor_of(identity)
+    if group is not None and out.get("group_granted"):
+        access_log.record(db, "role.granted", actor, workspace_id=workspace_id, subject_type="group",
+                          subject_id=group.uid, role_id=out.get("role_id"))
+    for p in out["people"]:
+        if p.get("added"):
+            access_log.record(db, "person.invited", actor, workspace_id=workspace_id, subject_type="user",
+                              subject_id=p["user_id"], email=p["email"])
+        if group is not None and p.get("joined"):
+            access_log.record(db, "group.member_added", actor, group_uid=group.uid, subject_type="user",
+                              subject_id=p["user_id"])
+        elif group is None and p.get("granted"):
+            access_log.record(db, "role.granted", actor, workspace_id=workspace_id, subject_type="user",
+                              subject_id=p["user_id"], role_id=out.get("role_id"))
     db.commit()
     return out
 
@@ -190,6 +218,9 @@ def create_binding(
         created_by=identity.user.id if isinstance(identity, OidcIdentity) else None,
     )
     db.add(binding)
+    from app.services import access_log
+    access_log.record(db, "role.granted", access_log.actor_of(identity), workspace_id=workspace_id,
+                      subject_type=body.subject_type, subject_id=body.subject_id, role_id=body.role_id)
     db.commit()
     db.refresh(binding)
     label, active = _subject_label(db, binding)
@@ -225,6 +256,9 @@ def delete_binding(
             )
 
     db.delete(binding)
+    from app.services import access_log
+    access_log.record(db, "role.revoked", access_log.actor_of(identity), workspace_id=workspace_id,
+                      subject_type=binding.subject_type, subject_id=binding.subject_id, role_id=binding.role_id)
     db.commit()
 
 
@@ -251,9 +285,11 @@ def my_permissions(
     legacy membership are resolved — so the UI can hide what would 403 and
     an operator can answer "why can't I?" without reading the database."""
     if isinstance(identity, OidcIdentity):
+        from app.services.permissions import explain
+        sources = explain(db, identity.user, workspace_id)
         if identity.user.is_admin:
             return EffectivePermissionsOut(
-                workspace_id=workspace_id, is_admin=True,
+                workspace_id=workspace_id, is_admin=True, sources=sources,
                 objects=["read", "create", "modify", "delete"],
                 tickets=["read", "create", "modify", "delete"],
                 documents=["read", "create", "modify", "delete", "approve"],
@@ -263,6 +299,7 @@ def my_permissions(
         return EffectivePermissionsOut(
             workspace_id=workspace_id,
             is_admin=False,
+            sources=sources,
             objects=sorted(granted["objects"]),
             tickets=sorted(granted["tickets"]),
             documents=sorted(granted["documents"]),

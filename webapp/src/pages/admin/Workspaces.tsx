@@ -2,20 +2,20 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ApiError, sitesApi, workspacesApi, type PlacementEnding } from "../../api/client";
-import type { MyWorkspace } from "../../api/types";
+import type { MyWorkspace, SiteMoveAccess } from "../../api/types";
 import { problem } from "../catalogue/catalogueText";
 
 /** A workspace's place in a site: a site (whose places its facilities use), the catalogue, or at a site. Leaving
  *  a site first shows the placements on its places that would end. */
 function SiteCell({ ws, all }: { ws: MyWorkspace; all: MyWorkspace[] }) {
   const queryClient = useQueryClient();
-  const [ending, setEnding] = useState<{ siteId: string | null; list: PlacementEnding[] } | null>(null);
+  const [ending, setEnding] = useState<{ siteId: string | null; list: PlacementEnding[]; access?: SiteMoveAccess } | null>(null);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["me-workspaces"] });
   const role = useMutation({ mutationFn: (site: boolean) => sitesApi.setRole(ws.id, site), onSuccess: refresh });
   const site = useMutation({
     mutationFn: (v: { siteId: string | null; confirm: boolean }) => sitesApi.setSite(ws.id, v.siteId, v.confirm),
     onSuccess: (r, v) => {
-      if (r.preview) setEnding({ siteId: v.siteId, list: r.would_end ?? [] });
+      if (r.preview) setEnding({ siteId: v.siteId, list: r.would_end ?? [], access: r.access });
       else { setEnding(null); refresh(); }
     },
   });
@@ -49,11 +49,17 @@ function SiteCell({ ws, all }: { ws: MyWorkspace; all: MyWorkspace[] }) {
       )}
       {ending && (
         <div role="alert" className="rounded border border-amber-300 bg-amber-50 p-2 text-amber-950">
-          <p>Leaving its site ends {ending.list.length} placement{ending.list.length === 1 ? "" : "s"} of its
-            records on the site's places: {ending.list.slice(0, 5).map((x) => x.record.name).join(", ")}
-            {ending.list.length > 5 ? "…" : ""}. They keep their position on the map.</p>
-          <button type="button" onClick={() => site.mutate({ siteId: ending.siteId, confirm: true })}
-                  className="mt-1 rounded bg-slate-900 px-2 py-0.5 font-medium text-white">Leave the site</button>
+          {ending.list.length > 0 && (
+            <p>Leaving its site ends {ending.list.length} placement{ending.list.length === 1 ? "" : "s"} of its
+              records on the site's places: {ending.list.slice(0, 5).map((x) => x.record.name).join(", ")}
+              {ending.list.length > 5 ? "…" : ""}. They keep their position on the map.</p>
+          )}
+          {ending.access && <MoveAccess access={ending.access} />}
+          <button type="button" disabled={!!ending.access?.blocked.length}
+                  onClick={() => site.mutate({ siteId: ending.siteId, confirm: true })}
+                  className="mt-1 rounded bg-slate-900 px-2 py-0.5 font-medium text-white disabled:opacity-50">
+            {ending.siteId ? "Move it" : "Leave the site"}
+          </button>
           <button type="button" onClick={() => setEnding(null)} className="ml-2 text-slate-600">Cancel</button>
         </div>
       )}
@@ -267,6 +273,23 @@ export function AdminWorkspaces() {
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  );
+}
+
+
+/** Who gains and who loses access when a facility changes site, and what must be settled first (issue #26). */
+function MoveAccess({ access }: { access: SiteMoveAccess }) {
+  const line = (g: SiteMoveAccess["loses"][number]) =>
+    `${g.group_name} (${g.role_name}): ${g.people.length} ${g.people.length === 1 ? "person" : "people"}`;
+  return (
+    <div className="mt-1 space-y-1">
+      {access.loses.length > 0 && <p>It stops inheriting from {access.from_site}: {access.loses.map(line).join("; ")}.</p>}
+      {access.gains.length > 0 && <p>It starts inheriting from {access.to_site}: {access.gains.map(line).join("; ")}.</p>}
+      {access.blocked.length > 0 && (
+        <p className="font-medium text-red-700">Settle first: it gives roles to groups of {access.blocked[0].home_site_id}{" "}
+          ({[...new Set(access.blocked.map((b) => b.group_name))].join(", ")}). Remove those grants on its Access page.</p>
       )}
     </div>
   );

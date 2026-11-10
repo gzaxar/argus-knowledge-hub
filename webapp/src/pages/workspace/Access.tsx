@@ -276,6 +276,7 @@ export function WorkspaceAccess() {
       {isSite && <SiteAdministrators siteId={workspaceId!} />}
       {isSite && <SiteWideGroupAccess siteId={workspaceId!} />}
       {!isSite && <InheritedGrants workspaceId={workspaceId!} />}
+      <AccessChanges workspaceId={workspaceId!} />
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex items-start justify-between gap-4">
@@ -565,6 +566,46 @@ function InheritedGrants({ workspaceId }: { workspaceId: string }) {
             {!g.group_active && <span className="ml-2 text-xs text-slate-400">group deactivated: gives nothing</span>}</li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+
+const CHANGE: Record<string, string> = {
+  "role.granted": "given", "role.revoked": "taken away", "site_role.granted": "given site-wide",
+  "site_role.revoked": "taken away site-wide", "group.member_added": "joined", "group.member_removed": "left",
+  "group.administrator_added": "named group administrator", "group.administrator_removed": "no longer group administrator",
+  "site.administrator_added": "named site administrator", "site.administrator_removed": "no longer site administrator",
+  "group.created": "group created", "group.moved": "group moved", "group.renamed": "group renamed",
+  "group.activated": "group reactivated", "group.deactivated": "group deactivated", "person.invited": "invited",
+  "site.facility_moved": "facility moved", "site.role_set": "made a site", "site.role_removed": "no longer a site",
+};
+
+/** The recorded changes to access here, and at this workspace's site (issue #26). */
+function AccessChanges({ workspaceId }: { workspaceId: string }) {
+  const [open, setOpen] = useState(false);
+  const events = useQuery({ queryKey: ["access-events", workspaceId], queryFn: () => rolesApi.accessEvents(workspaceId),
+                            enabled: open, retry: false });
+  return (
+    <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="font-semibold text-slate-900">
+        {open ? "▾" : "▸"} Changes to access
+      </button>
+      {open && (
+        <ul className="mt-2 divide-y divide-slate-100">
+          {(events.data ?? []).map((e) => (
+            <li key={e.id} className="py-1.5">
+              <span className="text-xs text-slate-400">{new Date(e.at).toLocaleString()}</span>{" "}
+              <span className="font-medium">{e.subject ?? e.detail?.name as string ?? ""}</span>{" "}
+              {CHANGE[e.kind] ?? e.kind}{e.role_id ? ` · ${e.role_id}` : ""}
+              {e.site_id && e.kind.startsWith("site") ? ` · ${e.site_id}` : ""}
+              {e.detail?.from_site !== undefined ? ` · ${e.detail.from_site ?? "no site"} → ${e.detail.to_site ?? "no site"}` : ""}
+              {e.actor && <span className="text-slate-500"> · by {e.actor}</span>}
+            </li>
+          ))}
+          {events.data?.length === 0 && <li className="py-1.5 text-slate-400">Nothing recorded yet.</li>}
+        </ul>
+      )}
     </div>
   );
 }

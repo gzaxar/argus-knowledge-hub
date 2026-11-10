@@ -90,7 +90,7 @@ export function AccountPage() {
                       <div className="text-xs text-slate-400">{w.id}{w.is_global ? " · global" : ""}</div></td>
                     <td className="px-3 py-2 text-xs">
                       {w.roles.length ? w.roles.map((r) => (
-                        <div key={r.id + r.via}>{r.name}{r.via !== "direct" && <span className="text-slate-400"> · {r.via.replace("group:", "via ")}</span>}</div>
+                        <div key={r.id + r.via}>{r.name}{r.via !== "direct" && <span className="text-slate-400"> · {viaText(r.via)}</span>}</div>
                       )) : u?.is_admin ? "administrator" : "workspace default access"}
                     </td>
                     {["objects", "tickets", "documents", "workspace"].map((k) => (
@@ -126,4 +126,15 @@ export function AccountPage() {
       </section>
     </div>
   );
+}
+
+
+/** Where a role comes from, in words: a group, a site-wide grant of the workspace's site, administering the site. */
+export function viaText(via: string): string {
+  if (via.startsWith("group:")) return `via ${via.slice(6)}`;
+  if (via.startsWith("site:")) {
+    const [, site, group] = via.split(":");
+    return group ? `site-wide at ${site}, via ${group}` : `as administrator of the site ${site}`;
+  }
+  return via === "membership" ? "membership" : via;
 }

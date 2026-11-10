@@ -21,13 +21,27 @@ Workspace archives include site and group administrator assignments with the acc
 
 ## Site-level groups and group access (issue #26)
 
-**Status: first part implemented.** Site-owned groups (`groups.home_site_id`), site-wide group grants
-(`site_group_role_bindings`), their resolution from each workspace's *current* site, the scope checks below, the
-refusals when a site loses its role or a facility moves, the site-wide and inherited sections of the Access page,
-and group scope on the Groups page are in place. Still to come: a preview of who gains or loses access before a
-facility moves (today the move is refused while it would leave grants out of scope), the source of each right in
-My permissions and access reviews, carrying a facility-only archive's inherited access as a site dependency, and
-the Flutter app. The migration created no grant: existing access is unchanged.
+**Status: implemented.** Site-owned groups (`groups.home_site_id`) and site-wide group grants
+(`site_group_role_bindings`) are worked out from each workspace's *current* site. The scope checks below apply.
+A site cannot lose its role while it gives site-wide grants or owns active groups. A facility cannot move while it
+gives direct roles to groups of its site.
+
+- **Moving a facility:** Administration › Workspaces shows who stops and who starts inheriting access, with the
+  people affected, before the move. It holds the move while grants block it.
+- **Moving a group:** a local group moves to a site or back to the installation with `PUT /v1/groups/{uid}/home`,
+  previewed first. Grants outside the new scope block the move. Only the installation's administrators give a
+  group back to the installation.
+- **Where rights come from:** each right names its source (a role of one's own, a group's, site-wide at which site,
+  legacy, site administrator). This appears in `my-permissions` (`sources`), on My account and in access reviews.
+- **The record of changes:** every change to access is recorded in `access_events`: roles given and taken away,
+  directly or site-wide, members, group and site administrators, groups moved, renamed or deactivated, facilities
+  moved, sites made or unmade. It is listed under **Changes to access** on the Access page.
+- **Archives:** a facility exported without its site lists what it inherits as `site_dependencies` in the
+  manifest. Importing it never creates a site-wide grant, nor a second copy of the site's group.
+- **Phone app:** permissions are worked out by the server, so the phone app receives inherited access with nothing
+  of its own.
+
+The migration created no grant: existing access is unchanged.
 
 ### Two separate scopes
 

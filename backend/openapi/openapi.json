@@ -5053,6 +5053,14 @@
             "title": "Objects",
             "type": "array"
           },
+          "sources": {
+            "default": [],
+            "items": {
+              "type": "object"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
           "tickets": {
             "items": {
               "type": "string"
@@ -6594,6 +6602,28 @@
           "name"
         ],
         "title": "GroupCreate",
+        "type": "object"
+      },
+      "GroupHomeIn": {
+        "properties": {
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "home_site_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Site Id"
+          }
+        },
+        "title": "GroupHomeIn",
         "type": "object"
       },
       "GroupMemberOut": {
@@ -43417,6 +43447,84 @@
         ]
       }
     },
+    "/v1/groups/{uid}/access-events": {
+      "get": {
+        "description": "The recorded changes to this group: members, administrators, its site, the roles it was given.",
+        "operationId": "group_access_events_v1_groups__uid__access_events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Group Access Events",
+        "tags": [
+          "directory"
+        ]
+      }
+    },
     "/v1/groups/{uid}/administrators": {
       "get": {
         "operationId": "list_group_administrators_v1_groups__uid__administrators_get",
@@ -43663,6 +43771,94 @@
           }
         ],
         "summary": "Remove Group Administrator",
+        "tags": [
+          "directory"
+        ]
+      }
+    },
+    "/v1/groups/{uid}/home": {
+      "put": {
+        "description": "Give a local group to a site, or back to the installation (issue #26). Without `confirm`, the preview: the grants\nthat would be out of the new scope (they block it until settled) and who would govern it. To a site: an\nadministrator of that site who may already change the group, or the installation's. To the installation: the\ninstallation's administrators only, since it widens where the group can be given roles.",
+        "operationId": "move_group_v1_groups__uid__home_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupHomeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Move Group",
         "tags": [
           "directory"
         ]
@@ -67382,6 +67578,94 @@
         "summary": "Update Workspace",
         "tags": [
           "workspaces"
+        ]
+      }
+    },
+    "/v1/workspaces/{workspace_id}/access-events": {
+      "get": {
+        "description": "The recorded changes to access here, with those at this workspace's site that reach it (issue #26).",
+        "operationId": "access_events_v1_workspaces__workspace_id__access_events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Access Events",
+        "tags": [
+          "roles"
         ]
       }
     },
