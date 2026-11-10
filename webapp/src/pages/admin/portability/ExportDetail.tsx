@@ -74,6 +74,8 @@ export function ExportDetailPage() {
     onSuccess: (v) => { if (v) done(v); else setError(null); }, onError: fail });
   const [reason, setReason] = useState("");
   const revoke = useMutation({ mutationFn: () => portabilityApi.revokeExport(id, reason), onSuccess: done, onError: fail });
+  // Analysed again with no new outcome: what stopped it (a file not there, a record since restored) may have changed.
+  const reanalyse = useMutation({ mutationFn: () => portabilityApi.decideExport(id, {}), onSuccess: done, onError: fail });
   const download = useMutation({
     mutationFn: () => portabilityApi.downloadArchive(id),
     onSuccess: (blob) => {
@@ -95,6 +97,12 @@ export function ExportDetailPage() {
   const selfApproval = e.risk === "high" && myEmail === e.requested_by && !!policy?.separation_of_duties;
   const needsConfirm = e.risk === "high" && policy?.step_up === "session_confirmation";
   const uninspected = e.analysis.blobs?.uninspected ?? [];
+  // What keeps it from being ready, each with what a person can do about it.
+  const unresolved = e.analysis.closure?.unresolved?.length ?? 0;
+  const blocked = e.analysis.closure?.blocked?.length ?? 0;
+  const secrets = e.analysis.blobs?.secrets?.length ?? 0;
+  const undecided = e.analysis.blobs?.needs_decision?.length ?? 0;
+  const missing = e.analysis.blobs?.missing_count ?? e.analysis.blobs?.missing?.length ?? 0;
   const busy = step.isPending ? step.variables : null;
 
   return (
@@ -130,13 +138,30 @@ export function ExportDetailPage() {
                             title={selfApproval ? "A high-risk export needs another approver" : undefined}
                             confirm={`Approve this ${e.risk === "high" ? "high-risk " : ""}export?`} />
               {!e.analysis.ready && (
-                <ol className="w-full list-decimal space-y-0.5 pl-5 text-sm text-amber-900">
-                  <li>Below, under <a href="#dependencies" className="underline">Dependencies</a>, choose an outcome for each
-                    highlighted row (the recommended one is marked ★).</li>
-                  <li>Press <b>Save outcomes and analyse again</b> (at the top right of that section).</li>
-                  <li>Then {needsConfirm ? <>tick <i>I confirm this high-risk approval</i> and </> : ""}press <b>Approve</b> here;
-                    next come <b>Generate</b> and {e.destination.repository ? <b>Publish to Git</b> : <b>Download</b>}.</li>
-                </ol>
+                <ActionButton label="Analyse again" busy={reanalyse.isPending} onClick={() => reanalyse.mutate()}
+                              title="Run the analysis again, e.g. once a missing file is back" />
+              )}
+              {!e.analysis.ready && (
+                <div className="w-full space-y-1 text-sm text-amber-900">
+                  <p className="font-medium">Not ready to approve, because:</p>
+                  <ul className="list-disc space-y-0.5 pl-5">
+                    {unresolved > 0 && <li>{unresolved} dependenc{unresolved === 1 ? "y needs" : "ies need"} an outcome: choose one
+                      under <a href="#dependencies" className="underline">Dependencies</a> (★ is recommended) and press{" "}
+                      <b>Save outcomes and analyse again</b>.</li>}
+                    {blocked > 0 && <li>{blocked} dependenc{blocked === 1 ? "y is" : "ies are"} set to <i>do not run this export</i>{" "}
+                      under <a href="#dependencies" className="underline">Dependencies</a>.</li>}
+                    {secrets > 0 && <li>{secrets} secret(s) found inside files (under <i>Content inspection</i>): the content
+                      must be corrected, then <b>Analyse again</b>.</li>}
+                    {undecided > 0 && <li>{undecided} file(s) need a decision under <i>Content inspection</i>.</li>}
+                    {missing > 0 && <li>{missing} attachment file(s) are missing from storage (listed under <i>Content
+                      inspection</i>). Put them back, then <b>Analyse again</b>. If every file is missing, the process that
+                      analysed this export did not see the attachments volume.</li>}
+                    {!(unresolved || blocked || secrets || undecided || missing) && <li>its analysis is out of date:
+                      press <b>Analyse again</b>.</li>}
+                  </ul>
+                  <p>Then {needsConfirm ? <>tick <i>I confirm this high-risk approval</i> and </> : ""}press <b>Approve</b>;
+                    next come <b>Generate</b> and {e.destination.repository ? <b>Publish to Git</b> : <b>Download</b>}.</p>
+                </div>
               )}
               {selfApproval && <span className="text-sm text-amber-800">You requested it: another administrator must approve.</span>}
               {uninspected.length > 0 && <span className="text-sm text-amber-800">{uninspected.length} file(s) will travel uninspected.</span>}
@@ -350,6 +375,17 @@ function BlobReview({ e, onSaved, onError }: { e: ExportView; onSaved: (v: Expor
         <div className="mb-3 rounded border border-rose-200 bg-rose-50 p-2 text-sm text-rose-800">
           <div className="font-medium">Secrets found inside files — the export is refused until the content is corrected.</div>
           <ul className="mt-1 list-disc pl-5 text-xs">{b.secrets.slice(0, 10).map((f, i) => <li key={i}><span className="font-mono">{f.where}</span>: {f.kind}</li>)}</ul>
+        </div>
+      )}
+      {(b.missing?.length ?? 0) > 0 && (
+        <div className="mb-3 rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900">
+          <div className="font-medium">{b.missing_count ?? b.missing.length} attachment file(s) are missing from storage —
+            the export cannot be ready until they are back.</div>
+          <ul className="mt-1 list-disc pl-5 text-xs">
+            {b.missing.slice(0, 10).map((m, i) => <li key={i}><span className="font-mono">{m.family}</span> {m.key}{" "}
+              <span className="text-amber-700">({m.file})</span></li>)}
+          </ul>
+          {(b.missing_count ?? b.missing.length) > 10 && <p className="mt-1 text-xs">… and {(b.missing_count ?? b.missing.length) - 10} more.</p>}
         </div>
       )}
       {b.needs_decision.length === 0 && b.secrets.length === 0 ? (

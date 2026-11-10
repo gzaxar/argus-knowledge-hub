@@ -321,6 +321,12 @@ def _warnings(exp: PortabilityExport, restriction: dict, analysis: dict, blobs: 
                    "refused until the content is corrected")
     if blobs["needs_decision"]:
         out.append(f"{len(blobs['needs_decision'])} blob(s) could not be inspected or carry restricted markers")
+    if blobs.get("missing"):
+        count = blobs.get("missing_count") or len(blobs["missing"])
+        families = sorted({m["family"] for m in blobs["missing"]})
+        out.append(f"{count} attachment file(s) are missing from storage ({', '.join(families)}…): the export cannot "
+                   "be ready until they are back. When every file reads as missing, the process that analysed it "
+                   "does not see the attachments volume.")
     if blobs.get("uninspected"):
         out.append(f"{len(blobs['uninspected'])} file(s) will travel UNINSPECTED (opaque or unreadable), labelled as "
                    "such; an importer must accept the warning")

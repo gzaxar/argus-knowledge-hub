@@ -228,7 +228,16 @@ def run(engine: Engine, db: Session, sched: PortabilitySchedule, cfg: Optional[s
         if pending.state in ("generating", "verifying", "publishing"):
             return _finish(db, sched, "waiting", f"{pending.id} is still {pending.state}", pending.id)
         if pending.state == "awaiting_approval":
-            # Its own export, stopped at the analysis by an earlier run: settled now if it can be, else it waits.
+            # Its own export, stopped at the analysis by an earlier run: analysed again first (what stopped it — a
+            # file that was not there, a record since restored — may have changed), then settled if it can be,
+            # else it waits.
+            if not (pending.analysis or {}).get("ready"):
+                try:
+                    pending = service.set_export_decisions(db, pending, {}, actor, cfg)
+                    db.commit()
+                except Exception as e:  # noqa: BLE001
+                    db.rollback()
+                    return _finish(db, sched, "failed", f"{pending.id}: analysing it again: {e}", pending.id)
             return _carry_on(engine, db, sched, pending, actor, cfg)
         return _finish(db, sched, "waiting", f"{pending.id} is {pending.state.replace('_', ' ')}: it needs a person "
                                              "on the Portability page before the next run", pending.id)

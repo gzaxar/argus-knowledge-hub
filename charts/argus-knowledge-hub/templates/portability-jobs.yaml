@@ -57,9 +57,14 @@ spec:
               volumeMounts:
                 - {name: portability, mountPath: /data/portability}
                 - {name: portability-secret, mountPath: /etc/argus/portability, readOnly: true}
+                # An export carries the attachment files: without them every file reads as missing and a scheduled
+                # export can never be ready (or restored, for the drill).
+                - {name: attachments, mountPath: /data/attachments}
           volumes:
             - name: portability
               persistentVolumeClaim: {claimName: argus-portability}
+            - name: attachments
+              persistentVolumeClaim: {claimName: argus-attachments}
             - name: portability-secret
               secret:
                 secretName: {{ $root.Values.portabilitySecret }}
