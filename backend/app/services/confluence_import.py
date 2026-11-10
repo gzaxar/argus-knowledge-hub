@@ -29,6 +29,9 @@ from app.models.attachment import Attachment
 from app.models.document import Document, DocumentRelation, DocumentRevision
 from app.models.import_job import ImportJob
 from app.services.document_types import ensure_document_kinds, type_uid
+from app.services.confluence_file_macros import FILE_VIEWER_MACROS, render_file_macro
+from app.services.confluence_presentation import prepare_presentation
+from app.services.confluence_auth import configure_confluence_session, confluence_json, reject_confluence_login
 from app.services.import_merge import effective_strategy
 from app.services.jira_import import (
     _TimeoutSession,
@@ -103,10 +106,13 @@ def _macro_body(block: str) -> str:
     return re.sub(r"^<!\[CDATA\[|\]\]>$", "", body.strip())
 
 
-def _convert_macro(match: re.Match) -> str:
+def _convert_macro(match: re.Match, files: Optional[dict] = None) -> str:
     block = match.group(0)
     name = (match.group(1) or "").lower()
     body = _macro_body(block)
+
+    if name in FILE_VIEWER_MACROS:
+        return render_file_macro(block, name, files)
 
     if name in ("code", "noformat"):
         language = _macro_param(block, "language") or ""
@@ -138,7 +144,7 @@ _INNERMOST_MACRO = re.compile(
 def _confluence_macros_to_html(storage: str, files: Optional[dict] = None) -> str:
     html = storage
     for _ in range(10):  # nesting this deep is already pathological
-        converted = _INNERMOST_MACRO.sub(_convert_macro, html)
+        converted = _INNERMOST_MACRO.sub(lambda match: _convert_macro(match, files), html)
         if converted == html:
             break
         html = converted
@@ -283,7 +289,7 @@ def _fetch_pages(session, base_url: str, space_key: Optional[str], cql: Optional
         url = f"{base_url}/rest/api/content"
     resp = session.get(url, params=params)
     resp.raise_for_status()
-    return resp.json()
+    return confluence_json(resp)
 
 
 def _has_more(payload: dict, received: int) -> bool:
@@ -318,7 +324,7 @@ def _fetch_attachments(session, base_url: str, page_id: str) -> tuple[list[dict]
         if resp.status_code == 404:
             return out, link_base
         resp.raise_for_status()
-        payload = resp.json()
+        payload = confluence_json(resp)
         link_base = link_base or (payload.get("_links") or {}).get("base")
         results = payload.get("results") or []
         out.extend(results)
@@ -499,15 +505,16 @@ def resolve_page(session, base_url: str, link: dict) -> tuple[str, str]:
     """The id and title of the page a parsed link names, read from the server so a
     link the account cannot open says so before anything is imported."""
     def refused(resp) -> RuntimeError:
+        reject_confluence_login(resp)
         if resp.status_code in (401, 403):
-            return RuntimeError("Confluence refused the token for this page: check the personal access "
-                                "token, and that its account can open the page.")
+            return RuntimeError("Confluence refused the credentials for this page: check the authentication "
+                                "method, token, and that its account can open the page.")
         return RuntimeError(f"The linked page was not found ({_describe_error(None, resp)}).")
 
     if "page_id" in link:
         resp = session.get(f"{base_url}/rest/api/content/{link['page_id']}")
         if resp.status_code == 200:
-            page = resp.json()
+            page = confluence_json(resp)
             return str(page["id"]), page.get("title") or ""
         if "short" not in link or resp.status_code in (401, 403):
             raise refused(resp)
@@ -524,7 +531,7 @@ def resolve_page(session, base_url: str, link: dict) -> tuple[str, str]:
                        params={"spaceKey": link["space"], "title": link["title"], "type": "page"})
     if resp.status_code != 200:
         raise refused(resp)
-    results = resp.json().get("results") or []
+    results = confluence_json(resp).get("results") or []
     if not results:
         raise RuntimeError(f"No page “{link['title']}” in the space {link['space']}, or the token's "
                            "account cannot see it.")
@@ -532,26 +539,31 @@ def resolve_page(session, base_url: str, link: dict) -> tuple[str, str]:
 
 
 def resolve_api_base(session, base_url: str) -> str:
-    """Confluence Server is often published under /confluence or /wiki, and
-    the site root answers with a normal page either way — so a wrong base
-    shows up as a 404 from the API and nothing more helpful."""
+    """Find an API response, never accept a login page as a successful probe."""
     tried = []
+    failure = None
     for suffix in ("", "/confluence", "/wiki"):
         candidate = f"{base_url}{suffix}"
         url = f"{candidate}/rest/api/space"
         tried.append(url)
         try:
-            resp = session.get(url, params={"limit": 1})
+            resp = session.get(url, params={"limit": 1}, allow_redirects=False)
         except Exception:
             continue
         if resp.status_code == 404:
             continue
-        if resp.status_code < 500:
+        try:
+            payload = confluence_json(resp)
+        except RuntimeError as exc:
+            failure = failure or str(exc)
+            continue
+        if isinstance(payload.get("results"), list):
             return candidate
+    if failure:
+        raise RuntimeError(failure)
     raise RuntimeError(
         "No Confluence REST API found. Tried: " + ", ".join(tried) +
-        ". Check the server URL — Confluence is often published under a "
-        "context path such as /confluence or /wiki rather than the site root."
+        ". Check the server URL, including its /wiki or /confluence context path."
     )
 
 
@@ -601,6 +613,8 @@ def run_confluence_import(
     link_assets: bool = True,
     page_url: Optional[str] = None,
     include_children: bool = True,
+    auth_mode: str = "pat",
+    email: str = "",
 ) -> None:
     """`page_url` imports one page (and, with `include_children`, every page under
     it) instead of a space or a CQL query; the server comes from the link when
@@ -617,7 +631,7 @@ def run_confluence_import(
         link = parse_page_link(page_url) if page_url else None
         base_url = (base_url or (link or {}).get("base_url") or "").rstrip("/")
         session = _TimeoutSession()
-        session.headers.update({"Authorization": f"Bearer {pat}", "Accept": "application/json"})
+        base_url = configure_confluence_session(session, base_url, pat, auth_mode, email)
 
         resolved = resolve_api_base(session, base_url)
         if resolved != base_url:
@@ -767,7 +781,11 @@ def run_confluence_import(
                     )
                     attachments_copied += copied
                     markdown = storage_to_markdown(body, files)
-                    revision.body_markdown = markdown
+                    revision.body_markdown, revision.attributes = prepare_presentation(
+                        title, markdown, attributes, body,
+                    )
+                    if not revision.attributes.get("argus_summary"):
+                        _note(job, seen, "summary_missing", f"page {page_id}: no introductory prose found for a summary")
 
                     if current is not None:
                         current.state = "superseded"

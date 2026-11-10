@@ -479,6 +479,9 @@ export interface GitImportConfigParams {
 
 export interface ConfluenceImportConfigParams {
   source: "confluence";
+  /** Existing saved configurations default to Data Center/Server PAT. */
+  auth_mode?: "pat" | "cloud_basic";
+  email?: string;
   /** Left out when `page_url` names the server. */
   base_url?: string;
   space_key?: string | null;
@@ -743,8 +746,35 @@ export interface AppDocument {
   updated_at: string;
 }
 
+export interface DocumentFolder {
+  uid: string;
+  workspace_id: string;
+  name: string;
+  parent_uid: string | null;
+}
+export interface DocumentNavigationNode {
+  id: string;
+  kind: "folder" | "document" | "group";
+  uid: string;
+  title: string;
+  parent_id: string | null;
+}
+export interface DocumentNavigationSnapshot {
+  folders: DocumentFolder[];
+  documents: AppDocument[];
+  nodes: DocumentNavigationNode[];
+  warnings: string[];
+}
+export interface DocumentNavigationPreview {
+  document: AppDocument;
+  revision: DocumentRevision | null;
+  revisions: { uid: string; revision_number: number; state: DocumentState }[];
+}
+
 export interface DocumentInput {
   uid?: string;
+  navigation_parent_document_uid?: string;
+  navigation_folder_uid?: string;
   /** Null lets the system assign one from the document's type. */
   code: string | null;
   title: string;

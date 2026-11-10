@@ -37,8 +37,18 @@ def _ensure(url: str) -> None:
         if not conn.scalar(text("select 1 from pg_database where datname = :n"), {"n": target.database}):
             conn.execute(text(f'create database "{target.database}"'))
     admin.dispose()
-    subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=BACKEND, check=True,
-                   env={**os.environ, "DATABASE_URL": url}, stdout=subprocess.DEVNULL)
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=BACKEND,
+        env={**os.environ, "DATABASE_URL": url},
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode:
+        raise RuntimeError(
+            "Test database migration failed:\n"
+            + result.stdout + "\n" + result.stderr
+        )
 
 
 # A publication in a test must not start indexing in a thread behind the test's back

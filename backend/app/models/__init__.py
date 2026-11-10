@@ -9,6 +9,7 @@ from app.models.asset_subresources import (
 )
 from app.models.attachment import Attachment
 from app.models.document import Document, DocumentRelation, DocumentRevision
+from app.models.document_navigation import DocumentFolder, DocumentPlacement  # noqa: F401
 from app.models.global_value import GlobalValue
 from app.models.ai_suggestion import AISuggestion
 from app.models.llm_config import LLMConfig
@@ -40,6 +41,8 @@ __all__ = [
     "Document",
     "DocumentRelation",
     "DocumentRevision",
+    "DocumentFolder",
+    "DocumentPlacement",
     "GlobalValue",
     "AISuggestion",
     "LLMConfig",
