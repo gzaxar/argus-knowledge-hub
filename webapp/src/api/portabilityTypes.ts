@@ -157,7 +157,8 @@ export interface ExportAnalysis {
   restriction?: { included: string[]; excluded_classes: string[]; fields_hidden: boolean };
   estimate?: { records: number; tickets: number; claim_events: number; attachments: number; attachment_bytes: number };
   blobs?: { inspected: number; secrets: { where: string; kind: string }[]; needs_decision: BlobDecision[];
-            excluded: { where: string; sha256: string; status: string }[]; missing: unknown[]; ready: boolean;
+            excluded: { where: string; sha256: string; status: string }[];
+            missing: { family: string; key: string; file: string }[]; missing_count?: number; ready: boolean;
             uninspected?: UninspectedBlob[] };
   identity_profile?: string;
   policy?: PortabilityPolicy;

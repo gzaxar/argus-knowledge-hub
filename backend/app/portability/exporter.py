@@ -359,7 +359,8 @@ def prescan(db: Session, sc: Scope, classifications: list[str], decisions: dict,
             for _ in rows_of(db, fam, sc, blobs, classifications):
                 pass
     return {"inspected": len(blobs.reports), "secrets": blobs.secrets[:50], "needs_decision": blobs.needs_decision,
-            "excluded": blobs.excluded, "missing": blobs.missing[:50], "uninspected": blobs.uninspected[:200],
+            "excluded": blobs.excluded, "missing": blobs.missing[:50], "missing_count": len(blobs.missing),
+            "uninspected": blobs.uninspected[:200],
             "ready": not blobs.secrets and not blobs.needs_decision and not blobs.missing}
 
 
