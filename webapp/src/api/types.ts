@@ -544,6 +544,8 @@ export interface Me {
   is_admin: boolean;
   /** May maintain the installation's catalogue: an administrator, or its workspace's Curator or Owner. */
   catalogue_maintainer?: boolean;
+  /** The sites this person may administer: every site for an administrator, else those they were named for. */
+  administered_sites?: { id: string; name: string }[];
 }
 
 export interface Workspace {

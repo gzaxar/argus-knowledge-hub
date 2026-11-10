@@ -3791,6 +3791,14 @@
       },
       "MeOut": {
         "properties": {
+          "administered_sites": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SiteRef"
+            },
+            "title": "Administered Sites",
+            "type": "array"
+          },
           "auth_type": {
             "enum": [
               "pat",
@@ -4723,6 +4731,24 @@
           "edges"
         ],
         "title": "SemanticGraphOut",
+        "type": "object"
+      },
+      "SiteRef": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SiteRef",
         "type": "object"
       },
       "SourceIn": {

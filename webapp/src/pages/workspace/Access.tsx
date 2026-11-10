@@ -103,9 +103,9 @@ export function WorkspaceAccess() {
         Grant a role to a person or to a whole group. Granting a group is how a service gets
         access in one go — anyone who joins it later inherits the same rights.{" "}
         <Link to={`/workspaces/${workspaceId}/members`} className="text-indigo-600 hover:underline">
-          Older per-person permissions
+          Area permissions
         </Link>{" "}
-        still apply and are managed separately. Every grant is re-certified in a signed{" "}
+        given to one person add to these roles: a person can do whatever either allows. Every grant is re-certified in a signed{" "}
         <Link to={`/workspaces/${workspaceId}/access-reviews`} className="text-indigo-600 hover:underline">
           access review
         </Link>
@@ -273,8 +273,14 @@ export function WorkspaceAccess() {
         queryClient.invalidateQueries({ queryKey: ["member-directory", workspaceId] });
       }} />
 
-      {isSite && <SiteAdministrators siteId={workspaceId!} />}
-      {isSite && <SiteWideGroupAccess siteId={workspaceId!} />}
+      {isSite && (
+        <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          This workspace is a site. Who administers it, and the roles its groups have at every facility here,
+          are under <span className="font-semibold">Site</span> in the sidebar:{" "}
+          <Link to={`/sites/${workspaceId}/administrators`} className="font-medium underline">administrators</Link>,{" "}
+          <Link to={`/sites/${workspaceId}/group-access`} className="font-medium underline">site-wide group access</Link>.
+        </div>
+      )}
       {!isSite && <InheritedGrants workspaceId={workspaceId!} />}
       <AccessChanges workspaceId={workspaceId!} />
 
@@ -347,7 +353,7 @@ export function WorkspaceAccess() {
 }
 
 
-function SiteAdministrators({ siteId }: { siteId: string }) {
+export function SiteAdministrators({ siteId, heading = true }: { siteId: string; heading?: boolean }) {
   const qc = useQueryClient();
   const [email, setEmail] = useState("");
   const admins = useQuery({ queryKey: ["site-administrators", siteId], queryFn: () => sitesApi.administrators(siteId) });
@@ -358,8 +364,8 @@ function SiteAdministrators({ siteId }: { siteId: string }) {
   const remove = useMutation({ mutationFn: (userId: string) => sitesApi.removeAdministrator(siteId, userId),
     onSuccess: refresh });
   return <section className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
-    <h2 className="text-sm font-semibold text-slate-900">Site administrators</h2>
-    <p className="mt-1 text-sm text-slate-500">These people can manage access to this site and every workspace currently at it. They can grant roles to people and groups.</p>
+    {heading && <><h2 className="text-sm font-semibold text-slate-900">Site administrators</h2>
+    <p className="mt-1 text-sm text-slate-500">These people can manage access to this site and every workspace currently at it. They can grant roles to people and groups.</p></>}
     <ul className="mt-3 divide-y divide-slate-100 text-sm">
       {(admins.data ?? []).map((a) => <li key={a.user_id} className="flex justify-between gap-3 py-2">
         <span>{a.name || a.email} {a.name && <span className="text-slate-500">{a.email}</span>}</span>
@@ -482,7 +488,7 @@ function Invite({ workspaceId, roles, onDone }: { workspaceId: string; roles: { 
 
 
 /** Roles groups have once for this site, in it and in every facility at it now or later (issue #26). */
-function SiteWideGroupAccess({ siteId }: { siteId: string }) {
+export function SiteWideGroupAccess({ siteId, heading = true }: { siteId: string; heading?: boolean }) {
   const qc = useQueryClient();
   const data = useQuery({ queryKey: ["site-group-grants", siteId], queryFn: () => sitesApi.groupGrants(siteId), retry: false });
   const groups = useQuery({ queryKey: ["groups"], queryFn: () => directoryApi.groups() });
@@ -501,7 +507,7 @@ function SiteWideGroupAccess({ siteId }: { siteId: string }) {
   const error = [preview, give, revoke].find((m) => m.isError)?.error as ApiError | undefined;
   return (
     <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-sm">
-      <h2 className="font-semibold text-slate-900">Site-wide group access</h2>
+      {heading && <h2 className="font-semibold text-slate-900">Site-wide group access</h2>}
       <p className="mt-1 text-slate-500">
         A role given here reaches this site and every workspace currently at it
         ({(data.data?.workspaces ?? []).join(", ") || "…"}), facilities added later included. It is not copied into
@@ -582,7 +588,7 @@ const CHANGE: Record<string, string> = {
 };
 
 /** The recorded changes to access here, and at this workspace's site (issue #26). */
-function AccessChanges({ workspaceId }: { workspaceId: string }) {
+export function AccessChanges({ workspaceId }: { workspaceId: string }) {
   const [open, setOpen] = useState(false);
   const events = useQuery({ queryKey: ["access-events", workspaceId], queryFn: () => rolesApi.accessEvents(workspaceId),
                             enabled: open, retry: false });

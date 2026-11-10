@@ -83,8 +83,8 @@ manages every workspace where it holds one. A directory's group is changed in th
 
 ## Site-wide group access
 
-On a **site**'s **Access** page, its administrators (and the installation's) can give a group one role for the whole
-site under **Site-wide group access**: its members then have it in the site and in every workspace currently at the
+In the **Site** section of **Administration**, the site's administrators (and the installation's) can give a group
+one role for the whole site on **Site-wide group access**: its members then have it in the site and in every workspace currently at the
 site, facilities added later included. **Preview** shows who would have it and where before you give it. Only the
 general levels (Viewer, Reporter, Agent, Approver, Contributor, Curator) can be given site-wide; Workspace
 administrator and Owner are given workspace by workspace.
@@ -113,9 +113,11 @@ active groups; a facility cannot leave while it gives roles to its site's groups
    same way: they add up.
 4. To take a role away, remove that line from *Granted roles*.
 
-**Members** is the older, per-person way of giving access to the workspace named at the top of the page: type
-part of a name or an e-mail in **Add a member** and pick the person (only people who have signed in once are
-offered; those already members are marked). Prefer roles on **Access**.
+**Area permissions** (formerly *Members*) is the older, per-person way of giving access to the workspace named at the
+top of the page, area by area (objects and types, tickets, documents): type part of a name or an e-mail in **Add a
+member** and pick the person (only people who have signed in once are offered; those already members are marked).
+These rights add to the roles on **Access**: a person can do whatever either allows, so removing a right here
+leaves what a role gives. Prefer roles on **Access**.
 
 People who sign in with the hub's own Keycloak also need a **login there**: an administrator creates it in
 Keycloak's admin console (*Users → Add user*, then *Credentials → Set password*, with *Temporary* on so they

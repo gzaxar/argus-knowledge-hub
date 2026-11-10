@@ -3,12 +3,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { directoryApi, membersApi, rolesApi, sitesApi, workspacesApi } from "../api/client";
 import type { DirectoryGroup, SiteGroupGrant } from "../api/types";
 import { WorkspaceAccess } from "../pages/workspace/Access";
+import { SiteGroupAccessPage } from "../pages/site/SiteAdministration";
 import { renderWith } from "../test/render";
 
 let here = "lnf";
 vi.mock("react-router-dom", async (actual) => ({
   ...(await actual<typeof import("react-router-dom")>()),
-  useParams: () => ({ workspaceId: here }),
+  useParams: () => ({ workspaceId: here, siteId: here }),
 }));
 afterEach(() => vi.restoreAllMocks());
 
@@ -28,9 +29,20 @@ function page() {
   vi.spyOn(workspacesApi, "listMine").mockResolvedValue([
     { id: "lnf", name: "LNF", role: "site", site_id: null }, { id: "btf", name: "BTF", role: null, site_id: "lnf" }] as never);
   vi.spyOn(sitesApi, "administrators").mockResolvedValue([]);
+  vi.spyOn(workspacesApi, "me").mockResolvedValue({ auth_type: "oidc", is_admin: true, workspace_id: null, user_id: "u",
+    email: null, name: null, administered_sites: [{ id: "lnf", name: "LNF" }] });
 }
 
 describe("site-wide group access", () => {
+  it("is on the site's own page, and the site's Access page points there", async () => {
+    here = "lnf";
+    page();
+    renderWith(<WorkspaceAccess />);
+    expect(await screen.findByText(/This workspace is a site/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "site-wide group access" })).toHaveAttribute("href", "/sites/lnf/group-access");
+    expect(screen.queryByLabelText("Group for the site")).not.toBeInTheDocument();
+  });
+
   it("previews who and where, then gives the role once for the site", async () => {
     here = "lnf";
     page();
@@ -40,8 +52,8 @@ describe("site-wide group access", () => {
       group_active: true, role_id: "reporter", role_name: "Reporter", workspaces: ["lnf", "sparc", "btf"],
       people: [{ user_id: "u", email: "ann@infn.it", name: null }] });
     const give = vi.spyOn(sitesApi, "grantGroup").mockResolvedValue(granted);
-    renderWith(<WorkspaceAccess />);
-    expect(await screen.findByText("Site-wide group access")).toBeInTheDocument();
+    renderWith(<SiteGroupAccessPage />);
+    expect(await screen.findByRole("heading", { name: /Site-wide group access/ })).toBeInTheDocument();
     const groupSelect = screen.getByLabelText("Group for the site");
     expect(screen.queryByRole("option", { name: "LNL crew" })).not.toBeInTheDocument();   // another site's group
     const roleSelect = screen.getByLabelText("Site-wide role");

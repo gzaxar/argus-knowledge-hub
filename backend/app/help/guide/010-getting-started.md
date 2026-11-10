@@ -87,7 +87,7 @@ Tick rows to act on them: the bar of actions (copy, move, delete, change type) a
 **Columns** chooses what a list shows; the filters stay in the page's address, so **List**, **Board** and **Map**
 show the same records.
 
-At the top right: **Help** (this guide); **⚙ Workspace settings**: **Access** (who has which role), **Members**,
+At the top right: **Help** (this guide); **⚙ Workspace settings**: **Access** (who has which role), **Area permissions**,
 **Packages**, the **Type catalogue**, **Global values**, **Ticket workflows**, **Equipment classes**, **Keys** (how
 record keys are made) and **Administration** (imports, GLPI, icon library, transfer, migration from Jira, AI
 endpoint, robot tokens; and workspaces, users, settings, portability and type migrations for administrators); your name, for **My

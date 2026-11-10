@@ -32,7 +32,7 @@ Neither ever holds site data: no serial numbers, installed units, locations, sel
 
 The catalogue is not a workspace to work in: it is not in the workspace switcher. Everyone reads its models from
 their own workspace, and a maintainer edits a model from there too (*Open the record › Edit*: the edit is made,
-and its permission checked, in the catalogue). Its shared types are upgraded on *Administration › Packages*. An
+and its permission checked, in the catalogue). Its shared types are upgraded on *Administration › Packages (all workspaces)*. An
 administrator renames it on *Administration › Catalogue* (its id and record keys stay, being printed on labels),
 and, rarely, opens it as a workspace from there — to clean up a record that does not belong in it, which the page
 names.

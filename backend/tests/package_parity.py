@@ -100,8 +100,25 @@ HARDWARE_2_3 = {"part_number", "rack_units", "full_depth", "airflow", "weight_kg
                 "components", "source_notes"}
 
 
+# accelerator 2.3.0: the commit a control configuration was read at and the commits that changed it, a unipolar
+# supply's sign (new fields only), and `git_revision` relabelled as the `gitrev` it is.
+NEW_2_3 = {"Control Configuration": {"git_commit", "git_last_change", "git_last_change_at", "git_last_change_url",
+                                     "git_last_change_commit", "git_recent_changes"},
+           "Power Supply": {"polarity_sign"}}
+
+
 def before_2_3(type_name: str, attributes: list[dict]) -> list[dict]:
-    return [a for a in attributes if not (type_name == "Product Model" and a.get("key") in HARDWARE_2_3)]
+    out = []
+    for a in attributes:
+        if type_name == "Product Model" and a.get("key") in HARDWARE_2_3:
+            continue
+        if a.get("key") in NEW_2_3.get(type_name, ()):
+            continue
+        if a.get("key") == "git_revision" and type_name in ("Control Configuration", "Facility"):
+            a = {**a, "name": "Revision"}
+            a.pop("description", None)
+        out.append(a)
+    return out
 
 
 def before_2_2(attribute: dict) -> dict:

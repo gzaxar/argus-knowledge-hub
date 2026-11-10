@@ -100,12 +100,23 @@ TYPES: dict[str, str] = {
 # What the IT equipment the hostnames name is made of, in the catalogue.
 IT_TYPES = ("Serial Converter", "Switch", "Server", "Workstation")
 
+# Converters a configuration declares as IOCs of their own (an IOC that polls the box), by devtype or
+# template: (manufacturer, product family). The box is then stated, not read from a name or a port range.
+DECLARED_CONVERTERS = {"moxanport": ("Moxa", "NPort")}
+# Moxa's default for a converter in TCP server mode: serial port N answers on TCP port 4000 + N. Advisory
+# only (asset-model-revision §9.3, I-PORT-4): it names the port a line probably uses, and never attaches one.
+MOXA_TCP_BASE = 4001
+
 # Where a device's settings end up. Everything else on a device row is a
 # setpoint or a limit, kept as-is under `settings` so a change to one is
 # visible without anybody having predicted which one mattered.
 DEVICE_ADDRESS_KEYS = ("server", "ip", "id", "host", "addr", "port", "channel", "axid")
 
 MAX_WARNINGS = 200
+
+# The commit in a source reference `<repository>@<commit>:<path>`.
+REVISION = re.compile(r"@([0-9a-f]{7,40}):[^:]*$")
+HISTORY_LIMIT = 30
 
 
 def _uid(workspace_id: str, key: str) -> str:
@@ -373,6 +384,9 @@ class _Importer:
         self.it_workspace = it_workspace
         self._it_seen: set = set()
         self._ap_equipment: dict = {}        # Access Point uid -> the IT equipment it is implemented by
+        self._converter_ports: dict = {}     # declared converter uid -> its number of serial ports
+        # The forge's history of this file, newest first, when the run can read it: (commits) -> list.
+        self.history = None
         # Serial lines seen while walking the devices: made once every device is known, because
         # what a line is depends on everything on it.
         self._lines: dict = {}
@@ -448,6 +462,11 @@ class _Importer:
             # Equipment Port simply makes none).
             if "Equipment Port" in usable:
                 self.schemas["it:Equipment Port"] = self.db.get(Schema, usable["Equipment Port"])
+        else:
+            # A converter the file declares is stated, so it is made even with no IT workspace: in this one.
+            for name in ("Serial Converter", "Equipment Port"):
+                if name in usable:
+                    self.schemas[f"it:{name}"] = self.db.get(Schema, usable[name])
         if self.controllers:
             missing = [n for n in CONTROLLER_TYPES if n not in usable]
             if missing:
@@ -829,29 +848,122 @@ class _Importer:
         a = device.attributes or {}
         return self._matcher.match(device.name, a.get("pv"), a.get("address"))
 
+    def _port(self, converter: Asset, n: int, why: str) -> Asset:
+        """Serial port P<n> of a converter, as an Equipment Port. Its TCP port is Moxa's default and says so:
+        a port named here is evidence for a person or the IT registry to confirm, never an attachment."""
+        asset = self._upsert_it("Equipment Port", f"{converter.key}:P{n}", f"{converter.name} P{n}", _present({
+            "port_label": f"P{n}", "port_role": f"serial-data#{n}", "tcp_port": MOXA_TCP_BASE - 1 + n,
+            "operating_mode": "TCP server", "argus_keywords": ["inferred"], "description": why,
+        }))
+        self.relate(asset, converter, "port of")
+        if asset.uid not in self._it_seen:
+            self._it_seen.add(asset.uid)
+            self.counts["ports"] += 1
+        return asset
+
+    def _line_port(self, converter: Optional[Asset], port) -> Optional[int]:
+        """The serial port a line on this TCP port would be, by Moxa's default, or None: not a converter, a
+        port outside the range, or beyond the ports a declared converter has."""
+        if converter is None or converter.type != "Serial Converter":
+            return None
+        try:
+            n = int(port) - (MOXA_TCP_BASE - 1)
+        except (TypeError, ValueError):
+            return None
+        declared = self._converter_ports.get(converter.uid) or (converter.attributes or {}).get("n_serial_ports")
+        limit = declared if isinstance(declared, int) and not isinstance(declared, bool) else 999
+        return n if 1 <= n <= limit else None
+
     def _ports(self, tag: str) -> None:
-        """A converter's ports, in the IT workspace: a line on TCP port 4003 of a Moxa is its port P3."""
+        """A converter's ports: every one of a declared converter, so the free ones show, and on any other
+        the ones the file's lines use. A line on TCP port 4003 of a Moxa is probably on its P3."""
         if "it:Equipment Port" not in self.schemas:
             return
+        for uid, count in self._converter_ports.items():
+            converter = self.db.get(Asset, uid)
+            for n in range(1, count + 1):
+                self._port(converter, n, (
+                    f"Inferred by the control-configuration import: {converter.name} is declared with {count} "
+                    f"serial ports, and by Moxa's default P{n} answers on TCP port {MOXA_TCP_BASE - 1 + n}. "
+                    f"Nobody has confirmed the mapping or how the port is configured."))
         for key, line in self._lines.items():
             converter = self._ap_equipment.get(line["ap"].uid)
-            port = line.get("port")
-            try:
-                n = int(port) - 4000
-            except (TypeError, ValueError):
+            n = self._line_port(converter, line.get("port"))
+            if n is None:
+                if converter is not None and converter.type == "Serial Converter" \
+                        and str(line.get("port") or "").isdigit() and int(line["port"]) >= MOXA_TCP_BASE:
+                    _note(self.job, self.db,
+                          f"{public_key(key)}: TCP port {line['port']} would be serial port "
+                          f"P{int(line['port']) - MOXA_TCP_BASE + 1}, which {converter.name} does not have "
+                          f"({self._converter_ports.get(converter.uid) or (converter.attributes or {}).get('n_serial_ports')}"
+                          f" declared). No port is named: "
+                          f"check the port in the file, or how the converter maps its ports.")
                 continue
-            if converter is None or converter.type != "Serial Converter" or not 1 <= n <= 999:
-                continue
-            asset = self._upsert_it("Equipment Port", f"{converter.key}:P{n}", f"{converter.name} P{n}", _present({
-                "port_label": f"P{n}", "port_role": f"serial-data#{n}", "tcp_port": int(port),
-                "operating_mode": "TCP server", "argus_keywords": ["inferred"],
-                "description": f"Inferred by the control-configuration import: {tag} reaches "
-                               f"{converter.name} on TCP port {port}, which a Moxa serves on its port {n}.",
+            self._port(converter, n, (
+                f"Inferred by the control-configuration import: {tag} reaches {converter.name} on TCP port "
+                f"{line['port']}, which a Moxa serves on its port {n} by default."))
+
+    def _declared_converter(self, entry: dict, name: str, ioc: Asset, access_point: Optional[Asset],
+                            address: Optional[str], product: tuple) -> None:
+        """A converter the file declares as an IOC of its own (`devtype: moxaNport`, `nports: 8`): the box is
+        stated, so it is made, the Access Point stays the endpoint and is `implemented by` it (§9.2), and its
+        ports are made from `nports`. Keyed by the hostname, or by beamline and address for a bare IP."""
+        if "it:Serial Converter" not in self.schemas:
+            _note(self.job, self.db, f"{name} declares a serial converter, but this workspace cannot use the "
+                                     f"Serial Converter type: not made. {_seed_hint(self.workspace_id)}")
+            return
+        if access_point is None or not address:
+            _note(self.job, self.db, f"{name} declares a serial converter but no address it is reached at "
+                                     f"(`server:`): not made.")
+            return
+        manufacturer, family = product
+        count = entry.get("nports")
+        count = int(count) if str(count or "").isdigit() and int(count) > 0 else None
+        text = address.strip()
+        fqdn = None if IPV4.match(text) else text.lower().rstrip(".")
+        # No `ip` on it: the Access Point already answers to the address, and two records that both do would
+        # leave the next file's address unresolved.
+        converter = self._upsert_it(
+            "Serial Converter", f"HOST:{fqdn}" if fqdn else f"{self.tag}:SC:{text}",
+            dns_convention.short_name(fqdn) if fqdn else name,
+            _present({
+                "hostname": dns_convention.short_name(fqdn) if fqdn else None, "fqdn": fqdn,
+                "manufacturer": manufacturer, "n_serial_ports": count,
+                "tcp_port_base": MOXA_TCP_BASE if count else None,
+                "description": (f"Declared in the control configuration as IOC {name} ({family}"
+                                f"{f', {count} serial ports' if count else ''}), reached at {text}. The TCP port "
+                                f"of serial port 1 is Moxa's default. Nobody has confirmed the model, its serial "
+                                f"number or where it is."),
             }))
-            self.relate(asset, converter, "port of")
-            if asset.uid not in self._it_seen:
-                self._it_seen.add(asset.uid)
-                self.counts["ports"] += 1
+        self.relate(ioc, converter, "acts on")
+        self._acted_on[ioc.uid] = converter
+        if self._assigned(access_point):
+            # An assigned endpoint's equipment is what is installed at its position (I-AP-4): not asserted.
+            _note(self.job, self.db, f"{access_point.key} is assigned to a position, so what implements it comes "
+                                     f"from that position; {converter.key} is not linked to it.")
+        else:
+            self.relate(access_point, converter, "implemented by")
+        self._ap_equipment[access_point.uid] = converter
+        if count:
+            self._converter_ports[converter.uid] = count
+        if converter.uid not in self._it_seen:
+            self._it_seen.add(converter.uid)
+            self.counts["converters_declared"] = self.counts.get("converters_declared", 0) + 1
+
+    def _assigned(self, access_point: Asset) -> bool:
+        return self.db.scalar(select(Relation.id).where(
+            Relation.from_asset_uid == access_point.uid, Relation.relation_type == "assigned to").limit(1)) is not None
+
+    def _known_equipment(self, access_point: Asset) -> None:
+        """The converter another file (or an earlier run) declared behind this Access Point: the lines this
+        file reaches through it are on that converter's ports too."""
+        if access_point.uid in self._ap_equipment or access_point.type != "Access Point":
+            return
+        found = self.db.scalar(select(Asset).join(Relation, Relation.to_asset_uid == Asset.uid).where(
+            Relation.from_asset_uid == access_point.uid, Relation.relation_type == "implemented by",
+            Asset.type == "Serial Converter", Asset.deleted_at.is_(None)).limit(1))
+        if found is not None:
+            self._ap_equipment[access_point.uid] = found
 
     def _infer_channel_element(self, element_type: str, control: Asset, unit: Asset,
                                name: str, zones: list, why: str) -> None:
@@ -928,8 +1040,11 @@ class _Importer:
         if access_point is None or not address or not port or not str(port).isdigit():
             return
         kind, how = dns_convention.endpoint_kind(address, port)
-        if kind != "Serial converter":
+        behind = self._ap_equipment.get(access_point.uid)
+        if kind != "Serial converter" and not (behind is not None and behind.type == "Serial Converter"):
             return
+        if kind != "Serial converter":
+            how = f"{behind.name} is the serial converter behind {access_point.name}"
         key = f"{tag}:LINE:{_host_label(address).upper()}:{int(port)}"
         line = self._lines.setdefault(key, {
             "ap": access_point, "address": address, "port": int(port), "devices": [],
@@ -964,16 +1079,21 @@ class _Importer:
                 line_kind = "Multi-drop bus"
             else:
                 line_kind = None
+            converter = self._ap_equipment.get(line["ap"].uid)
+            n = self._line_port(converter, line["port"])
             asset = self.upsert("Serial Line", key, f"{_host_label(line['address'])}:{line['port']}", _present({
                 "beamline": tag, "tcp_port": line["port"], "line_kind": line_kind,
                 "baud": line["baud"],
+                # Advisory (§9.3): what Moxa's default makes of the TCP port. Never attaches the port.
+                "serial_port": f"P{n}" if n else None,
+                "description": (f"Probably serial port P{n} of {converter.name}: Moxa's default maps TCP port "
+                                f"{line['port']} to it. Not confirmed, so no port is attached.") if n else None,
             }))
             self.counts["serial_lines"] = self.counts.get("serial_lines", 0) + 1
             self.relate(asset, line["ap"], "port of")
             # A line is carried by the converter it is a port of: the first element of the path that
             # the file states. The cables and switches between are not in any configuration; a person
             # adds them (`carried by`), and the walk then goes through them too.
-            converter = self._ap_equipment.get(line["ap"].uid)
             if converter is not None:
                 self.relate(asset, converter, "carried by")
             for device in devices:
@@ -1050,6 +1170,7 @@ class _Importer:
             else:
                 self.counts["access_points_linked"] += 1
             self._describe_endpoint(match.asset, address)
+            self._known_equipment(match.asset)
             return match.asset
 
         if match.ambiguous:
@@ -1112,7 +1233,8 @@ class _Importer:
         """An object in the site-wide IT workspace. Made once whichever beamline reaches it first;
         what is on it stays, and this only fills what is missing, as for every inference."""
         key = self._public_key(identity)
-        uid = _uid(self.it_workspace, identity)
+        home = self.it_workspace or self.workspace_id
+        uid = _uid(home, identity)
         asset = self.db.get(Asset, uid)
         provenance = {"argus_source": SOURCE, "argus_source_ref": self.source_ref}
         if asset is None:
@@ -1120,8 +1242,8 @@ class _Importer:
             if clash is not None:
                 raise ValueError(
                     f"“{key}” already exists in workspace “{clash.workspace_id}”, not the IT "
-                    f"workspace “{self.it_workspace}”.")
-            asset = Asset(uid=uid, workspace_id=self.it_workspace,
+                    f"workspace “{home}”.")
+            asset = Asset(uid=uid, workspace_id=home,
                           schema_uid=self.schemas[f"it:{type_name}"].uid, key=key, name=name,
                           type=type_name, is_global=True, attributes={**attributes, **provenance})
             self.db.add(asset)
@@ -1188,8 +1310,7 @@ class _Importer:
         self._services(epics.get("services") or {}, facility, tag)
         self._iocs(ioc_entries, defaults, facility, tag, beamline, create_missing)
         self._serial_lines(tag)
-        if self.it_workspace:
-            self._ports(tag)
+        self._ports(tag)
         if self.infer:
             self._pair_screens(tag)
             self._wire_plant(tag)
@@ -1205,6 +1326,46 @@ class _Importer:
 
     # --- what the file is, and what it is made of --------------------------------
 
+    def _changes(self, previous: Optional[dict]) -> dict:
+        """The commit this file was read at, the last commit that changed it, and the commits that changed it
+        since the previous import, from the forge's history of the file. Nothing when the forge does not
+        answer: the revision in the source reference is still there."""
+        found = REVISION.search(self.source_ref)
+        out: dict = {"git_commit": found.group(1) if found else None}
+        history = self.history() if self.history is not None else None
+        if not history:
+            return out
+        last = history[0]
+        out.update({
+            "git_last_change_commit": last["sha"],
+            "git_last_change": f"{last['title']} ({last['author']})" if last.get("author") else last["title"],
+            "git_last_change_at": last.get("date"),
+            "git_last_change_url": last.get("url"),
+        })
+        _note(self.job, self.db, f"Read at commit {(out['git_commit'] or '')[:8]}. Last change to this file: "
+                                 f"{last['sha'][:8]} {last.get('date') or ''} {last.get('author') or ''}: "
+                                 f"{last['title']}".replace("  ", " "))
+        seen = (previous or {}).get("git_last_change_commit")
+        if not seen:
+            return out                     # the first import that knows the history: nothing to compare with
+        if seen == last["sha"]:
+            out["git_recent_changes"] = (previous or {}).get("git_recent_changes")
+            return out
+        since = []
+        for commit in history:
+            if commit["sha"] == seen:
+                break
+            since.append(commit)
+        else:
+            _note(self.job, self.db, f"More than {len(history)} commits changed this file since the last import; "
+                                     f"the {len(history)} newest are listed.")
+        out["git_recent_changes"] = [
+            f"{c['sha'][:8]} {(c.get('date') or '')[:10]} {c.get('author') or ''}: {c['title']}".replace("  ", " ")
+            for c in since]
+        _note(self.job, self.db, f"{len(since)} commit{'s' if len(since) != 1 else ''} changed this file since "
+                                 f"the last import: " + "; ".join(out["git_recent_changes"]))
+        return out
+
     def _configuration(self, values: dict, epics: dict, beamline: str, tag: str,
                        facility: Asset) -> None:
         """This file at this revision: the one thing every other object is declared
@@ -1215,6 +1376,8 @@ class _Importer:
         # values.yaml is the beamline's configuration; an overlay beside it (values-linac.yaml) is one more.
         key, label = (f"{tag}:CFG", f"{beamline} configuration") if stem in ("values", "") else (
             f"{tag}:CFG:{stem}", f"{beamline} configuration ({stem})")
+        before = self.db.get(Asset, _uid(self.workspace_id, key))
+        changes = self._changes(dict(before.attributes or {}) if before is not None else None)
         self.cfg = self.upsert(
             "Control Configuration", key, label,
             _present({
@@ -1230,6 +1393,7 @@ class _Importer:
                 "base_ip": values.get("baseIp"),
                 "ingress_class": values.get("ingressClassName"),
                 "imported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                **changes,
             }),
         )
         self.relate(self.cfg, facility, "configures")
@@ -1429,6 +1593,12 @@ class _Importer:
                     if _text(merged.get("host")) and not params.get("server"):
                         self.relate(ioc, ioc_access, "runs on")
 
+            declared = (DECLARED_CONVERTERS.get(_s_lower(merged.get("devtype")))
+                        or DECLARED_CONVERTERS.get(_s_lower(merged.get("template"))))
+            if declared is not None:
+                self._declared_converter(merged, name, ioc, ioc_access, address, declared)
+                continue
+
             devices = merged.get("devices") or []
             if not devices:
                 if found is not None and found.element_name:
@@ -1620,6 +1790,39 @@ def _resolve_commit(provider: str, repo_url: str, pat: Optional[str], branch: st
         return None
 
 
+def _file_history(provider: str, repo_url: str, pat: Optional[str], ref: str, path: str,
+                  limit: int = HISTORY_LIMIT) -> Optional[list[dict]]:
+    """The commits that changed this file, newest first, up to `ref`: sha, title, author, date and link.
+    Best effort, like the revision: None when the forge does not answer."""
+    try:
+        owner, repo = _parse_repo(repo_url)
+        headers = {}
+        if provider == "github":
+            if pat:
+                headers["Authorization"] = f"Bearer {pat}"
+            resp = requests.get(f"{github_api(repo_url)}/repos/{owner}/{repo}/commits",
+                                params={"sha": ref, "path": path, "per_page": limit}, headers=headers, timeout=10)
+            if not resp.ok:
+                return None
+            return [{"sha": c["sha"], "title": (c["commit"]["message"] or "").splitlines()[0][:200],
+                     "author": (c["commit"].get("author") or {}).get("name"),
+                     "date": (c["commit"].get("author") or {}).get("date"), "url": c.get("html_url")}
+                    for c in resp.json() if isinstance(c, dict) and c.get("sha")]
+        if pat:
+            headers["PRIVATE-TOKEN"] = pat
+        from urllib.parse import quote
+        project = quote(f"{owner}/{repo}", safe="")
+        resp = requests.get(f"{gitlab_api(repo_url)}/projects/{project}/repository/commits",
+                            params={"ref_name": ref, "path": path, "per_page": limit}, headers=headers, timeout=10)
+        if not resp.ok:
+            return None
+        return [{"sha": c["id"], "title": (c.get("title") or "")[:200], "author": c.get("author_name"),
+                 "date": c.get("committed_date"), "url": c.get("web_url")}
+                for c in resp.json() if isinstance(c, dict) and c.get("id")]
+    except Exception:
+        return None
+
+
 def run_epik8s_import(
     job_uid: str,
     workspace_id: str,
@@ -1675,6 +1878,9 @@ def run_epik8s_import(
         importer = _Importer(db, job, workspace_id, f"{repo_url}@{revision}:{path}",
                              infer_elements=infer_elements, it_workspace=it_workspace,
                              infer_controllers=infer_controllers, link_inventory=link_inventory)
+        if revision != branch:
+            # The forge named the commit, so it can say what changed this file and when.
+            importer.history = lambda: _file_history(provider, repo_url, pat, revision, path)
         importer.ensure_types()
 
         merge_strategy, retired = effective_strategy(merge_strategy)

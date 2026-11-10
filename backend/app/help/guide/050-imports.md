@@ -45,6 +45,13 @@ holds: new records are made, only what really differs is updated, and everything
 naming the revision that last changed it. The job says how many records were created, updated and left
 unchanged.
 
+The file's **Control Configuration** record says which commit was read (**Commit read**) and which commit last
+changed the file: its message, author, date and a link to it on the forge. From the second import on, **Changes
+since the previous import** lists every commit that changed the file in between, newest first, and the job's
+messages repeat them. **Target revision (gitrev)** is the `gitrev` the file itself writes, a branch or a tag,
+not the commit. When the forge can't be reached, the import still runs and the commit stays in the source
+reference.
+
 What the file no longer declares, such as a renamed IOC or a changed prefix, stays unless you tick **Clear
 what this file no longer declares**. Those records are then retired, each one listed in the job's messages.
 Tickets and documents keep their links, and a record the file states again comes back as it was. Only records
@@ -76,6 +83,29 @@ with or without inference:
 - Magnets are found by name among the beam elements, the beam model's first. A name that matches nothing, or
   several, is reported in the import's messages and no magnet is invented.
 - With a list, the file decides: a magnet taken off the list loses its `powers` link at the next import.
+
+The supply also takes the channel's `ps:` block: maximum current and voltage, whether it is bipolar and, for a
+unipolar supply, its **Output polarity** (`polarity: {mode: unipolar, sign: negative}`). The maker and model come
+from the IOC's `devtype` where the import knows it (Danfysik System 8000 for `sys80it`, Hazemeyer CIT for
+`haz-cit`).
+
+## A serial converter the file declares
+
+A Moxa that the file lists as an IOC of its own is made as a **Serial Converter**:
+
+```yaml
+nport803: {name: nport803, template: moxaNport, devtype: moxaNport, server: 192.168.192.32, nports: 8}
+```
+
+- The converter is named after the IOC, made by Moxa, with its number of serial ports. It is made in the IT
+  workspace if the import has one, or else in this workspace.
+- The **Access Point** for its address stays the endpoint every IOC connects to, and is `implemented by` the
+  converter. An Access Point already assigned to a position gets its equipment from that position instead.
+- Every serial port, P1 to P8, is made, so the free ones show too.
+- A serial line names the port it probably uses: TCP port 4005 is **P5** by Moxa's default mapping. This is
+  advice, not a connection. No port is attached on a number alone; a person or the IT registry confirms it.
+  A TCP port beyond the declared ports names no port and is reported in the import's messages.
+- Another file that reaches the same address (`values-tl.yaml` on `192.168.192.32:4004`) uses the same converter.
 
 An element the beam model or a person already recorded is also reused by **Infer equipment and lattice elements**,
 which no longer makes a second record beside it.
