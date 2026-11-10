@@ -23,6 +23,7 @@ from app.models.asset_subresources import AssetComment, AssetHistory, AssetLabel
 from app.models.attachment import Attachment
 from app.models.beam_model import BeamAssetBinding, BeamModelDocument, BeamModelValue
 from app.models.document import Document, DocumentRelation, DocumentRevision
+from app.models.document_navigation import DocumentFolder, DocumentPlacement
 from app.models.document_template import DocumentGeneration, DocumentTemplate, DocumentTemplateVersion
 from app.models.global_value import GlobalValue
 from app.models.icon import Icon
@@ -194,6 +195,10 @@ def build() -> list[Family]:
         Family("documents", Document, _ws(Document), deferred=("current_revision_uid", "superseded_by_uid")),
         Family("document_revisions", DocumentRevision, _by(DocumentRevision, "document_uid", "documents"),
                deferred=("superseded_by_uid",)),
+        Family("document_folders", DocumentFolder, _ws(DocumentFolder), deferred=("parent_uid",),
+               note="navigation folders, with their parent links restored after every folder exists"),
+        Family("document_navigation_placements", DocumentPlacement, _ws(DocumentPlacement),
+               note="manual document locations, including explicit root placement"),
         Family("document_relations", DocumentRelation, _ws(DocumentRelation)),
         Family("attachments", Attachment, _ws(Attachment), files=("storage_path",)),
         Family("document_templates", DocumentTemplate, _ws(DocumentTemplate)),

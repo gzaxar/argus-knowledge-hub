@@ -2134,6 +2134,28 @@
             "title": "Is Global",
             "type": "boolean"
           },
+          "navigation_folder_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Navigation Folder Uid"
+          },
+          "navigation_parent_document_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Navigation Parent Document Uid"
+          },
           "next_review_due": {
             "anyOf": [
               {
