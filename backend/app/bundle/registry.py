@@ -280,6 +280,7 @@ NOT_CARRIED = {
     "group_members": "directory groups belong to the installation's directory",
     "group_administrators": "who administers a group is decided in each installation, not carried by a workspace",
     "site_administrators": "who administers a site is decided in each installation, not carried by a workspace",
+    "site_group_role_bindings": "a site-wide grant belongs to the site, not to a workspace: never made by an import",
     "alembic_version": "the database's own schema revision",
     "spatial_ref_sys": "PostGIS's catalogue of coordinate systems, the same in every installation",
     **{t: "the meaning-search index is built from the records with the target's own embedding model "

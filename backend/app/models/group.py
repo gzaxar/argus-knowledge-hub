@@ -34,6 +34,10 @@ class Group(Base, TimestampMixin):
     # reference recorded on an object.
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     synced_at: Mapped[Optional[object]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # A local group owned by one site (issue #26): its site administrators govern it, and it may hold direct
+    # grants only at that site and its current facilities. Null: owned by the installation.
+    home_site_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("workspaces.id", ondelete="SET NULL"),
+                                                        nullable=True, index=True)
 
 
 class GroupMember(Base):

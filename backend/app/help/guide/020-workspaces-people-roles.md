@@ -81,6 +81,21 @@ deactivated group keeps its members, and its roles stop applying. Give a group a
 A group can hold roles in several workspaces, so its members are changed by an administrator, or by someone who
 manages every workspace where it holds one. A directory's group is changed in the directory.
 
+## Site-wide group access
+
+On a **site**'s **Access** page, its administrators (and the installation's) can give a group one role for the whole
+site under **Site-wide group access**: its members then have it in the site and in every workspace currently at the
+site, facilities added later included. **Preview** shows who would have it and where before you give it. Only the
+general levels (Viewer, Reporter, Agent, Approver, Contributor, Curator) can be given site-wide; Workspace
+administrator and Owner are given workspace by workspace.
+
+A facility's **Access** page lists what it **inherits from the site**; it is changed at the site, not there. A
+facility that leaves the site loses it at once. A deactivated group gives nothing, directly or site-wide.
+
+On **Groups**, a site's administrators can make a group **owned by the site** (tick *the site's*). Such a group can
+have roles only at that site and its facilities. A site keeps its site role while it gives roles site-wide or owns
+active groups; a facility cannot leave while it gives roles to its site's groups: remove those first.
+
 ## Give a person or a group a role
 
 1. The person **signs in once**, so ARGUS knows them. (An administrator can also add someone before their

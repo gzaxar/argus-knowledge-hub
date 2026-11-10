@@ -6574,6 +6574,17 @@
             ],
             "title": "Description"
           },
+          "home_site_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Site Id"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -6703,6 +6714,17 @@
             ],
             "title": "Email"
           },
+          "home_site_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Site Id"
+          },
           "member_count": {
             "default": 0,
             "title": "Member Count",
@@ -6711,6 +6733,14 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "site_grants": {
+            "default": [],
+            "items": {
+              "type": "object"
+            },
+            "title": "Site Grants",
+            "type": "array"
           },
           "source": {
             "title": "Source",
@@ -12620,6 +12650,24 @@
           "email"
         ],
         "title": "SiteAdministratorIn",
+        "type": "object"
+      },
+      "SiteGroupGrantIn": {
+        "properties": {
+          "group_uid": {
+            "title": "Group Uid",
+            "type": "string"
+          },
+          "role_id": {
+            "title": "Role Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_uid",
+          "role_id"
+        ],
+        "title": "SiteGroupGrantIn",
         "type": "object"
       },
       "SiteIn": {
@@ -18775,6 +18823,339 @@
           }
         ],
         "summary": "Remove Site Administrator",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/v1/admin/sites/{site_id}/group-grants": {
+      "get": {
+        "description": "The roles groups have site-wide here: in the site and every facility currently at it.",
+        "operationId": "list_site_group_grants_v1_admin_sites__site_id__group_grants_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Site Group Grants",
+        "tags": [
+          "sites"
+        ]
+      },
+      "post": {
+        "description": "Give a group a role once for the site: its members have it in the site and in each facility at it now or\nlater. Only an administrator of this site or of the installation; a workspace administrator cannot.",
+        "operationId": "create_site_group_grant_v1_admin_sites__site_id__group_grants_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteGroupGrantIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Site Group Grant",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/v1/admin/sites/{site_id}/group-grants/preview": {
+      "post": {
+        "description": "Who would have the role, and in which workspaces, before it is given or revoked. Changes nothing.",
+        "operationId": "preview_site_group_grant_v1_admin_sites__site_id__group_grants_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteGroupGrantIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview Site Group Grant",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/v1/admin/sites/{site_id}/group-grants/{grant_id}": {
+      "delete": {
+        "operationId": "revoke_site_group_grant_v1_admin_sites__site_id__group_grants__grant_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "title": "Grant Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Site Group Grant",
         "tags": [
           "sites"
         ]
@@ -42793,7 +43174,7 @@
         ]
       },
       "post": {
-        "description": "A group made here, by whoever manages the current workspace. Give it a role on Access.",
+        "description": "A group made here, by whoever manages the current workspace; or owned by a site, by an administrator of that\nsite. Making it, or putting people in it, gives nobody access: a role is given to it on Access.",
         "operationId": "create_group_v1_groups_post",
         "parameters": [
           {
@@ -67508,6 +67889,84 @@
         "summary": "Set Default Access",
         "tags": [
           "workspaces"
+        ]
+      }
+    },
+    "/v1/workspaces/{workspace_id}/inherited-grants": {
+      "get": {
+        "description": "The roles groups have here because they have them site-wide at this workspace's current site. Listed with\nthe workspace's own grants, removable only at the site (issue #26).",
+        "operationId": "inherited_grants_v1_workspaces__workspace_id__inherited_grants_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Inherited Grants",
+        "tags": [
+          "roles"
         ]
       }
     },

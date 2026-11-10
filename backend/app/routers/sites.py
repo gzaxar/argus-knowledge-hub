@@ -85,6 +85,55 @@ def remove_site_administrator(site_id: str, user_id: str,
     db.commit()
 
 
+class SiteGroupGrantIn(BaseModel):
+    group_uid: str
+    role_id: str
+
+
+def _actor(identity: Identity) -> Optional[str]:
+    user = getattr(identity, "user", None)
+    return user.id if user is not None else None
+
+
+@router.get("/{site_id}/group-grants")
+def list_site_group_grants(site_id: str, identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """The roles groups have site-wide here: in the site and every facility currently at it."""
+    from app.services import site_group_grants
+    _site_manager(identity, db, site_id)
+    return {"site_id": site_id, "workspaces": site_group_grants.scope(db, site_id),
+            "roles": list(site_group_grants.SITE_ROLES), "grants": site_group_grants.of_site(db, site_id)}
+
+
+@router.post("/{site_id}/group-grants/preview")
+def preview_site_group_grant(site_id: str, body: SiteGroupGrantIn, identity: Identity = Depends(get_identity),
+                             db: Session = Depends(get_db)):
+    """Who would have the role, and in which workspaces, before it is given or revoked. Changes nothing."""
+    from app.services import site_group_grants
+    _site_manager(identity, db, site_id)
+    return site_group_grants.preview(db, site_id, body.group_uid, body.role_id)
+
+
+@router.post("/{site_id}/group-grants", status_code=201)
+def create_site_group_grant(site_id: str, body: SiteGroupGrantIn, identity: Identity = Depends(get_identity),
+                            db: Session = Depends(get_db)):
+    """Give a group a role once for the site: its members have it in the site and in each facility at it now or
+    later. Only an administrator of this site or of the installation; a workspace administrator cannot."""
+    from app.services import site_group_grants
+    _site_manager(identity, db, site_id)
+    out = site_group_grants.grant(db, site_id, body.group_uid, body.role_id, _actor(identity))
+    db.commit()
+    return out
+
+
+@router.delete("/{site_id}/group-grants/{grant_id}", status_code=204)
+def revoke_site_group_grant(site_id: str, grant_id: int, identity: Identity = Depends(get_identity),
+                            db: Session = Depends(get_db)):
+    from app.services import site_group_grants
+    _site_manager(identity, db, site_id)
+    site_group_grants.revoke(db, site_id, grant_id)
+    db.commit()
+
+
 @router.get("")
 def list_sites(identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
     """Every site, its facilities, and how many of its places they see."""

@@ -21,6 +21,13 @@ def workspaces_of(db: Session, group_uid: str) -> list[str]:
         RoleBinding.subject_type == "group", RoleBinding.subject_id == group_uid))))
 
 
+def sites_of(db: Session, group_uid: str) -> list[str]:
+    """The sites where it holds a role site-wide (issue #26)."""
+    from app.models.role import SiteGroupRoleBinding
+    return sorted(set(db.scalars(select(SiteGroupRoleBinding.site_id).where(
+        SiteGroupRoleBinding.group_uid == group_uid))))
+
+
 def require_manage(db: Session, identity, group: Group, workspace_id: Optional[str]) -> None:
     from app.routers.workspaces import _require_owner_or_admin
     if group.source != "local":
@@ -29,7 +36,10 @@ def require_manage(db: Session, identity, group: Group, workspace_id: Optional[s
     user = getattr(identity, "user", None)
     if user is not None and user.is_admin and getattr(identity, "token", None) is None:
         return
-    where = workspaces_of(db, group.uid) or ([workspace_id] if workspace_id else [])
+    # Whoever changes its members changes access wherever it holds a role, directly or site-wide; a group that
+    # holds none yet is governed where it belongs: its site, or the workspace it is changed from.
+    where = sorted(set(workspaces_of(db, group.uid)) | set(sites_of(db, group.uid))) or (
+        [group.home_site_id] if group.home_site_id else [workspace_id] if workspace_id else [])
     if not where:
         raise HTTPException(status_code=403, detail="Not permitted")
     for ws in where:
@@ -54,14 +64,14 @@ def require_manage_members(db: Session, identity, group: Group, workspace_id: Op
     require_manage(db, identity, group, workspace_id)
 
 
-def create(db: Session, name: str, description: Optional[str]) -> Group:
+def create(db: Session, name: str, description: Optional[str], home_site_id: Optional[str] = None) -> Group:
     name = (name or "").strip()
     if not name:
         raise HTTPException(status_code=422, detail="A group needs a name")
     if db.scalar(select(Group.uid).where(Group.name == name, Group.active.is_(True))) is not None:
         raise HTTPException(status_code=409, detail=f"There is already a group called {name}")
     group = Group(uid=str(uuid.uuid4()), name=name, description=(description or "").strip() or None, source="local",
-                  active=True)
+                  active=True, home_site_id=home_site_id or None)
     db.add(group)
     db.flush()
     return group

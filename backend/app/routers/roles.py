@@ -92,6 +92,19 @@ def _pending(db: Session, binding: RoleBinding) -> bool:
     return user is not None and user.oidc_sub is None and user.last_login_at is None and user.source == "oidc"
 
 
+@router.get("/workspaces/{workspace_id}/inherited-grants")
+def inherited_grants(
+    workspace_id: str,
+    identity: Identity = Depends(get_identity),
+    db: Session = Depends(get_db),
+):
+    """The roles groups have here because they have them site-wide at this workspace's current site. Listed with
+    the workspace's own grants, removable only at the site (issue #26)."""
+    from app.services import site_group_grants
+    _require_manage_members(workspace_id, identity, db)
+    return site_group_grants.inherited(db, workspace_id)
+
+
 @router.post("/workspaces/{workspace_id}/invitations", response_model=InvitationOut)
 def invite_people(
     workspace_id: str,
@@ -112,6 +125,9 @@ def invite_people(
         if group is None:
             raise HTTPException(status_code=404, detail="Group not found")
         local_groups.require_manage(db, identity, group, workspace_id)
+        if body.role_id:
+            from app.services.site_group_grants import check_direct_grant
+            check_direct_grant(db, group, workspace_id)
     elif body.new_group and body.new_group.strip():
         group = local_groups.create(db, body.new_group, None)
     try:
@@ -146,8 +162,11 @@ def create_binding(
         if db.get(User, body.subject_id) is None:
             raise HTTPException(status_code=404, detail="User not found")
     elif body.subject_type == "group":
-        if db.get(Group, body.subject_id) is None:
+        group = db.get(Group, body.subject_id)
+        if group is None:
             raise HTTPException(status_code=404, detail="Group not found")
+        from app.services.site_group_grants import check_direct_grant
+        check_direct_grant(db, group, workspace_id)
     else:
         raise HTTPException(status_code=422, detail="subject_type must be 'user' or 'group'")
 

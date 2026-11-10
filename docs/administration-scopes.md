@@ -19,9 +19,15 @@ A local group can receive members before it receives its first workspace role. T
 
 Workspace archives include site and group administrator assignments with the access data. Personal and robot API tokens do not receive these delegated powers automatically; token scopes still restrict administration.
 
-## Proposed: site-level groups and group access
+## Site-level groups and group access (issue #26)
 
-**Status: specification, not implemented.** Today a group has no site owner and every role binding names one workspace. The proposal below adds site ownership for local groups and a site-wide group grant. It does not change existing grants automatically.
+**Status: first part implemented.** Site-owned groups (`groups.home_site_id`), site-wide group grants
+(`site_group_role_bindings`), their resolution from each workspace's *current* site, the scope checks below, the
+refusals when a site loses its role or a facility moves, the site-wide and inherited sections of the Access page,
+and group scope on the Groups page are in place. Still to come: a preview of who gains or loses access before a
+facility moves (today the move is refused while it would leave grants out of scope), the source of each right in
+My permissions and access reviews, carrying a facility-only archive's inherited access as a site dependency, and
+the Flutter app. The migration created no grant: existing access is unchanged.
 
 ### Two separate scopes
 

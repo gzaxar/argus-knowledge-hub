@@ -16,13 +16,19 @@ export function WorkspaceGroups() {
   const [open, setOpen] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [ofSite, setOfSite] = useState(false);
   const [filter, setFilter] = useState("");
+  // The site this workspace belongs to (itself, when it is one): a group can be owned by it (issue #26).
+  const mine = useQuery({ queryKey: ["my-workspaces"], queryFn: workspacesApi.listMine });
+  const here = mine.data?.find((w) => w.id === workspaceId);
+  const siteId = here?.role === "site" ? here.id : here?.site_id ?? null;
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["groups"] });
     void qc.invalidateQueries({ queryKey: ["bindings", workspaceId] });
   };
   const create = useMutation({
-    mutationFn: () => directoryApi.createGroup({ name, ...(description.trim() ? { description } : {}) }),
+    mutationFn: () => directoryApi.createGroup({ name, ...(description.trim() ? { description } : {}),
+                                                 ...(ofSite && siteId ? { home_site_id: siteId } : {}) }),
     onSuccess: (g) => { setName(""); setDescription(""); setOpen(g.uid); refresh(); },
   });
   const n = filter.trim().toLowerCase();
@@ -46,6 +52,12 @@ export function WorkspaceGroups() {
                aria-label="New group name" className="w-56 rounded border border-slate-300 px-2 py-1.5" />
         <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What it is for (optional)"
                aria-label="Description" className="min-w-48 flex-1 rounded border border-slate-300 px-2 py-1.5" />
+        {siteId && (
+          <label className="flex items-center gap-1" title="Owned by the site: its administrators govern it, and it can have roles only at the site and its facilities">
+            <input type="checkbox" checked={ofSite} onChange={(e) => setOfSite(e.target.checked)} />
+            the site {siteId}&apos;s
+          </label>
+        )}
         <button type="submit" disabled={create.isPending}
                 className="rounded bg-slate-900 px-4 py-1.5 font-medium text-white hover:bg-slate-800 disabled:opacity-50">
           Create group
@@ -91,7 +103,10 @@ function GroupRow({ group: g, open, onToggle, onChanged, editable, canAppoint, c
         </span>
         <span className="shrink-0 text-xs text-slate-500">
           {g.member_count} member{g.member_count === 1 ? "" : "s"}
-          {g.workspaces?.length ? ` · roles in ${g.workspaces.join(", ")}` : " · no role yet"}
+          {g.home_site_id ? ` · the site ${g.home_site_id}'s` : g.source === "local" ? " · the installation's" : ""}
+          {g.workspaces?.length ? ` · roles in ${g.workspaces.join(", ")}` : ""}
+          {g.site_grants?.length ? ` · site-wide: ${g.site_grants.map((s) => `${s.role_name} at ${s.site_id}`).join(", ")}` : ""}
+          {!g.workspaces?.length && !g.site_grants?.length ? " · no role yet" : ""}
           {!g.active && " · inactive"}
         </span>
       </button>
