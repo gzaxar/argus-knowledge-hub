@@ -80,6 +80,8 @@ import type {
   RoleBinding,
   RoleBindingInput,
   InvitationResult,
+  SiteGroupGrant,
+  SiteGroupGrantPreview,
   DirectoryGroup,
   DirectoryGroupMember,
   ScopedAdministrator,
@@ -928,6 +930,7 @@ export const rolesApi = {
   list: () => request<Role[]>("/v1/roles"),
   listBindings: (workspaceId: string) =>
     request<RoleBinding[]>(`/v1/workspaces/${workspaceId}/bindings`),
+  inherited: (workspaceId: string) => request<SiteGroupGrant[]>(`/v1/workspaces/${workspaceId}/inherited-grants`),
   invite: (workspaceId: string, input: { emails: string; role_id?: string; send_email: boolean; message?: string;
                                           group_uid?: string; new_group?: string }) =>
     request<InvitationResult>(`/v1/workspaces/${workspaceId}/invitations`, { method: "POST", body: json(input) }),
@@ -953,7 +956,7 @@ export const directoryApi = {
   removeGroupAdministrator: (uid: string, userId: string) =>
     request<void>(`/v1/groups/${uid}/administrators/${encodeURIComponent(userId)}`, { method: "DELETE" }),
   allGroups: () => request<DirectoryGroup[]>("/v1/groups?include_inactive=true"),
-  createGroup: (input: { name: string; description?: string }) =>
+  createGroup: (input: { name: string; description?: string; home_site_id?: string }) =>
     request<DirectoryGroup>("/v1/groups", { method: "POST", body: json(input) }),
   updateGroup: (uid: string, input: { name?: string; description?: string; active?: boolean }) =>
     request<DirectoryGroup>(`/v1/groups/${uid}`, { method: "PATCH", body: json(input) }),
@@ -3151,6 +3154,17 @@ export const sitesApi = {
       { method: "DELETE" }),
   list: () => request<{ id: string; name: string; facilities: string[]; shared_places: number; withheld: number }[]>(
     "/v1/admin/sites"),
+  groupGrants: (siteId: string) =>
+    request<{ site_id: string; workspaces: string[]; roles: string[]; grants: SiteGroupGrant[] }>(
+      `/v1/admin/sites/${encodeURIComponent(siteId)}/group-grants`),
+  previewGroupGrant: (siteId: string, input: { group_uid: string; role_id: string }) =>
+    request<SiteGroupGrantPreview>(`/v1/admin/sites/${encodeURIComponent(siteId)}/group-grants/preview`,
+      { method: "POST", body: json(input) }),
+  grantGroup: (siteId: string, input: { group_uid: string; role_id: string }) =>
+    request<SiteGroupGrant>(`/v1/admin/sites/${encodeURIComponent(siteId)}/group-grants`,
+      { method: "POST", body: json(input) }),
+  revokeGroupGrant: (siteId: string, grantId: number) =>
+    request<void>(`/v1/admin/sites/${encodeURIComponent(siteId)}/group-grants/${grantId}`, { method: "DELETE" }),
   setRole: (workspaceId: string, site: boolean) =>
     request<{ workspace_id: string; role: string | null; ended: string[] }>(
       `/v1/admin/sites/${encodeURIComponent(workspaceId)}/role`, { method: "PUT", body: json({ site }) }),

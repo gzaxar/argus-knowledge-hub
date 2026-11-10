@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.models.group import Group, GroupMember
 from app.models.membership import Membership
-from app.models.role import Role, RoleBinding
+from app.models.role import Role, RoleBinding, SiteGroupRoleBinding
 from app.models.user import User
 from app.models.workspace import Workspace, SiteAdministrator
 from app.services.roles import membership_permissions
@@ -28,6 +28,19 @@ RESOURCE_SUFFIX = {"objects": "", "tickets": "_tickets", "documents": "_document
 def user_group_uids(db: Session, user_id: str) -> list[str]:
     return list(db.scalars(select(GroupMember.group_uid).join(Group, Group.uid == GroupMember.group_uid).where(
         GroupMember.user_id == user_id, Group.active.is_(True))))
+
+
+def current_site(db: Session, workspace_id: str) -> "str | None":
+    """The site a workspace is in now: itself when it is a site, its site when it is a facility of one."""
+    workspace = db.get(Workspace, workspace_id)
+    if workspace is None:
+        return None
+    if workspace.role == "site":
+        return workspace.id
+    if workspace.site_id:
+        site = db.get(Workspace, workspace.site_id)
+        return site.id if site is not None and site.role == "site" else None
+    return None
 
 
 def administers_site(db: Session, user_id: str, workspace_id: str) -> bool:
@@ -66,6 +79,14 @@ def effective_permissions(db: Session, user: User, workspace_id: str) -> dict[st
     ).all()
     for role in roles:
         _merge(granted, role.permissions or {})
+
+    # Site-wide group grants (issue #26): those of the workspace's *current* site, to an active group of theirs.
+    site_id = current_site(db, workspace_id)
+    if site_id and group_uids:
+        for role in db.scalars(select(Role).join(SiteGroupRoleBinding, SiteGroupRoleBinding.role_id == Role.id)
+                               .where(SiteGroupRoleBinding.site_id == site_id,
+                                      SiteGroupRoleBinding.group_uid.in_(group_uids))):
+            _merge(granted, role.permissions or {})
 
     legacy = db.scalar(
         select(Membership).where(

@@ -10,7 +10,7 @@ from app.models.group import Group, GroupMember, GroupAdministrator
 from app.models.user import User
 from app.schemas.group import (DirectoryStatusOut, GroupCreate, GroupMemberOut, GroupMembersIn, GroupOut,
                                GroupUpdate, GroupAdministratorOut, GroupAdministratorIn)
-from app.services import local_groups
+from app.services import local_groups, site_group_grants
 from app.services.directory import provider_name
 from app.services.directory_sync import sync_directory
 from app.services.permissions import resolve_permission
@@ -69,6 +69,7 @@ def list_groups(
             uid=g.uid, dn=g.dn, name=g.name, description=g.description, email=g.email,
             source=g.source, active=g.active, member_count=counts.get(g.uid, 0),
             workspaces=local_groups.workspaces_of(db, g.uid),
+            home_site_id=g.home_site_id, site_grants=site_group_grants.of_group(db, g.uid),
         )
         for g in groups
     ]
@@ -83,17 +84,24 @@ def _group(db: Session, uid: str) -> Group:
 
 def _out(db: Session, g: Group) -> GroupOut:
     count = db.scalar(select(func.count()).select_from(GroupMember).where(GroupMember.group_uid == g.uid)) or 0
+    from app.services import site_group_grants
     return GroupOut(uid=g.uid, dn=g.dn, name=g.name, description=g.description, email=g.email, source=g.source,
-                    active=g.active, member_count=count, workspaces=local_groups.workspaces_of(db, g.uid))
+                    active=g.active, member_count=count, workspaces=local_groups.workspaces_of(db, g.uid),
+                    home_site_id=g.home_site_id, site_grants=site_group_grants.of_group(db, g.uid))
 
 
 @router.post("/groups", response_model=GroupOut, status_code=201)
 def create_group(body: GroupCreate, workspace_id: str = Depends(require_permission("read")),
                  identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
-    """A group made here, by whoever manages the current workspace. Give it a role on Access."""
+    """A group made here, by whoever manages the current workspace; or owned by a site, by an administrator of that
+    site. Making it, or putting people in it, gives nobody access: a role is given to it on Access."""
     from app.routers.workspaces import _require_owner_or_admin
-    _require_owner_or_admin(workspace_id, identity, db)
-    group = local_groups.create(db, body.name, body.description)
+    if body.home_site_id:
+        from app.routers.sites import _site_manager
+        _site_manager(identity, db, body.home_site_id)
+    else:
+        _require_owner_or_admin(workspace_id, identity, db)
+    group = local_groups.create(db, body.name, body.description, body.home_site_id)
     if isinstance(identity, OidcIdentity):
         db.add(GroupAdministrator(group_uid=group.uid, user_id=identity.user.id))
     db.commit()

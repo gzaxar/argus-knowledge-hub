@@ -50,7 +50,7 @@ from app.models.equipment_class import EquipmentClass, EquipmentClassReview
 from app.models.global_value import GlobalValue
 from app.models.group import Group, GroupMember, GroupAdministrator
 from app.models.membership import Membership
-from app.models.role import Role, RoleBinding
+from app.models.role import Role, RoleBinding, SiteGroupRoleBinding
 from app.models.schema import Schema
 from app.models.user import User
 from app.models.workflow import TicketWatcher, Workflow
@@ -226,9 +226,12 @@ def _users(db, sc):
 
 
 def _groups(db, sc):
-    """The groups the scope grants roles to (a grant to a group needs the group, and its members)."""
+    """The groups the scope grants roles to, directly or site-wide (a grant to a group needs the group, and its
+    members)."""
     return select(Group).where(Group.uid.in_(select(RoleBinding.subject_id).where(
-        RoleBinding.workspace_id.in_(sc.workspaces), RoleBinding.subject_type == "group"))).order_by(Group.uid)
+        RoleBinding.workspace_id.in_(sc.workspaces), RoleBinding.subject_type == "group"))
+        | Group.uid.in_(select(SiteGroupRoleBinding.group_uid).where(
+            SiteGroupRoleBinding.site_id.in_(sc.workspaces)))).order_by(Group.uid)
 
 
 def _roles(db, sc):
@@ -267,6 +270,10 @@ FAMILIES: list[Family] = [
            lambda db, sc: select(GroupAdministrator).where(GroupAdministrator.group_uid.in_(
                _groups(db, sc).with_only_columns(Group.uid))).order_by(GroupAdministrator.id),
            exclude=("id",), replace_set=True),
+    # A site's own grants travel with the site (a facility-only archive carries none: issue #26).
+    Family("site_group_role_bindings", "access", SiteGroupRoleBinding, ("site_id", "group_uid", "role_id"),
+           lambda db, sc: select(SiteGroupRoleBinding).where(SiteGroupRoleBinding.site_id.in_(sc.workspaces))
+               .order_by(SiteGroupRoleBinding.id), exclude=("id",), replace_set=True),
     Family("site_administrators", "access", SiteAdministrator, ("site_id", "user_id"),
            lambda db, sc: select(SiteAdministrator).where(SiteAdministrator.site_id.in_(sc.workspaces))
                .order_by(SiteAdministrator.id), exclude=("id",), replace_set=True),

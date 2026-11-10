@@ -17,11 +17,16 @@ class GroupOut(BaseModel):
     member_count: int = 0
     # The workspaces where it holds a role: who changes its members changes access there.
     workspaces: list[str] = []
+    # Owned by this site (null: the installation), and the sites where it holds a role site-wide (issue #26).
+    home_site_id: Optional[str] = None
+    site_grants: list[dict] = []
 
 
 class GroupCreate(BaseModel):
     name: str
     description: Optional[str] = None
+    # A site-owned group: made by an administrator of that site (or of the installation).
+    home_site_id: Optional[str] = None
 
 
 class GroupUpdate(BaseModel):

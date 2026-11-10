@@ -20,7 +20,7 @@ from app.models.import_snapshot import ImportSnapshot
 from app.models import ledger  # noqa: F401  (registers the ledger tables)
 from app.models.issue import Issue, IssueComment, IssueHistory, IssueLink
 from app.models.membership import Membership
-from app.models.role import Role, RoleBinding
+from app.models.role import Role, RoleBinding, SiteGroupRoleBinding
 from app.models.schema import Schema
 from app.models.transfer_job import TransferJob
 from app.models.user import User
@@ -56,6 +56,7 @@ __all__ = [
     "Membership",
     "Role",
     "RoleBinding",
+    "SiteGroupRoleBinding",
     "Schema",
     "TransferJob",
     "User",

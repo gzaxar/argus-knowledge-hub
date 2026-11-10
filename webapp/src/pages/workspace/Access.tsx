@@ -274,6 +274,8 @@ export function WorkspaceAccess() {
       }} />
 
       {isSite && <SiteAdministrators siteId={workspaceId!} />}
+      {isSite && <SiteWideGroupAccess siteId={workspaceId!} />}
+      {!isSite && <InheritedGrants workspaceId={workspaceId!} />}
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex items-start justify-between gap-4">
@@ -473,6 +475,96 @@ function Invite({ workspaceId, roles, onDone }: { workspaceId: string; roles: { 
           )}
         </ul>
       )}
+    </div>
+  );
+}
+
+
+/** Roles groups have once for this site, in it and in every facility at it now or later (issue #26). */
+function SiteWideGroupAccess({ siteId }: { siteId: string }) {
+  const qc = useQueryClient();
+  const data = useQuery({ queryKey: ["site-group-grants", siteId], queryFn: () => sitesApi.groupGrants(siteId), retry: false });
+  const groups = useQuery({ queryKey: ["groups"], queryFn: () => directoryApi.groups() });
+  const roles = useQuery({ queryKey: ["roles"], queryFn: rolesApi.list });
+  const [groupUid, setGroupUid] = useState("");
+  const [roleId, setRoleId] = useState("viewer");
+  const refresh = () => { void qc.invalidateQueries({ queryKey: ["site-group-grants", siteId] }); preview.reset(); };
+  const preview = useMutation({ mutationFn: () => sitesApi.previewGroupGrant(siteId, { group_uid: groupUid, role_id: roleId }) });
+  const give = useMutation({ mutationFn: () => sitesApi.grantGroup(siteId, { group_uid: groupUid, role_id: roleId }),
+                             onSuccess: () => { setGroupUid(""); refresh(); } });
+  const revoke = useMutation({ mutationFn: (id: number) => sitesApi.revokeGroupGrant(siteId, id), onSuccess: refresh });
+  if (data.isError) return null;                 // only for an administrator of this site or of the installation
+  const allowed = new Set(data.data?.roles ?? []);
+  const eligible = (groups.data ?? []).filter((g) => g.active && (!g.home_site_id || g.home_site_id === siteId));
+  const shown = preview.data && preview.data.group_uid === groupUid && preview.data.role_id === roleId ? preview.data : null;
+  const error = [preview, give, revoke].find((m) => m.isError)?.error as ApiError | undefined;
+  return (
+    <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+      <h2 className="font-semibold text-slate-900">Site-wide group access</h2>
+      <p className="mt-1 text-slate-500">
+        A role given here reaches this site and every workspace currently at it
+        ({(data.data?.workspaces ?? []).join(", ") || "…"}), facilities added later included. It is not copied into
+        them: a facility that leaves the site loses it at once. Only general access levels can be given site-wide.
+      </p>
+      <ul className="mt-3 divide-y divide-slate-100">
+        {(data.data?.grants ?? []).map((g) => (
+          <li key={g.id} className="flex items-center justify-between gap-2 py-1.5">
+            <span><span className="font-medium">{g.group_name}</span> · {g.role_name}
+              {!g.group_active && <span className="ml-2 text-xs text-slate-400">group deactivated: gives nothing</span>}</span>
+            <button type="button" className="text-xs text-red-500 hover:text-red-700"
+                    onClick={() => { if (confirm(`Take ${g.role_name} away from ${g.group_name} in every workspace of this site?`)) revoke.mutate(g.id); }}>
+              Revoke
+            </button>
+          </li>
+        ))}
+        {data.data?.grants.length === 0 && <li className="py-1.5 text-slate-400">No site-wide grant yet.</li>}
+      </ul>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <select value={groupUid} onChange={(e) => setGroupUid(e.target.value)} aria-label="Group for the site"
+                className="min-w-56 rounded border border-slate-300 px-2 py-1">
+          <option value="">Choose a group…</option>
+          {eligible.map((g) => <option key={g.uid} value={g.uid}>{g.name}{g.home_site_id ? " (this site's)" : ""}</option>)}
+        </select>
+        <select value={roleId} onChange={(e) => setRoleId(e.target.value)} aria-label="Site-wide role"
+                className="rounded border border-slate-300 px-2 py-1">
+          {(roles.data ?? []).filter((r) => allowed.has(r.id)).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+        </select>
+        <button type="button" disabled={!groupUid || preview.isPending} onClick={() => preview.mutate()}
+                className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50 disabled:opacity-50">Preview</button>
+      </div>
+      {shown && (
+        <div className="mt-2 rounded bg-slate-50 p-2">
+          <p>{shown.people.length} {shown.people.length === 1 ? "person" : "people"} in {shown.group_name} would have{" "}
+            {shown.role_name} in {shown.workspaces.join(", ")}.</p>
+          {shown.people.length > 0 && <p className="mt-1 text-xs text-slate-500">{shown.people.map((p) => p.email).join(", ")}</p>}
+          <button type="button" disabled={give.isPending} onClick={() => give.mutate()}
+                  className="mt-2 rounded bg-slate-900 px-3 py-1 font-medium text-white disabled:opacity-50">
+            Give {shown.role_name} site-wide
+          </button>
+        </div>
+      )}
+      {error && <p className="mt-2 text-red-600">{error.detail ?? "Could not do that."}</p>}
+    </div>
+  );
+}
+
+/** What this workspace has from its site: listed here, removable only on the site's Access page. */
+function InheritedGrants({ workspaceId }: { workspaceId: string }) {
+  const inherited = useQuery({ queryKey: ["inherited-grants", workspaceId], queryFn: () => rolesApi.inherited(workspaceId),
+                               retry: false });
+  if (!inherited.data?.length) return null;
+  return (
+    <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+      <h2 className="font-semibold text-slate-900">Inherited from the site {inherited.data[0].site_id}</h2>
+      <p className="mt-1 text-slate-500">These groups have a role here because they have it site-wide. They are changed
+        on the site&apos;s Access page, by its administrators.</p>
+      <ul className="mt-2 divide-y divide-slate-100">
+        {inherited.data.map((g) => (
+          <li key={g.id} className="py-1.5"><span className="font-medium">{g.group_name}</span> · {g.role_name}
+            <span className="ml-2 text-xs text-slate-500">from {g.site_id}</span>
+            {!g.group_active && <span className="ml-2 text-xs text-slate-400">group deactivated: gives nothing</span>}</li>
+        ))}
+      </ul>
     </div>
   );
 }

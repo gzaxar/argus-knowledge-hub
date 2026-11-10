@@ -880,6 +880,31 @@ export interface RoleBinding {
   created_at: string | null;
 }
 
+/** A role a group has once for a site: in the site and every facility currently at it (issue #26). */
+export interface SiteGroupGrant {
+  id: number;
+  site_id: string;
+  group_uid: string;
+  group_name: string;
+  group_active: boolean;
+  group_source: string | null;
+  role_id: string;
+  role_name: string;
+  created_by: string | null;
+  created_at: string | null;
+}
+
+export interface SiteGroupGrantPreview {
+  site_id: string;
+  group_uid: string;
+  group_name: string;
+  group_active: boolean;
+  role_id: string;
+  role_name: string;
+  workspaces: string[];
+  people: { user_id: string; email: string; name: string | null }[];
+}
+
 export interface InvitedPerson {
   email: string;
   user_id: string;
@@ -919,6 +944,10 @@ export interface DirectoryGroup {
   member_count: number;
   /** The workspaces where it holds a role: changing its members changes access there. */
   workspaces?: string[];
+  /** Owned by this site (null: the installation). */
+  home_site_id?: string | null;
+  /** Roles it has site-wide. */
+  site_grants?: SiteGroupGrant[];
 }
 
 export interface DirectoryGroupMember {
