@@ -1,4 +1,5 @@
 """Pure navigation graph rules. No database, UI or source-content processing."""
+import re
 
 
 def assert_parent_move(parents: dict, node: str, parent: str | None) -> None:
@@ -43,6 +44,16 @@ def navigation_nodes(folders: list[dict], documents: list[dict], placements: lis
                 elif len(candidates) > 1:
                     warnings.add("Some source pages have multiple parents; they are shown in Unfiled documents until organised.")
         nodes[f"d:{uid}"] = dict(id=f"d:{uid}", kind="document", uid=uid, title=doc["title"], parent_id=parent)
+    # WP overview pages are subsystem roots, including leaf WP pages.
+    # Decide before recovery so damaged links/cycles stay in the repair group.
+    source_children = {link["from_document_uid"] for link in relations}
+    subsystem_roots = {
+        node["id"] for node in nodes.values()
+        if node["kind"] == "document" and node["uid"] in own_docs
+        and node["parent_id"] is None
+        and re.match(r"^WP[\s_-]*[0-9]+(?=$|[\s_:–—-])", node["title"].strip(), re.IGNORECASE)
+        and (node["uid"] in overrides or node["uid"] not in source_children)
+    }
     for node in nodes.values():
         if node["parent_id"] and node["parent_id"] not in nodes:
             node["parent_id"] = None
@@ -66,6 +77,8 @@ def navigation_nodes(folders: list[dict], documents: list[dict], placements: lis
     unfiled, shared = False, False
     for node in list(nodes.values()):
         if node["kind"] == "document" and node["parent_id"] is None:
+            if node["id"] in subsystem_roots:
+                continue
             if node["uid"] in own_docs:
                 node["parent_id"] = "group:unfiled"
                 unfiled = True
