@@ -39,7 +39,7 @@ object_types:
         - {key: namespace, name: Kubernetes namespace, indexed: true}
         - {key: cluster, name: Cluster, indexed: true}
         - {key: git_url, name: Repository, indexed: true}
-        - {key: git_revision, name: Revision}
+        - {key: git_revision, name: Target revision (gitrev), description: "The `gitrev` the configuration deploys from, as the file writes it: a branch or a tag, not the commit that was read."}
     - name: "Section"
       parent: "Functional Element"
       description: "Injector, linac, bunch compressor, undulator hall."
@@ -418,6 +418,7 @@ object_types:
         - {key: current_max, name: Maximum current (A), type: float}
         - {key: voltage_max, name: Maximum voltage (V), type: float}
         - {key: bipolar, name: Bipolar, type: boolean}
+        - {key: polarity_sign, name: Output polarity, type: enumeration, options: [{id: positive, value: Positive}, {id: negative, value: Negative}], description: "For a unipolar supply, the sign of its output current."}
         - {key: interface, name: Interface, type: enumeration, options: [{id: modbus_tcp, value: Modbus TCP}, {id: serial, value: Serial}, {id: ethernet, value: Ethernet}, {id: gpib, value: GPIB}, {id: can, value: CAN}]}
         - {key: ramp_rate, name: Ramp rate (A/s), type: float}
     - name: "Magnet Assembly"
@@ -640,7 +641,13 @@ object_types:
       icon: tabler/file-settings
       attributes:
         - {key: git_url, name: Repository, indexed: true}
-        - {key: git_revision, name: Revision}
+        - {key: git_revision, name: Target revision (gitrev), description: "The `gitrev` the configuration deploys from, as the file writes it: a branch or a tag, not the commit that was read."}
+        - {key: git_commit, name: Commit read, indexed: true, readonly: true, description: "The commit the import read this file at."}
+        - {key: git_last_change, name: Last change, readonly: true, description: "The last commit that changed this file: its message and author."}
+        - {key: git_last_change_at, name: Last changed at, type: datetime, readonly: true}
+        - {key: git_last_change_url, name: Last change (link), readonly: true}
+        - {key: git_last_change_commit, name: Last change (commit), indexed: true, readonly: true}
+        - {key: git_recent_changes, name: Changes since the previous import, multi: true, readonly: true, description: "The commits that changed this file between the previous import and this one, newest first."}
         - {key: config_path, name: Path in repository}
         - {key: namespace, name: Kubernetes namespace, indexed: true}
         - {key: cluster, name: Cluster, indexed: true}

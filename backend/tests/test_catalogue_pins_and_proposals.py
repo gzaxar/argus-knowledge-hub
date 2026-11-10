@@ -375,8 +375,10 @@ def test_adding_a_vendor_by_name_never_makes_a_second_one(cat):
     db, ws = cat["db"], cat["ws"]
     found, created = model_vendor.ensure(db, ws, cat["vendor_schema"].uid, "KEYSIGHT", cat["actor"])
     assert found.uid == cat["vendor"].uid and not created
-    new, created = model_vendor.ensure(db, ws, cat["vendor_schema"].uid, " Acme Instruments ", cat["actor"])
-    assert created and new.name == "Acme Instruments" and new.type == "Vendor" and new.is_global
+    # A name of its own: another test's catalogue may already hold a shared "Acme Instruments".
+    unique = f"Acme Instruments {secrets.token_hex(3)}"
+    new, created = model_vendor.ensure(db, ws, cat["vendor_schema"].uid, f" {unique} ", cat["actor"])
+    assert created and new.name == unique and new.type == "Vendor" and new.is_global
     with pytest.raises(ValueError):
         model_vendor.ensure(db, ws, cat["vendor_schema"].uid, "  ", cat["actor"])
     db.commit()

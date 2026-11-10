@@ -62,6 +62,8 @@ SYSTEM_BY_GROUP = {
 PRODUCTS: dict = {
     "histar": ("CAEN ELS", "Hi-Star"), "easydriver": ("CAEN ELS", "EASY-DRIVER"),
     "fastps": ("CAEN ELS", "FAST-PS"), "sys8x00": ("Danfysik", "System 8x00"),
+    "sys80it": ("Danfysik", "System 8000"), "danfysik": ("Danfysik", None),
+    "haz-cit": ("Hazemeyer", "CIT"), "hazemeyer": ("Hazemeyer", None),
     "e642": ("OCEM", "E642"), "modbusps": ("OCEM", "Modbus PS"),
     "modbusps4chan": ("OCEM", "Modbus PS 4-channel"), "tti": ("Aim-TTi", None),
     "haz-ser": ("Hazemeyer", None), "twistorr305": ("Agilent", "TwisTorr 305"),
@@ -159,11 +161,16 @@ def _ratings(ioc: dict, device: dict) -> dict:
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 return float(value)
         return None
-    polarity = ((dev_ps.get("polarity") or ioc_ps.get("polarity") or {}).get("mode")
-                if isinstance(dev_ps.get("polarity") or ioc_ps.get("polarity"), dict) else None)
+    stated = dev_ps.get("polarity") or ioc_ps.get("polarity")
+    stated = stated if isinstance(stated, dict) else {}
+    polarity = stated.get("mode")
     out = {"current_max": limit("current"), "voltage_max": limit("voltage")}
     if polarity:
         out["bipolar"] = "bipolar" in str(polarity)
+    # A unipolar supply's sign: which way its current flows, the thing a swapped cable gets wrong.
+    sign = str(stated.get("sign") or "").strip().lower()
+    if sign in ("positive", "negative") and not out.get("bipolar"):
+        out["polarity_sign"] = sign
     return {k: v for k, v in out.items() if v is not None}
 
 

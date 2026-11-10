@@ -192,7 +192,7 @@ export function WorkspaceMembers() {
   return (
     <div>
       <h1 className="text-2xl font-semibold text-slate-900">
-        Members of {workspace.data?.name ?? workspaceId}{" "}
+        Area permissions in {workspace.data?.name ?? workspaceId}{" "}
         <code className="rounded bg-slate-100 px-1.5 py-0.5 align-middle text-sm font-normal text-slate-600">{workspaceId}</code>
       </h1>
       <p className="mt-1 text-sm text-slate-500">
@@ -204,7 +204,12 @@ export function WorkspaceMembers() {
             </Link>
           </>
         ) : (
-          "Objects & types, tickets and documents have independent rights per member."
+          <>
+            Rights per area (objects & types, tickets, documents), given to one person at a time. They add to the
+            roles on{" "}
+            <Link to={`/workspaces/${workspaceId}/access`} className="text-indigo-600 hover:underline">Access</Link>:
+            a person can do whatever either allows, so taking a right away here does not remove what a role gives.
+          </>
         )}
       </p>
 
