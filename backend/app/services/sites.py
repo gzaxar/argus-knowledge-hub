@@ -15,12 +15,12 @@ from __future__ import annotations
 
 from typing import Iterable, Optional
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models.asset import Asset
 from app.models.schema import Schema
-from app.models.workspace import Workspace
+from app.models.workspace import Workspace, SiteAdministrator
 
 ROLE = "site"
 PLACE_ROOT = "Location"
@@ -66,7 +66,16 @@ def set_role(db: Session, workspace_id: str, site: bool) -> list[str]:
     if facilities(db, workspace_id):
         raise SiteProblem(f"{workspace_id} has facilities ({', '.join(facilities(db, workspace_id))}): "
                           f"set them at another site, or at none, first")
+    from app.models.role import SiteGroupRoleBinding
+    from app.models.group import Group
+    if db.scalar(select(SiteGroupRoleBinding.id).where(SiteGroupRoleBinding.site_id == workspace_id).limit(1)):
+        raise SiteProblem(f"{workspace_id} gives groups roles site-wide: revoke those site-wide grants first")
+    if db.scalar(select(Group.uid).where(Group.home_site_id == workspace_id, Group.active.is_(True)).limit(1)):
+        raise SiteProblem(f"groups belong to the site {workspace_id}: deactivate them or give them to the "
+                          f"installation first")
     ws.role = None
+    # A later return to site status must not silently revive old administrators.
+    db.execute(delete(SiteAdministrator).where(SiteAdministrator.site_id == workspace_id))
     db.flush()
     return refresh(db, workspace_id)
 
@@ -91,6 +100,13 @@ def set_site(db: Session, workspace_id: str, site_id: Optional[str], *, actor: O
         if ws.role == CATALOGUE:
             raise SiteProblem(f"{workspace_id} is the installation's catalogue: it is at no site")
     before = ws.site_id
+    if before != (site_id or None):
+        from app.services.site_group_grants import out_of_scope_after_move
+        stranded = out_of_scope_after_move(db, workspace_id, site_id)
+        if stranded:
+            raise SiteProblem(f"{workspace_id} gives roles to groups of the site {stranded[0]['home_site_id']} ("
+                              + ", ".join(sorted({s['group_name'] for s in stranded}))
+                              + "), which it would no longer be at: remove those grants first")
     ws.site_id = site_id or None
     db.flush()
     ended: list[str] = []

@@ -20,6 +20,9 @@ has one sequence. A number already used as a key (by an import, or by hand) is
 skipped rather than refused.
 
 A key typed by a person is still accepted; generation only fills a blank.
+
+Tickets get theirs from the same pattern, with TCK as their type ({WS}-TCK-0042), when they are created
+however they are created. So do the records a beam model brings, instead of the name in the model file.
 """
 import re
 from datetime import datetime, timezone
@@ -93,11 +96,25 @@ def _split(pattern: str, workspace_id: str, schema: Optional[Schema], now: datet
     return fill(pattern[:seq.start()]), fill(pattern[seq.end():]), int(seq.group(2) or 1)
 
 
+TICKET_CODE = "TCK"
+
+
+def ticket_type() -> Schema:
+    """What a ticket's key is made from: a type of its own, whatever kind of ticket it is."""
+    return Schema(name="Ticket", metadata_json={"key_prefix": TICKET_CODE})
+
+
+def _taken(db: Session, key: str) -> bool:
+    from app.models.issue import Issue
+    return (db.scalar(select(Asset.uid).where(Asset.key == key)) is not None
+            or db.scalar(select(Issue.uid).where(Issue.key == key)) is not None)
+
+
 def _free(db: Session, before: str, after: str, width: int, start: int) -> tuple[str, int]:
     n = start
     for _ in range(MAX_TRIES):
         key = f"{before}{n:0{width}d}{after}"
-        if db.scalar(select(Asset.uid).where(Asset.key == key)) is None:
+        if not _taken(db, key):
             return key, n
         n += 1
     raise KeyPatternError(f"No free key after {MAX_TRIES} tries from {before}{start:0{width}d}{after}.")
@@ -136,3 +153,15 @@ def example(pattern: str, workspace_id: str) -> str:
     before, after, width = _split(pattern, workspace_id, Schema(name="Ion Pump", metadata_json={}),
                                   datetime.now(timezone.utc))
     return f"{before}{1:0{width}d}{after}"
+
+
+def backfill_ticket_keys(db: Session, workspace_id: str) -> list[tuple[str, str]]:
+    """Keys for the tickets made before tickets had keys, oldest first. (uid, key) of each; the caller commits."""
+    from app.models.issue import Issue
+    done = []
+    for issue in db.scalars(select(Issue).where(Issue.workspace_id == workspace_id, Issue.key.is_(None))
+                            .order_by(Issue.created_at, Issue.uid)):
+        issue.key = allocate(db, workspace_id, ticket_type())
+        done.append((issue.uid, issue.key))
+    db.flush()
+    return done

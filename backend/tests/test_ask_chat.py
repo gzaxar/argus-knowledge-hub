@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from app.auth import OidcIdentity, get_identity
 from app.db import SessionLocal
 from app.main import app
+from app.models.ask_conversation import AskMessage
 from app.models.asset import Asset
 from app.models.llm_config import LLMConfig
 from app.models.schema import Schema
@@ -216,3 +217,135 @@ def test_a_question_comes_with_its_files_and_a_follow_up_still_sees_them(chat_wo
     too_many = client.post("/v1/ai/chat", headers=w["h"], json={
         "question": "x", "attachments": [{"name": f"f{i}", "text": "t"} for i in range(4)]})
     assert too_many.status_code == 422
+
+
+# --- A model going round in circles (seen in production: the same reasoning, word for word, until Stop) --------
+
+LOOP = ("I'm mapping out the remaining quadrupole groups to their power supplies, and I'm uncertain about the "
+        "exact assignment since the IOC only lists three power supplies in total, so I need to figure it out. ")
+
+
+class FakeStream:
+    """What the endpoint streams: these reasoning or content pieces, then the end."""
+
+    def __init__(self, status=200, text="", pieces=(), key="reasoning", clock=None):
+        self.status_code, self.text, self.headers, self.closed = status, text, {}, False
+        self.pieces, self.key, self.clock = pieces, key, clock
+
+    def iter_lines(self, decode_unicode=True):
+        for piece in self.pieces:
+            if self.clock:
+                self.clock["now"] += 100
+            yield "data: " + json.dumps({"choices": [{"delta": {self.key: piece}}]})
+        yield "data: [DONE]"
+
+    def close(self):
+        self.closed = True
+
+
+def endpoint(**settings):
+    from app.services.llm import Endpoint
+    return Endpoint(base_url="http://model.test/v1", model="auto", model_settings={"auto": settings} if settings else None)
+
+
+def replying(monkeypatch, *responses):
+    """The endpoint answers these in turn; what each request carried is returned."""
+    sent, queue = [], list(responses)
+
+    def fake(purpose, model, url, **kwargs):
+        sent.append(dict(kwargs["json"]))
+        return queue.pop(0)
+
+    monkeypatch.setattr("app.services.llm._post", fake)
+    return sent
+
+
+def test_reasoning_that_repeats_word_for_word_is_stopped_and_the_connection_closed(monkeypatch):
+    from app.services.llm import LLMRepeating, converse_stream
+    stream = FakeStream(pieces=[LOOP] * 1000)
+    replying(monkeypatch, stream)
+    seen = []
+    with pytest.raises(LLMRepeating, match="repeating"):
+        for kind, value in converse_stream(endpoint(), [{"role": "user", "content": "q"}]):
+            seen.append(value)
+    assert len(seen) < 30, "stopped soon after the loop began, not at the end of the stream"
+    assert stream.closed
+
+
+def test_answers_that_only_look_repetitive_are_left_alone(monkeypatch):
+    from app.services.llm import converse_stream
+    rows = [f"| `btf:accumulator_pa/QUAA{i}` | QUAA{i} | quadrupole | sector {i % 4} | Active |\n" for i in range(400)]
+    twice = ["".join(f"Sentence {i} of a passage quoted a second time. " for i in range(40))] * 2
+    for pieces in (rows, twice):
+        replying(monkeypatch, FakeStream(pieces=pieces, key="content"))
+        last = list(converse_stream(endpoint(), [{"role": "user", "content": "q"}]))[-1]
+        assert last[1]["content"] == "".join(pieces)
+
+
+def test_a_model_past_its_time_limit_is_stopped(monkeypatch):
+    from app.services.llm import LLMOvertime, converse_stream
+    clock = {"now": 0.0}
+    monkeypatch.setattr("app.services.llm.time.monotonic", lambda: clock["now"])
+    # All different, so only the limit can stop it.
+    replying(monkeypatch, FakeStream(pieces=[f"thought {i} " for i in range(50)], clock=clock))
+    with pytest.raises(LLMOvertime, match="after 250 s"):
+        list(converse_stream(endpoint(time_limit_s=250), [{"role": "user", "content": "q"}]))
+
+
+def test_the_second_try_changes_how_the_model_is_called_and_survives_a_refusal(monkeypatch):
+    from app.services.llm import converse_stream
+    sent = replying(monkeypatch, FakeStream(pieces=["ok"], key="content"))
+    list(converse_stream(endpoint(), [{"role": "user", "content": "q"}]))
+    assert sent[0]["temperature"] == 0 and "chat_template_kwargs" not in sent[0]
+
+    sent = replying(monkeypatch, FakeStream(status=400, text="unknown field"), FakeStream(pieces=["ok"], key="content"))
+    last = list(converse_stream(endpoint(), [{"role": "user", "content": "q"}], fresh=True))[-1]
+    assert "temperature" not in sent[0] and sent[0]["chat_template_kwargs"] == {"enable_thinking": False}
+    assert "chat_template_kwargs" not in sent[1]
+    assert last[1]["content"] == "ok"
+
+    sent = replying(monkeypatch, FakeStream(pieces=["ok"], key="content"))
+    list(converse_stream(endpoint(no_thinking=False), [{"role": "user", "content": "q"}], fresh=True))
+    assert "chat_template_kwargs" not in sent[0], "a model set not to be told keeps that setting"
+
+
+def looping_then(monkeypatch, *turns):
+    """Each turn is the pieces it yields, or an exception to raise; records whether it was the fresh try."""
+    tries, queue = [], list(turns)
+
+    def fake(endpoint, messages, tools=None, fresh=False):
+        tries.append(fresh)
+        turn = queue.pop(0)
+        for piece in turn:
+            if isinstance(piece, Exception):
+                raise piece
+            yield piece
+
+    monkeypatch.setattr("app.services.ask.converse_stream", fake)
+    return tries
+
+
+def test_a_loop_is_asked_once_more_and_what_it_wrote_is_cleared(monkeypatch):
+    from app.services.ask import ask_events
+    from app.services.llm import LLMRepeating
+    tries = looping_then(monkeypatch, [("reasoning", LOOP), LLMRepeating("auto kept repeating")], answer("Three each."))
+    out = list(ask_events(None, "ws", endpoint(), "q"))
+    assert tries == [False, True]
+    assert [e["type"] for e in out if e["type"] != "text"] == ["thinking", "text_reset", "done"]
+    assert out[-1]["answer"] == "Three each." and out[-1]["stopped"] == "answered"
+
+
+def test_a_model_that_loops_twice_ends_with_a_clear_message_and_is_kept(chat_world, monkeypatch):
+    from app.services.llm import LLMRepeating
+    tries = looping_then(monkeypatch, [LLMRepeating("auto kept repeating the same reasoning and was stopped")],
+                         [LLMRepeating("auto kept repeating the same reasoning and was stopped")])
+    as_(chat_world["ann"])
+    resp = client.post("/v1/ai/chat", headers=chat_world["h"], json={"question": "which channel?"})
+    evs = events(resp)
+    done = evs[-1]
+    assert tries == [False, True]
+    assert done["type"] == "done" and done["stopped"] == "failed" and "kept repeating" in done["error"]
+    db = SessionLocal()
+    kept = db.query(AskMessage).filter(AskMessage.conversation_id == evs[0]["id"], AskMessage.role == "assistant").one()
+    assert kept.stopped == "failed" and "kept repeating" in kept.error
+    db.close()

@@ -69,14 +69,14 @@ export function BeamModelEditorPage() {
 
 // ------------------------------------------------------------------------- upload
 
-interface ConvertOptions { topology: string; keep_markers: boolean; system_kind: string }
+interface ConvertOptions { topology: string; keep_markers: boolean; system_kind: string; beamline: string; same_element_suffixes: string }
 interface UploadedFile { name: string; models: CanonicalBeamModel[]; error?: string; via?: string; report?: BeamConversionReport }
 
 function Upload({ onEdit }: { onEdit: (m: BeamModelV2) => void }) {
   const qc = useQueryClient();
   const [raw, setRaw] = useState<{ name: string; text: string }[]>([]);
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [opts, setOpts] = useState<ConvertOptions>({ topology: "auto", keep_markers: true, system_kind: "" });
+  const [opts, setOpts] = useState<ConvertOptions>({ topology: "auto", keep_markers: true, system_kind: "", beamline: "", same_element_suffixes: "" });
   const formats = useQuery({ queryKey: ["beam-formats"], queryFn: beamModelApi.formats });
   const docs = files.flatMap((f) => f.models);
   const check = useQuery({
@@ -114,6 +114,8 @@ function Upload({ onEdit }: { onEdit: (m: BeamModelV2) => void }) {
       try {
         const out = await beamModelApi.convert(name, text, {
           topology: opts.topology, keep_markers: opts.keep_markers, ...(opts.system_kind ? { system_kind: opts.system_kind } : {}),
+          ...(opts.beamline ? { beamline: opts.beamline } : {}),
+          ...(opts.same_element_suffixes.trim() ? { same_element_suffixes: opts.same_element_suffixes } : {}),
         });
         return { name, models: [out.model], via: out.report.converter, report: out.report };
       } catch (e) {
@@ -123,6 +125,7 @@ function Upload({ onEdit }: { onEdit: (m: BeamModelV2) => void }) {
     return () => { live = false; };
   }, [raw, opts]);
   const simulators = raw.some((f) => !f.name.toLowerCase().endsWith(".json"));
+  const sequences = [...new Set(files.flatMap((f) => f.report?.sequences ?? []))];
 
   return (
     <div className="space-y-3 rounded border border-slate-200 bg-white p-4">
@@ -154,6 +157,19 @@ function Upload({ onEdit }: { onEdit: (m: BeamModelV2) => void }) {
             <input type="checkbox" checked={opts.keep_markers} onChange={(e) => setOpts({ ...opts, keep_markers: e.target.checked })} />
             keep markers
           </label>
+          {sequences.length > 1 && (
+            <label>Sequences{" "}
+              <select value={opts.beamline} onChange={(e) => setOpts({ ...opts, beamline: e.target.value })} className="rounded border border-slate-300 px-1 py-0.5">
+                <option value="">all, a path each</option>
+                {sequences.map((s) => <option key={s} value={s}>only {s.toUpperCase()}</option>)}
+              </select>
+            </label>
+          )}
+          <label title="Name endings that mark one physical element in several configurations: DHPTT001_IN and DHPTT001_OUT become DHPTT001, each path keeping its own values.">
+            Same element, name endings{" "}
+            <input value={opts.same_element_suffixes} placeholder="e.g. _IN, _OUT" onChange={(e) => setOpts({ ...opts, same_element_suffixes: e.target.value })}
+                   className="w-28 rounded border border-slate-300 px-1 py-0.5" />
+          </label>
         </div>
       )}
       {files.some((f) => f.error) && (
@@ -164,7 +180,10 @@ function Upload({ onEdit }: { onEdit: (m: BeamModelV2) => void }) {
           {files.filter((f) => f.report).map((f) => (
             <li key={f.name}>
               <span className="font-medium">{f.name}</span> read as {f.via}: {f.report!.elements} elements
-              {f.report!.ring ? `, a ring (bends total ${(f.report!.total_bend * 180 / Math.PI).toFixed(1)}°, layout closes within ${f.report!.survey_closure_m?.toFixed(3)} m)` : ", a line"}
+              {f.report!.paths ? `, placed ${f.report!.placements} times on ${f.report!.paths.length} paths` : f.report!.ring ? `, a ring (bends total ${(f.report!.total_bend * 180 / Math.PI).toFixed(1)}°, layout closes within ${f.report!.survey_closure_m?.toFixed(3)} m)` : ", a line"}
+              {f.report!.chosen && f.report!.sequences ? <span className="text-amber-700"> · only {f.report!.chosen.toUpperCase()} of {f.report!.sequences.length} sequences</span> : null}
+              {f.report!.conflicts?.length ? <span className="text-rose-700"> · {f.report!.conflicts.length} name(s) with two types, the first stays: {f.report!.conflicts.slice(0, 5).map((c) => `${c.component} (${c.kept}, ${c.also})`).join("; ")}</span> : null}
+              {f.report!.differs?.length ? <span className="text-amber-700"> · {new Set(f.report!.differs.map((d) => d.component)).size} element(s) with different values per path: {[...new Set(f.report!.differs.map((d) => d.component))].slice(0, 8).join(", ")}</span> : null}
               {f.report!.not_executed?.length ? <span className="text-amber-700"> · not executed: {f.report!.not_executed.join("; ")}</span> : null}
             </li>
           ))}
@@ -207,13 +226,16 @@ function Upload({ onEdit }: { onEdit: (m: BeamModelV2) => void }) {
   );
 }
 
-function ImportReports({ reports }: { reports: BeamImportReport[] }) {
+export function ImportReports({ reports }: { reports: BeamImportReport[] }) {
   if (!reports.length) return null;
   return (
     <div className="rounded bg-emerald-50 p-3 text-sm text-emerald-900">
       {reports.map((r) => (
         <div key={r.model}>
-          <b>{r.model}</b>: {r.state} — {r.elements} elements, {r.values} dataset values
+          <b>{r.model}</b>: {r.state === "published"
+            ? <>{r.state} — {r.elements} elements, {r.values} dataset values</>
+            : <span className="text-amber-800">not applied yet — it removes records that need a person&apos;s approval,
+                so nothing has changed. <Link to="/review" className="underline">Approve it in the review queue</Link>, then import again.</span>}
           {r.awaiting_policy && <span className="text-amber-800"> · waiting for the authority policy to cover this source</span>}
         </div>
       ))}

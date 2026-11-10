@@ -91,7 +91,7 @@ def create(db: Session, exp: PortabilityExport, actor: str, *, every_minutes: in
     cfg = cfg or service.config()
     if not admin:
         raise ServiceError("scheduling an export needs an instance administrator", "forbidden", 403)
-    if exp.state != "published" or not (exp.git or {}).get("tag"):
+    if not service.was_published(exp):
         raise ServiceError("only an export published to a Git repository can be repeated", "invalid", 409)
     repo = (exp.destination or {}).get("repository")
     if repo not in cfg.repositories:
@@ -232,14 +232,14 @@ def run(engine: Engine, db: Session, sched: PortabilitySchedule, cfg: Optional[s
             return _carry_on(engine, db, sched, pending, actor, cfg)
         return _finish(db, sched, "waiting", f"{pending.id} is {pending.state.replace('_', ' ')}: it needs a person "
                                              "on the Portability page before the next run", pending.id)
-    base = db.get(PortabilityExport, sched.last_published_export_id or sched.source_export_id)
-    if base is None or base.state != "published":
-        base = db.scalar(select(PortabilityExport).where(
-            PortabilityExport.id.in_([sched.source_export_id, sched.last_published_export_id or ""]),
-            PortabilityExport.state == "published").order_by(PortabilityExport.created_at.desc()))
+    # The last publication, else the export the schedule was set on — expired ones included: retention deletes
+    # their local files after a few days, not their publication, which is all an increment needs.
+    base = next((e for e in (db.get(PortabilityExport, i) for i in (sched.last_published_export_id,
+                                                                     sched.source_export_id) if i)
+                 if service.was_published(e)), None)
     if base is None:
-        return _finish(db, sched, "failed", "the export this schedule continues is no longer published (revoked or "
-                                            "expired): set a new schedule on a published export")
+        return _finish(db, sched, "failed", "the export this schedule continues is no longer published (revoked): "
+                                            "set a new schedule on a published export")
     if sched.skip_unchanged and (base.watermark or {}).get("vector") == current_vector(db):
         return _finish(db, sched, "unchanged", f"nothing recorded since {base.id}")
     exp_id = None

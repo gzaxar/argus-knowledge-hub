@@ -204,7 +204,12 @@
         "description": "A manufacturer's catalogue model, instances of which are the actual units.",
         "is_concrete": true,
         "parent_schema_uid": null,
-        "attributes": [],
+        "attributes": [
+            {"key": "vendor", "name": "Vendor", "type": "string"},
+            {"key": "vendor_ref", "name": "Supplied by", "type": "reference", "referenceType": "Vendor",
+             "referenceSchemaUid": "slice-20463f:argus-object:vendor"},
+            {"key": "model_code", "name": "Model code", "type": "string"}
+        ],
         "metadata": {},
         "version": 1,
         "icon_uid": null,

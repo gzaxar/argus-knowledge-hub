@@ -3538,6 +3538,17 @@
             ],
             "title": "Due Date"
           },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
           "labels": {
             "items": {
               "type": "string"
@@ -6466,7 +6477,7 @@
             }
           },
           {
-            "description": "A page of at most this many, with the total in X-Total-Count. Without it, every record (and deleted ones are not left out).",
+            "description": "A page of at most this many, with the total in X-Total-Count. Without it, every record (deleted and retired ones are not left out).",
             "in": "query",
             "name": "limit",
             "required": false,
@@ -6481,7 +6492,7 @@
                   "type": "null"
                 }
               ],
-              "description": "A page of at most this many, with the total in X-Total-Count. Without it, every record (and deleted ones are not left out).",
+              "description": "A page of at most this many, with the total in X-Total-Count. Without it, every record (deleted and retired ones are not left out).",
               "title": "Limit"
             }
           },
@@ -6494,6 +6505,18 @@
               "minimum": 0,
               "title": "Offset",
               "type": "integer"
+            }
+          },
+          {
+            "description": "A page also holds retired and merged records.",
+            "in": "query",
+            "name": "include_retired",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "A page also holds retired and merged records.",
+              "title": "Include Retired",
+              "type": "boolean"
             }
           },
           {
@@ -6646,7 +6669,7 @@
     },
     "/v1/assets/type-counts": {
       "get": {
-        "description": "How many visible, not deleted records each type has (its own, not its subtypes'): what a type tree\nshows beside each type.",
+        "description": "How many visible records in use (not deleted, retired or merged) each type has (its own, not its subtypes'): what a type tree\nshows beside each type.",
         "operationId": "asset_type_counts",
         "parameters": [
           {
@@ -7409,7 +7432,7 @@
     },
     "/v1/assets/{uid}/location": {
       "get": {
-        "description": "The record's approved location (or none), whether its type may have one and on which map layer, the\nhistory of its approved locations, and the field observations of it.",
+        "description": "The record's approved location (or none), whether its type may have one and on which map layer, whether\nthis person may set it (`may_set`), the history of its approved locations, and the field observations of it.",
         "operationId": "get_location",
         "parameters": [
           {

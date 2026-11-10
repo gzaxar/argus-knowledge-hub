@@ -86,6 +86,8 @@ def claims(ws: str, doc: Document, rule: str) -> list[dict]:
         out.append({"source_ref": ref, "predicate": "exists", "value": {"type": type_name, "key": key, "name": name},
                     **base})
         out.append({"source_ref": ref, "predicate": "name", "value": name, **base})
+        # Which model it belongs to, now that its key no longer says.
+        out.append({"source_ref": ref, "predicate": "attr:beam_model", "value": mid, **base})
         for k, v in attrs.items():
             if v not in (None, "", []):
                 out.append({"source_ref": ref, "predicate": f"attr:{k}", "value": v, **base})

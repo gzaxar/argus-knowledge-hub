@@ -27,6 +27,21 @@ optics. It is independent of any simulation code, and linked to the real equipme
 3. ARGUS checks it and says how complete it is, level by level (topology, lattice, geometry, optics, physical,
    integrated) and what is missing for the next level.
 
+## A file with several sequences
+
+A MAD-X file with several sequences and no `USE` becomes **one model with one path per sequence**. An element
+that several sequences place is one component on all those paths, so it is one record, with one supply and one
+history; each path keeps its own positions and values. Below the file, the upload says how many times the elements
+were placed on how many paths, which elements have different values from path to path, and any name given two
+different types (the first stays). **Sequences** can read just one of them. With `USE`, the file has already chosen.
+
+When a simulator needs one label per configuration, as `DHPTT001_IN` and `DHPTT001_OUT` for one magnet bending
+either way, put the endings in **Same element, name endings** (`_IN, _OUT`): they become `DHPTT001`, on both paths,
+each keeping its own angle. It is off unless you ask, since an ending does not mean this in every file.
+
+Do not import each sequence as its own model: the same magnet would then be several records, and a control channel
+of that name could not tell which one it powers.
+
 ## Markers, and what a simulation does not compute
 
 A lattice places with **markers** what its simulation computes nothing for: a vacuum pump, a valve, a gauge,
@@ -58,6 +73,15 @@ conversion warnings before relying on it.
 **Beam model** (side bar) lists the models. Open one to see its paths, components and their positions along the
 beam. The editor changes the model, its definitions and datasets, boundaries along paths, alignment, state
 mappings and value provenance; saving keeps a new revision.
+
+A component's id is what identifies it. Change the id, or remove the component, and the old record is **retired**
+and a new one made; change only its values and it stays the same record. A retired record keeps its history and
+opens from its link, marked **Retired**, but search, lists, the map and Ask no longer offer it. To see them, tick
+**Show retired** on the Assets page, or search for `status = Retired`.
+
+A save that would remove more than a tenth of the model (at least 10 records), or a record with tickets, documents
+or a confirmed installation, is not applied at once. The editor says so: approve it in the review queue, then save
+again.
 
 ## Remove a model
 

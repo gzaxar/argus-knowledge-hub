@@ -20,7 +20,7 @@ import { isScannableType, LabelCode, printLabel } from "../../components/LabelCo
 import { LabelScanner } from "../../components/LabelScanner";
 import { RelationGraph } from "../../components/RelationGraph";
 import { TransferItemAction } from "../../components/TransferItemAction";
-import { effectiveAttributes, inheritedKeys } from "../../lib/schemaAttributes";
+import { effectiveAttributes, inheritedKeys, oneVendorField } from "../../lib/schemaAttributes";
 import { empty } from "../../components/AttributeFields";
 import { ModelComponents } from "../../components/ModelComponents";
 import { AssetContextPanel } from "../../components/hub/ContextPanels";
@@ -185,8 +185,9 @@ export function AssetDetail() {
   if (!asset.data) return <p className="text-sm text-red-600">Asset not found.</p>;
 
   const a = asset.data;
-  const attrDefs = effectiveAttributes(schema.data, allSchemas.data);
-  const inherited = inheritedKeys(schema.data, attrDefs);
+  const allAttrDefs = effectiveAttributes(schema.data, allSchemas.data);
+  const attrDefs = oneVendorField(allAttrDefs, a.attributes, "page");
+  const inherited = inheritedKeys(schema.data, allAttrDefs);
   // Only what has a value; the type's other fields one click away (a Switch need not list PBS segments).
   const filledDefs = attrDefs.filter((d) => !empty(a.attributes[d.key ?? d.name]));
   const assetName = (id: string) => allAssets.data?.find((x) => x.uid === id)?.name ?? id;
@@ -232,6 +233,12 @@ export function AssetDetail() {
                 </span>
               )}
               <OwnerBadge workspaceId={a.workspace_id} />
+              {(a.record_status === "Retired" || a.record_status === "Merged") && (
+                <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700"
+                      title="No longer in use: its history and links stay, but search, lists and Ask do not offer it.">
+                  {a.record_status}
+                </span>
+              )}
             </h1>
             <p className="text-sm text-slate-500">
               {showKeys && <>{a.key} · </>}{a.type} · schema:{" "}

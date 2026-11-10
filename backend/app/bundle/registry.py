@@ -270,11 +270,17 @@ NOT_CARRIED = {
     **{t: "which catalogue release this installation installed, and which of its records each catalogue id is: the "
           "target installs the collections itself, and adopts the carried records with a migration manifest"
        for t in ("catalogue_entries", "catalogue_installations")},
+    "catalogue_pins": "the catalogue release this installation reads, moved from Administration: the target pins its own",
+    "catalogue_proposals": "pull requests this installation opened on the catalogue repository: they are followed where "
+                           "they were opened; the target installs the release that carries them",
     **{t: "a type migration is this installation's administrative record of moving records between types; the "
           "records carry their result and history"
        for t in ("type_migrations", "type_migration_items")},
     "groups": "directory groups belong to the installation's directory: role bindings to a group need it there",
     "group_members": "directory groups belong to the installation's directory",
+    "group_administrators": "who administers a group is decided in each installation, not carried by a workspace",
+    "site_administrators": "who administers a site is decided in each installation, not carried by a workspace",
+    "site_group_role_bindings": "a site-wide grant belongs to the site, not to a workspace: never made by an import",
     "alembic_version": "the database's own schema revision",
     "spatial_ref_sys": "PostGIS's catalogue of coordinate systems, the same in every installation",
     **{t: "the meaning-search index is built from the records with the target's own embedding model "

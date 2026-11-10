@@ -38,6 +38,48 @@ before writing anything and says which package to install: install it on the wor
 own data names (a Jira issue type the workspace lacks), never a whole catalogue, and leaves the fields of
 the workspace's ticket and document types as they are.
 
+## A new release of an EPIK8s configuration
+
+Run the import again, or let its schedule do it. It compares what the file says now with what the hub
+holds: new records are made, only what really differs is updated, and everything else is left alone, still
+naming the revision that last changed it. The job says how many records were created, updated and left
+unchanged.
+
+What the file no longer declares, such as a renamed IOC or a changed prefix, stays unless you tick **Clear
+what this file no longer declares**. Those records are then retired, each one listed in the job's messages.
+Tickets and documents keep their links, and a record the file states again comes back as it was. Only records
+this file made are affected: never another file's, another source's, or one made by hand. A file that
+declares no IOC retires nothing. A ledger-only workspace retires records through a bulk change instead.
+
+Keys join their parts with `-` (`BTF-ELM-BPSA31`, `BTF-DEV-libera12-BPSA11`), so they don't read as PV names.
+The PV itself is on the record, under `pv`.
+
+A BPM whose IOC lists no devices is one monitor, so the import makes one Control Device for it on the IOC's own
+prefix (`BTF-DEV-libera02-BPSA31`, PV `ACC:DIA:LIB02:BPSA31`).
+
+## One supply, several magnets
+
+Say in the values file which magnets a channel's power supply drives, with `magnets:` on the device. It works
+with or without inference:
+
+```yaml
+- name: QUAA-001
+  id: 2
+  magnets: [QUAA101, QUAA201, QUAA301, QUAA401]
+```
+
+- The channel gets a **Power Supply** record (one already held under the channel's name is reused), and each
+  magnet is linked to it with `powers`. The magnet's page then shows its supply and channel.
+- With no list, a channel of a magnet IOC (`devgroup: mag`) powers the magnet of its own name, if the workspace
+  has one. Channels left with no magnet are listed together in the import's messages. A channel spelt differently
+  from its magnet (`CHHTL001`, `CHTL001`) needs a list, or the same name in both.
+- Magnets are found by name among the beam elements, the beam model's first. A name that matches nothing, or
+  several, is reported in the import's messages and no magnet is invented.
+- With a list, the file decides: a magnet taken off the list loses its `powers` link at the next import.
+
+An element the beam model or a person already recorded is also reused by **Infer equipment and lattice elements**,
+which no longer makes a second record beside it.
+
 ## Import an EPIK8s configuration, step by step
 
 1. The workspace has the **Accelerator catalogue** (its **Packages** page). Hanging from a catalogue

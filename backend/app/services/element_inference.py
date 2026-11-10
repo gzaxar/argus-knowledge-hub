@@ -212,7 +212,11 @@ def infer_ioc(ioc: dict) -> Optional[Inference]:
         if listed:
             # One box, several monitors: each channel is a BPM and this is what realises them.
             return Inference(asset_type=DIGITIZER, asset_attrs=base, channel_element=BPM, why=why)
-        element = _s(ioc.get("iocprefix")).strip(":").upper() or name.upper()
+        # The BPM's name, not its PV prefix: a prefix changes between releases, and then the same
+        # monitor would become a new element.
+        element = _s(ioc.get("iocprefix")).strip(":").upper().rsplit(":", 1)[-1]
+        if not LATTICE_NAME.match(element):
+            element = name.upper()
         return Inference(
             asset_type=DIGITIZER, asset_attrs=base, element_type=BPM, element_name=element,
             element_attrs={"lattice_name": element} if LATTICE_NAME.match(element) else {}, why=why)

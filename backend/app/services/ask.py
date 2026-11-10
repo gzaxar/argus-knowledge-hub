@@ -15,14 +15,17 @@ The tools are the MCP ones, called in process. The same eight tools an
 external assistant gets, so what is learned here is true there too.
 """
 import json
+import logging
 import re
 import time
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
-from app.services.llm import Endpoint, LLMError, converse, converse_stream
-from app.services.mcp_tools import BY_NAME, catalogue
+from app.services.llm import Endpoint, LLMError, LLMRepeating, converse, converse_stream
+from app.services.mcp_tools import BY_NAME, LOOKUP_GUIDE, catalogue
+
+log = logging.getLogger(__name__)
 
 # Enough hops for search → open → traverse, and a stop before a confused
 # model spends a workspace's quota going in circles.
@@ -54,17 +57,7 @@ SYSTEM = (
     "Work from the records, never from what you know about accelerators in general. "
     "Look things up before answering — a question you think you can answer without a "
     "tool call is a question you are about to answer about some other laboratory.\n"
-    "Names here are codes: equipment is called things like FI4-B-CAM-VIS-001, and the "
-    "word somebody uses ('camera', 'quadrupole') is usually the type rather than the "
-    "name. If a search finds nothing, try the word as a type, or a shorter fragment, "
-    "before concluding there is none.\n"
-    "A kind of equipment is often several types, organised in a tree, and none of them may "
-    "carry the word used in the question. When you are not sure which types a word means, "
-    "call list_types (with the word, or with nothing to see every type), choose the types "
-    "whose descriptions match, and search_objects with types=[...]. For a question about "
-    "what there is or how many, give the total and the count per type from by_type, not "
-    "just the objects listed. List at most 40 records; when there are more, say how many "
-    "more there are rather than stopping part way.\n"
+    + LOOKUP_GUIDE +
     "For what is written rather than what exists — how to do something, what a manual or "
     "datasheet says, what went wrong before and how it was fixed — use search_knowledge: it "
     "finds passages by meaning, in any language. Cite a passage by the code or key of its "
@@ -271,10 +264,21 @@ def ask_events(db: Session, workspace_id: str, endpoint: Endpoint, question: str
         if not stream:
             message = converse(endpoint, messages, tools=tools if with_tools else None)
             return message
+        offered = tools if with_tools else None
+        try:
+            return (yield from written(converse_stream(endpoint, messages, tools=offered)))
+        except LLMRepeating as e:
+            # Nothing was looked up or proposed in this turn yet, so it can simply be asked again, once.
+            log.warning("Ask: %s; asking once more", e)
+            yield {"type": "text_reset"}
+            return (yield from written(converse_stream(endpoint, messages, tools=offered, fresh=True)))
+
+    def written(pieces):
+        """The events of one streamed model turn; returns the assistant message."""
         think = _ThinkFilter()
         message: dict = {}
         wrote = False
-        for kind, value in converse_stream(endpoint, messages, tools=tools if with_tools else None):
+        for kind, value in pieces:
             if kind == "reasoning":
                 yield {"type": "thinking", "text": value}
             elif kind == "content":

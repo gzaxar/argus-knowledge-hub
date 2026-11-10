@@ -34,6 +34,10 @@ class Group(Base, TimestampMixin):
     # reference recorded on an object.
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     synced_at: Mapped[Optional[object]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # A local group owned by one site (issue #26): its site administrators govern it, and it may hold direct
+    # grants only at that site and its current facilities. Null: owned by the installation.
+    home_site_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("workspaces.id", ondelete="SET NULL"),
+                                                        nullable=True, index=True)
 
 
 class GroupMember(Base):
@@ -51,4 +55,16 @@ class GroupMember(Base):
         String, ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     source: Mapped[str] = mapped_column(String, default="local")
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class GroupAdministrator(Base):
+    """A person entrusted with membership of one locally managed group."""
+
+    __tablename__ = "group_administrators"
+    __table_args__ = (UniqueConstraint("group_uid", "user_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    group_uid: Mapped[str] = mapped_column(String, ForeignKey("groups.uid", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -349,6 +349,7 @@ currently valid* revision rather than to an arbitrary PDF.
 - [The element panorama](docs/element-panorama.md) and [the IT model](docs/it-model-design.md) —
   what the utility matrices say next to the control configurations, and where switches, hosts and
   serial converters live.
+- [INFN SSO](docs/corporate-sso.md) — connect directly to the INFN Keycloak with client `argus-knowledge-hub`.
 - [A local Keycloak for testing multi-workspace users](docs/oidc-dev-setup.md) — how one person
   ends up with different rights in different workspaces (`RoleBinding`, not a PAT, which can only
   ever be one workspace), the dev-only identity provider that proves it end to end, six test users

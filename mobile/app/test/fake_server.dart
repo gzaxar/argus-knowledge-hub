@@ -14,6 +14,7 @@ const recordedUnit = '506c63d7-f353-4b5f-9e6d-a0528d4e679f';
 const recordedInstallation = 'a54b9136-c75f-4840-9d0e-1830186774dc';
 const incomingUnit = '812ddce6-b3a6-4d69-8e23-4e3600136faa';
 const ionPumpUid = 'd2b1c2d3-1234-4a5b-8c9d-0e1f2a3b4c5d';
+const vendorSchema = 'slice-20463f:argus-object:vendor';
 const closedTicketUid = '5b3c9a10-0000-4000-8000-00000000c105';
 
 String fixture(String name) => File('test/fixtures/$name.json').readAsStringSync();
@@ -80,6 +81,13 @@ class FakeArgus {
 
   /// Labels on records, by record uid: put on and taken off by the app.
   final Map<String, List<Map<String, dynamic>>> labels = {};
+  bool maySetLocation = false;
+  final Set<String> noLocationFor = {};
+  final List<Map<String, dynamic>> positionsSet = [];
+  final List<Map<String, dynamic>> vendors = [
+    {'uid': 'vendor-keysight', 'key': 'V-1', 'name': 'Keysight', 'schema_uid': vendorSchema,
+     'workspace_id': 'slice-20463f', 'type': 'Vendor', 'attributes': <String, dynamic>{}},
+  ];
 
   late final http.Client client = MockClient((req) async {
     if (offline) throw http.ClientException('Network is unreachable', req.url);
@@ -153,10 +161,20 @@ class FakeArgus {
     }
     final located = RegExp(r'^/v1/assets/([^/]+)/location$').firstMatch(p);
     if (located != null && m == 'GET') {
+      if (noLocationFor.contains(located.group(1))) {
+        return _json({'uid': located.group(1), 'locatable': true, 'map_layer': 'equipment', 'hidden': false,
+          'may_set': maySetLocation, 'location': null, 'history': [], 'observations': observations});
+      }
       return _json({'uid': located.group(1), 'locatable': true, 'map_layer': 'equipment', 'hidden': false,
+        'may_set': maySetLocation,
         'location': {'uid': 'f1', 'latitude': 41.8217, 'longitude': 12.6726, 'accuracy_m': 3, 'source': 'manual',
           'confirmed_at': '2026-10-12T09:00:00Z', 'valid_from': '2026-10-12T09:00:00Z', 'state': 'confirmed'},
         'history': [], 'observations': observations});
+    }
+    if (located != null && m == 'PUT') {
+      positionsSet.add(body());
+      noLocationFor.remove(located.group(1));
+      return _json({'uid': 'f2', ...body(), 'state': 'confirmed'});
     }
     final observing = RegExp(r'^/v1/assets/([^/]+)/location/observations$').firstMatch(p);
     if (observing != null && m == 'POST') {
@@ -214,6 +232,10 @@ class FakeArgus {
     if (m == 'GET' && revFiles != null) return _json([]);
     if (m == 'POST') {
       switch (p) {
+        case '/v1/catalogue/collections/vendors':
+          vendors.add({'uid': 'vendor-new', 'key': 'V-NEW', 'name': body()['name'], 'schema_uid': vendorSchema,
+                       'workspace_id': 'slice-20463f', 'type': 'Vendor', 'attributes': {}});
+          return _json({'uid': 'vendor-new', 'key': 'V-NEW', 'name': body()['name'], 'created': true});
         case '/v1/catalogue/collections/models/install-one':
           return _json({'uid': 'pm-c9200', 'key': 'PM-C9200', 'name': 'Cisco C9200-24T', 'installed': true});
         case '/v1/devices':
@@ -421,6 +443,15 @@ class FakeArgus {
         final offset = int.parse(q['offset'] ?? '0'), limit = int.parse(q['limit']!);
         return http.Response.bytes(utf8.encode(jsonEncode(rows.skip(offset).take(limit).toList())), 200,
             headers: {'content-type': 'application/json', 'x-total-count': '${rows.length}'});
+      }
+      if (p == '/v1/assets' && q['schema_uid'] == vendorSchema) return _json(vendors);
+      // A Product Model with its vendor, for the one Vendor field.
+      if (p == '/v1/hub/assets/pm-linked/context' || p == '/v1/assets/pm-linked') {
+        final isContext = p.contains('/hub/');
+        final raw = jsonEncode(fixtureJson(isContext ? 'ion_pump_context' : 'ion_pump')).replaceAll(ionPumpUid, 'pm-linked');
+        final got = jsonDecode(raw) as Map<String, dynamic>;
+        return _json(isContext ? got : {...got, 'schema_uid': 'slice-20463f:argus-object:product-model', 'type': 'Product Model',
+            'attributes': {'vendor': 'Keysight', 'vendor_ref': 'vendor-keysight', 'model_code': '34465A'}});
       }
       if (p == '/v1/assets' && q['schema_uid'] == 'slice-20463f:argus-object:product-model') {
         return _json(fixture('product_models'));

@@ -30,8 +30,8 @@ from app.services.alarm_symptoms import root_cause_from_alarms as _root_cause_fr
 from app.services.root_cause import blast_radius as _blast_radius
 from app.services.root_cause import impact_of as _impact_of
 from app.services.root_cause import root_causes as _root_causes
-from app.services.visibility import (can_see, redacted_attributes, restriction_clause, visible_assets_clause,
-                                     visible_issues_clause)
+from app.services.visibility import (can_see, live_assets_clause, redacted_attributes, restriction_clause,
+                                     visible_assets_clause, visible_issues_clause)
 
 # Enough to answer with, small enough not to bury the model.
 DEFAULT_LIMIT = 20
@@ -75,18 +75,25 @@ def _document_visible(workspace_id: str):
 
 
 def _asset_summary(asset: Asset) -> dict:
-    return {
+    out = {
         "uid": asset.uid,
         "key": asset.key,
         "name": asset.name,
         "type": asset.type,
     }
+    if asset.record_status != "Active":       # said, so an answer never presents a retired record as current
+        out["status"] = asset.record_status
+    model = (asset.attributes or {}).get("beam_model")
+    if model:                                 # where a beam element sits: one model is one line or ring
+        out["model"] = model
+    return out
 
 
 def _issue_summary(issue: Issue) -> dict:
     attributes = issue.attributes or {}
     return {
         "uid": issue.uid,
+        "key": issue.key,
         "title": issue.title,
         "state": issue.state,
         "source_key": attributes.get("argus_source_key"),
@@ -116,6 +123,17 @@ def _singular(word: str) -> str:
     if w.endswith("s") and not w.endswith("ss") and len(w) > 3:
         return w[:-1]
     return w
+
+
+# Words a question is made of, not what it is about: "dipoles in the accumulator" asks about two things.
+_NOT_SEARCHED = frozenset({"the", "and", "for", "with", "from", "all", "any", "nel", "nella", "dell", "della", "del",
+                           "dei", "degli", "delle", "con", "per"})
+
+
+def _search_words(needle: str) -> list[str]:
+    """The words of a query that has several; none for a single word, which is matched as it is."""
+    words = [w for w in re.split(r"\s+", needle) if len(w) > 2 and w not in _NOT_SEARCHED]
+    return words if len(needle.split()) > 1 else []
 
 
 def _types(db: Session, workspace_id: str) -> list[dict]:
@@ -149,16 +167,41 @@ def _mentioning(types: list[dict], word: str) -> list[dict]:
             for t in types if re.search(rf"\b{w}(e?s)?\b", _first_sentence(t["description"]), re.I)]
 
 
+# How to look equipment up and count it. Said to Ask ARGUS's model and to an MCP client's: the same records
+# have to give the same answer whoever asks.
+LOOKUP_GUIDE = (
+    "Names here are codes: equipment is called things like FI4-B-CAM-VIS-001, and the "
+    "word somebody uses ('camera', 'quadrupole') is usually the type rather than the "
+    "name. If a search finds nothing, try the word as a type, or a shorter fragment, "
+    "before concluding there is none.\n"
+    "A kind of equipment is often several types, organised in a tree, and none of them may "
+    "carry the word used in the question. When you are not sure which types a word means, "
+    "call list_types (with the word, or with nothing to see every type), choose the types "
+    "whose descriptions match, and search_objects with types=[...]. For a question about "
+    "what there is or how many, give the total and the count per type from by_type, not "
+    "just the objects listed. List at most 40 records; when there are more, say how many "
+    "more there are rather than stopping part way.\n"
+    "Count what was asked about. A magnet, its power supply and the control channel of that supply are three "
+    "different records, and one supply may power several magnets (the relation `powers`): how many dipoles "
+    "there are is the number of Dipole records, however few supplies feed them. A beam element's `model` says "
+    "which line or ring it belongs to.\n"
+)
+
+
 def search_objects(db: Session, workspace_id: str, query: str = "",
                    type: Optional[str] = None, types: Optional[list] = None,
-                   limit: int = DEFAULT_LIMIT, offset: int = 0, with_attributes: bool = False) -> dict:
+                   limit: int = DEFAULT_LIMIT, offset: int = 0, with_attributes: bool = False,
+                   include_retired: bool = False) -> dict:
     """Equipment by name, key or type. A type includes its subtypes; a word that names a type matches
     the objects of that type and of the types below it. Returns the total and the count per type, so a
     question about how many there are is answered from all of them, not from the first page.
 
     `offset` and `with_attributes` are for a client listing every object of a type (ARGUS reading a
     beamline's Control Devices): page after page in a stable order, each object with the attributes
-    get_object would give it, instead of one get_object call per object."""
+    get_object would give it, instead of one get_object call per object.
+
+    Retired and merged records are left out unless `include_retired` asks for them: they no longer exist as far
+    as a question about what is there goes."""
     needle = (query or "").strip().lower()
     catalogue = _types(db, workspace_id)
     asked = [x for x in ([type] if type else []) + list(types or []) if isinstance(x, str) and x.strip()]
@@ -179,6 +222,8 @@ def search_objects(db: Session, workspace_id: str, query: str = "",
     # The rule the REST API and the graph apply: this workspace's objects and the ones flagged shared. An
     # object of a shared *type* is not itself shared — every beamline's pumps are of the catalogue's type.
     stmt = select(Asset).where(visible_assets_clause(workspace_id), Asset.deleted_at.is_(None))
+    if not include_retired:
+        stmt = stmt.where(live_assets_clause())
     if wanted is not None:
         stmt = stmt.where(Asset.type.in_(wanted))
     # The type counts as a match. Equipment here is named FI4-B-CAM-VIS-001,
@@ -186,13 +231,20 @@ def search_objects(db: Session, workspace_id: str, query: str = "",
     # about cameras concludes there are none. So does a type above it: "vacuum pumps" are the ion,
     # turbo and primary pumps.
     single = _singular(needle)
+    # A query of several words: each must match, by name, key or type ("accumulator dipole"), or the whole of it.
+    words = [(w, _singular(w), _with_subtypes(catalogue, _named(catalogue, w))) for w in _search_words(needle)]
+
+    def is_of_kind(a: Asset, word_single: str, named: set) -> bool:
+        return word_single in (a.type or "").lower() or a.type in named
+
+    def matches(a: Asset, word: str, word_single: str, named: set) -> bool:
+        return word in (a.name or "").lower() or word in (a.key or "").lower() or is_of_kind(a, word_single, named)
+
     rows = [
         a for a in db.scalars(stmt)
         if not needle
-        or needle in (a.name or "").lower()
-        or needle in (a.key or "").lower()
-        or single in (a.type or "").lower()
-        or a.type in by_word
+        or matches(a, needle, single, by_word)
+        or (words and all(matches(a, *w) for w in words))
     ]
     # This workspace's own first: the shared catalogue's records are there to be referenced, not to bury
     # the answer about this beamline. Then by key, so that pages of the same query never overlap or skip.
@@ -207,7 +259,8 @@ def search_objects(db: Session, workspace_id: str, query: str = "",
     }
     if unknown:
         out["unknown_types"] = unknown
-    by_type = sum(1 for a in rows if a.type in by_word or single in (a.type or "").lower())
+    by_type = sum(1 for a in rows if is_of_kind(a, single, by_word)
+                  or any(is_of_kind(a, w[1], w[2]) for w in words))
     if needle and not by_type and wanted is None:
         # No object matched by its type, so what matched (if anything) matched by name only: the kind may
         # still be here under the names the catalogue uses ('magnet' → Quadrupole, "A focusing magnet"), and
@@ -239,11 +292,19 @@ def list_types(db: Session, workspace_id: str, query: Optional[str] = None) -> d
     }
 
 
+def _by_former_key(db: Session, key: str) -> Optional[Asset]:
+    """A record found by a key it had before (a beam element's btf:accumulator_pa/DHSA11)."""
+    from app.models.asset_subresources import AssetLabel
+    uid = db.scalar(select(AssetLabel.asset_uid).where(AssetLabel.type == "former_key", AssetLabel.value == key)
+                    .limit(1))
+    return db.get(Asset, uid) if uid else None
+
+
 def get_object(db: Session, workspace_id: str, uid_or_key: str) -> dict:
     """One object: its attributes, and what it is physically connected to."""
     asset = db.scalar(select(Asset).where(Asset.uid == uid_or_key)) or db.scalar(
         select(Asset).where(Asset.key == uid_or_key)
-    )
+    ) or _by_former_key(db, uid_or_key)
     if asset is None or not _asset_visible(db, asset, workspace_id):
         return {"found": False, "looked_for": uid_or_key}
 
@@ -283,6 +344,7 @@ def search_tickets(db: Session, workspace_id: str, query: str = "",
         if not needle
         or needle in (i.title or "").lower()
         or needle in (i.description or "").lower()
+        or needle in (i.key or "").lower()
     ]
     return {
         "total": len(rows),
@@ -293,7 +355,8 @@ def search_tickets(db: Session, workspace_id: str, query: str = "",
 def get_ticket(db: Session, workspace_id: str, uid: str) -> dict:
     """One ticket, including the ARGUS fields: cause, cure, downtime."""
     issue = db.scalar(
-        select(Issue).where(Issue.workspace_id == workspace_id, Issue.uid == uid, visible_issues_clause())
+        select(Issue).where(Issue.workspace_id == workspace_id, (Issue.uid == uid) | (Issue.key == uid),
+                            visible_issues_clause())
     )
     if issue is None:
         return {"found": False, "looked_for": uid}
@@ -550,12 +613,16 @@ TOOLS: list[dict[str, Any]] = [
         "name": "search_objects",
         "description": "Search equipment (objects) by name, key or type. A type includes the types "
                        "below it. Returns the total, the count per type (by_type) and the first "
-                       "objects (uid, key, name, type).",
+                       "objects (uid, key, name, type; a beam element also its model). Names are codes, so "
+                       "'dipole' is usually a type: for what there is or how many, search by type and answer "
+                       "from total and by_type, counting the records of that type and not the channel or "
+                       "the supply that drives them.",
         "handler": search_objects,
         "inputSchema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Text to look for in the name, key or type"},
+                "query": {"type": "string", "description": "Text to look for in the name, key or type. With "
+                                                           "several words each must match: 'accumulator dipole'"},
                 "type": {"type": "string", "description": "Restrict to one object type (and its subtypes)"},
                 "types": {"type": "array", "items": {"type": "string"},
                           "description": "Restrict to several object types (and their subtypes)"},
@@ -566,6 +633,10 @@ TOOLS: list[dict[str, Any]] = [
                 "with_attributes": {"type": "boolean",
                                     "description": "Return each object's attributes too, as get_object "
                                                    "would; default false"},
+                "include_retired": {"type": "boolean",
+                                    "description": "Also return retired and merged records, each with its "
+                                                   "status. Only for a question about what was removed or "
+                                                   "what used to exist; default false"},
             },
         },
     },
@@ -612,12 +683,12 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "get_ticket",
-        "description": "One ticket by uid, including root cause, corrective action, "
+        "description": "One ticket by uid or key (BTF-TCK-0042), including root cause, corrective action, "
                        "affected system and downtime where they are recorded.",
         "handler": get_ticket,
         "inputSchema": {
             "type": "object",
-            "properties": {"uid": {"type": "string"}},
+            "properties": {"uid": {"type": "string", "description": "The ticket's uid or its key"}},
             "required": ["uid"],
         },
     },
@@ -1060,7 +1131,7 @@ def _link_text(o: dict) -> str:
 def add_links(result: Any, workspace_id: str, base: str) -> Any:
     """Give every record in a result the address of its page in the web app, so an
     assistant outside ARGUS (LibreChat, Claude) can link what it cites. The same records
-    the web's Ask page links: a code is a document, a key an asset, a source_key a ticket;
+    the web's Ask page links: a code is a document, a source_key a ticket, a key an asset;
     a graph node says its kind. `?ws=` opens the page in the workspace that was asked."""
     from urllib.parse import quote
 
@@ -1072,10 +1143,10 @@ def add_links(result: Any, workspace_id: str, base: str) -> Any:
             return None
         if "code" in o:
             return "documents"
+        if "source_key" in o:                 # a ticket has a key now too, and always a source_key
+            return "tickets"
         if "key" in o:
             return "assets"
-        if "source_key" in o:
-            return "tickets"
         return None
 
     def walk(v: Any) -> None:

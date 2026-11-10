@@ -505,7 +505,8 @@ class _Run:
             if _same(cur, v) or _blank(cur):                   # agreeing, or empty here: the collection's
                 action = "managed"
             else:
-                action = chosen.get(f)
+                # A proposal's record (app/catalogue/proposals.py) takes the reviewed values unless decided here.
+                action = chosen.get(f) or decision.get("fields_default")
                 if action not in FIELD_DECISIONS:
                     item.needs_decision = True
                     action = None
@@ -661,7 +662,8 @@ def plan(db: Session, workspace_id: str, collection_ids: list[str], *, actor: st
     if bad:
         raise CatalogueProblem("the collections are not valid: run `python -m app.catalogue validate`", bad)
     have = installed(db, workspace_id)
-    run = _Run(db, workspace_id, actor, decisions or {}, apply, merges)
+    from app.catalogue.proposals import mark_installed, with_proposals
+    run = _Run(db, workspace_id, actor, with_proposals(db, workspace_id, decisions or {}), apply, merges)
     for c in tree.values():                       # every vendor, so a model finds its vendor's entry
         for v in c.vendors:
             run.vendor_entries[v.id] = v
@@ -712,6 +714,8 @@ def plan(db: Session, workspace_id: str, collection_ids: list[str], *, actor: st
             db.flush()
     if apply and expected:
         _check_references(db, out, run, expected)
+    if apply:
+        mark_installed(db, workspace_id)
     return out
 
 

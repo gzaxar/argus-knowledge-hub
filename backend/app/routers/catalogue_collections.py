@@ -251,6 +251,27 @@ def install_one_model(body: InstallOneIn, identity: Identity = Depends(get_ident
     return out
 
 
+class VendorIn(BaseModel):
+    name: str
+
+
+@router.post("/vendors")
+def add_vendor(body: VendorIn, identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """The catalogue's Vendor of this name or alias, or a new one: what the Vendor field of a Product Model offers
+    when the company is not listed. Maintainers only: a vendor is shared with every workspace."""
+    from app.services.model_vendor import ensure
+    ws = _workspace(db)
+    _may_install(db, identity, ws)
+    _, vendor_schema = installer._types(db, ws)
+    try:
+        record, created = ensure(db, ws, vendor_schema.uid, body.name, _actor(identity))
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=422, detail={"error": str(e)})
+    db.commit()
+    return {"uid": record.uid, "key": record.key, "name": record.name, "created": created}
+
+
 class LinkModelIn(BaseModel):
     catalogue_id: str
     record_uid: str
@@ -406,3 +427,140 @@ def designate_catalogue(body: DesignateIn, identity: Identity = Depends(get_iden
         raise HTTPException(status_code=422, detail={"error": str(e), "code": "catalogue_workspace"})
     db.commit()
     return status(db)
+
+
+# --------------------------------------------------------------------------- releases pinned from here
+
+def _who(identity: Identity) -> str:
+    """Who did it, as a pull request or the pin's history names them."""
+    if isinstance(identity, OidcIdentity):
+        return identity.user.email or identity.user.name or identity.user.id
+    return "api-token"
+
+
+def _pin_problem(db: Session, e) -> None:
+    db.rollback()
+    raise HTTPException(status_code=422, detail={"error": str(e), "details": getattr(e, "details", [])})
+
+
+class PinIn(BaseModel):
+    source: str
+    ref: str
+
+
+@router.get("/releases")
+def source_releases(source: str = "argus", identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """A source's releases newer than the lock ARGUS ships, and which one is read now."""
+    from app.catalogue import pins
+    from app.catalogue.sources import SourceProblem
+    ws = _workspace(db)
+    _may_install(db, identity, ws)
+    try:
+        return pins.available(source)
+    except pins.PinProblem as e:
+        _pin_problem(db, e)
+    except SourceProblem as e:
+        raise HTTPException(status_code=502, detail={"error": str(e)})
+
+
+@router.post("/pin")
+def pin_release(body: PinIn, identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """Read a newer release of a source, checked first with the validator against the catalogue read now.
+    Installs nothing: the collections then show their upgrades."""
+    from app.catalogue import pins
+    from app.catalogue.sources import SourceProblem
+    ws = _workspace(db)
+    _may_install(db, identity, ws)
+    try:
+        out = pins.pin(db, body.source, body.ref, _who(identity))
+    except pins.PinProblem as e:
+        _pin_problem(db, e)
+    except SourceProblem as e:
+        db.rollback()
+        raise HTTPException(status_code=502, detail={"error": str(e)})
+    db.commit()
+    return out
+
+
+@router.delete("/pin/{source}")
+def unpin_release(source: str, identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """Back to the release the lock file ships. What is installed stays installed."""
+    from app.catalogue import pins
+    ws = _workspace(db)
+    _may_install(db, identity, ws)
+    try:
+        out = pins.unpin(db, source)
+    except pins.PinProblem as e:
+        _pin_problem(db, e)
+    db.commit()
+    return out
+
+
+# --------------------------------------------------------------------------- models proposed to Git
+
+class ProposalIn(BaseModel):
+    record_uid: str
+    # The entry's fields the person changed from the draft: model_code, name, part_number, description,
+    # device_class, instance_type, datasheet_url, eol_date (an empty value leaves it out); and `id`.
+    entry: dict = {}
+    # For a new vendor: id, name, website, aliases.
+    vendor: dict = {}
+    # An existing collection's id, or a new one's {id, name, description, domain}.
+    collection: dict
+    # Where the values can be checked: {kind: datasheet | manufacturer-page | other, ref, note}.
+    source: dict
+
+
+@router.get("/proposals")
+def list_proposals(refresh: bool = True, identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """The models proposed to Git, each with its pull request's state (open, merged, closed) or installed."""
+    from app.catalogue import proposals
+    ws = _workspace(db)
+    _may_install(db, identity, ws)
+    if refresh:
+        proposals.refresh(db, ws)
+        db.commit()
+    return {"enabled": proposals.enabled(), "repository": proposals.repository(),
+            "proposals": proposals.listing(db, ws)}
+
+
+@router.get("/proposals/draft")
+def proposal_draft(record_uid: str, identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """What ARGUS would propose for a Product Model of the catalogue, and the choices left."""
+    from app.catalogue import proposals
+    ws = _workspace(db)
+    _may_install(db, identity, ws)
+    try:
+        return proposals.draft(db, ws, record_uid)
+    except proposals.ProposalProblem as e:
+        _pin_problem(db, e)
+
+
+@router.post("/proposals/preview")
+def proposal_preview(body: ProposalIn, identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """The pull request's files, checked with the validator. Nothing is opened."""
+    from app.catalogue import proposals
+    ws = _workspace(db)
+    _may_install(db, identity, ws)
+    try:
+        built = proposals.build(db, ws, body.model_dump())
+    except proposals.ProposalProblem as e:
+        _pin_problem(db, e)
+    db.rollback()
+    return {k: built[k] for k in ("title", "base", "files", "entry", "vendor", "collection", "repository")}
+
+
+@router.post("/proposals")
+def proposal_open(body: ProposalIn, identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """Open the pull request on the catalogue repository (signed-in maintainers only: it names them)."""
+    from app.catalogue import proposals
+    ws = _workspace(db)
+    _may_install(db, identity, ws)
+    if not isinstance(identity, OidcIdentity) or identity.token is not None:
+        raise HTTPException(status_code=403, detail="A pull request is proposed by a person signed in, not a token")
+    try:
+        out = proposals.propose(db, ws, body.model_dump(), _who(identity))
+    except proposals.ProposalProblem as e:
+        _pin_problem(db, e)
+    db.commit()
+    return out

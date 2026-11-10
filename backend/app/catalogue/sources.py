@@ -28,6 +28,11 @@ units, end of life — comes from a `classifications` entry of the `argus` sourc
 
 The result is written once per lock (its checksum names the folder) as ordinary collection files, which
 `load_tree` reads and the validator checks over both sources together.
+
+The lock file shipped in the image is the floor. A catalogue maintainer can move a source pinned by a release tag
+to a newer release of the same repository from *Administration › Catalogue* (app/catalogue/pins.py): that pin is
+kept in the database (`catalogue_pins`) and read here, so a catalogue release needs no ARGUS release. It applies
+only while it is newer than the lock's: an ARGUS release that ships a newer pin wins on its own.
 """
 from __future__ import annotations
 
@@ -56,6 +61,84 @@ class SourceProblem(RuntimeError):
 def lock_path(base: Optional[Path] = None) -> Path:
     from app.catalogue.loader import catalogue_dir
     return (base or catalogue_dir()) / LOCK
+
+
+def tag_version(ref: Optional[str]):
+    """The version of a release tag (`v0.3.0`), or None for a branch or anything else."""
+    from packaging.version import InvalidVersion, Version
+    if not ref or not re.fullmatch(r"v\d+(\.\d+){0,2}", str(ref)):
+        return None
+    try:
+        return Version(str(ref)[1:])
+    except InvalidVersion:
+        return None
+
+
+def stored_pins() -> dict[str, dict]:
+    """The pins a catalogue maintainer set (app/catalogue/pins.py), by source id; none without a database."""
+    try:
+        from app.db import SessionLocal
+        from app.models.catalogue_entry import CataloguePin
+        with SessionLocal() as db:
+            return {p.source_id: {"ref": p.ref, "commit": p.commit, "pinned_by": p.pinned_by,
+                                  "pinned_at": p.pinned_at.isoformat() if p.pinned_at else None,
+                                  "previous_ref": p.previous_ref}
+                    for p in db.query(CataloguePin).all()}
+    except Exception as e:                                 # the command line, CI: no database, the lock alone
+        import logging
+        logging.getLogger(__name__).debug("catalogue pins not read: %s", e)
+        return {}
+
+
+def _over(source: dict, pin: Optional[dict]) -> dict:
+    """The source as pinned: the stored release when it is newer than the lock's, else the lock's."""
+    if not pin:
+        return source
+    newer, shipped = tag_version(pin.get("ref")), tag_version(source.get("ref"))
+    if newer is None or shipped is None or newer <= shipped or not SHA.match(str(pin.get("commit") or "")):
+        return source
+    return {**source, "ref": pin["ref"], "commit": pin["commit"]}
+
+
+def _is_installations(lock: Path) -> bool:
+    try:
+        return lock.resolve() == lock_path().resolve()
+    except Exception:
+        return False
+
+
+def effective(lock: Optional[Path] = None, pins: Optional[dict[str, dict]] = None) -> list[dict]:
+    """The sources read: the lock's, with the installation's stored pins over them (only for its own lock)."""
+    lock = lock or lock_path()
+    sources = read_lock(lock)
+    if pins is None:
+        pins = stored_pins() if _is_installations(lock) else {}
+    return [_over(s, pins.get(s["id"])) for s in sources]
+
+
+def releases(source: dict) -> list[dict]:
+    """The release tags of a source's repository (`vX.Y.Z`), newest first, each with the commit it points at."""
+    try:
+        out = subprocess.run(["git", "ls-remote", "--tags", source["repo"]], capture_output=True, timeout=60,
+                             check=True, env={**os.environ, "GIT_TERMINAL_PROMPT": "0"}).stdout.decode()
+    except subprocess.CalledProcessError as e:
+        raise SourceProblem(f"{source['id']}: its releases cannot be listed: "
+                            f"{e.stderr.decode(errors='replace').strip()[:300]}")
+    except subprocess.TimeoutExpired:
+        raise SourceProblem(f"{source['id']}: its releases cannot be listed: no answer within a minute")
+    tags: dict[str, str] = {}
+    for line in out.splitlines():
+        if "\t" not in line:
+            continue
+        sha, ref = line.split("\t", 1)
+        name = ref[len("refs/tags/"):]
+        peeled = name.endswith("^{}")
+        name = name[:-3] if peeled else name
+        if tag_version(name) is None:
+            continue
+        if peeled or name not in tags:                     # an annotated tag: the commit, not the tag object
+            tags[name] = sha
+    return [{"tag": t, "commit": c} for t, c in sorted(tags.items(), key=lambda kv: tag_version(kv[0]), reverse=True)]
 
 
 def cache_dir() -> Path:
@@ -308,11 +391,13 @@ class _Dumper(yaml.SafeDumper):
         return True
 
 
-def materialize(lock: Optional[Path] = None, cache: Optional[Path] = None) -> Path:
-    """The collections of every pinned source, as files in one folder (made once per lock)."""
-    lock = lock or lock_path()
+def materialize(lock: Optional[Path] = None, cache: Optional[Path] = None, sources: Optional[list[dict]] = None
+                ) -> Path:
+    """The collections of every pinned source, as files in one folder (made once per set of pins). `sources`:
+    read these instead of the lock's (a release being checked before it is pinned)."""
     cache = cache or cache_dir()
-    sources = read_lock(lock)
+    if sources is None:
+        sources = effective(lock or lock_path())
     out = cache / f"tree-{_lock_key(sources)}"
     if (out / ".complete").exists():
         return out
@@ -416,9 +501,19 @@ def materialize(lock: Optional[Path] = None, cache: Optional[Path] = None) -> Pa
 
 
 def describe(lock: Optional[Path] = None) -> list[dict]:
-    """The pins, as the collections page shows them."""
+    """The pins, as the collections page shows them: what is read, what the lock ships, and who moved it."""
     path = lock or lock_path()
     if not path.is_file():
         return []
-    return [{"id": s["id"], "kind": s["kind"], "repo": s["repo"], "ref": s.get("ref"), "commit": s["commit"],
-             "select": s.get("select")} for s in read_lock(path)]
+    pins = stored_pins() if _is_installations(path) else {}
+    out = []
+    for shipped in read_lock(path):
+        s = _over(shipped, pins.get(shipped["id"]))
+        moved = s is not shipped
+        out.append({"id": s["id"], "kind": s["kind"], "repo": s["repo"], "ref": s.get("ref"), "commit": s["commit"],
+                    "select": s.get("select"), "shipped_ref": shipped.get("ref"), "shipped_commit": shipped["commit"],
+                    "pinned_in": "administration" if moved else "lock",
+                    "pinned_by": pins[s["id"]]["pinned_by"] if moved else None,
+                    "pinned_at": pins[s["id"]]["pinned_at"] if moved else None,
+                    "releasable": tag_version(shipped.get("ref")) is not None})
+    return out

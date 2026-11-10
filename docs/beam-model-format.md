@@ -494,7 +494,7 @@ endsequence;                                              "name": "QUAA101", "fi
 
 | Converter | Reads |
 |---|---|
-| `madx` | sequences (`REFER`, `AT … FROM`), `LINE`s with repetition and reversal, variables (`:=` deferred), inheritance (an element made from a user's definition gets it as `definition` and `family`), `BEAM`, `USE`. Macros, `IF`/`WHILE`, `CALL` are reported, not executed |
+| `madx` | sequences (`REFER`, `AT … FROM`), `LINE`s with repetition and reversal, variables (`:=` deferred), inheritance (an element made from a user's definition gets it as `definition` and `family`), `BEAM`, `USE`. Several sequences and no `USE`: one path each, in one model, a component once however many paths place it, with what differs reported (`conversion.differs`, `conversion.conflicts`). `same_element_suffixes` makes `Q_IN` and `Q_OUT` one component. Macros, `IF`/`WHILE`, `CALL` are reported, not executed |
 | `madx-tfs` | a TWISS table: positions, strengths, optics columns |
 | `elegant` | `.lte`: definitions, RPN expressions with `sto`, `LINE`s, `USE` |
 | `bmad` | `.bmad`: variables, inheritance, `LINE`s, `USE`, `parameter[particle/e_tot/p0c]`, bends by `angle`, `g` or `rho`, collimator limits as boundaries; `call`/`superimpose`/`overlay`/`group` reported |

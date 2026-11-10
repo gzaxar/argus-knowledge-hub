@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { ledgerApi, workspacesApi } from "../api/client";
+import { directoryApi, ledgerApi, workspacesApi } from "../api/client";
 import { signOut } from "../api/signOut";
 import { useCurrentWorkspaceId } from "../api/useCurrentWorkspaceId";
 import { CommandPalette, useCommandPaletteShortcut } from "../components/hub/CommandPalette";
@@ -231,10 +231,13 @@ function HeaderMenu({
 
 export function AppShell() {
   const me = useQuery({ queryKey: ["me"], queryFn: workspacesApi.me });
+  const managedGroups = useQuery({ queryKey: ["groups", "mine"], queryFn: directoryApi.myGroups,
+    enabled: me.data?.auth_type === "oidc" });
   const location = useLocation();
   const currentWorkspaceId = useCurrentWorkspaceId();
   const membersLink = currentWorkspaceId ? `/workspaces/${currentWorkspaceId}/members` : null;
-  const adminLink = membersLink ?? (me.data?.is_admin ? "/admin/workspaces" : null);
+  const adminLink = membersLink ?? (me.data?.is_admin ? "/admin/workspaces" :
+    (managedGroups.data?.length ? "/admin/my-groups" : null));
 
   const review = useQuery({ queryKey: ["ledger-review"], queryFn: ledgerApi.review, refetchInterval: 60_000 });
   const reviewCount = review.data
@@ -267,6 +270,7 @@ export function AppShell() {
   const settingsItems = currentWorkspaceId
     ? [
         { to: `/workspaces/${currentWorkspaceId}/access`, label: "Access", hint: "Who may see and change what" },
+        { to: `/workspaces/${currentWorkspaceId}/groups`, label: "Groups", hint: "People given roles together" },
         { to: `/workspaces/${currentWorkspaceId}/members`, label: "Members" },
         { to: `/workspaces/${currentWorkspaceId}/packages`, label: "Packages", hint: "Types, kinds and workflows" },
         { to: "/catalogue/types", label: "Type catalogue", hint: "Object, ticket and document types" },

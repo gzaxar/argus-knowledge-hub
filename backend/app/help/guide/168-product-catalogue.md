@@ -37,6 +37,16 @@ administrator renames it on *Administration › Catalogue* (its id and record ke
 and, rarely, opens it as a workspace from there — to clean up a record that does not belong in it, which the page
 names.
 
+## A model's vendor
+
+A Product Model has one vendor: the **Vendor** record it points at, chosen on the model's form, or added there
+with **Not listed? Add a vendor** (a maintainer's step: a vendor is shared with every workspace). One going by
+that name or alias is chosen instead of a second one being made. The company's name is also kept beside the
+reference, for search and imports: ARGUS keeps it in step, and a Vendor renamed takes its models' name with it.
+A name that arrives alone (an import, Ask ARGUS) is linked to the Vendor of that name or alias; an older record
+that names a company no Vendor has shows that name, and its form asks for the vendor. The record's relation
+*supplied by* comes from the same reference. The web and the field app work the same way.
+
 ## Choosing a unit's model
 
 A unit's **Product model** is typed as on its label — the model code, or part of it — on the web and on the
@@ -103,22 +113,61 @@ Its shared types are managed by its packages, as in any workspace.
 
 ## Which release ARGUS reads
 
-ARGUS reads each repository at exactly the commit pinned in `backend/catalogue/sources.lock.yaml` (the
-collections page shows the pins). A release tag must still point at its commit: if someone moved it, ARGUS
-refuses to read it. To take a new release:
+ARGUS reads each repository at exactly one commit. The lock file it ships, `backend/catalogue/sources.lock.yaml`,
+pins each source at a release tag and its commit; the collections page shows the pins. A release tag must still
+point at its commit: if someone moved it, ARGUS refuses to read it.
 
-1. In the repository, the release is a tag (`v0.2.0`), with its changes in `CHANGELOG.md`; its CI has run the
-   ARGUS validator, including the check against the previous tag.
-2. Change the pin (the tag and the full commit) in a pull request to ARGUS, and release ARGUS.
-3. On the collections page, **Preview** the collections that changed, then **Install** (below).
+A newer release is taken **from the top of Administration › Catalogue**, without an ARGUS release:
 
-The API pod needs to reach github.com to fetch a new pin; each pin is fetched once. `python -m app.catalogue
-sources` in the pod shows the pins and reads them.
+1. In the repository, the release is a tag (`v0.3.0`), with its changes in `CHANGELOG.md`. The catalogue
+   repository makes one by itself after each merge that changes its collections, once the ARGUS validator passes.
+2. The page says the release is out. **Review the update** reads it and runs its validator over it, against the
+   catalogue read now (nothing removed without being retired or moved, versions raised); a release that fails is
+   not pinned, and the problems are listed. It then chooses every collection with an upgrade (and any a merged
+   proposal is waiting in), and shows what would change. Nothing is installed.
+3. Decide any entry that needs it, then **Install** (below).
+
+To take an older release than the newest, use **Check for newer releases** under **Sources**, and **Check and
+pin** the one you want.
+
+The page says who pinned a release and when; **Back to** returns to the lock's release (what is installed stays
+installed). An ARGUS release whose lock ships a newer release than the one pinned here takes over by itself.
+
+The API pod needs to reach github.com to list releases and fetch a new pin; each pin is fetched once.
+`python -m app.catalogue sources` in the pod shows the pins and reads them.
+
+## Proposing a model made here
+
+A model a unit needs today can be made by hand in the catalogue. To put it in the Git catalogue, open it from
+the product catalogue and choose **Propose for the catalogue…**:
+
+- ARGUS fills the entry from the record: its vendor (the catalogue's, or a new one proposed with it — a
+  manufacturer only the NetBox library has is added to the Manufacturers collection under the library's id),
+  model code, name, part number, device class, datasheet; the catalogue id is `vendor/model`. A model the
+  NetBox library already defines is not proposed: link the record to it.
+- Choose the collection, or name a new one (with the packages its models are offered to, or `catalogue` for
+  every workspace), and say what the values were **checked against** — the datasheet or manufacturer page.
+  Only what the source confirms goes in: a unit's serial number, firmware, address or location never does.
+- The form opens with the catalogue's device class the record's text means ("digital multimeter" is read as
+  `multimeter`), and with the collection holding most models of that class first; change either if it is wrong.
+- **Open the pull request**: ARGUS writes the files against the repository's main branch (the entry in its place,
+  the collection's version raised once per release) and runs its validator; anything refused is listed and nothing
+  is opened. **Show the files** shows them first, if you want to read them. The pull request names you, and the
+  repository's reviewers decide. ARGUS never merges.
+
+**Proposed to Git**, on the collections page, follows each one: pull request open, merged (waiting for a
+release), closed, installed. When the update carrying it is installed, the record you made is linked to its entry — same
+record, its units untouched — and takes the reviewed values, with no decision to make.
+
+Proposing needs ARGUS's GitHub credential (`ARGUS_GITHUB_TOKEN`, key `ioc-github-token` in the chart) with
+*Contents* and *Pull requests* on the catalogue repository; `ARGUS_CATALOGUE_REPO` names another repository than
+the one the lock pins.
 
 ## Installing or upgrading a release
 
-1. **Catalogue collections**: tick the collections to install or upgrade (those they require come with them; one
-   that does not validate cannot be ticked), then **Preview**.
+1. **Review the update** at the top of the page (above) chooses them for you. To choose by hand, for a collection
+   not installed yet: tick the collections (those they require come with them; one that does not validate cannot be
+   ticked), then **Preview**.
 2. Read the preview, entry by entry:
    - *New* — created, shared, every value it states managed by the collection;
    - *Changed* — a managed value the release changed, written;
@@ -221,6 +270,10 @@ waiting for their datasheet.
 | *needs the package … and … has …* | install or upgrade that package on the catalogue workspace's Packages page |
 | *… is installed with other content* | the release changed without a new version: ask its maintainers for one |
 | *the tag … no longer points at the pinned commit* | someone moved a release tag: check the release before pinning again |
+| *… is not a valid catalogue for this ARGUS* (pinning) | the release fails ARGUS's validator: the list says why; fix it in the repository and release again |
+| *… is not newer than …, the release this ARGUS ships* | the lock already has it, or a newer one: nothing to pin |
+| *… is in the catalogue already* / *… is the same model* / *it is in the NetBox library as …* (proposing) | link the record to that model instead (**Link to the same model in the sources**) |
+| *no ARGUS_GITHUB_TOKEN is installed* | an administrator adds the credential before ARGUS opens pull requests |
 | *the catalogue's sources cannot be read as pinned* | the API pod cannot reach github.com, or the commit is gone |
 | *no vendor named … in the catalogue* | a NetBox device type's manufacturer is not in `vendors.yaml` (or its aliases): add it |
 | *references would be lost* | an install with a manifest would leave a unit or document pointing nowhere: nothing was installed; check the manifest's merges |

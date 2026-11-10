@@ -339,6 +339,12 @@ class AttributeDef {
   /// since there may be thousands (docs/netbox-whole-library.md, N2b).
   bool get isProductModel => type == 'reference' && (referenceType == 'Product Model' || key == 'product_model');
 
+  AttributeDef withLabel(String label, {String? note}) => AttributeDef(
+        key: key, name: label, type: type, required: required, multiValue: multiValue, minCardinality: minCardinality,
+        maxCardinality: maxCardinality, options: options, regex: regex, readOnly: readOnly,
+        description: note ?? description, referenceSchemaUid: referenceSchemaUid, includeChildren: includeChildren,
+        referenceType: referenceType);
+
   /// The option value (what is stored) an answer names — by that value or by the option's id
   /// ("service_degraded", as the assistant and packages call it), in any case; null if it names none.
   /// The server reads an answer the same way (attribute_validation.choice_value).
@@ -531,6 +537,7 @@ class AssetLocation {
       {required this.locatable,
       this.layer,
       this.hidden = false,
+      this.maySet = false,
       this.current,
       this.observations = const [],
       this.route,
@@ -539,6 +546,7 @@ class AssetLocation {
   final bool locatable;
   final String? layer;
   final bool hidden; // its type restricts the location from this person
+  final bool maySet; // this person may set it directly, rather than send what they see for review
   final PlacedPoint? current;
   final List<LocationObservationItem> observations;
   /// Its route (a cable, a pipe, a beamline) and its outline (a building, hall, room or zone), if it has them.
@@ -702,4 +710,22 @@ class NearbyHit {
   final LinkTarget target;
   final double distance;
   final String? layer;
+}
+
+/// A Product Model has one vendor: the Vendor record it points at. The type's text `vendor` is that record's name,
+/// kept by the server for search and imports (services/model_vendor.py), so a form offers only the reference, called
+/// Vendor. A page shows the reference, or the text of an older record not linked yet — as the web does.
+List<AttributeDef> oneVendorField(List<AttributeDef> defs, Map<String, Object?> values, {required bool form}) {
+  if (!defs.any((d) => d.key == 'vendor') || !defs.any((d) => d.key == 'vendor_ref')) return defs;
+  final text = values['vendor']?.toString() ?? '';
+  final linked = values['vendor_ref'] != null && values['vendor_ref'] != '';
+  final showText = !form && !linked && text.isNotEmpty;
+  return [
+    for (final d in defs)
+      if (d.key != (showText ? 'vendor_ref' : 'vendor'))
+        d.key != 'vendor_ref'
+            ? d
+            : d.withLabel('Vendor',
+                note: form && !linked && text.isNotEmpty ? '"$text" is not linked to a vendor record yet: choose it, or add it.' : null),
+  ];
 }

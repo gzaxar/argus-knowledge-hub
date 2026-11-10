@@ -64,6 +64,7 @@ import { WorkspaceAccess } from "./pages/workspace/Access";
 import { WorkspaceMembers } from "./pages/workspace/Members";
 import { WorkspaceIntegrity } from "./pages/workspace/Integrity";
 import { WorkspaceKeys } from "./pages/workspace/Keys";
+import { WorkspaceGroups } from "./pages/workspace/Groups";
 import { WorkspacePackages } from "./pages/workspace/Packages";
 import { AdminPackagesPage } from "./pages/admin/Packages";
 import { GlpiPage } from "./pages/workspace/Glpi";
@@ -191,6 +192,8 @@ export function App() {
           <Route path="/workspaces/:workspaceId/members" element={<WorkspaceMembers />} />
           <Route path="/workspaces/:workspaceId/integrity" element={<WorkspaceIntegrity />} />
           <Route path="/workspaces/:workspaceId/keys" element={<WorkspaceKeys />} />
+          <Route path="/workspaces/:workspaceId/groups" element={<WorkspaceGroups />} />
+          <Route path="/admin/my-groups" element={<WorkspaceGroups />} />
           <Route path="/workspaces/:workspaceId/packages" element={<WorkspacePackages />} />
           <Route path="/workspaces/:workspaceId/glpi" element={<GlpiPage />} />
           <Route path="/workspaces/:workspaceId/icons" element={<IconLibrary />} />

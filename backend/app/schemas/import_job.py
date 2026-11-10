@@ -110,6 +110,9 @@ class Epik8sImportRequest(BaseModel):
     # Also make the controller box each IOC talks to (an IPCMini, a TPG 366, a Pollux chain), powering
     # what its channels drive.
     infer_controllers: bool = False
+    # Retire what an earlier import of this file made and it no longer declares (a release renamed an
+    # IOC, a prefix changed). Unchanged records are left alone with or without this.
+    clear_previous: bool = False
     # The site-wide workspace where the converters, servers and consoles the hostnames name are made (with
     # their ports), shared, one per box. Needs create rights there.
     it_workspace: Optional[str] = None

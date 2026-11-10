@@ -341,6 +341,7 @@ class Ctx:
     current_workspace: Optional[str]
     grants: Any = None            # what the person may see of restricted records and fields
     project_named: bool = False
+    status_named: bool = False
 
 
 @dataclass
@@ -690,7 +691,8 @@ def asset_fields() -> dict[str, Field]:
         "type": kind, "objecttype": kind,
         "category": Field("text", column=lambda: Asset.type, order=lambda: Asset.type, help="the type's family"),
         "status": Field("enum", column=lambda: Asset.record_status, order=lambda: Asset.record_status,
-                        help="Active, Provisional or Retired"),
+                        help="Active, Provisional, Retired or Merged. Retired and merged records "
+                             "are only found when the query names a status"),
         "project": _workspace_field(Asset), "workspace": _workspace_field(Asset),
         "global": Field("bool", column=lambda: Asset.is_global, help="shared with every workspace"),
         "shared": Field("bool", column=lambda: Asset.is_global, help="shared with every workspace"),
@@ -781,6 +783,8 @@ def compile_where(entity: str, node, ctx: Ctx, fields: dict[str, Field]):
             return or_(*parts)
         return not_(parts[0])
     f = _field(entity, fields, node.field, node.pos)
+    if node.field.lower() == "status":
+        ctx.status_named = True
     try:
         if f.kind == "special":
             if node.op in ("IS", "IS NOT") and f.match is None:
@@ -851,6 +855,10 @@ def run(db: Session, entity: str, text: str, *, user_ids: list[str], workspaces:
     stmt = select(model).where(scope, where)
     if hasattr(model, "deleted_at"):
         stmt = stmt.where(model.deleted_at.is_(None))
+    if entity == "assets" and not ctx.status_named:
+        from app.services.visibility import live_assets_clause
+        # Retired and merged records are found by asking for them: `status = Retired`.
+        stmt = stmt.where(live_assets_clause())
     order = compile_order(entity, q.order, fields) if q.order else [model.updated_at.desc().nulls_last()]
     stmt = stmt.order_by(*order, model.uid)
     rows, skipped, total, fetched = [], 0, 0, 0

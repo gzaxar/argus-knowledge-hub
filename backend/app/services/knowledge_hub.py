@@ -27,8 +27,8 @@ from app.models.asset_subresources import AssetTicket
 from app.models.document import Document, DocumentRelation, DocumentRevision
 from app.models.issue import Issue
 from app.models.schema import Schema
-from app.services.visibility import (asset_visible_in, can_see, redacted_attributes, restricted_class,
-                                     visible_assets_clause, visible_issues_clause)
+from app.services.visibility import (asset_visible_in, can_see, live_assets_clause, redacted_attributes,
+                                     restricted_class, visible_assets_clause, visible_issues_clause)
 
 CLOSED_STATES = frozenset({"closed", "done", "resolved", "cancelled", "canceled", "rejected"})
 
@@ -317,7 +317,8 @@ def document_context(db: Session, workspace_id: str, doc: Document, access: Acce
                 continue
             subtree = _schema_subtree(db, schema.uid)
             count = db.scalar(select(func.count()).select_from(Asset).where(
-                Asset.schema_uid.in_(subtree), visible_assets_clause(workspace_id))) or 0
+                Asset.schema_uid.in_(subtree), visible_assets_clause(workspace_id), Asset.deleted_at.is_(None),
+                live_assets_clause())) or 0
             types.append({"uid": schema.uid, "name": schema.name, "assets": count})
     if doc.responsible_service_asset_uid:
         a = db.get(Asset, doc.responsible_service_asset_uid)
@@ -388,7 +389,7 @@ def unified_search(db: Session, workspace_id: str, access: Access, q: str, limit
         from app.models.asset_subresources import AssetLabel
         from app.services.identifiers import label_match
         rows = db.scalars(select(Asset).where(
-            visible_assets_clause(workspace_id), Asset.deleted_at.is_(None),
+            visible_assets_clause(workspace_id), Asset.deleted_at.is_(None), live_assets_clause(),
             or_(Asset.key.ilike(like), Asset.name.ilike(like), Asset.type.ilike(like),
                 label_match(lambda c: c.ilike(like)),
                 cast(Asset.attributes, String).ilike(like))).limit(fetch)).all()
@@ -432,11 +433,11 @@ def overview(db: Session, workspace_id: str, access: Access, user_id: Optional[s
     if access.assets:
         out["assets"] = {
             "own": db.scalar(select(func.count()).select_from(Asset).where(
-                Asset.workspace_id == workspace_id, Asset.deleted_at.is_(None),
+                Asset.workspace_id == workspace_id, Asset.deleted_at.is_(None), live_assets_clause(),
                 visible_assets_clause(workspace_id))) or 0,
             "recent": [asset_summary(a) for a in db.scalars(
                 select(Asset).where(Asset.workspace_id == workspace_id, Asset.deleted_at.is_(None),
-                                    visible_assets_clause(workspace_id))
+                                    live_assets_clause(), visible_assets_clause(workspace_id))
                 .order_by(Asset.updated_at.desc()).limit(8))],
         }
     if access.tickets:

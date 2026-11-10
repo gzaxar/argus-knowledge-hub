@@ -40,6 +40,62 @@ You need to be an administrator.
    **Administration → Settings**; it is used in URLs and record keys and **cannot be changed later**.
 3. Create it. You are its first member with full rights. Give others access next.
 
+## Record keys
+
+**Record keys** (**⚙ Workspace** menu) is the pattern a new record's key is made from, by default
+`{WS}-{TYPE}-{SEQ:4}` (`BTF-QUA-0007`). The same pattern gives:
+
+- **tickets** their key, with `TCK` as their type: `BTF-TCK-0042`. Search a ticket by its key, in the list or in
+  Ask ARGUS;
+- the records a **beam model** brings, instead of the name in the model file. The element keeps that name, and
+  says which model it belongs to (`beam_model`).
+
+Changing the pattern changes only new keys. Tickets made before tickets had keys, and beam model records keyed by
+the old rule (`btf:accumulator_pa/DHSA11`), get theirs when an administrator applies the pattern to them once; an
+old key stays as an alias, so a link or a note that names it still finds the record.
+
+## Invite people by e-mail
+
+You do not have to wait for someone's first sign-in to give them access.
+
+1. Open the workspace, then **Access** (**⚙ Workspace** menu).
+2. Under **Invite by e-mail**, type or paste one or more addresses (commas or new lines; `Name <address>` is fine),
+   choose the **Role**, and **Invite**.
+3. Leave **send an invitation e-mail** ticked to tell them, with a link to ARGUS and an optional line of your own.
+
+To give them the role **together**, choose **Given to** a group (one made here, or *a new group…*): they join
+it, and the group gets the role here, so whoever joins it later has it too.
+
+Each person not known yet is added, and gets the role at once. In **Granted roles** they show as *not signed in
+yet* until their first sign-in, which claims the account and the access, whatever the case of the letters.
+**Use the address they will sign in with**: with INFN AAI, the one AAI gives them (`name.surname@infn.it` may not be
+`name.surname@lnf.infn.it`). Signing in with another address makes a second account without that access. Invite
+the same people into each workspace they need; inviting someone again only adds what they lack.
+
+## Groups
+
+**Groups** (**⚙ Workspace** menu) lists the groups made here and, for reference, the directory's. Create a group,
+open it to add people by e-mail (told by e-mail if you like), take someone out, rename it, or deactivate it: a
+deactivated group keeps its members, and its roles stop applying. Give a group a role on **Access**.
+
+A group can hold roles in several workspaces, so its members are changed by an administrator, or by someone who
+manages every workspace where it holds one. A directory's group is changed in the directory.
+
+## Site-wide group access
+
+On a **site**'s **Access** page, its administrators (and the installation's) can give a group one role for the whole
+site under **Site-wide group access**: its members then have it in the site and in every workspace currently at the
+site, facilities added later included. **Preview** shows who would have it and where before you give it. Only the
+general levels (Viewer, Reporter, Agent, Approver, Contributor, Curator) can be given site-wide; Workspace
+administrator and Owner are given workspace by workspace.
+
+A facility's **Access** page lists what it **inherits from the site**; it is changed at the site, not there. A
+facility that leaves the site loses it at once. A deactivated group gives nothing, directly or site-wide.
+
+On **Groups**, a site's administrators can make a group **owned by the site** (tick *the site's*). Such a group can
+have roles only at that site and its facilities. A site keeps its site role while it gives roles site-wide or owns
+active groups; a facility cannot leave while it gives roles to its site's groups: remove those first.
+
 ## Give a person or a group a role
 
 1. The person **signs in once**, so ARGUS knows them. (An administrator can also add someone before their

@@ -207,6 +207,9 @@ export function SchedulesList() {
               </td>
               <td className="px-3 py-2 text-xs">{s.repository}</td>
               <td className="px-3 py-2 text-xs"><Outcome s={s} />
+                {s.last_outcome === "failed" && s.last_message && (
+                  <span role="status" className="mt-0.5 block max-w-xs text-rose-700">{s.last_message}</span>
+                )}
                 {s.last_outcome === "waiting" && s.last_export_id && (
                   <div><Link className="text-indigo-700 hover:underline" to={`/admin/portability/exports/${s.last_export_id}`}>
                     decide on {s.last_export_id}</Link></div>

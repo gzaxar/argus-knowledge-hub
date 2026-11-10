@@ -94,7 +94,7 @@ def db():
 
 
 def pos(db, ws, component) -> str:
-    return db.scalar(select(Asset.uid).where(Asset.key == f"{ws}:dafne-accumulator-v2/{component}"))
+    return next((u for u, i in bm.model_ids(db, ws, "dafne-accumulator-v2", "element").items() if i == component), None)
 
 
 def by_comp(result) -> dict:
@@ -268,7 +268,7 @@ def test_ledger_records_for_new_component_kinds_and_shared_paths(ring, db):
     assert mounted.to_asset_uid == g.uid
     assert bm.import_canonical(db, ws, load("collider_ir.beam.json"), "person", trusted=True)["state"] == "published"
     db.commit()
-    ip = db.scalar(select(Asset).where(Asset.key == f"{ws}:test-collider-ir/IP1"))
+    ip = db.get(Asset, next(u for u, i in bm.model_ids(db, ws, "test-collider-ir", "element").items() if i == "IP1"))
     placed = {r.to_asset_uid for r in db.scalars(select(Relation).where(Relation.from_asset_uid == ip.uid,
                                                                           Relation.relation_type == "placed on"))}
     assert len(placed) == 2

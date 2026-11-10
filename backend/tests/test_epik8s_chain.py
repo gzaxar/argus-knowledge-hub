@@ -291,10 +291,10 @@ def test_an_overlay_takes_its_beamline_and_template_defaults_from_values_yaml(un
     tag = unseeded["tag"]
     keys = {a.key: a for a in db.query(Asset).filter(Asset.workspace_id == unseeded["ws"])}
     assert not any(k.startswith("UNKNOWN:") for k in keys)
-    assert f"{tag}:IOC:easy-linac-1" in keys
-    assert f"{tag}:IOC:main-only" not in keys                 # the base's own IOCs are its own import's
+    assert f"{tag}-IOC-easy-linac-1" in keys
+    assert f"{tag}-IOC-main-only" not in keys                 # the base's own IOCs are its own import's
     # its own configuration record, beside (not over) the beamline's
-    assert f"{tag}:CFG:values-linac" in keys and f"{tag}:CFG" not in keys
+    assert f"{tag}-CFG-values-linac" in keys and f"{tag}-CFG" not in keys
     assert job.counts["inferred_elements"] > 0                # caenels' devgroup came from values.yaml
     db.close()
 
@@ -355,7 +355,7 @@ def test_eli_screen_stations_are_composed_of_their_camera_and_motor(world, monke
     counts = run(w, infer_elements=True)
     db = SessionLocal()
     for n in ("01", "02"):
-        station = db.query(Asset).filter(Asset.workspace_id == w["ws"], Asset.key == f"{w['tag']}:ELM:SCN{n}").one()
+        station = db.query(Asset).filter(Asset.workspace_id == w["ws"], Asset.key == f"{w['tag']}-ELM-SCN{n}").one()
         assert station.type == "Screen Station"
         parts = {db.get(Asset, r.to_asset_uid).type for r in db.query(Relation).filter(
             Relation.from_asset_uid == station.uid, Relation.relation_type == "composed of")}

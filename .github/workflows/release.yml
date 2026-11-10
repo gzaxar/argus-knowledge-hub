@@ -18,6 +18,9 @@ env:
   VALUES: charts/argus-knowledge-hub/values-production.yaml
   # Built into the web app (Vite): where the browser signs in and finds the API in production.
   WEB_KEYCLOAK: https://keycloak.90.147.174.30.myip.cloud.infn.it/realms/argus
+  # The web's INFN login signs in with INFN AAI directly (the API also trusts Keycloak and Google: values-production).
+  WEB_OIDC_AUTHORITY: https://idp-test.app.infn.it/auth/realms/aai
+  WEB_OIDC_CLIENT_ID: argus-knowledge-hub
   WEB_API: https://argus-hub-api.90.147.174.30.myip.cloud.infn.it
 
 jobs:
@@ -70,9 +73,10 @@ jobs:
           context: webapp
           push: true
           build-args: |
-            VITE_OIDC_AUTHORITY=${{ env.WEB_KEYCLOAK }}
-            VITE_OIDC_CLIENT_ID=argus-webapp
-            VITE_OIDC_LABEL=Keycloak login
+            VITE_OIDC_AUTHORITY=${{ vars.OIDC_AUTHORITY || env.WEB_OIDC_AUTHORITY }}
+            VITE_OIDC_CLIENT_ID=${{ vars.OIDC_CLIENT_ID || env.WEB_OIDC_CLIENT_ID }}
+            VITE_OIDC_TOKEN_ENDPOINT=${{ vars.OIDC_TOKEN_ENDPOINT }}
+            VITE_OIDC_LABEL=${{ vars.OIDC_LABEL || 'INFN login' }}
             VITE_API_BASE_URL=${{ env.WEB_API }}
             VITE_APP_VERSION=${{ steps.version.outputs.version }}
             VITE_APP_COMMIT=${{ steps.version.outputs.commit }}

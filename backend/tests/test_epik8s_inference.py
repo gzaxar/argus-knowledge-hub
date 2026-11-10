@@ -151,60 +151,60 @@ def test_nothing_is_inferred_unless_asked_for(db, split, tag):
 def test_the_channels_become_the_things_they_drive(db, split, tag):
     _, ws = split
     run(db, ws, tag)
-    assert of_type(db, ws, "Ion Pump") == [f"{tag}:AST:vac-gunvpc:GUNSIP01"]
-    assert of_type(db, ws, "NEG Cartridge") == [f"{tag}:AST:vac-gunvpc:GUNNEG01"]
-    assert of_type(db, ws, "Power Supply") == [f"{tag}:AST:histar:AC1VCR01", f"{tag}:AST:histar:GUNQUA01"]
-    assert of_type(db, ws, "Camera") == [f"{tag}:AST:cameras:AC101"]        # the simulator is not one
-    assert of_type(db, ws, "Quadrupole") == [f"{tag}:ELM:GUNQUA01"]
-    assert of_type(db, ws, "Corrector") == [f"{tag}:ELM:AC1VCR01"]
+    assert of_type(db, ws, "Ion Pump") == [f"{tag}-AST-vac-gunvpc-GUNSIP01"]
+    assert of_type(db, ws, "NEG Cartridge") == [f"{tag}-AST-vac-gunvpc-GUNNEG01"]
+    assert of_type(db, ws, "Power Supply") == [f"{tag}-AST-histar-AC1VCR01", f"{tag}-AST-histar-GUNQUA01"]
+    assert of_type(db, ws, "Camera") == [f"{tag}-AST-cameras-AC101"]        # the simulator is not one
+    assert of_type(db, ws, "Quadrupole") == [f"{tag}-ELM-GUNQUA01"]
+    assert of_type(db, ws, "Corrector") == [f"{tag}-ELM-AC1VCR01"]
 
 
 def test_an_ioc_that_is_one_unit_is_one_asset_whatever_channels_it_lists(db, split, tag):
     _, ws = split
     run(db, ws, tag)
-    assert of_type(db, ws, "Low-Level RF Unit") == [f"{tag}:AST:llrfs01"]     # ad1 and ad2 are its channels
-    assert of_type(db, ws, "Modulator") == [f"{tag}:AST:ppt-mod1"]
-    assert of_type(db, ws, "Digitizer") == [f"{tag}:AST:ac1bpm01"]
-    assert of_type(db, ws, "Beam Position Monitor") == [f"{tag}:ELM:AC1BPM01"]
+    assert of_type(db, ws, "Low-Level RF Unit") == [f"{tag}-AST-llrfs01"]     # ad1 and ad2 are its channels
+    assert of_type(db, ws, "Modulator") == [f"{tag}-AST-ppt-mod1"]
+    assert of_type(db, ws, "Digitizer") == [f"{tag}-AST-ac1bpm01"]
+    assert of_type(db, ws, "Beam Position Monitor") == [f"{tag}-ELM-AC1BPM01"]
 
 
 def test_what_a_channel_drives_is_linked_from_the_channel(db, split, tag):
     _, ws = split
     run(db, ws, tag)
     e = edges(db, ws)
-    assert (f"{tag}:DEV:vac-gunvpc:GUNSIP01", "acts on", f"{tag}:AST:vac-gunvpc:GUNSIP01") in e
-    assert (f"{tag}:DEV:histar:GUNQUA01", "acts on", f"{tag}:AST:histar:GUNQUA01") in e
+    assert (f"{tag}-DEV-vac-gunvpc-GUNSIP01", "acts on", f"{tag}-AST-vac-gunvpc-GUNSIP01") in e
+    assert (f"{tag}-DEV-histar-GUNQUA01", "acts on", f"{tag}-AST-histar-GUNQUA01") in e
     # a supply powers its magnet
-    assert (f"{tag}:AST:histar:GUNQUA01", "powers", f"{tag}:ELM:GUNQUA01") in e
+    assert (f"{tag}-AST-histar-GUNQUA01", "powers", f"{tag}-ELM-GUNQUA01") in e
     # a unit is driven by its IOC; a BPM element is realised by its electronics
-    assert (f"{tag}:IOC:llrfs01", "drives", f"{tag}:AST:llrfs01") in e
-    assert (f"{tag}:IOC:ac1bpm01", "drives", f"{tag}:AST:ac1bpm01") in e
-    assert (f"{tag}:ELM:AC1BPM01", "realized by", f"{tag}:AST:ac1bpm01") in e
+    assert (f"{tag}-IOC-llrfs01", "drives", f"{tag}-AST-llrfs01") in e
+    assert (f"{tag}-IOC-ac1bpm01", "drives", f"{tag}-AST-ac1bpm01") in e
+    assert (f"{tag}-ELM-AC1BPM01", "realized by", f"{tag}-AST-ac1bpm01") in e
 
 
 def test_what_the_file_says_about_a_supply_and_a_camera_is_kept(db, split, tag):
     _, ws = split
     run(db, ws, tag)
     objs = objects(db, ws)
-    psu = objs[f"{tag}:AST:histar:GUNQUA01"].attributes
+    psu = objs[f"{tag}-AST-histar-GUNQUA01"].attributes
     assert psu["current_max"] == 30.0 and psu["manufacturer"] == "CAEN ELS" and psu["model"] == "Hi-Star"
-    cam = objs[f"{tag}:AST:cameras:AC101"].attributes
+    cam = objs[f"{tag}-AST-cameras-AC101"].attributes
     assert (cam["manufacturer"], cam["model"]) == ("Basler", "scA640-70gm")
     assert cam["inventory_url"].endswith("objectId=145351")                  # the device's own `asset:` link
-    element = objs[f"{tag}:ELM:AC1VCR01"].attributes
+    element = objs[f"{tag}-ELM-AC1VCR01"].attributes
     assert element["plane"] == "V" and element["zone"] == ["LINAC"] and element["lattice_name"] == "AC1VCR01"
 
 
 def test_every_inferred_object_says_it_is_and_why(db, split, tag):
     _, ws = split
     run(db, ws, tag)
-    inferred = [a for a in objects(db, ws).values() if ":AST:" in a.key or ":ELM:" in a.key]
+    inferred = [a for a in objects(db, ws).values() if "-AST-" in a.key or "-ELM-" in a.key]
     assert inferred
     for obj in inferred:
         assert obj.attributes["argus_keywords"] == ["inferred"], obj.key
         assert "Inferred by the control-configuration import" in obj.attributes["description"]
         assert obj.attributes["argus_facility"] == tag and obj.attributes["argus_source"] == "epik8s"
-    assert "channel GUNSIP01" in objects(db, ws)[f"{tag}:AST:vac-gunvpc:GUNSIP01"].attributes["description"]
+    assert "channel GUNSIP01" in objects(db, ws)[f"{tag}-AST-vac-gunvpc-GUNSIP01"].attributes["description"]
 
 
 def test_what_no_rule_covers_is_counted_and_not_guessed_at(db, split, tag):
@@ -230,9 +230,9 @@ def test_assets_are_of_the_shared_types_and_elements_of_the_beamlines_own(db, sp
     cat, ws = split
     run(db, ws, tag)
     objs = objects(db, ws)
-    assert objs[f"{tag}:AST:vac-gunvpc:GUNSIP01"].schema_uid == at.type_uid(cat, "Ion Pump")
-    assert objs[f"{tag}:AST:histar:GUNQUA01"].schema_uid == at.type_uid(cat, "Power Supply")
-    assert objs[f"{tag}:ELM:GUNQUA01"].schema_uid == at.type_uid(ws, "Quadrupole")
+    assert objs[f"{tag}-AST-vac-gunvpc-GUNSIP01"].schema_uid == at.type_uid(cat, "Ion Pump")
+    assert objs[f"{tag}-AST-histar-GUNQUA01"].schema_uid == at.type_uid(cat, "Power Supply")
+    assert objs[f"{tag}-ELM-GUNQUA01"].schema_uid == at.type_uid(ws, "Quadrupole")
 
 
 def test_every_key_it_writes_is_declared_by_the_type_it_writes_to(db, split, tag):
@@ -262,13 +262,13 @@ def test_without_the_catalogues_types_it_says_so_and_writes_nothing(db, tag):
 def test_what_somebody_has_since_entered_survives_a_re_read(db, split, tag):
     _, ws = split
     run(db, ws, tag)
-    pump = objects(db, ws)[f"{tag}:AST:vac-gunvpc:GUNSIP01"]
+    pump = objects(db, ws)[f"{tag}-AST-vac-gunvpc-GUNSIP01"]
     pump.attributes = {**pump.attributes, "serial": "IPC-77", "condition": "Good",
                        "description": "Replaced in 2025 after the arc."}
     db.commit()
     run(db, ws, tag)
     db.expire_all()
-    again = objects(db, ws)[f"{tag}:AST:vac-gunvpc:GUNSIP01"].attributes
+    again = objects(db, ws)[f"{tag}-AST-vac-gunvpc-GUNSIP01"].attributes
     assert again["serial"] == "IPC-77" and again["condition"] == "Good"
     assert again["description"] == "Replaced in 2025 after the arc."        # not put back to the inference
 
@@ -320,26 +320,26 @@ epicsConfiguration:
 def test_a_multi_channel_bpm_unit_is_one_digitizer_and_a_bpm_per_channel(db, split, tag):
     _, ws = split
     run(db, ws, tag, text=UNITS)
-    assert of_type(db, ws, "Digitizer") == [f"{tag}:AST:bdelilibera03"]
-    assert of_type(db, ws, "Beam Position Monitor") == [f"{tag}:ELM:BPM01", f"{tag}:ELM:BPM02"]
+    assert of_type(db, ws, "Digitizer") == [f"{tag}-AST-bdelilibera03"]
+    assert of_type(db, ws, "Beam Position Monitor") == [f"{tag}-ELM-BPM01", f"{tag}-ELM-BPM02"]
     e = edges(db, ws)
     for bpm in ("BPM01", "BPM02"):
-        assert (f"{tag}:ELM:{bpm}", "realized by", f"{tag}:AST:bdelilibera03") in e
-        assert (f"{tag}:DEV:bdelilibera03:{bpm}", "acts on", f"{tag}:ELM:{bpm}") in e
-    assert objects(db, ws)[f"{tag}:ELM:BPM01"].attributes["zone"] == ["LEL"]
+        assert (f"{tag}-ELM-{bpm}", "realized by", f"{tag}-AST-bdelilibera03") in e
+        assert (f"{tag}-DEV-bdelilibera03-{bpm}", "acts on", f"{tag}-ELM-{bpm}") in e
+    assert objects(db, ws)[f"{tag}-ELM-BPM01"].attributes["zone"] == ["LEL"]
 
 
 def test_a_modulator_ioc_with_channels_makes_a_modulator_per_channel(db, split, tag):
     _, ws = split
     run(db, ws, tag, text=UNITS)
-    assert of_type(db, ws, "Modulator") == [f"{tag}:AST:scandicat-mod:MOD01", f"{tag}:AST:scandicat-mod:MOD02"]
-    assert (f"{tag}:DEV:scandicat-mod:MOD01", "acts on", f"{tag}:AST:scandicat-mod:MOD01") in edges(db, ws)
+    assert of_type(db, ws, "Modulator") == [f"{tag}-AST-scandicat-mod-MOD01", f"{tag}-AST-scandicat-mod-MOD02"]
+    assert (f"{tag}-DEV-scandicat-mod-MOD01", "acts on", f"{tag}-AST-scandicat-mod-MOD01") in edges(db, ws)
 
 
 def test_the_unit_types_are_declared_and_the_channels_say_they_are_inferred(db, split, tag):
     _, ws = split
     run(db, ws, tag, text=UNITS)
-    for key in (f"{tag}:ELM:BPM01", f"{tag}:AST:bdelilibera03", f"{tag}:AST:scandicat-mod:MOD01"):
+    for key in (f"{tag}-ELM-BPM01", f"{tag}-AST-bdelilibera03", f"{tag}-AST-scandicat-mod-MOD01"):
         obj = objects(db, ws)[key]
         declared = {a["key"] for a in effective_attributes(db, db.get(Schema, obj.schema_uid))}
         assert set(obj.attributes) <= declared, (key, set(obj.attributes) - declared)
@@ -392,15 +392,15 @@ def test_every_axis_of_a_motor_controller_is_a_motor_axis(db, split, tag):
     _, ws = split
     run(db, ws, tag, text=MOTION)
     axes = of_type(db, ws, "Motor Axis")
-    assert f"{tag}:AST:tml-ch1:GUNSOLH1" in axes and f"{tag}:AST:pollux-chain-fi-01:FI8-SLT-01" in axes
-    obj = objects(db, ws)[f"{tag}:AST:tml-ch1:GUNSOLH1"]
+    assert f"{tag}-AST-tml-ch1-GUNSOLH1" in axes and f"{tag}-AST-pollux-chain-fi-01-FI8-SLT-01" in axes
+    obj = objects(db, ws)[f"{tag}-AST-tml-ch1-GUNSOLH1"]
     assert obj.attributes["axis_id"] == "2" and obj.attributes["argus_system"] == "Motion"
     # An axis whose code says nothing gets no element: what it moves is not in the file.
     e = edges(db, ws)
-    assert (f"{tag}:DEV:tml-ch1:GUNSOLH1", "acts on", f"{tag}:AST:tml-ch1:GUNSOLH1") in e
+    assert (f"{tag}-DEV-tml-ch1-GUNSOLH1", "acts on", f"{tag}-AST-tml-ch1-GUNSOLH1") in e
     assert not [k for k in e if k[1] == "composed of"
                 and (k[2].endswith(":FI8-SLT-01") or k[2].endswith(":FI2-MPB-001"))]
-    assert f"{tag}:AST:pollux-chain-fi-01:FI2-MPB-001" in axes
+    assert f"{tag}-AST-pollux-chain-fi-01-FI2-MPB-001" in axes
 
 
 def test_a_flag_is_a_screen_station_composed_of_its_actuator(db, split, tag):
@@ -408,25 +408,25 @@ def test_a_flag_is_a_screen_station_composed_of_its_actuator(db, split, tag):
     run(db, ws, tag, text=MOTION)
     objs, e = objects(db, ws), edges(db, ws)
     assert of_type(db, ws, "Screen Station") == [
-        f"{tag}:ELM:AC1FLG01", f"{tag}:ELM:FELFLG01A", f"{tag}:ELM:FELFLG01B", f"{tag}:ELM:GUNFLG01"]
-    assert f"{tag}:AST:tml-ch1:AC1FLG01" in of_type(db, ws, "Actuator")
-    assert (f"{tag}:ELM:AC1FLG01", "composed of", f"{tag}:AST:tml-ch1:AC1FLG01") in e
-    station = objs[f"{tag}:ELM:AC1FLG01"].attributes
+        f"{tag}-ELM-AC1FLG01", f"{tag}-ELM-FELFLG01A", f"{tag}-ELM-FELFLG01B", f"{tag}-ELM-GUNFLG01"]
+    assert f"{tag}-AST-tml-ch1-AC1FLG01" in of_type(db, ws, "Actuator")
+    assert (f"{tag}-ELM-AC1FLG01", "composed of", f"{tag}-AST-tml-ch1-AC1FLG01") in e
+    station = objs[f"{tag}-ELM-AC1FLG01"].attributes
     assert station["insertion_positions"] == ["YAG", "calibration"] and station["lattice_name"] == "AC1FLG01"
-    assert objs[f"{tag}:AST:tml-ch1:AC1FLG01"].attributes["position_labels"] == ["YAG", "calibration"]
-    assert objs[f"{tag}:ELM:AC1FLG01"].schema_uid == at.type_uid(ws, "Screen Station")
+    assert objs[f"{tag}-AST-tml-ch1-AC1FLG01"].attributes["position_labels"] == ["YAG", "calibration"]
+    assert objs[f"{tag}-ELM-AC1FLG01"].schema_uid == at.type_uid(ws, "Screen Station")
 
 
 def test_a_screen_is_composed_of_the_camera_its_name_pairs_it_with(db, split, tag):
     _, ws = split
     importer = run(db, ws, tag, text=MOTION)
     e = edges(db, ws)
-    assert (f"{tag}:ELM:AC1FLG01", "composed of", f"{tag}:AST:accameras:AC101") in e
+    assert (f"{tag}-ELM-AC1FLG01", "composed of", f"{tag}-AST-accameras-AC101") in e
     # two flags of a pair share their camera
-    assert (f"{tag}:ELM:FELFLG01A", "composed of", f"{tag}:AST:accameras:FEL01") in e
-    assert (f"{tag}:ELM:FELFLG01B", "composed of", f"{tag}:AST:accameras:FEL01") in e
+    assert (f"{tag}-ELM-FELFLG01A", "composed of", f"{tag}-AST-accameras-FEL01") in e
+    assert (f"{tag}-ELM-FELFLG01B", "composed of", f"{tag}-AST-accameras-FEL01") in e
     # no camera by that name, so none is invented; and a camera with no flag is not a screen
-    assert not [k for k in e if k[0] == f"{tag}:ELM:GUNFLG01" and k[1] == "composed of"
+    assert not [k for k in e if k[0] == f"{tag}-ELM-GUNFLG01" and k[1] == "composed of"
                 and ":AST:accameras:" in k[2]]
     assert not [k for k in e if k[1] == "composed of" and k[2].endswith(":accameras:UTL01")]
     assert importer.counts["screens_paired"] == 3
@@ -437,17 +437,17 @@ def test_an_h_v_pair_of_axes_is_one_mirror(db, split, tag):
     run(db, ws, tag, text=MOTION)
     objs, e = objects(db, ws), edges(db, ws)
     assert of_type(db, ws, "Mirror") == [
-        f"{tag}:ELM:FI4-MMIR-001", f"{tag}:ELM:FI4-MMIR-002", f"{tag}:ELM:FI8-PAR-001"]
+        f"{tag}-ELM-FI4-MMIR-001", f"{tag}-ELM-FI4-MMIR-002", f"{tag}-ELM-FI8-PAR-001"]
     for axis in ("FI4-HMN-01", "FI4-VMN-01"):
-        assert (f"{tag}:ELM:FI4-MMIR-001", "composed of", f"{tag}:AST:pollux-chain-fi-01:{axis}") in e
+        assert (f"{tag}-ELM-FI4-MMIR-001", "composed of", f"{tag}-AST-pollux-chain-fi-01-{axis}") in e
     # the second mirror has one axis so far, and is still its own mirror
-    assert (f"{tag}:ELM:FI4-MMIR-002", "composed of", f"{tag}:AST:pollux-chain-fi-01:FI4-HMN-02") in e
+    assert (f"{tag}-ELM-FI4-MMIR-002", "composed of", f"{tag}-AST-pollux-chain-fi-01-FI4-HMN-02") in e
     # the parabolic mirror is one mirror with a horizontal and a vertical axis
     for axis in ("FI8-PRH-01", "FI8-PRV-01"):
-        assert (f"{tag}:ELM:FI8-PAR-001", "composed of", f"{tag}:AST:pollux-chain-fi-01:{axis}") in e
+        assert (f"{tag}-ELM-FI8-PAR-001", "composed of", f"{tag}-AST-pollux-chain-fi-01-{axis}") in e
     assert "horizontal axis of the main-laser mirror FI4-MMIR-001" in \
-        objs[f"{tag}:AST:pollux-chain-fi-01:FI4-HMN-01"].attributes["description"]
-    main, parabolic = objs[f"{tag}:ELM:FI4-MMIR-001"].attributes, objs[f"{tag}:ELM:FI8-PAR-001"].attributes
+        objs[f"{tag}-AST-pollux-chain-fi-01-FI4-HMN-01"].attributes["description"]
+    main, parabolic = objs[f"{tag}-ELM-FI4-MMIR-001"].attributes, objs[f"{tag}-ELM-FI8-PAR-001"].attributes
     assert main["zone"] == ["FI", "FI4", "FI4_main"] and main["beam"] == "main"
     assert parabolic["mirror_kind"] == "Parabolic" and "beam" not in parabolic
 
@@ -540,27 +540,27 @@ def test_a_chiller_cools_the_element_it_names_and_a_hall_chiller_every_modulator
     _, ws = split
     run(db, ws, tag, text=PLANT)
     e = edges(db, ws)
-    assert (f"{tag}:AST:chiller-smc:GUN", "cools", f"{tag}:ELM:GUN") in e
-    assert (f"{tag}:AST:chiller-smc:ACC01", "cools", f"{tag}:ELM:ACC01") in e
-    assert of_type(db, ws, "RF Gun") == [f"{tag}:ELM:GUN"]
+    assert (f"{tag}-AST-chiller-smc-GUN", "cools", f"{tag}-ELM-GUN") in e
+    assert (f"{tag}-AST-chiller-smc-ACC01", "cools", f"{tag}-ELM-ACC01") in e
+    assert of_type(db, ws, "RF Gun") == [f"{tag}-ELM-GUN"]
     for mod in ("MOD01", "MOD02"):
-        assert (f"{tag}:AST:chiller-poly-roof:MOD", "cools", f"{tag}:AST:scandicat-mod:{mod}") in e
+        assert (f"{tag}-AST-chiller-poly-roof-MOD", "cools", f"{tag}-AST-scandicat-mod-{mod}") in e
     # a chiller whose target is not known cools nothing in the graph
-    assert not [k for k in e if k[0] == f"{tag}:AST:chiller-smc:BOCX" and k[1] == "cools"]
-    assert f"{tag}:AST:chiller-smc:BOCX" in of_type(db, ws, "Chiller")
+    assert not [k for k in e if k[0] == f"{tag}-AST-chiller-smc-BOCX" and k[1] == "cools"]
+    assert f"{tag}-AST-chiller-smc-BOCX" in of_type(db, ws, "Chiller")
 
 
 def test_timing_receivers_are_timed_by_the_generator_and_trigger_what_their_names_say(db, split, tag):
     _, ws = split
     run(db, ws, tag, text=PLANT)
     e = edges(db, ws)
-    gen = f"{tag}:AST:evg:TMG"
+    gen = f"{tag}-AST-evg-TMG"
     for receiver in ("EVR-LLRF", "EVR-CAM", "EVR-LAS"):
-        assert (f"{tag}:AST:evr-a:{receiver}", "timed by", gen) in e
-    assert (f"{tag}:AST:evr-a:EVR-LLRF", "triggers", f"{tag}:AST:llrf01") in e
+        assert (f"{tag}-AST-evr-a-{receiver}", "timed by", gen) in e
+    assert (f"{tag}-AST-evr-a-EVR-LLRF", "triggers", f"{tag}-AST-llrf01") in e
     for cam in ("SCN01:CAM01", "SCN02:CAM01"):
-        assert (f"{tag}:AST:evr-a:EVR-CAM", "triggers", f"{tag}:AST:cams:{cam}") in e
-    assert not [k for k in e if k[0] == f"{tag}:AST:evr-a:EVR-LAS" and k[1] == "triggers"]
+        assert (f"{tag}-AST-evr-a-EVR-CAM", "triggers", f"{tag}-AST-cams-{cam.replace(':', '-')}") in e
+    assert not [k for k in e if k[0] == f"{tag}-AST-evr-a-EVR-LAS" and k[1] == "triggers"]
     assert not [k for k in objects(db, ws) if "FCT01" in k and ":AST:" in k]
 
 
@@ -577,10 +577,10 @@ def test_the_pumps_an_rf_conditioning_ioc_watches_gate_it(db, split, tag):
     _, ws = split
     importer = run(db, ws, tag, text=PLANT)
     e = edges(db, ws)
-    ioc = f"{tag}:IOC:rf-conditioning-gun"
+    ioc = f"{tag}-IOC-rf-conditioning-gun"
     for pump in ("IONP01", "IONP02"):
-        assert (ioc, "enabled by", f"{tag}:DEV:vpcon01:{pump}") in e                     # what the file states
-        assert (ioc, "enabled by", f"{tag}:AST:vpcon01:{pump}") in e                     # the pump itself
+        assert (ioc, "enabled by", f"{tag}-DEV-vpcon01-{pump}") in e                     # what the file states
+        assert (ioc, "enabled by", f"{tag}-AST-vpcon01-{pump}") in e                     # the pump itself
     assert importer.counts["gates"] == 2 and importer.counts["gates_unresolved"] == 1     # VPCON09 is not there
     assert objects(db, ws)[ioc].attributes["permit_conditions"] == [
         "LEL:VAC:VPCON01:IONP01:PRES_RB < 1E-7", "LEL:VAC:VPCON01:IONP02:PRES_RB < 1E-7"]
@@ -590,7 +590,7 @@ def test_without_inference_the_gate_reaches_the_device_and_not_an_invented_pump(
     _, ws = split
     run(db, ws, tag, infer=False, text=PLANT)
     e = edges(db, ws)
-    assert (f"{tag}:IOC:rf-conditioning-gun", "enabled by", f"{tag}:DEV:vpcon01:IONP01") in e
+    assert (f"{tag}-IOC-rf-conditioning-gun", "enabled by", f"{tag}-DEV-vpcon01-IONP01") in e
     assert not [k for k in e if k[1] == "enabled by" and ":AST:" in k[2]]
 
 
@@ -633,7 +633,7 @@ def test_a_stopped_serial_converter_in_sparc_blinds_its_pumps_and_stops_the_rf_t
     _, ws = split
     importer = run(db, ws, tag, text=_real("epik8-sparc"))
     assert importer.counts["gates"] >= 20
-    moxa = db.query(Asset).filter(Asset.workspace_id == ws, Asset.key.like("NET:%SCSPARCSIPMXA001")).one()
+    moxa = db.query(Asset).filter(Asset.workspace_id == ws, Asset.key.like("NET-%SCSPARCSIPMXA001")).one()
     result = impact_of(db, ws, moxa.uid)
     assert result["by_loss"].get("control", 0) >= 30 and result["by_loss"].get("permit", 0) >= 1
     assert result["by_type"].get("Ion Pump", 0) >= 10
@@ -644,7 +644,7 @@ def test_a_stopped_serial_converter_in_sparc_blinds_its_pumps_and_stops_the_rf_t
 def test_two_pump_readouts_lost_behind_different_iocs_point_at_the_converter_they_share(db, split, tag):
     _, ws = split
     run(db, ws, tag, text=_real("epik8-sparc"))
-    one, two = "SPARC:DEV:vac-gunvpc:GUNSIP01", "SPARC:DEV:vac-kly02vpc:W2KSIP03"   # the file says `beamline: sparc`
+    one, two = "SPARC-DEV-vac-gunvpc-GUNSIP01", "SPARC-DEV-vac-kly02vpc-W2KSIP03"   # the file says `beamline: sparc`
     result = root_causes(db, ws, [one, two], symptom_kind={one: "control", two: "control"})
     assert result["candidates"][0]["key"].endswith("SCSPARCSIPMXA001") and result["candidates"][0]["fit"] == 1.0
 
@@ -652,7 +652,7 @@ def test_two_pump_readouts_lost_behind_different_iocs_point_at_the_converter_the
 def test_the_eli_event_generator_reaches_every_receiver_and_what_they_trigger(db, split, tag):
     _, ws = split
     run(db, ws, tag, text=_real("epik8s-eli"))
-    generator = db.query(Asset).filter(Asset.workspace_id == ws, Asset.key.like("%:AST:plelievg001:TMG")).one()
+    generator = db.query(Asset).filter(Asset.workspace_id == ws, Asset.key.like("%-AST-plelievg001-TMG")).one()
     result = impact_of(db, ws, generator.uid)
     assert result["by_type"].get("Timing Module", 0) >= 7             # every receiver
     assert result["by_type"].get("Camera", 0) >= 6 and result["by_type"].get("Low-Level RF Unit", 0) >= 1

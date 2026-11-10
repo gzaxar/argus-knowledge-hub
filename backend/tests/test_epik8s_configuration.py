@@ -132,23 +132,23 @@ def edges(db, ws):
 
 def test_the_file_is_an_object_that_says_which_revision_it_was(db, workspace, tag):
     run(db, workspace, tag)
-    cfg = objects(db, workspace)[f"{tag}:CFG"]
+    cfg = objects(db, workspace)[f"{tag}-CFG"]
     assert cfg.type == "Control Configuration"
     assert cfg.attributes["git_revision"] == "main"
     assert cfg.attributes["config_path"] == "deploy/values.yaml"
     assert cfg.attributes["argocd_project"] == "sparc" and cfg.attributes["base_ip"] == "10.43.240.0/22"
     assert cfg.attributes["max_array_bytes"] == 10000000                # a number, not "10000000"
     assert cfg.attributes["epics_address_list"] == "10.0.0.1 10.0.0.2"
-    assert (f"{tag}:CFG", "configures", tag) in edges(db, workspace)
+    assert (f"{tag}-CFG", "configures", tag) in edges(db, workspace)
 
 
 def test_everything_the_file_declares_says_so(db, workspace, tag):
     run(db, workspace, tag)
     e = edges(db, workspace)
-    for key in (f"{tag}:IOC:vac-gunvpc", f"{tag}:IOC:histar", f"{tag}:SVC:docs",
-                f"{tag}:DEV:vac-gunvpc:GUNSIP01", f"{tag}:DEV:histar:GUNQUA01",
-                f"{tag}:TPL:agilent-vac", f"{tag}:NET:sparc-magnets", f"{tag}:MNT:data"):
-        assert (key, "declared in", f"{tag}:CFG") in e, key
+    for key in (f"{tag}-IOC-vac-gunvpc", f"{tag}-IOC-histar", f"{tag}-SVC-docs",
+                f"{tag}-DEV-vac-gunvpc-GUNSIP01", f"{tag}-DEV-histar-GUNQUA01",
+                f"{tag}-TPL-agilent-vac", f"{tag}-NET-sparc-magnets", f"{tag}-MNT-data"):
+        assert (key, "declared in", f"{tag}-CFG") in e, key
 
 
 def test_every_object_says_which_facility_it_belongs_to(db, workspace, tag):
@@ -162,11 +162,11 @@ def test_every_object_says_which_facility_it_belongs_to(db, workspace, tag):
 def test_a_template_is_one_object_that_its_iocs_share(db, workspace, tag):
     run(db, workspace, tag)
     objs, e = objects(db, workspace), edges(db, workspace)
-    defined = objs[f"{tag}:TPL:agilent-vac"]
+    defined = objs[f"{tag}-TPL-agilent-vac"]
     assert defined.type == "IOC Template"
     assert defined.attributes["devfunc"] == "ion" and defined.attributes["autosync"] is True
     assert "servicedesk.infn.it" in defined.attributes["inventory_url"]
-    assert (f"{tag}:IOC:vac-gunvpc", "templated from", f"{tag}:TPL:agilent-vac") in e
+    assert (f"{tag}-IOC-vac-gunvpc", "templated from", f"{tag}-TPL-agilent-vac") in e
 
 
 def test_a_template_only_the_iocs_name_is_still_in_the_graph(db, workspace, tag):
@@ -174,9 +174,9 @@ def test_a_template_only_the_iocs_name_is_still_in_the_graph(db, workspace, tag)
     IOCs that use it still share its fate, and that has to be a walkable edge."""
     run(db, workspace, tag)
     objs = objects(db, workspace)
-    named = objs[f"{tag}:TPL:caenels"]
+    named = objs[f"{tag}-TPL-caenels"]
     assert named.attributes["template_name"] == "caenels" and "chart_url" not in named.attributes
-    assert (f"{tag}:IOC:histar", "templated from", f"{tag}:TPL:caenels") in edges(db, workspace)
+    assert (f"{tag}-IOC-histar", "templated from", f"{tag}-TPL-caenels") in edges(db, workspace)
 
 
 # --- networks -------------------------------------------------------------------------------------
@@ -185,13 +185,13 @@ def test_two_networks_with_one_name_are_told_apart_by_their_annotation(db, works
     run(db, workspace, tag)
     objs = objects(db, workspace)
     nets = {k for k, o in objs.items() if o.type == "Control Network"}
-    assert nets == {f"{tag}:NET:sparc-magnets", f"{tag}:NET:sparc-net"}
-    assert objs[f"{tag}:NET:sparc-magnets"].attributes["network_name"] == "control"
-    assert objs[f"{tag}:NET:sparc-net"].attributes["vlan"] == 197
+    assert nets == {f"{tag}-NET-sparc-magnets", f"{tag}-NET-sparc-net"}
+    assert objs[f"{tag}-NET-sparc-magnets"].attributes["network_name"] == "control"
+    assert objs[f"{tag}-NET-sparc-net"].attributes["vlan"] == 197
     e = edges(db, workspace)
     # one network, two IOCs on it
-    assert (f"{tag}:IOC:vac-gunvpc", "on network", f"{tag}:NET:sparc-magnets") in e
-    assert (f"{tag}:IOC:histar", "on network", f"{tag}:NET:sparc-magnets") in e
+    assert (f"{tag}-IOC-vac-gunvpc", "on network", f"{tag}-NET-sparc-magnets") in e
+    assert (f"{tag}-IOC-histar", "on network", f"{tag}-NET-sparc-magnets") in e
 
 
 # --- storage --------------------------------------------------------------------------------------
@@ -201,13 +201,13 @@ def test_the_same_server_and_path_is_one_mount_however_many_things_name_it(db, w
     objs, e = objects(db, workspace), edges(db, workspace)
     mounts = {k for k, o in objs.items() if o.type == "Storage Mount"}
     # `data` at the top level and the docs service's `httpsrv-nfs` are one place
-    assert mounts == {f"{tag}:MNT:data", f"{tag}:MNT:backups", f"{tag}:MNT:docs:private"}
-    assert (f"{tag}:SVC:docs", "mounts", f"{tag}:MNT:data") in e
-    assert (f"{tag}:SVC:docs", "mounts", f"{tag}:MNT:docs:private") in e
-    assert objs[f"{tag}:MNT:backups"].attributes["is_backup"] is True
-    assert objs[f"{tag}:MNT:data"].attributes["is_backup"] is False
-    assert objs[f"{tag}:MNT:data"].attributes["export_path"] == "/data/sparc"
-    assert (f"{tag}:MNT:data", "part of", tag) in e
+    assert mounts == {f"{tag}-MNT-data", f"{tag}-MNT-backups", f"{tag}-MNT-docs-private"}
+    assert (f"{tag}-SVC-docs", "mounts", f"{tag}-MNT-data") in e
+    assert (f"{tag}-SVC-docs", "mounts", f"{tag}-MNT-docs-private") in e
+    assert objs[f"{tag}-MNT-backups"].attributes["is_backup"] is True
+    assert objs[f"{tag}-MNT-data"].attributes["is_backup"] is False
+    assert objs[f"{tag}-MNT-data"].attributes["export_path"] == "/data/sparc"
+    assert (f"{tag}-MNT-data", "part of", tag) in e
 
 
 # --- what an IOC and a service now carry --------------------------------------------------------------
@@ -215,13 +215,13 @@ def test_the_same_server_and_path_is_one_mount_however_many_things_name_it(db, w
 def test_an_ioc_and_a_service_carry_what_the_file_says_about_them(db, workspace, tag):
     run(db, workspace, tag)
     objs = objects(db, workspace)
-    ioc = objs[f"{tag}:IOC:vac-gunvpc"].attributes
+    ioc = objs[f"{tag}-IOC-vac-gunvpc"].attributes
     assert ioc["autosync"] is False                       # an explicit false is a value, not an absence
     assert ioc["networks"] == ["sparc-magnets"]
     assert "PixelFormat" in ioc["ioc_init"]
-    svc = objs[f"{tag}:SVC:docs"].attributes
+    svc = objs[f"{tag}-SVC-docs"].attributes
     assert svc["image"] == "nginx" and svc["replicas"] == 2 and svc["chart_revision"] == "v1.2"
-    assert objs[f"{tag}:DEV:vac-gunvpc:GUNSIP01"].attributes["pv"] == f"SPARC:VAC:GUNVPC:GUNSIP01"
+    assert objs[f"{tag}-DEV-vac-gunvpc-GUNSIP01"].attributes["pv"] == f"SPARC:VAC:GUNVPC:GUNSIP01"
 
 
 # --- the catalogue has to describe what is written ---------------------------------------------------
@@ -285,6 +285,6 @@ def test_one_pv_on_two_iocs_is_recorded_twice_and_reported(db, workspace, tag):
     histar:""")
     importer = run(db, workspace, tag, text)
     objs = objects(db, workspace)
-    assert f"{tag}:DEV:vac-gunvpc:GUNSIP01" in objs and f"{tag}:DEV:second:GUNSIP01" in objs
+    assert f"{tag}-DEV-vac-gunvpc-GUNSIP01" in objs and f"{tag}-DEV-second-GUNSIP01" in objs
     assert any("SPARC:VAC:GUNVPC:GUNSIP01 is configured on two IOCs" in w
                for w in importer.job.warnings)

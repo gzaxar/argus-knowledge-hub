@@ -12,6 +12,8 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.schemas.role import (
     EffectivePermissionsOut,
+    InvitationIn,
+    InvitationOut,
     RoleBindingCreate,
     RoleBindingOut,
     RoleOut,
@@ -74,10 +76,69 @@ def list_bindings(
             subject_id=binding.subject_id,
             subject_label=label,
             subject_active=active,
+            subject_pending=_pending(db, binding),
             role_id=role.id,
             role_name=role.name,
             created_at=binding.created_at,
         ))
+    return out
+
+
+def _pending(db: Session, binding: RoleBinding) -> bool:
+    """A person added by e-mail who has not signed in yet."""
+    if binding.subject_type != "user":
+        return False
+    user = db.get(User, binding.subject_id)
+    return user is not None and user.oidc_sub is None and user.last_login_at is None and user.source == "oidc"
+
+
+@router.get("/workspaces/{workspace_id}/inherited-grants")
+def inherited_grants(
+    workspace_id: str,
+    identity: Identity = Depends(get_identity),
+    db: Session = Depends(get_db),
+):
+    """The roles groups have here because they have them site-wide at this workspace's current site. Listed with
+    the workspace's own grants, removable only at the site (issue #26)."""
+    from app.services import site_group_grants
+    _require_manage_members(workspace_id, identity, db)
+    return site_group_grants.inherited(db, workspace_id)
+
+
+@router.post("/workspaces/{workspace_id}/invitations", response_model=InvitationOut)
+def invite_people(
+    workspace_id: str,
+    body: InvitationIn,
+    identity: Identity = Depends(get_identity),
+    db: Session = Depends(get_db),
+):
+    """Give people this role here by their e-mail address, before they have ever signed in: each one not known yet
+    is added, and their first sign-in with that address claims the account and the access. With `send_email` they
+    are told, with a link to ARGUS; what could not be sent is said per address and stops nothing."""
+    from app.models.group import Group
+    from app.services import invitations, local_groups
+    _require_manage_members(workspace_id, identity, db)
+    user = identity.user if isinstance(identity, OidcIdentity) else None
+    group = None
+    if body.group_uid:
+        group = db.get(Group, body.group_uid)
+        if group is None:
+            raise HTTPException(status_code=404, detail="Group not found")
+        local_groups.require_manage(db, identity, group, workspace_id)
+        if body.role_id:
+            from app.services.site_group_grants import check_direct_grant
+            check_direct_grant(db, group, workspace_id)
+    elif body.new_group and body.new_group.strip():
+        group = local_groups.create(db, body.new_group, None)
+    try:
+        out = invitations.invite(db, workspace_id, body.emails, body.role_id,
+                                 created_by=user.id if user else None,
+                                 inviter=(user.name or user.email) if user else None,
+                                 send_email=body.send_email, note=body.message, group=group)
+    except invitations.InviteError as e:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    db.commit()
     return out
 
 
@@ -101,8 +162,11 @@ def create_binding(
         if db.get(User, body.subject_id) is None:
             raise HTTPException(status_code=404, detail="User not found")
     elif body.subject_type == "group":
-        if db.get(Group, body.subject_id) is None:
+        group = db.get(Group, body.subject_id)
+        if group is None:
             raise HTTPException(status_code=404, detail="Group not found")
+        from app.services.site_group_grants import check_direct_grant
+        check_direct_grant(db, group, workspace_id)
     else:
         raise HTTPException(status_code=422, detail="subject_type must be 'user' or 'group'")
 
@@ -132,6 +196,7 @@ def create_binding(
     return RoleBindingOut(
         id=binding.id, workspace_id=workspace_id, subject_type=binding.subject_type,
         subject_id=binding.subject_id, subject_label=label, subject_active=active,
+        subject_pending=_pending(db, binding),
         role_id=role.id, role_name=role.name, created_at=binding.created_at,
     )
 

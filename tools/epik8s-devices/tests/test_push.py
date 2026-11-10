@@ -105,7 +105,7 @@ def test_a_row_is_a_control_device_under_the_key_the_import_gives_it(tmp_path, m
     hub = FakeHub()
     assert push(tmp_path, monkeypatch, [DEVICE_ROW], hub) == 0
     (made,) = hub.created
-    assert made["key"] == "SPARC:DEV:histar:GUNQUA01" and made["uid"] == UID_OF_A_KNOWN_DEVICE
+    assert made["key"] == "SPARC-DEV-histar-GUNQUA01" and made["uid"] == UID_OF_A_KNOWN_DEVICE
     assert made["type"] == "Control Device" and made["schema_uid"] == "s-device"
     attrs = made["attributes"]
     assert attrs["device_class"] == "Power Supply" and attrs["element"] == "Quadrupole"

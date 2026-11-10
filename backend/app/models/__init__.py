@@ -13,7 +13,7 @@ from app.models.document_navigation import DocumentFolder, DocumentPlacement  # 
 from app.models.global_value import GlobalValue
 from app.models.ai_suggestion import AISuggestion
 from app.models.llm_config import LLMConfig
-from app.models.group import Group, GroupMember
+from app.models.group import Group, GroupMember, GroupAdministrator
 from app.models.icon import Icon
 from app.models.import_config import ImportConfig
 from app.models.import_job import ImportJob
@@ -21,11 +21,11 @@ from app.models.import_snapshot import ImportSnapshot
 from app.models import ledger  # noqa: F401  (registers the ledger tables)
 from app.models.issue import Issue, IssueComment, IssueHistory, IssueLink
 from app.models.membership import Membership
-from app.models.role import Role, RoleBinding
+from app.models.role import Role, RoleBinding, SiteGroupRoleBinding
 from app.models.schema import Schema
 from app.models.transfer_job import TransferJob
 from app.models.user import User
-from app.models.workspace import Workspace
+from app.models.workspace import Workspace, SiteAdministrator
 
 __all__ = [
     "ApiToken",
@@ -47,6 +47,7 @@ __all__ = [
     "LLMConfig",
     "Group",
     "GroupMember",
+    "GroupAdministrator",
     "Icon",
     "ImportConfig",
     "ImportJob",
@@ -58,10 +59,12 @@ __all__ = [
     "Membership",
     "Role",
     "RoleBinding",
+    "SiteGroupRoleBinding",
     "Schema",
     "TransferJob",
     "User",
     "Workspace",
+    "SiteAdministrator",
 ]
 from app.models import workflow  # noqa: F401,E402
 from app.models import access_review  # noqa: F401,E402

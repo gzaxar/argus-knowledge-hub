@@ -40,6 +40,20 @@ api:
   nodeSelector: {}
   # Sign-in providers besides Keycloak, as the API's OIDC_EXTRA_PROVIDERS entries: {issuer, jwks_uri, audience}.
   extraProviders: []
+  # Direct external OIDC authentication; takes precedence over the bundled Keycloak.
+  oidc:
+    issuer: ""
+    jwksUri: ""
+    audience: ""
+    # Optional confidential-client token mediation (secret from existingSecret).
+    tokenEndpoint: ""
+    redirectUris: []
+    clientSecretKey: ""
+  # Optional confidential client used only by the API to send mail through INFN.
+  mail:
+    url: ""
+    tokenUrl: ""
+    clientOAuthSecretKey: "back-end-client-oauth"
   # More environment, e.g. the portability settings (docs/operations.md, "Configuration").
   env: {}
   resources:
@@ -115,7 +129,8 @@ iocEngineer:
   # every release: https://github.com/infn-epics/infn-epics-ioc/releases/latest/download/ioc-catalog.json.gz
   catalog: ""
   # Pull requests Ask ARGUS proposes and a person confirms. Off until the key ioc-github-token is in
-  # existingSecret: a token with contents and pull-requests write on these repositories only.
+  # existingSecret: a token with contents and pull-requests write on these repositories only — and on
+  # infn-argus/argus-catalogue, where catalogue maintainers propose models (docs/catalogue-collections.md §4).
   pullRequests:
     repositories: "infn-epics/ibek-support-infn,infn-epics/ibek-templates,infn-epics/infn-epics-ioc"
     draft: true

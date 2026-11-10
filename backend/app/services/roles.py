@@ -44,6 +44,13 @@ SYSTEM_ROLES = [
         50,
     ),
     (
+        "workspace_admin", "Workspace administrator",
+        "Manages workspace access and group role grants; can read workspace content.",
+        {"objects": READ, "tickets": READ, "documents": READ,
+         "workspace": ["manage_members"]},
+        55,
+    ),
+    (
         "owner", "Owner", "Everything a curator can do, plus granting access to others.",
         {
             "objects": FULL,

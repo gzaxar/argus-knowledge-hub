@@ -111,8 +111,13 @@ class _AssetBodyState extends ConsumerState<_AssetBody> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final current = a.current;
-    final attrs = a.attributes.entries.where((e) => e.value != null && e.value.toString().isNotEmpty).toList();
-    final defsByKey = {for (final d in ref.watch(schemaAttributesProvider(a.schemaUid)).value ?? const []) d.key: d};
+    final allDefs = ref.watch(schemaAttributesProvider(a.schemaUid)).value ?? const <AttributeDef>[];
+    final defsByKey = {for (final d in oneVendorField(allDefs, a.attributes, form: false)) d.key: d};
+    // One vendor: of the two fields a Product Model keeps, only the one oneVendorField shows.
+    final hiddenVendor = allDefs.map((d) => d.key).where((k) => (k == 'vendor' || k == 'vendor_ref') && !defsByKey.containsKey(k)).toSet();
+    final attrs = a.attributes.entries
+        .where((e) => e.value != null && e.value.toString().isNotEmpty && !hiddenVendor.contains(e.key))
+        .toList();
     final openTickets = a.tickets.where((t) => t.open).toList();
     final comments = ref.watch(assetCommentsProvider(a.uid)).value ?? const [];
     final history = ref.watch(assetHistoryProvider(a.uid)).value ?? const [];

@@ -135,7 +135,7 @@ def parse_epik8s(content: bytes, stream: LedgerStream, ruleset: Ruleset) -> list
         name = str(ioc["name"])
         ioc_ref = f"epik8s:{fac}:ioc:{name}"
         path = f"epicsConfiguration.iocs.{name}"
-        out.append(ParsedClaim(ioc_ref, "exists", {"type": "IOC", "key": f"{fac}:IOC:{name}", "name": name},
+        out.append(ParsedClaim(ioc_ref, "exists", {"type": "IOC", "key": f"{fac}-IOC-{name}".replace(":", "-"), "name": name},
                                rule_id="epik8s.ioc/1", evidence={"path": path}))
         if ioc.get("template"):
             out.append(ParsedClaim(ioc_ref, "attr:template", str(ioc["template"]), rule_id="epik8s.ioc/1",
@@ -146,7 +146,7 @@ def parse_epik8s(content: bytes, stream: LedgerStream, ruleset: Ruleset) -> list
             dname = str(dev["name"])
             dref = f"epik8s:{fac}:dev:{name}/{dname}"
             dpath = f"{path}.devices[{i}]"
-            out.append(ParsedClaim(dref, "exists", {"type": "Control Device", "key": f"{fac}:DEV:{name}:{dname}",
+            out.append(ParsedClaim(dref, "exists", {"type": "Control Device", "key": f"{fac}-DEV-{name}-{dname}".replace(":", "-"),
                                                     "name": dname}, rule_id="epik8s.device/1",
                                    evidence={"path": dpath}))
             out.append(ParsedClaim(dref, "rel:provided by", {"ref": ioc_ref}, rule_id="epik8s.device/1",

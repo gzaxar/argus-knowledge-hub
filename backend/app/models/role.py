@@ -61,3 +61,19 @@ class RoleBinding(Base):
     role_id: Mapped[str] = mapped_column(String, ForeignKey("roles.id", ondelete="CASCADE"))
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True))
     created_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+
+class SiteGroupRoleBinding(Base):
+    """A role given to a group once for a site (issue #26): its members have it in the site workspace and in every
+    workspace whose *current* site is that site, facilities added later included. Never copied into a facility's
+    role bindings; worked out from the site relationship each time (services/permissions.py)."""
+
+    __tablename__ = "site_group_role_bindings"
+    __table_args__ = (UniqueConstraint("site_id", "group_uid", "role_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    site_id: Mapped[str] = mapped_column(String, ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    group_uid: Mapped[str] = mapped_column(String, ForeignKey("groups.uid", ondelete="CASCADE"), index=True)
+    role_id: Mapped[str] = mapped_column(String, ForeignKey("roles.id", ondelete="CASCADE"))
+    created_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True))

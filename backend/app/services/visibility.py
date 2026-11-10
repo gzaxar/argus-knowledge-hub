@@ -40,6 +40,7 @@ from app.models.asset import Asset
 from app.models.issue import Issue
 
 RESTRICTED_PREFIX = "restricted:"
+GONE = ("Retired", "Merged")
 RESTRICTED_CLASSES = ("costs", "personnel", "security_incident", "safety_investigation", "sensitive_design")
 
 
@@ -140,6 +141,12 @@ def visible_assets_clause(workspace_id: str, grants: Optional[Grants] = None):
     base = or_(Asset.workspace_id == workspace_id, Asset.is_global.is_(True), site_clause(workspace_id))
     extra = _restriction_clause(Asset, grants)
     return base if extra is None else and_(base, extra)
+
+
+def live_assets_clause():
+    """Records still in use. A retired or merged record keeps its history and its links, and opens by its key,
+    but what looks for records (search, lists, counts, the map, Ask) does not offer it unless asked to."""
+    return Asset.record_status.notin_(GONE)
 
 
 def visible_issues_clause(grants: Optional[Grants] = None):

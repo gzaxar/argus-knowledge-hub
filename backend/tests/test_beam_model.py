@@ -128,7 +128,7 @@ def test_the_import_keeps_its_provenance_and_is_idempotent_and_retires_what_is_g
     bm.import_canonical(db, ws, smaller, "test")
     db.commit()
     # Found by its stable key: a retired record's facts no longer project.
-    gone = db.scalar(select(Asset).where(Asset.key == f"{ws}:linac-demo/ACC02"))
+    gone = db.get(Asset, next(u for u, i in bm.model_ids(db, ws, "linac-demo", "element").items() if i == "ACC02"))
     assert gone.record_status == "Retired"
     assert names(bm.neighbours(db, ws, el(db, ws, "QUA01").uid, "downstream")) == ["BPM01"]
     assert q.uid == el(db, ws, "QUAA101").uid

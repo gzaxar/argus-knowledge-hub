@@ -40,9 +40,11 @@ SOURCE_KINDS = {"netbox-devicetype-library", "datasheet", "manufacturer-page", "
 RELATION_VERBS = {"successor-of", "compatible-with", "accessory-of"}
 # The device classes in use (the production inventory, 2026-10-31), with spelling variants merged: "switch" and
 # "network switch", "host" and "server", "chassi", "controller motor". Adoption maps the old spellings (§6).
+# Bench and test instruments (2026-11-05): multimeter, oscilloscope, signal generator, spectrum analyzer.
 DEVICE_CLASSES = {"adc", "bpm", "cable", "camera", "chassis", "converter", "desktop computer", "io",
-                  "ion pump controller", "laser", "modulator", "monitor", "motion controller", "motor", "nas",
-                  "network switch", "plasma", "power supply", "rf", "server", "timing", "vacuum", "vacuum chamber"}
+                  "ion pump controller", "laser", "modulator", "monitor", "motion controller", "motor", "multimeter",
+                  "nas", "network switch", "oscilloscope", "plasma", "power supply", "rf", "server",
+                  "signal generator", "spectrum analyzer", "timing", "vacuum", "vacuum chamber"}
 # A description says what the product is. A copied datasheet is not ours to license: facts go in
 # `specifications`, and the datasheet is linked.
 DESCRIPTION_MAX = 500
@@ -378,10 +380,18 @@ def validate_tree(tree: dict[str, Collection]) -> dict[str, list[Problem]]:
     seen_ids: dict[str, str] = {}
     vendor_names: dict[str, tuple[str, str]] = {}
     products: dict[tuple[str, str], tuple[str, str]] = {}
+    # A manufacturer the NetBox library brought, then stated in an Argus collection (a model of it proposed
+    # there): the same id is the same company, and the Argus entry is the one that counts. Both are seen only by
+    # a proposal's check, which reads the library as written before; read again, the library makes no copy.
+    netbox_vendors = {v.id for c in tree.values() if c.origin == "netbox" for v in c.vendors}
+    argus_vendors = {v.id for c in tree.values() if c.origin != "netbox" for v in c.vendors}
+    restated = netbox_vendors & argus_vendors
     for c in tree.values():
         for e in c.entries():
             for ident in [e.id, *(e.data.get("former_ids") or [])]:
                 if not ident:
+                    continue
+                if ident in seen_ids and e.kind == "vendor" and ident in restated:
                     continue
                 if ident in seen_ids:
                     add(c, e, f"{ident!r} is already used in {seen_ids[ident]!r}: an id names one thing, everywhere")
@@ -413,13 +423,20 @@ def compare(previous: dict[str, Collection], current: dict[str, Collection]) -> 
     """A release against the one before: every entry is still there, retired, or transferred with a
     tombstone; and a collection whose content changed has a newer version."""
     out: dict[str, list[Problem]] = {cid: [] for cid in current}
+    # A NetBox collection is written when the sources are read, with a vendor made for each manufacturer the
+    # Argus vendors do not have. Once `vendors` states that company (a model of it proposed), the library makes
+    # no vendor of its own for it: the same id, now in `vendors` — absorbed, not lost, and no edit of the library.
+    argus_vendors = {v.id for c in current.values() if c.origin != "netbox" for v in c.vendors}
     for cid, before in previous.items():
         now = current.get(cid)
         if now is None:
             out.setdefault(cid, []).append(Problem(cid, MANIFEST, "", "the collection is gone: collections are "
                                                    "never removed; retire or transfer what it holds"))
             continue
-        if before.checksum != now.checksum:
+        absorbed: set[str] = set()
+        if before.origin == "netbox":
+            absorbed = {v.id for v in before.vendors} - {v.id for v in now.vendors} & argus_vendors
+        if before.checksum != now.checksum and not absorbed:
             try:
                 newer = Version(now.version) > Version(before.version)
             except InvalidVersion:
@@ -430,7 +447,7 @@ def compare(previous: dict[str, Collection], current: dict[str, Collection]) -> 
         kept = {e.id for e in now.entries()}
         tombstones = {e.id for e in now.moved}
         for e in before.entries():
-            if e.id not in kept and e.id not in tombstones:
+            if e.id not in kept and e.id not in tombstones and e.id not in absorbed:
                 out[cid].append(Problem(cid, e.file, f"{e.kind}s › {e.id}",
                                         "is no longer in the collection: retire it (`retired:`), transfer it "
                                         "(`moved:` here and `transferred_from:` there), or put it back"))

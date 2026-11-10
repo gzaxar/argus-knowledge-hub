@@ -33,7 +33,11 @@ class Options:
     topology (`auto` reads it from the bends: a full turn is a ring), the beam, which beam line to use when a
     file defines several, and whether to keep markers and drifts as elements. Markers are kept unless asked
     otherwise: a lattice places with them what its simulation does not compute (pumps, valves, gauges), and
-    the beam model describes the beam line, not one simulator's view of it."""
+    the beam model describes the beam line, not one simulator's view of it.
+
+    `same_element_suffixes` ("_IN, _OUT"): name endings that mark one physical element in several
+    configurations, for a simulator that needs a label per configuration. Off unless asked: an ending does
+    not mean this in every file."""
     model_id: Optional[str] = None
     model_name: Optional[str] = None
     version: Optional[str] = None
@@ -46,6 +50,7 @@ class Options:
     keep_markers: bool = True
     keep_drifts: bool = False
     name_hints: bool = True
+    same_element_suffixes: str = ""
     output: str = "2"                   # "2": argus.beam-model/2; "1": the v1 form
     extra: dict = field(default_factory=dict)
 

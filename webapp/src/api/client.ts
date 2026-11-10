@@ -80,8 +80,12 @@ import type {
   Role,
   RoleBinding,
   RoleBindingInput,
+  InvitationResult,
+  SiteGroupGrant,
+  SiteGroupGrantPreview,
   DirectoryGroup,
   DirectoryGroupMember,
+  ScopedAdministrator,
   DirectoryStatus,
   EffectivePermissions,
   Graph,
@@ -283,8 +287,8 @@ export const assetsApi = {
     request<Asset[]>(`/v1/assets${schemaUid ? `?schema_uid=${schemaUid}` : ""}`),
   /** The uids of the records whose key, name, a label (QR code, barcode, former key, alias), serial,
    *  inventory number or MAC contains this. */
-  matching: (q: string) =>
-    request<{ uid: string }[]>(`/v1/assets?q=${encodeURIComponent(q)}&sort=key&limit=500`).then(
+  matching: (q: string, includeRetired = false) =>
+    request<{ uid: string }[]>(`/v1/assets?q=${encodeURIComponent(q)}&sort=key&limit=500${includeRetired ? "&include_retired=true" : ""}`).then(
       (rows) => new Set(rows.map((r) => r.uid)),
     ),
   get: (uid: string) => request<Asset>(`/v1/assets/${uid}`),
@@ -943,6 +947,10 @@ export const rolesApi = {
   list: () => request<Role[]>("/v1/roles"),
   listBindings: (workspaceId: string) =>
     request<RoleBinding[]>(`/v1/workspaces/${workspaceId}/bindings`),
+  inherited: (workspaceId: string) => request<SiteGroupGrant[]>(`/v1/workspaces/${workspaceId}/inherited-grants`),
+  invite: (workspaceId: string, input: { emails: string; role_id?: string; send_email: boolean; message?: string;
+                                          group_uid?: string; new_group?: string }) =>
+    request<InvitationResult>(`/v1/workspaces/${workspaceId}/invitations`, { method: "POST", body: json(input) }),
   createBinding: (workspaceId: string, input: RoleBindingInput) =>
     request<RoleBinding>(`/v1/workspaces/${workspaceId}/bindings`, {
       method: "POST",
@@ -955,9 +963,24 @@ export const rolesApi = {
 };
 
 export const directoryApi = {
+  myGroups: () => request<DirectoryGroup[]>("/v1/groups/mine"),
   groups: (search?: string) =>
     request<DirectoryGroup[]>(`/v1/groups${search ? `?search=${encodeURIComponent(search)}` : ""}`),
   groupMembers: (uid: string) => request<DirectoryGroupMember[]>(`/v1/groups/${uid}/members`),
+  groupAdministrators: (uid: string) => request<ScopedAdministrator[]>(`/v1/groups/${uid}/administrators`),
+  addGroupAdministrator: (uid: string, email: string) =>
+    request<ScopedAdministrator>(`/v1/groups/${uid}/administrators`, { method: "POST", body: json({ email }) }),
+  removeGroupAdministrator: (uid: string, userId: string) =>
+    request<void>(`/v1/groups/${uid}/administrators/${encodeURIComponent(userId)}`, { method: "DELETE" }),
+  allGroups: () => request<DirectoryGroup[]>("/v1/groups?include_inactive=true"),
+  createGroup: (input: { name: string; description?: string; home_site_id?: string }) =>
+    request<DirectoryGroup>("/v1/groups", { method: "POST", body: json(input) }),
+  updateGroup: (uid: string, input: { name?: string; description?: string; active?: boolean }) =>
+    request<DirectoryGroup>(`/v1/groups/${uid}`, { method: "PATCH", body: json(input) }),
+  addGroupMembers: (uid: string, input: { emails: string; send_email: boolean; message?: string }) =>
+    request<InvitationResult>(`/v1/groups/${uid}/members`, { method: "POST", body: json(input) }),
+  removeGroupMember: (uid: string, userId: string) =>
+    request<void>(`/v1/groups/${uid}/members/${encodeURIComponent(userId)}`, { method: "DELETE" }),
   status: () => request<DirectoryStatus>("/v1/directory/status"),
   sync: () => request<Record<string, unknown>>("/v1/directory/sync", { method: "POST" }),
 };
@@ -2896,6 +2919,64 @@ export interface CatalogueSourcePin {
   ref: string | null;
   commit: string;
   select: string[] | null;
+  /** The lock file's pin; `ref` and `commit` differ when a maintainer pinned a newer release. */
+  shipped_ref?: string | null;
+  shipped_commit?: string;
+  pinned_in?: "lock" | "administration";
+  pinned_by?: string | null;
+  pinned_at?: string | null;
+  /** Pinned to a release tag: a newer one can be pinned from Administration. */
+  releasable?: boolean;
+}
+
+/** A source's releases newer than the lock ARGUS ships (GET …/releases). */
+export interface CatalogueReleases {
+  source: string;
+  repo: string;
+  ref: string | null;
+  commit: string;
+  shipped_ref: string;
+  shipped_commit: string;
+  releases: { tag: string; commit: string; current: boolean; newer: boolean }[];
+}
+
+/** A model made here, proposed to the catalogue repository as a pull request. */
+export interface CatalogueProposal {
+  id: number;
+  record_uid: string;
+  record_name: string | null;
+  catalogue_id: string;
+  vendor_id: string | null;
+  collection_id: string;
+  repository: string;
+  number: number | null;
+  url: string | null;
+  state: "open" | "merged" | "closed" | "installed";
+  proposed_by: string;
+  proposed_at: string;
+  files: string[];
+}
+
+export interface CatalogueProposalDraft {
+  record_uid: string;
+  entry: Record<string, string>;
+  vendor: { id: string; name: string; new: boolean; record_uid: string | null; entry?: Record<string, unknown>;
+            library_name?: string };
+  collections: { id: string; name: string; version: string; domains: string[] }[];
+  device_classes: string[];
+  /** What the record says, when it is not a catalogue class: the entry's class, if any, is ARGUS's reading of it. */
+  device_class_written?: string;
+  source_kinds: string[];
+  repository: string | null;
+  enabled: boolean;
+}
+
+export interface CatalogueProposalIn {
+  record_uid: string;
+  entry: Record<string, string>;
+  vendor: { id?: string; name?: string; website?: string; aliases?: string[] };
+  collection: { id: string; name?: string; description?: string; domain?: string };
+  source: { kind: string; ref: string; note?: string };
 }
 
 export interface CatalogueHistoryRow {
@@ -3080,8 +3161,27 @@ export interface PlacementEnding {
 
 /** Sites: laboratories whose places their facility workspaces use (administrators). */
 export const sitesApi = {
+  administrators: (siteId: string) =>
+    request<ScopedAdministrator[]>(`/v1/admin/sites/${encodeURIComponent(siteId)}/administrators`),
+  addAdministrator: (siteId: string, email: string) =>
+    request<ScopedAdministrator>(`/v1/admin/sites/${encodeURIComponent(siteId)}/administrators`,
+      { method: "POST", body: json({ email }) }),
+  removeAdministrator: (siteId: string, userId: string) =>
+    request<void>(`/v1/admin/sites/${encodeURIComponent(siteId)}/administrators/${encodeURIComponent(userId)}`,
+      { method: "DELETE" }),
   list: () => request<{ id: string; name: string; facilities: string[]; shared_places: number; withheld: number }[]>(
     "/v1/admin/sites"),
+  groupGrants: (siteId: string) =>
+    request<{ site_id: string; workspaces: string[]; roles: string[]; grants: SiteGroupGrant[] }>(
+      `/v1/admin/sites/${encodeURIComponent(siteId)}/group-grants`),
+  previewGroupGrant: (siteId: string, input: { group_uid: string; role_id: string }) =>
+    request<SiteGroupGrantPreview>(`/v1/admin/sites/${encodeURIComponent(siteId)}/group-grants/preview`,
+      { method: "POST", body: json(input) }),
+  grantGroup: (siteId: string, input: { group_uid: string; role_id: string }) =>
+    request<SiteGroupGrant>(`/v1/admin/sites/${encodeURIComponent(siteId)}/group-grants`,
+      { method: "POST", body: json(input) }),
+  revokeGroupGrant: (siteId: string, grantId: number) =>
+    request<void>(`/v1/admin/sites/${encodeURIComponent(siteId)}/group-grants/${grantId}`, { method: "DELETE" }),
   setRole: (workspaceId: string, site: boolean) =>
     request<{ workspace_id: string; role: string | null; ended: string[] }>(
       `/v1/admin/sites/${encodeURIComponent(workspaceId)}/role`, { method: "PUT", body: json({ site }) }),
@@ -3162,6 +3262,24 @@ export const catalogueCollectionsApi = {
     request<CataloguePlan>(`${CC}/preview`, { method: "POST", body: json({ collections, decisions, manifest: manifest ?? null }) }),
   install: (collections: string[], decisions: Record<string, CatalogueDecision>, manifest?: string | null) =>
     request<CataloguePlan>(`${CC}/install`, { method: "POST", body: json({ collections, decisions, manifest: manifest ?? null }) }),
+  releases: (source: string) => request<CatalogueReleases>(`${CC}/releases?${new URLSearchParams({ source })}`),
+  /** Read a newer release: checked by the server first; installs nothing. */
+  pin: (source: string, ref: string) =>
+    request<{ source: string; ref: string; commit: string; previous_ref: string | null }>(`${CC}/pin`,
+      { method: "POST", body: json({ source, ref }) }),
+  unpin: (source: string) =>
+    request<{ source: string; ref: string; commit: string }>(`${CC}/pin/${encodeURIComponent(source)}`, { method: "DELETE" }),
+  proposals: () => request<{ enabled: boolean; repository: string | null; proposals: CatalogueProposal[] }>(`${CC}/proposals`),
+  proposalDraft: (recordUid: string) =>
+    request<CatalogueProposalDraft>(`${CC}/proposals/draft?${new URLSearchParams({ record_uid: recordUid })}`),
+  proposalPreview: (body: CatalogueProposalIn) =>
+    request<{ title: string; base: string; files: Record<string, string>; repository: string }>(`${CC}/proposals/preview`,
+      { method: "POST", body: json(body) }),
+  propose: (body: CatalogueProposalIn) =>
+    request<CatalogueProposal>(`${CC}/proposals`, { method: "POST", body: json(body) }),
+  /** The catalogue's Vendor of this name or alias, or a new one (maintainers). */
+  addVendor: (name: string) =>
+    request<{ uid: string; key: string; name: string; created: boolean }>(`${CC}/vendors`, { method: "POST", body: json({ name }) }),
   decideField: (catalogueId: string, field: string, decision: CatalogueFieldDecision, reason?: string) =>
     request<unknown>(`${CC}/entries/${catalogueId.split("/").map(encodeURIComponent).join("/")}/fields`,
                      { method: "POST", body: json({ field, decision, reason }) }),

@@ -120,7 +120,7 @@ def create_import(
             job.uid, workspace_id, body.provider, body.repo_url, body.pat, body.branch,
             body.path, body.merge_strategy, body.create_missing_nodes, body.infer_elements,
             body.it_workspace, body.infer_controllers, body.link_inventory, body.ai_unrecognised,
-            actor_name(identity),
+            actor_name(identity), body.clear_previous,
         )
     else:
         background_tasks.add_task(

@@ -40,6 +40,46 @@ The LNF relay (`smtp.lnf.infn.it`) relays from the INFN cloud only for an authen
 
 then restart the API (`kubectl -n argus rollout restart deploy/argus-api`) and use **Send me a test message**.
 
+## INFN OAuth mail service
+
+For instant notifications caused by a signed-in INFN user (including ticket assignments), set:
+
+```yaml
+# Helm values; the same environment variables are supported by docker-compose.
+api:
+  mail:
+    url: https://api.app-pre.infn.it/mail/send/
+    tokenUrl: https://idp-test.app.infn.it/auth/realms/aai/protocol/openid-connect/token
+    clientOAuthSecretKey: back-end-client-oauth
+  # Additional non-secret mail settings only.
+  env:
+    # Optional sender accepted by the mail service; otherwise the service chooses it.
+    INFN_MAIL_FROM: ""
+```
+
+The endpoint is configurable because the [published OpenAPI specification](https://api.app-pre.infn.it/mail/v3/api-docs)
+lists `/send/` without the gateway's `/mail` prefix. Verify the gateway route in the target environment.
+The service documents an entitlement requirement for sending. Configure the confidential client's service
+account with that entitlement. Its token must also include the `infnUUID` claim expected by the mail
+service's shared authorization library. Store one JSON value under the key named by
+`api.mail.clientOAuthSecretKey` in the chart's `existingSecret` Kubernetes Secret:
+`{"client_id":"…","client_secret":"…","scope":"…"}`. Omit `scope` if the client does not need it.
+Use **My account → Notifications → Send me a test message** to check the route and client authorization.
+
+The browser authenticates to ARGUS as before. For mail, the API obtains a short-lived access token from
+Keycloak with the confidential client's `client_credentials` grant, then caches it in process memory until
+shortly before expiry. It does not forward the signed-in user's token.
+
+Only instant notifications committed by that request are sent, respecting muted categories and disabled
+mail. The client secret and access token remain in API process memory and are never stored in notification
+records. HTTP redirects are not followed. A response is accepted only with HTTP 200, `errorCode: 0` and
+`payload: true`. Mail errors leave the notification pending without undoing the user's operation.
+
+SMTP remains the delivery channel for scheduled digests and automated escalations. Configure the existing
+`email:` settings if those are needed. With INFN mail alone, those notifications stay in-app. As with SMTP,
+a crash between remote acceptance and recording delivery can cause a duplicate on retry; the service
+exposes no idempotency key.
+
 ## Point-in-time recovery (RPO ≤ 15 min, RTO ≤ 4 h)
 
 The daily dump alone gives a one-day RPO. For the §19 target, run Postgres

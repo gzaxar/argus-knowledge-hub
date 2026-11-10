@@ -88,6 +88,8 @@ export interface Asset {
   inbound_relations: string[];
   outbound_relations: string[];
   is_global: boolean;
+  /** Provisional, Active, Retired or Merged. */
+  record_status?: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -122,6 +124,8 @@ export interface Relation {
 
 export interface Issue {
   uid: string;
+  /** BTF-TCK-0042, from the workspace's Record keys pattern; none on a ticket made before tickets had keys. */
+  key?: string | null;
   workspace_id: string;
   asset_uid: string | null;
   schema_uid: string | null;
@@ -502,6 +506,7 @@ export interface Epik8sImportConfigParams {
   create_missing_nodes?: boolean;
   infer_elements?: boolean;
   infer_controllers?: boolean;
+  clear_previous?: boolean;
   it_workspace?: string | null;
   link_inventory?: boolean;
   ai_unrecognised?: boolean;
@@ -898,9 +903,58 @@ export interface RoleBinding {
   subject_id: string;
   subject_label: string;
   subject_active: boolean;
+  /** A person added by e-mail who has not signed in yet: the access waits for them. */
+  subject_pending?: boolean;
   role_id: string;
   role_name: string;
   created_at: string | null;
+}
+
+/** A role a group has once for a site: in the site and every facility currently at it (issue #26). */
+export interface SiteGroupGrant {
+  id: number;
+  site_id: string;
+  group_uid: string;
+  group_name: string;
+  group_active: boolean;
+  group_source: string | null;
+  role_id: string;
+  role_name: string;
+  created_by: string | null;
+  created_at: string | null;
+}
+
+export interface SiteGroupGrantPreview {
+  site_id: string;
+  group_uid: string;
+  group_name: string;
+  group_active: boolean;
+  role_id: string;
+  role_name: string;
+  workspaces: string[];
+  people: { user_id: string; email: string; name: string | null }[];
+}
+
+export interface InvitedPerson {
+  email: string;
+  user_id: string;
+  added: boolean;
+  granted: boolean;
+  joined?: boolean;
+  signed_in: boolean;
+  emailed: boolean;
+  error: string | null;
+}
+
+export interface InvitationResult {
+  workspace_id: string;
+  role_id: string | null;
+  role_name: string | null;
+  group_uid?: string | null;
+  group_name?: string | null;
+  group_granted?: boolean;
+  people: InvitedPerson[];
+  not_addresses: string[];
 }
 
 export interface RoleBindingInput {
@@ -918,6 +972,12 @@ export interface DirectoryGroup {
   source: string;
   active: boolean;
   member_count: number;
+  /** The workspaces where it holds a role: changing its members changes access there. */
+  workspaces?: string[];
+  /** Owned by this site (null: the installation). */
+  home_site_id?: string | null;
+  /** Roles it has site-wide. */
+  site_grants?: SiteGroupGrant[];
 }
 
 export interface DirectoryGroupMember {
@@ -927,6 +987,12 @@ export interface DirectoryGroupMember {
   username: string | null;
   active: boolean;
   source: string;
+}
+
+export interface ScopedAdministrator {
+  user_id: string;
+  email: string;
+  name: string | null;
 }
 
 export interface DirectoryStatus {
@@ -1642,6 +1708,15 @@ export interface BeamConversionReport {
   survey_closure_m: number | null;
   not_executed?: string[];
   tunes?: Record<string, string>;
+  /** Every sequence in the file, when it has several; `chosen` when only one was read. */
+  sequences?: string[];
+  chosen?: string;
+  placements?: number;
+  paths?: { id: string; elements: number; ring: boolean; total_bend: number }[];
+  /** One name given two different types: the first stays. */
+  conflicts?: { component: string; kept: string; also: string; path: string }[];
+  /** One component with different values per path: each path keeps its own. */
+  differs?: { component: string; parameter: string; values: Record<string, unknown> }[];
 }
 
 export interface BeamValues {

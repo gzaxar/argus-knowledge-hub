@@ -224,7 +224,14 @@ export function EditorV2({ initial, editing }: { initial: BeamModelV2; editing: 
           <button type="button" onClick={() => downloadJson(`${doc.model.id || "beam-model"}.beam.json`, tidyV2(doc, vocab.data))}
                   className="rounded border border-slate-300 px-3 py-2 text-sm">Download .beam.json</button>
           {save.isError && <span className="text-sm text-rose-700">{errorText(save.error)}</span>}
-          {report && (
+          {report && report.state !== "published" && (
+            <span className="text-sm text-amber-800" role="status">
+              Not applied yet: this save removes records that need a person&apos;s approval, so nothing has changed.{" "}
+              <button type="button" className="underline" onClick={() => navigate("/review")}>Approve it in the review queue</button>
+              , then save again.
+            </span>
+          )}
+          {report && report.state === "published" && (
             <span className="text-sm text-emerald-700">
               Saved: {report.elements} components, {report.values} values{report.levels ? ` · ${report.levels.join(", ")}` : ""}.{" "}
               <button type="button" className="underline" onClick={() => navigate("/beam-model")}>Open the beam model</button>

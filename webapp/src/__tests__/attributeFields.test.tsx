@@ -1,3 +1,4 @@
+import { oneVendorField } from "../lib/schemaAttributes";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, catalogueCollectionsApi } from "../api/client";
@@ -52,5 +53,29 @@ describe("adding a library model", () => {
     fireEvent.change(screen.getByLabelText("Search a product model"), { target: { value: "5650" } });
     fireEvent.click(await screen.findByRole("option", { name: /NPort 5650-8/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("needs the package it");
+  });
+});
+
+describe("a Product Model's one vendor field", () => {
+  const defs = [{ key: "vendor", name: "Vendor", type: "string" }, { key: "vendor_ref", name: "Supplied by", type: "reference" },
+                { key: "model_code", name: "Model code", type: "string" }] as SchemaAttribute[];
+  const names = (a: SchemaAttribute[]) => a.map((x) => `${x.key}:${x.name}`);
+
+  it("offers only the reference, called Vendor, on a form", () => {
+    expect(names(oneVendorField(defs, { vendor: "Keysight", vendor_ref: "u" }, "form")))
+      .toEqual(["vendor_ref:Vendor", "model_code:Model code"]);
+  });
+  it("asks an older record for the vendor its text names", () => {
+    const [field] = oneVendorField(defs, { vendor: "Keysight" }, "form");
+    expect(field.key).toBe("vendor_ref");
+    expect(field.description).toMatch(/“Keysight” is not linked/);
+  });
+  it("shows the one value on a page: the reference, or the text not linked yet", () => {
+    expect(names(oneVendorField(defs, { vendor: "Keysight", vendor_ref: "u" }, "page"))[0]).toBe("vendor_ref:Vendor");
+    expect(names(oneVendorField(defs, { vendor: "Keysight" }, "page"))).toEqual(["vendor:Vendor", "model_code:Model code"]);
+  });
+  it("leaves other types alone", () => {
+    const others = [defs[0], defs[2]];
+    expect(oneVendorField(others, { vendor: "x" }, "form")).toBe(others);
   });
 });

@@ -61,6 +61,7 @@ export function ImportConfigForm() {
   // The chain the configuration implies, each one optional.
   const [inferElements, setInferElements] = useState(false);
   const [inferControllers, setInferControllers] = useState(false);
+  const [clearPrevious, setClearPrevious] = useState(false);
   const [itWorkspace, setItWorkspace] = useState("");
   const [linkInventory, setLinkInventory] = useState(true);
   const [aiUnrecognised, setAiUnrecognised] = useState(false);
@@ -113,6 +114,7 @@ export function ImportConfigForm() {
       setCreateMissingNodes(existing.data.params.create_missing_nodes !== false);
       setInferElements(existing.data.params.infer_elements === true);
       setInferControllers(existing.data.params.infer_controllers === true);
+      setClearPrevious(existing.data.params.clear_previous === true);
       setItWorkspace(param("it_workspace"));
       setLinkInventory(existing.data.params.link_inventory !== false);
       setAiUnrecognised(existing.data.params.ai_unrecognised === true);
@@ -169,6 +171,7 @@ export function ImportConfigForm() {
               create_missing_nodes: createMissingNodes,
               infer_elements: inferElements,
               infer_controllers: inferElements && inferControllers,
+              clear_previous: clearPrevious,
               it_workspace: itWorkspace || null,
               link_inventory: inferElements && linkInventory,
               ai_unrecognised: inferElements && aiUnrecognised,
@@ -563,6 +566,12 @@ export function ImportConfigForm() {
                     channels imply, marked as inferred and waiting for someone to confirm.
                   </p>
                   <div className="space-y-2">
+                    <Check
+                      checked={clearPrevious}
+                      onChange={setClearPrevious}
+                      label="Clear what this file no longer declares"
+                      hint="Retires the records an earlier import of this file made and this revision no longer states, such as a renamed IOC. Records that did not change are left alone either way, and a retired one returns if the file states it again."
+                    />
                     <Check
                       checked={inferElements}
                       onChange={setInferElements}

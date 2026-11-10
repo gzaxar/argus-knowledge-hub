@@ -660,7 +660,7 @@ whole is a different kind of thing from its parts.
 | Type uid | `{workspace_id}:argus-object:{slug}` — the convention the other two seeders use | `sparc:argus-object:ion-pump` |
 | Type name | The operator's word, singular, title case — MCP search matches the name | `Ion Pump`, not `VacuumPumpDevice` |
 | Object key | `<FACILITY>-<FAMILY>-<NNNN>`, anchored `^[A-Z][A-Z0-9]{1,9}-\d{1,8}$` | `SPARC-QUA-0012` |
-| Control-plane key | Keep the importer's scheme, which already carries the beamline | `SPARC:DEV:histar:GUNQUA01` |
+| Control-plane key | The importer's scheme, with its parts joined by `-`: a `:` reads as a PV name, which a key is not. The uid stays derived from the same parts joined by `:`, so a key's spelling never changes a uid | `SPARC-DEV-histar-GUNQUA01` |
 | Attribute key | `argus_*` when shared with tickets or documents; bare for the four reserved by photo identification and for the control plane's existing keys | `argus_system`, `serial`, `pv_prefix` |
 
 The facility prefix on object keys is **mandatory**, not cosmetic: `assets.key` is unique
@@ -1020,7 +1020,7 @@ beamline workspace hanging from one catalogue:
 - **A person outranks it.** What is already on an inferred object stays: a serial, a location or a
   rewritten description survives every later read. Inference only fills what is missing.
 - **Stable.** An asset's key is its channel's (`SPARC:AST:vac-gunvpc:GUNSIP01`), an element's is
-  its name (`SPARC:ELM:GUNQUA01`), so a re-read updates rather than duplicates, and turning the
+  its name (`SPARC-ELM-GUNQUA01`), so a re-read updates rather than duplicates, and turning the
   option on after an import adds to it without disturbing what was there.
 - **Typed by the catalogue.** It needs the catalogue's types and says so if they are missing.
 

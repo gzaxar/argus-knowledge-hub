@@ -5,6 +5,7 @@ import { assetsApi, schemasApi, workspacesApi } from "../../api/client";
 import { useShowKeys } from "../../api/displayPrefs";
 import { has, useCapabilities } from "../../api/useCapabilities";
 import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
+import { isLive } from "../../lib/liveRecords";
 import { AttributeFilterInput } from "../../components/AttributeFilterInput";
 import { activeFilterCount, defaultFilterFor, FilterState, matchesFilters } from "../../components/AttributeFilters";
 import {
@@ -37,6 +38,7 @@ export function AssetSearch() {
   const { get, set } = useBrowseParams();
   const q = get("q");
   const schemaUid = get("type") || null;
+  const showRetired = get("retired") === "1";
   // A workspace at a site (docs/sites.md) sees its site's places with its own records by default.
   const mine = useQuery({ queryKey: ["my-workspaces"], queryFn: workspacesApi.listMine, staleTime: 60_000 });
   const here = (mine.data ?? []).find((w) => w.id === ws);
@@ -61,15 +63,15 @@ export function AssetSearch() {
   // Beyond the key and the name: labels (QR codes, barcodes, former keys, aliases), serial, inventory number.
   const needle = q.trim();
   const byIdentifier = useQuery({
-    queryKey: ["asset-match", needle],
-    queryFn: () => assetsApi.matching(needle),
+    queryKey: ["asset-match", needle, showRetired],
+    queryFn: () => assetsApi.matching(needle, showRetired),
     enabled: needle.length >= 2,
     staleTime: 30_000,
   });
-  const inScope = useMemo(() => (assets.data ?? []).filter((a) =>
+  const inScope = useMemo(() => (assets.data ?? []).filter((a) => (showRetired ? !a.deleted_at : isLive(a))).filter((a) =>
     ws === null || owner === "all" || (owner === "own" ? a.workspace_id === ws
       : owner === "site" ? a.workspace_id === ws || (!!siteId && a.workspace_id === siteId)
-      : a.workspace_id !== ws)), [assets.data, owner, ws, siteId]);
+      : a.workspace_id !== ws)), [assets.data, owner, ws, siteId, showRetired]);
   const counts = useMemo(() => countBy(inScope, (a) => a.schema_uid), [inScope]);
   const matched = useMemo(() => {
     const n = needle.toLowerCase();
@@ -128,6 +130,10 @@ export function AssetSearch() {
               <option value="shared">Shared with it</option>
             </ToolbarSelect>
           )}
+          <label className="flex items-center gap-1.5 whitespace-nowrap text-sm text-slate-600">
+            <input type="checkbox" checked={showRetired} onChange={(e) => set({ retired: e.target.checked ? "1" : null })} />
+            Show retired
+          </label>
           <ColumnSettings columns={columns} />
           {has(features, "map") && (
             <ViewSwitch views={[
@@ -205,6 +211,7 @@ export function AssetSearch() {
                   <td className="min-w-0 px-3 py-2">
                     <Link to={`/assets/${a.uid}`} className="block truncate font-medium text-slate-900 hover:underline" title={a.name}>
                       {a.name}
+                      {!isLive(a) && <span className="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700">{a.record_status}</span>}
                     </Link>
                     {/* What the hidden columns would say, on a narrow screen. */}
                     <Clip className="text-xs text-slate-500 sm:hidden" title={`${a.type} · ${a.key}`}>{a.type} · {a.key}</Clip>

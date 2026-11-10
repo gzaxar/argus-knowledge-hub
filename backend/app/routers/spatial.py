@@ -18,7 +18,7 @@ from app.models.workspace import Workspace
 from app.routers.ledger import actor_of
 from app.services import spatial
 from app.services.permissions import resolve_permission
-from app.services.visibility import asset_visible_in, visible_assets_clause
+from app.services.visibility import asset_visible_in, live_assets_clause, visible_assets_clause
 
 router = APIRouter(prefix="/v1", tags=["locations"])
 
@@ -29,6 +29,11 @@ class PointIn(BaseModel):
     accuracy_m: Optional[float] = None
     crs: Optional[str] = None              # WGS 84 only in this release
     note: Optional[str] = None
+
+
+class LocationIn(PointIn):
+    # How it was known: a point chosen by hand, or where the device stood ("field", with its GPS accuracy).
+    source: Literal["manual", "field"] = "manual"
 
 
 class ObservationIn(PointIn):
@@ -62,6 +67,15 @@ def _readable_asset(db: Session, uid: str, workspace_id: str, grants) -> Asset:
     return asset
 
 
+def _may_modify(db: Session, identity, workspace_id: str) -> bool:
+    """What PUT …/location will answer: the same check, asked in advance."""
+    try:
+        require_permission("modify")(identity=identity, db=db, x_workspace_id=workspace_id)
+    except HTTPException:
+        return False
+    return True
+
+
 def _when(value: Optional[str]):
     if not value:
         return None
@@ -76,9 +90,9 @@ def _when(value: Optional[str]):
 
 @router.get("/assets/{uid}/location")
 def get_location(uid: str, workspace_id: str = Depends(require_permission("read")), grants=Depends(get_grants),
-                 db: Session = Depends(get_db)):
-    """The record's approved location (or none), whether its type may have one and on which map layer, the
-    history of its approved locations, and the field observations of it."""
+                 identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """The record's approved location (or none), whether its type may have one and on which map layer, whether
+    this person may set it (`may_set`), the history of its approved locations, and the field observations of it."""
     asset = _readable_asset(db, uid, workspace_id, grants)
     locatable, layer = spatial.placement(db, asset.schema_uid)
     if spatial.location_hidden(db, asset, grants):
@@ -87,6 +101,7 @@ def get_location(uid: str, workspace_id: str = Depends(require_permission("read"
     approved = spatial.current(db, uid)
     shapes = {r: spatial.current(db, uid, r) for r in ("route", "outline")}
     return {"uid": uid, "locatable": locatable, "map_layer": layer, "hidden": False,
+            "may_set": locatable and asset.workspace_id == workspace_id and _may_modify(db, identity, workspace_id),
             "location": spatial.feature_out(approved) if approved else None,
             "route": spatial.feature_out(shapes["route"], db) if shapes["route"] else None,
             "outline": spatial.feature_out(shapes["outline"], db) if shapes["outline"] else None,
@@ -97,7 +112,7 @@ def get_location(uid: str, workspace_id: str = Depends(require_permission("read"
 
 
 @router.put("/assets/{uid}/location")
-def set_location(uid: str, body: PointIn, workspace_id: str = Depends(require_permission("modify")),
+def set_location(uid: str, body: LocationIn, workspace_id: str = Depends(require_permission("modify")),
                  grants=Depends(get_grants), identity=Depends(get_identity), db: Session = Depends(get_db)):
     """Approve a location for the record (WGS 84 latitude and longitude, with its accuracy). The one it had is
     kept in the history."""
@@ -106,7 +121,7 @@ def set_location(uid: str, body: PointIn, workspace_id: str = Depends(require_pe
         raise HTTPException(status_code=403, detail="Not permitted")
     try:
         geometry = spatial.point(body.latitude, body.longitude, crs=body.crs, accuracy_m=body.accuracy_m)
-        feature = spatial.set_location(db, asset, geometry, actor=actor_of(identity), source="manual",
+        feature = spatial.set_location(db, asset, geometry, actor=actor_of(identity), source=body.source,
                                        accuracy_m=body.accuracy_m, note=body.note)
     except spatial.SpatialError as e:
         db.rollback()
@@ -295,6 +310,8 @@ def _scope(db: Session, identity, workspaces: list[str], types: Optional[str], s
         cond = cond & tf
     if status:
         cond = cond & Asset.record_status.in_([s.strip() for s in status.split(",") if s.strip()])
+    else:
+        cond = cond & live_assets_clause()
     return cond
 
 
