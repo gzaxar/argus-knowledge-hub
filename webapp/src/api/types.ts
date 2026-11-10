@@ -924,6 +924,40 @@ export interface SiteGroupGrant {
   created_at: string | null;
 }
 
+export interface AccessEvent {
+  id: number;
+  at: string;
+  actor: string | null;
+  kind: string;
+  workspace_id: string | null;
+  site_id: string | null;
+  group_uid: string | null;
+  subject_type: string | null;
+  subject: string | null;
+  role_id: string | null;
+  detail: Record<string, unknown>;
+}
+
+/** What moving a facility to another site does to access (issue #26). */
+export interface SiteMoveAccess {
+  workspace_id: string;
+  from_site: string | null;
+  to_site: string | null;
+  loses: (SiteGroupGrant & { people: string[] })[];
+  gains: (SiteGroupGrant & { people: string[] })[];
+  blocked: { binding_id: number; group_uid: string; group_name: string; home_site_id: string; role_id: string }[];
+}
+
+export interface GroupMovePreview {
+  group_uid: string;
+  group_name: string;
+  from_site: string | null;
+  to_site: string | null;
+  blocked: { kind: "direct" | "site"; workspace_id?: string; site_id?: string; role_id: string }[];
+  governed_by: string;
+  preview: boolean;
+}
+
 export interface SiteGroupGrantPreview {
   site_id: string;
   group_uid: string;
@@ -1004,9 +1038,20 @@ export interface DirectoryStatus {
   last_synced_at: string | null;
 }
 
+export interface PermissionSource {
+  source: "direct" | "group" | "site" | "legacy" | "site_administrator" | "instance_administrator";
+  label: string;
+  role?: string;
+  group?: string;
+  group_uid?: string;
+  site?: string | null;
+}
+
 export interface EffectivePermissions {
   workspace_id: string;
   is_admin: boolean;
+  /** Where the rights come from (issue #26). */
+  sources?: PermissionSource[];
   objects: string[];
   tickets: string[];
   documents: string[];

@@ -122,3 +122,50 @@ def out_of_scope_after_move(db: Session, workspace_id: str, new_site_id: Optiona
         Group.home_site_id.isnot(None), Group.home_site_id != (new_site_id or ""))).all()
     return [{"binding_id": b.id, "group_uid": g.uid, "group_name": g.name, "home_site_id": g.home_site_id,
              "role_id": b.role_id} for b, g in rows]
+
+
+def _members(db: Session, group_uid: str) -> list[str]:
+    return list(db.scalars(select(User.email).join(GroupMember, GroupMember.user_id == User.id)
+                           .where(GroupMember.group_uid == group_uid).order_by(User.email)))
+
+
+def move_preview(db: Session, workspace_id: str, new_site_id: Optional[str]) -> dict:
+    """What moving a facility to another site (or to none) does to access, before it is done: the site-wide grants it
+    stops inheriting and those it starts to, with the people they reach, and the direct grants to groups of its old
+    site that block the move until they are settled."""
+    ws = db.get(Workspace, workspace_id)
+    old = ws.site_id if ws is not None else None
+
+    def grants(site_id: Optional[str]) -> list[dict]:
+        if not site_id:
+            return []
+        out = []
+        for g in of_site(db, site_id):
+            if g["group_active"]:
+                out.append({**g, "people": _members(db, g["group_uid"])})
+        return out
+
+    key = lambda g: (g["group_uid"], g["role_id"])  # noqa: E731
+    before, after = grants(old), grants(new_site_id)
+    kept = {key(g) for g in before} & {key(g) for g in after}
+    return {"workspace_id": workspace_id, "from_site": old, "to_site": new_site_id or None,
+            "loses": [g for g in before if key(g) not in kept], "gains": [g for g in after if key(g) not in kept],
+            "blocked": out_of_scope_after_move(db, workspace_id, new_site_id)}
+
+
+def move_group_preview(db: Session, group: Group, new_site_id: Optional[str]) -> dict:
+    """Moving a local group to a site, or back to the installation: which of its grants would be out of the new scope
+    (they block the move), and who would govern it from then on."""
+    blocked = []
+    if new_site_id:
+        for b in db.scalars(select(RoleBinding).where(RoleBinding.subject_type == "group",
+                                                      RoleBinding.subject_id == group.uid)):
+            if not in_site_scope(db, new_site_id, b.workspace_id):
+                blocked.append({"kind": "direct", "workspace_id": b.workspace_id, "role_id": b.role_id})
+        for g in db.scalars(select(SiteGroupRoleBinding).where(SiteGroupRoleBinding.group_uid == group.uid,
+                                                               SiteGroupRoleBinding.site_id != new_site_id)):
+            blocked.append({"kind": "site", "site_id": g.site_id, "role_id": g.role_id})
+    return {"group_uid": group.uid, "group_name": group.name, "from_site": group.home_site_id,
+            "to_site": new_site_id or None, "blocked": blocked,
+            "governed_by": f"the administrators of the site {new_site_id}" if new_site_id
+            else "the installation's administrators, and those who manage every workspace where it has a role"}

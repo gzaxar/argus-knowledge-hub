@@ -15,7 +15,7 @@ from app.models.workspace import Workspace, SiteAdministrator
 from app.models.user import User
 from app.services.invitations import ADDRESS, person
 from app.services.permissions import administers_site
-from app.services import sites
+from app.services import access_log, sites
 
 router = APIRouter(prefix="/v1/admin/sites", tags=["sites"])
 
@@ -69,6 +69,8 @@ def add_site_administrator(site_id: str, body: SiteAdministratorIn,
         SiteAdministrator.site_id == site_id, SiteAdministrator.user_id == user.id)) is not None:
         raise HTTPException(status_code=409, detail="Already a site administrator")
     db.add(SiteAdministrator(site_id=site_id, user_id=user.id))
+    access_log.record(db, "site.administrator_added", access_log.actor_of(identity), site_id=site_id,
+                      subject_type="user", subject_id=user.id)
     db.commit()
     return {"user_id": user.id, "email": user.email, "name": user.name}
 
@@ -82,6 +84,8 @@ def remove_site_administrator(site_id: str, user_id: str,
     if row is None:
         raise HTTPException(status_code=404, detail="Site administrator not found")
     db.delete(row)
+    access_log.record(db, "site.administrator_removed", access_log.actor_of(identity), site_id=site_id,
+                      subject_type="user", subject_id=user_id)
     db.commit()
 
 
@@ -121,6 +125,8 @@ def create_site_group_grant(site_id: str, body: SiteGroupGrantIn, identity: Iden
     from app.services import site_group_grants
     _site_manager(identity, db, site_id)
     out = site_group_grants.grant(db, site_id, body.group_uid, body.role_id, _actor(identity))
+    access_log.record(db, "site_role.granted", _actor(identity), site_id=site_id, group_uid=body.group_uid,
+                      subject_type="group", subject_id=body.group_uid, role_id=body.role_id)
     db.commit()
     return out
 
@@ -130,7 +136,11 @@ def revoke_site_group_grant(site_id: str, grant_id: int, identity: Identity = De
                             db: Session = Depends(get_db)):
     from app.services import site_group_grants
     _site_manager(identity, db, site_id)
+    from app.models.role import SiteGroupRoleBinding
+    row = db.get(SiteGroupRoleBinding, grant_id)
     site_group_grants.revoke(db, site_id, grant_id)
+    access_log.record(db, "site_role.revoked", _actor(identity), site_id=site_id, group_uid=row.group_uid,
+                      subject_type="group", subject_id=row.group_uid, role_id=row.role_id)
     db.commit()
 
 
@@ -161,10 +171,14 @@ def set_role(workspace_id: str, body: RoleIn, identity: Identity = Depends(get_i
     """Make a workspace a site, or stop it being one (refused while facilities are at it)."""
     _admin(identity)
     try:
+        before = db.get(Workspace, workspace_id).role if db.get(Workspace, workspace_id) else None
         ended = sites.set_role(db, workspace_id, body.site)
     except sites.SiteProblem as e:
         db.rollback()
         _problem(e)
+    if (before == sites.ROLE) != body.site:
+        access_log.record(db, "site.role_set" if body.site else "site.role_removed", access_log.actor_of(identity),
+                          site_id=workspace_id)
     db.commit()
     return {"workspace_id": workspace_id, "role": db.get(Workspace, workspace_id).role, "ended": ended}
 
@@ -184,15 +198,25 @@ def set_site(workspace_id: str, body: SiteIn, identity: Identity = Depends(get_i
     ws = db.get(Workspace, workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    if ws.site_id and ws.site_id != body.site_id and not body.confirm:
+    from app.services import site_group_grants
+    changing = (ws.site_id or None) != (body.site_id or None)
+    if changing and not body.confirm:
+        # What it does to access first: the site-wide grants it stops or starts inheriting, and what blocks it.
+        access = site_group_grants.move_preview(db, workspace_id, body.site_id)
         affected = sites.affected_by_withdrawal(db, ws.site_id, list(db.scalars(
-            select(Asset.uid).where(Asset.workspace_id == ws.site_id))), only_workspace=workspace_id)
-        if affected:
-            return {"workspace_id": workspace_id, "site_id": ws.site_id, "preview": True, "would_end": affected}
+            select(Asset.uid).where(Asset.workspace_id == ws.site_id))), only_workspace=workspace_id) \
+            if ws.site_id else []
+        if affected or access["loses"] or access["gains"] or access["blocked"]:
+            return {"workspace_id": workspace_id, "site_id": ws.site_id, "preview": True, "would_end": affected,
+                    "access": access}
+    before = ws.site_id
     try:
         ended = sites.set_site(db, workspace_id, body.site_id, actor=identity.user.id)
     except sites.SiteProblem as e:
         db.rollback()
         _problem(e)
+    if changing:
+        access_log.record(db, "site.facility_moved", access_log.actor_of(identity), workspace_id=workspace_id,
+                          site_id=body.site_id or before, from_site=before, to_site=body.site_id or None)
     db.commit()
     return {"workspace_id": workspace_id, "site_id": body.site_id, "ended": ended}

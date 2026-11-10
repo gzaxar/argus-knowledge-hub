@@ -200,3 +200,85 @@ def test_a_directory_group_can_be_granted_site_wide_and_stays_read_only(lab):
     assert e.value.status_code == 409
     db.delete(ldap)
     db.commit()
+
+
+# --- second part: where rights come from, previews before moving, the record of changes, archives --------------
+
+def test_my_permissions_say_where_each_right_comes_from(lab):
+    db, ids = lab["db"], lab["ids"]
+    grant(lab, "reporter")
+    roles.create_binding(ids["btf"], RoleBindingCreate(subject_type="user", subject_id=lab["people"]["member"].id,
+                                                       role_id="viewer"), identity=as_(lab["people"]["ws_admin"]), db=db)
+    out = roles.my_permissions(ids["btf"], identity=as_(lab["people"]["member"]), db=db)
+    kinds = {(s["source"], s.get("role")) for s in out.sources}
+    assert ("direct", "Viewer") in kinds and ("site", "Reporter") in kinds
+    site = next(s for s in out.sources if s["source"] == "site")
+    assert site["site"] == ids["site"] and site["group"] == lab["ops"].name and "site-wide" in site["label"]
+
+
+def test_an_access_review_names_site_wide_grants(lab):
+    from app.services import access_review
+    grant(lab, "reporter")
+    snap = access_review.snapshot(lab["db"], lab["ids"]["btf"])
+    member = next(p for p in snap["people"] if p["user"] == lab["people"]["member"].id)
+    assert any("site-wide" in r for r in member["roles"])
+    assert any(g.get("site_wide_from") == lab["ids"]["site"] for g in snap["groups"])
+
+
+def test_moving_a_facility_previews_who_loses_and_gains_before_anything_changes(lab):
+    db, ids = lab["db"], lab["ids"]
+    grant(lab, "reporter")
+    admin = as_(User(id=f"adm-{lab['t']}", email="adm@infn.it", is_admin=True))
+    out = sites.set_site(ids["sparc"], sites.SiteIn(site_id=ids["other_site"]), identity=admin, db=db)
+    assert out["preview"] and out["access"]["to_site"] == ids["other_site"]
+    [lost] = out["access"]["loses"]
+    assert lost["group_name"] == lab["ops"].name and lost["people"] == [lab["people"]["member"].email]
+    assert db.get(Workspace, ids["sparc"]).site_id == ids["site"], "a preview changes nothing"
+    done = sites.set_site(ids["sparc"], sites.SiteIn(site_id=ids["other_site"], confirm=True), identity=admin, db=db)
+    assert done["site_id"] == ids["other_site"] and not can(lab, "member", "sparc")
+
+
+def test_every_change_to_access_is_recorded(lab):
+    db, ids = lab["db"], lab["ids"]
+    out = grant(lab, "reporter")
+    roles.create_binding(ids["btf"], RoleBindingCreate(subject_type="group", subject_id=lab["ops"].uid, role_id="viewer"),
+                         identity=as_(lab["people"]["ws_admin"]), db=db)
+    sites.revoke_site_group_grant(ids["site"], out["id"], identity=as_(lab["people"]["site_admin"]), db=db)
+    events = roles.access_events(ids["btf"], identity=as_(lab["people"]["ws_admin"]), db=db)
+    kinds = [e["kind"] for e in events]
+    assert kinds[:3] == ["site_role.revoked", "role.granted", "site_role.granted"]
+    assert events[0]["actor"] == lab["people"]["site_admin"].email and events[0]["subject"] == lab["ops"].name
+
+
+def test_a_group_moves_to_a_site_only_when_its_grants_fit_and_back_only_by_an_instance_administrator(lab):
+    db, ids, t = lab["db"], lab["ids"], lab["t"]
+    from app.schemas.group import GroupHomeIn
+    loose = Group(uid=f"loose-{t}", name=f"Loose {t}", source="local", active=True)
+    db.add(loose)
+    db.commit()
+    admin = as_(User(id=f"adm-{t}", email="adm@infn.it", is_admin=True))
+    roles.create_binding(ids["other"], RoleBindingCreate(subject_type="group", subject_id=loose.uid, role_id="viewer"),
+                         identity=admin, db=db)
+    blocked = groups.move_group(loose.uid, GroupHomeIn(home_site_id=ids["site"], confirm=True), workspace_id=None,
+                                identity=admin, db=db)
+    assert blocked["preview"] and blocked["blocked"] == [{"kind": "direct", "workspace_id": ids["other"], "role_id": "viewer"}]
+    assert db.get(Group, loose.uid).home_site_id is None
+    with pytest.raises(HTTPException) as e:
+        groups.move_group(lab["ops"].uid, GroupHomeIn(home_site_id=None, confirm=True), workspace_id=None,
+                          identity=as_(lab["people"]["site_admin"]), db=db)
+    assert e.value.status_code == 403
+    moved = groups.move_group(lab["ops"].uid, GroupHomeIn(home_site_id=None, confirm=True), workspace_id=None,
+                              identity=admin, db=db)
+    assert not moved["preview"] and db.get(Group, lab["ops"].uid).home_site_id is None
+    db.delete(db.get(Group, loose.uid))
+    db.commit()
+
+
+def test_a_facility_only_archive_keeps_its_inherited_access_as_a_dependency(lab):
+    from app.portability import exporter
+    grant(lab, "reporter")
+    deps = exporter._site_dependencies(lab["db"], type("Scope", (), {"workspaces": [lab["ids"]["btf"]]})())
+    assert deps == [{"workspace": lab["ids"]["btf"], "site": lab["ids"]["site"],
+                     "inherited": [{"group": lab["ops"].name, "group_uid": lab["ops"].uid, "role": "reporter"}]}]
+    both = exporter._site_dependencies(lab["db"], type("Scope", (), {"workspaces": [lab["ids"]["btf"], lab["ids"]["site"]]})())
+    assert both == [], "with its site in the archive, the grant itself travels"

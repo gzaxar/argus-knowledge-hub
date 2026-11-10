@@ -8,9 +8,9 @@ from app.auth import Identity, OidcIdentity, PatIdentity, get_identity, require_
 from app.db import get_db
 from app.models.group import Group, GroupMember, GroupAdministrator
 from app.models.user import User
-from app.schemas.group import (DirectoryStatusOut, GroupCreate, GroupMemberOut, GroupMembersIn, GroupOut,
+from app.schemas.group import (GroupHomeIn, DirectoryStatusOut, GroupCreate, GroupMemberOut, GroupMembersIn, GroupOut,
                                GroupUpdate, GroupAdministratorOut, GroupAdministratorIn)
-from app.services import local_groups, site_group_grants
+from app.services import access_log, local_groups, site_group_grants
 from app.services.directory import provider_name
 from app.services.directory_sync import sync_directory
 from app.services.permissions import resolve_permission
@@ -102,10 +102,22 @@ def create_group(body: GroupCreate, workspace_id: str = Depends(require_permissi
     else:
         _require_owner_or_admin(workspace_id, identity, db)
     group = local_groups.create(db, body.name, body.description, body.home_site_id)
+    access_log.record(db, "group.created", access_log.actor_of(identity), group_uid=group.uid,
+                      site_id=body.home_site_id, workspace_id=None if body.home_site_id else workspace_id, name=group.name)
     if isinstance(identity, OidcIdentity):
         db.add(GroupAdministrator(group_uid=group.uid, user_id=identity.user.id))
+        access_log.record(db, "group.administrator_added", identity.user.id, group_uid=group.uid,
+                          subject_type="user", subject_id=identity.user.id)
     db.commit()
     return _out(db, group)
+
+
+@router.get("/groups/{uid}/access-events")
+def group_access_events(uid: str, workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
+                        identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """The recorded changes to this group: members, administrators, its site, the roles it was given."""
+    _may_read_group(db, identity, _group(db, uid), workspace_id)
+    return access_log.for_group(db, uid)
 
 
 @router.get("/groups/{uid}/administrators", response_model=list[GroupAdministratorOut])
@@ -133,6 +145,8 @@ def add_group_administrator(uid: str, body: GroupAdministratorIn,
         GroupAdministrator.group_uid == uid, GroupAdministrator.user_id == user.id)):
         raise HTTPException(status_code=409, detail="Already a group administrator")
     db.add(GroupAdministrator(group_uid=uid, user_id=user.id))
+    access_log.record(db, "group.administrator_added", access_log.actor_of(identity), group_uid=uid,
+                      subject_type="user", subject_id=user.id)
     db.commit()
     return GroupAdministratorOut(user_id=user.id, email=user.email, name=user.name)
 
@@ -148,6 +162,8 @@ def remove_group_administrator(uid: str, user_id: str,
     if row is None:
         raise HTTPException(status_code=404, detail="Group administrator not found")
     db.delete(row)
+    access_log.record(db, "group.administrator_removed", access_log.actor_of(identity), group_uid=uid,
+                      subject_type="user", subject_id=user_id)
     db.commit()
 
 
@@ -157,14 +173,51 @@ def update_group(uid: str, body: GroupUpdate, workspace_id: str = Depends(requir
     """Rename a local group, describe it, or deactivate it (its roles then stop applying; nothing is deleted)."""
     group = _group(db, uid)
     local_groups.require_manage(db, identity, group, workspace_id)
+    before = {"name": group.name, "active": group.active}
     if body.name is not None and body.name.strip():
         group.name = body.name.strip()
     if body.description is not None:
         group.description = body.description.strip() or None
     if body.active is not None:
         group.active = body.active
+    if group.active != before["active"]:
+        access_log.record(db, "group.activated" if group.active else "group.deactivated",
+                          access_log.actor_of(identity), group_uid=uid)
+    if group.name != before["name"]:
+        access_log.record(db, "group.renamed", access_log.actor_of(identity), group_uid=uid,
+                          before=before["name"], after=group.name)
     db.commit()
     return _out(db, group)
+
+
+@router.put("/groups/{uid}/home")
+def move_group(uid: str, body: GroupHomeIn, workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
+               identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """Give a local group to a site, or back to the installation (issue #26). Without `confirm`, the preview: the grants
+    that would be out of the new scope (they block it until settled) and who would govern it. To a site: an
+    administrator of that site who may already change the group, or the installation's. To the installation: the
+    installation's administrators only, since it widens where the group can be given roles."""
+    from app.routers.sites import _site_manager
+    group = _group(db, uid)
+    if group.source != "local":
+        raise HTTPException(status_code=409, detail=f"{group.name} comes from the directory: it belongs to no site")
+    user = getattr(identity, "user", None)
+    instance_admin = user is not None and user.is_admin and getattr(identity, "token", None) is None
+    if body.home_site_id:
+        _site_manager(identity, db, body.home_site_id)
+        if not instance_admin:
+            local_groups.require_manage(db, identity, group, workspace_id)
+    elif not instance_admin:
+        raise HTTPException(status_code=403, detail="Only the installation's administrators give a group to the installation")
+    preview = site_group_grants.move_group_preview(db, group, body.home_site_id)
+    if not body.confirm or preview["blocked"]:
+        return {**preview, "preview": True}
+    before = group.home_site_id
+    group.home_site_id = body.home_site_id or None
+    access_log.record(db, "group.moved", access_log.actor_of(identity), group_uid=uid, site_id=body.home_site_id,
+                      from_site=before, to_site=body.home_site_id or None)
+    db.commit()
+    return {**preview, "preview": False}
 
 
 @router.post("/groups/{uid}/members")
@@ -190,6 +243,10 @@ def add_group_members(uid: str, body: GroupMembersIn, workspace_id: Optional[str
     except invitations.InviteError as e:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(e)) from e
+    for p in out["people"]:
+        if p.get("joined"):
+            access_log.record(db, "group.member_added", access_log.actor_of(identity), group_uid=uid,
+                              subject_type="user", subject_id=p["user_id"])
     db.commit()
     return out
 
@@ -201,6 +258,8 @@ def remove_group_member(uid: str, user_id: str, workspace_id: Optional[str] = He
     local_groups.require_manage_members(db, identity, group, workspace_id)
     if not local_groups.remove_member(db, group, user_id):
         raise HTTPException(status_code=404, detail="Not a member of this group")
+    access_log.record(db, "group.member_removed", access_log.actor_of(identity), group_uid=uid,
+                      subject_type="user", subject_id=user_id)
     db.commit()
 
 

@@ -203,6 +203,7 @@ function GroupDetail({ group: g, onChanged, editable, canAppoint, currentUserId 
               {add.data.not_addresses.length > 0 && <li className="text-red-600">Not addresses: {add.data.not_addresses.join(", ")}</li>}
             </ul>
           )}
+          {canAppoint && <MoveGroup group={g} onDone={done} />}
           {canAppoint && <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2">
             <input value={rename} onChange={(e) => setRename(e.target.value)} aria-label="Group name"
                    className="w-56 rounded border border-slate-300 px-2 py-1" />
@@ -217,6 +218,41 @@ function GroupDetail({ group: g, onChanged, editable, canAppoint, currentUserId 
         </>
       )}
       {error && <p className="text-red-600">{error.detail ?? "Could not do that."}</p>}
+    </div>
+  );
+}
+
+
+/** Give a local group to its workspace's site, or back to the installation, after seeing what blocks it (issue #26). */
+function MoveGroup({ group: g, onDone }: { group: DirectoryGroup; onDone: () => void }) {
+  const { workspaceId } = useParams<{ workspaceId: string }>();
+  const mine = useQuery({ queryKey: ["my-workspaces"], queryFn: workspacesApi.listMine });
+  const here = mine.data?.find((w) => w.id === workspaceId);
+  const siteId = here?.role === "site" ? here.id : here?.site_id ?? null;
+  const target = g.home_site_id ? null : siteId;
+  const move = useMutation({ mutationFn: (confirm: boolean) => directoryApi.moveGroup(g.uid, target, confirm),
+                             onSuccess: (r) => { if (!r.preview) onDone(); } });
+  if (!g.home_site_id && !siteId) return null;
+  const p = move.data?.preview ? move.data : null;
+  return (
+    <div className="border-t border-slate-200 pt-2">
+      <button type="button" onClick={() => move.mutate(false)} className="rounded border border-slate-300 px-3 py-1 hover:bg-white">
+        {g.home_site_id ? "Give it back to the installation" : `Give it to the site ${siteId}`}
+      </button>
+      {p && (
+        <div className="mt-2 rounded bg-white p-2 text-xs">
+          <p>From then on it is governed by {p.governed_by}.</p>
+          {p.blocked.length > 0 ? (
+            <p className="text-red-700">Settle first: it has roles outside {p.to_site} ({p.blocked.map((b) =>
+              b.kind === "direct" ? `${b.role_id} in ${b.workspace_id}` : `${b.role_id} site-wide at ${b.site_id}`).join(", ")}).</p>
+          ) : (
+            <button type="button" onClick={() => move.mutate(true)} className="mt-1 rounded bg-slate-900 px-2 py-0.5 font-medium text-white">
+              Move it
+            </button>
+          )}
+        </div>
+      )}
+      {move.isError && <p className="mt-1 text-red-600">{(move.error as ApiError)?.detail ?? "Could not move it."}</p>}
     </div>
   );
 }

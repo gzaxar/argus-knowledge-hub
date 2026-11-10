@@ -108,7 +108,13 @@ def snapshot(db: Session, workspace_id: str) -> dict:
     roles = {r.id: r for r in db.scalars(select(Role))}
     user_ids = {b.subject_id for b in bindings if b.subject_type == "user"}
     group_ids = {b.subject_id for b in bindings if b.subject_type == "group"}
-    for gid in group_ids:
+    # Site-wide grants of the workspace's current site reach it too (issue #26).
+    from app.services.permissions import current_site, explain
+    from app.models.role import SiteGroupRoleBinding
+    site_id = current_site(db, workspace_id)
+    site_grants = list(db.scalars(select(SiteGroupRoleBinding).where(SiteGroupRoleBinding.site_id == site_id))) \
+        if site_id else []
+    for gid in group_ids | {g.group_uid for g in site_grants}:
         user_ids |= set(db.scalars(select(GroupMember.user_id).where(GroupMember.group_uid == gid)))
     user_ids |= set(db.scalars(select(Membership.user_id).where(Membership.workspace_id == workspace_id)))
     people = []
@@ -116,19 +122,17 @@ def snapshot(db: Session, workspace_id: str) -> dict:
         user = db.get(User, uid)
         if user is None:
             continue
-        via = sorted({roles[b.role_id].name for b in bindings if b.subject_type == "user" and b.subject_id == uid
-                      and b.role_id in roles}
-                     | {f"{roles[b.role_id].name} (via group {b.subject_id})" for b in bindings
-                        if b.subject_type == "group" and b.role_id in roles and uid in set(
-                            db.scalars(select(GroupMember.user_id).where(GroupMember.group_uid == b.subject_id)))})
-        if db.scalar(select(Membership.id).where(Membership.workspace_id == workspace_id, Membership.user_id == uid)):
-            via.append("legacy membership")
+        via = sorted({s["label"] for s in explain(db, user, workspace_id)
+                      if s["source"] in ("direct", "group", "site", "legacy")})
         people.append({"user": user.id, "email": user.email, "name": user.name, "active": getattr(user, "active", True),
                        "roles": via, "permissions": _perm_map(effective_permissions(db, user, workspace_id))})
     groups = [{"group": g, "name": (db.get(Group, g).name if db.get(Group, g) else g),
                "roles": sorted(roles[b.role_id].name for b in bindings
                                if b.subject_type == "group" and b.subject_id == g and b.role_id in roles)}
               for g in sorted(group_ids)]
+    groups += [{"group": g.group_uid, "name": (db.get(Group, g.group_uid).name if db.get(Group, g.group_uid) else g.group_uid),
+                "roles": [roles[g.role_id].name if g.role_id in roles else g.role_id], "site_wide_from": g.site_id}
+               for g in site_grants]
     tokens = [{"token": t.id, "label": t.label, "restricted_grants": sorted(t.restricted_grants or []),
                "created_at": t.created_at.isoformat() if t.created_at else None,
                "last_used_at": t.last_used_at.isoformat() if t.last_used_at else None,

@@ -429,6 +429,7 @@ def _generate(engine, export_id, mode, workspaces, out_dir, staging, store, sign
         sc = Scope(workspaces=sorted(workspaces), watermark=watermark["vector"], previous=previous)
         restriction = restrict(db, sc, classifications)
         analysis = closure.resolve(db, sc, decisions)
+        site_dependencies = _site_dependencies(db, sc)
         if analysis["unresolved"] or analysis["blocked"]:
             raise ExportError("dependencies need an outcome before this export can run", code="closure",
                               detail={"closure": analysis})
@@ -522,6 +523,9 @@ def _generate(engine, export_id, mode, workspaces, out_dir, staging, store, sign
                   "uninspected": [{k: u[k] for k in ("sha256", "status", "reason", "by")}
                                   for u in blobs.uninspected[:1000]]},
         "classifications": restriction,
+        # A facility exported without its site keeps what it inherits from the site only as a dependency: an import
+        # never makes a site-wide grant or a second copy of the site's group from it (issue #26).
+        "site_dependencies": site_dependencies,
         "closure": {"dependencies": [_public(d) for d in analysis["dependencies"]],
                     "automatic": analysis["automatic"],
                     "decisions": {k: v for k, v in decisions.items() if not k.startswith("blob:")}},
@@ -551,6 +555,20 @@ def _place_chunk(out_dir: Path, c: dict, group: str, store: DirectoryStore, enve
     digest, size = store.put_bytes(data)
     c.update({"storage": "artifact", "locator": store.locator(digest), "sha256": digest, "bytes": size,
               "encrypted": envelope is not None})
+
+
+def _site_dependencies(db, sc) -> list[dict]:
+    from app.models.workspace import Workspace
+    from app.services.site_group_grants import of_site
+    out = []
+    for wid in sc.workspaces:
+        ws = db.get(Workspace, wid)
+        if ws is None or not ws.site_id or ws.site_id in sc.workspaces:
+            continue
+        out.append({"workspace": wid, "site": ws.site_id,
+                    "inherited": [{"group": g["group_name"], "group_uid": g["group_uid"], "role": g["role_id"]}
+                                  for g in of_site(db, ws.site_id)]})
+    return out
 
 
 def _public(dep: dict) -> dict:
