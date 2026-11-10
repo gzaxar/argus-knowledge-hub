@@ -38,7 +38,7 @@ def _ensure(url: str) -> None:
             conn.execute(text(f'create database "{target.database}"'))
     admin.dispose()
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=BACKEND, check=True,
-                   env={**os.environ, "DATABASE_URL": url}, stdout=subprocess.DEVNULL)
+                   env={**os.environ, "DATABASE_URL": url}, stdout=None)
 
 
 # A publication in a test must not start indexing in a thread behind the test's back
