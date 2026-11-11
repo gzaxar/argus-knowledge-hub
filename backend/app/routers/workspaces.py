@@ -105,9 +105,15 @@ def get_me(identity: Identity = Depends(get_identity), db: Session = Depends(get
         return MeOut(auth_type="pat", workspace_id=identity.workspace_id)
     user = identity.user
     from app.catalogue.system import may_maintain
+    from app.models.workspace import SiteAdministrator
+    sites = select(Workspace.id, Workspace.name).where(Workspace.role == "site").order_by(Workspace.id)
+    if not user.is_admin:
+        sites = sites.join(SiteAdministrator, SiteAdministrator.site_id == Workspace.id).where(
+            SiteAdministrator.user_id == user.id)
     return MeOut(
         auth_type="oidc", user_id=user.id, email=user.email, name=user.name, is_admin=user.is_admin,
         catalogue_maintainer=may_maintain(db, user),
+        administered_sites=[{"id": i, "name": n} for i, n in db.execute(sites)],
     )
 
 

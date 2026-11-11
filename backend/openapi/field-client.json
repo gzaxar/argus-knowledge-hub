@@ -2134,6 +2134,28 @@
             "title": "Is Global",
             "type": "boolean"
           },
+          "navigation_folder_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Navigation Folder Uid"
+          },
+          "navigation_parent_document_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Navigation Parent Document Uid"
+          },
           "next_review_due": {
             "anyOf": [
               {
@@ -3769,6 +3791,14 @@
       },
       "MeOut": {
         "properties": {
+          "administered_sites": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SiteRef"
+            },
+            "title": "Administered Sites",
+            "type": "array"
+          },
           "auth_type": {
             "enum": [
               "pat",
@@ -4701,6 +4731,24 @@
           "edges"
         ],
         "title": "SemanticGraphOut",
+        "type": "object"
+      },
+      "SiteRef": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SiteRef",
         "type": "object"
       },
       "SourceIn": {

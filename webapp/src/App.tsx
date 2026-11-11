@@ -61,6 +61,7 @@ import { IconLibrary } from "./pages/icons/List";
 import { SchemaForm } from "./pages/schemas/Form";
 import { InstallationAI, WorkspaceAI } from "./pages/workspace/AI";
 import { WorkspaceAccess } from "./pages/workspace/Access";
+import { SiteAdministratorsPage, SiteFacilitiesPage, SiteGroupAccessPage } from "./pages/site/SiteAdministration";
 import { WorkspaceMembers } from "./pages/workspace/Members";
 import { WorkspaceIntegrity } from "./pages/workspace/Integrity";
 import { WorkspaceKeys } from "./pages/workspace/Keys";
@@ -194,6 +195,9 @@ export function App() {
           <Route path="/workspaces/:workspaceId/keys" element={<WorkspaceKeys />} />
           <Route path="/workspaces/:workspaceId/groups" element={<WorkspaceGroups />} />
           <Route path="/admin/my-groups" element={<WorkspaceGroups />} />
+          <Route path="/sites/:siteId/administrators" element={<SiteAdministratorsPage />} />
+          <Route path="/sites/:siteId/group-access" element={<SiteGroupAccessPage />} />
+          <Route path="/sites/:siteId/facilities" element={<SiteFacilitiesPage />} />
           <Route path="/workspaces/:workspaceId/packages" element={<WorkspacePackages />} />
           <Route path="/workspaces/:workspaceId/glpi" element={<GlpiPage />} />
           <Route path="/workspaces/:workspaceId/icons" element={<IconLibrary />} />

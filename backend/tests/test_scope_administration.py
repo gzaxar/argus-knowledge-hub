@@ -34,6 +34,9 @@ def test_site_administrator_manages_only_current_site_facilities():
     db.commit()
     try:
         identity = OidcIdentity(user=site_admin)
+        # The administration sidebar's site section: the sites this person was named for, and no other.
+        assert [s.id for s in workspaces.get_me(identity=identity, db=db).administered_sites] == [site_id]
+        assert workspaces.get_me(identity=OidcIdentity(user=workspace_admin), db=db).administered_sites == []
         listed = workspaces.list_my_workspaces(identity=identity, db=db)
         ids = {w.id for w in listed}        # beside any workspace open to everyone that other tests left
         assert {site_id, facility_id} <= ids and other_id not in ids

@@ -59,7 +59,7 @@ Every install, upgrade and revert is in the page's **History**, with who did it 
 
 ### Every workspace at once
 
-*Administration › Packages* (administrators) lists each package that is behind somewhere and the workspaces
+*Administration › Installation › Packages (all workspaces)* (administrators) lists each package that is behind somewhere and the workspaces
 behind on it. **Preview upgrade everywhere** says, for each, whether it is ready (no decision to make), needs
 decisions, or is refused and why; **Upgrade** then upgrades the ready ones — shared catalogues first, then the
 workspaces that hang from them, each on its own, so one refusal leaves the others upgraded. A workspace that

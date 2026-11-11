@@ -1,12 +1,13 @@
 ---
 title: Ask ARGUS
-summary: Asking questions from records and the user guide; document hierarchy and import walkthroughs, checking revision/source evidence, confirmed proposals and mobile use.
-keywords: [hierarchy help, document navigation, WP, unfiled, confluence import, folder, revision preview, search help, ask, ask argus, attach, attachment, file, screenshot, upload, paperclip, rate, rating, feedback, thumbs up, thumbs down, not useful, wrong answer, chat, voice, speak, microphone, hands-free, orb, repeat, slower, show the source, interrupt, read aloud, phone, mobile, assistant, ai, question, answer, conversation, propose, proposal, apply, discard, create with ai, help, how to, register from a photo, dictate, transcribe, document from a photo]
+summary: Asking questions from workspace records, access information and the user guide; document hierarchy and Confluence walkthroughs, checking answers and revisions, confirmed proposals and mobile use.
+keywords: [hierarchy help, document navigation, WP, unfiled, confluence import, folder, revision preview, search help, ask, ask argus, attach, attachment, file, screenshot, upload, paperclip, rate, rating, feedback, thumbs up, thumbs down, not useful, wrong answer, chat, voice, speak, microphone, hands-free, orb, repeat, slower, show the source, interrupt, read aloud, phone, mobile, assistant, ai, question, answer, conversation, propose, proposal, apply, discard, create with ai, help, how to, register from a photo, dictate, transcribe, document from a photo, who has access, permissions]
 order: 110
 ---
 
 **Ask ARGUS** answers questions in your own words, in any language, from the workspace's equipment, tickets,
-documents, the text of attached files and this guide.
+documents, the text of attached files, who has access, and this guide. It looks only in the workspace you are
+in (and what is shared with it), and finds only what you may read yourself.
 
 ## Ask
 
@@ -16,6 +17,13 @@ documents, the text of attached files and this guide.
    Each record key in the answer opens its record.
 3. **Follow up** in the same conversation ("which of those are in AC1?"): earlier turns are its context.
    **New chat** starts afresh. Conversations are kept, for you only.
+
+## Ask who has access
+
+"Who can access this workspace, and how?", "Who can approve documents here?", "Why can riccardo.gargana edit?":
+it answers with each person and the route that gives them access (a role, a group, site-wide, area permissions,
+administering the site or the installation), as **Who has access** on **Access** shows it. The whole list is
+given only to those who manage access to the workspace; anyone else is told only about their own access.
 
 ## Ask about a file
 

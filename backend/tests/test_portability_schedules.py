@@ -332,3 +332,27 @@ def test_a_revoked_publication_ends_the_chain(dbs, env):
     _edit(src, s, "Rack E3")
     out = _run(src, env, sid)
     assert out["outcome"] == "failed" and "no longer published (revoked)" in out["message"]
+
+
+def test_a_run_that_cannot_see_an_attachment_says_so_and_publishes_once_the_file_is_back(dbs, env):
+    """A file the runner cannot see (a CronJob without the attachments volume, a file restored later) makes the
+    export wait, saying which; the next run analyses it again rather than reading the stale analysis."""
+    from pathlib import Path
+    from sqlalchemy import select
+    from app.models.attachment import Attachment
+    src = dbs()
+    s = populate(src, env.tmp)
+    first, _ = run_export(src, env, s)
+    sid = _schedule(src, env, first["id"], skip_unchanged=False)
+    with Session(src) as db:
+        path = Path(db.scalar(select(Attachment.storage_path).where(Attachment.issue_uid == s.issue)))
+    hidden = path.with_name(path.name + ".away")
+    path.rename(hidden)
+    out = _run(src, env, sid)
+    assert out["outcome"] == "waiting" and "missing from storage" in out["message"], out["message"]
+    with Session(src) as db:
+        blobs = db.get(PortabilityExport, out["export"]).analysis["blobs"]
+        assert blobs["missing_count"] == 1 and blobs["missing"][0]["family"] == "attachments"
+    hidden.rename(path)
+    again = _run(src, env, sid)
+    assert again["outcome"] == "published" and again["export"] == out["export"], again["message"]

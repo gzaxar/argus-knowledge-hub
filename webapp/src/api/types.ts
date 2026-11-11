@@ -544,6 +544,8 @@ export interface Me {
   is_admin: boolean;
   /** May maintain the installation's catalogue: an administrator, or its workspace's Curator or Owner. */
   catalogue_maintainer?: boolean;
+  /** The sites this person may administer: every site for an administrator, else those they were named for. */
+  administered_sites?: { id: string; name: string }[];
 }
 
 export interface Workspace {
@@ -922,6 +924,37 @@ export interface SiteGroupGrant {
   role_name: string;
   created_by: string | null;
   created_at: string | null;
+}
+
+/** One way a person reaches a workspace (backend services/permissions.explain). */
+export interface AccessRoute {
+  source: "instance_administrator" | "direct" | "group" | "site" | "legacy" | "site_administrator";
+  label: string;
+  role?: string;
+  group?: string;
+  group_uid?: string;
+  site?: string | null;
+}
+
+export interface PersonAccess {
+  user_id: string;
+  email: string;
+  name: string | null;
+  signed_in: boolean;
+  active: boolean;
+  installation_administrator: boolean;
+  rights: Partial<Record<"objects" | "tickets" | "documents" | "workspace" | "restricted", string[]>>;
+  routes: AccessRoute[];
+}
+
+/** Everyone who can get into a workspace, by any route (GET /v1/workspaces/{id}/who-has-access). */
+export interface WhoHasAccess {
+  workspace_id: string;
+  workspace_name: string;
+  site_id: string | null;
+  people: PersonAccess[];
+  anyone_signed_in: Partial<Record<"objects" | "tickets" | "documents", string[]>>;
+  counts: { people: number; installation_administrators: number; manage_access: number; anyone_signed_in: boolean };
 }
 
 export interface AccessEvent {

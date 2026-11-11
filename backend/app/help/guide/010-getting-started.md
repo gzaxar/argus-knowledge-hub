@@ -91,7 +91,7 @@ subsystems, root pages such as WP01 and WP02 appear directly at the top level, w
 **Unfiled documents** holds ordinary pages still without a usable location. Use **Full table** for the table's
 filters and bulk operations. See *Document hierarchy and subsystem pages* for moves, counts and revisions.
 
-At the top right: **Help** (this guide); **⚙ Workspace settings**: **Access** (who has which role), **Members**,
+At the top right: **Help** (this guide); **⚙ Workspace settings**: **Access** (who has which role), **Area permissions**,
 **Packages**, the **Type catalogue**, **Global values**, **Ticket workflows**, **Equipment classes**, **Keys** (how
 record keys are made) and **Administration** (imports, GLPI, icon library, transfer, migration from Jira, AI
 endpoint, robot tokens; and workspaces, users, settings, portability and type migrations for administrators); your name, for **My

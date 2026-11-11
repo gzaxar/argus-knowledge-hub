@@ -59,3 +59,13 @@ os.environ.setdefault("ARGUS_IMPORT_SCHEDULER", "off")
 if os.environ.get("DATABASE_URL") and os.environ.get("ARGUS_TESTS_USE_DATABASE_URL") != "1":
     os.environ["DATABASE_URL"] = _test_url()
     _ensure(os.environ["DATABASE_URL"])
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _no_forge_history(monkeypatch):
+    """An EPIK8s import asks the forge which commits changed its file; a test never reaches a real one."""
+    from app.services import epik8s_import
+    monkeypatch.setattr(epik8s_import, "_file_history", lambda *a, **k: None)

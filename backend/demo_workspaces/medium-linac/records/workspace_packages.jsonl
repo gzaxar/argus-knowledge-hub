@@ -5,7 +5,7 @@
 {"$row": 303, "checksum": "042db8dbba0f38d378c042a2432ba21392e8316897f1067f729c39d112848c4e", "options": {"scope": "all"}, "package_id": "safety", "version": "1.0.0", "workspace_id": "valmora-linac-demo"}
 {"$row": 304, "checksum": "365a129ebf29cf9c96262b0ce1569fa137e5ecdb5367bcc8684d8831f9ec1cab", "options": {"scope": "all"}, "package_id": "vacuum-cryo", "version": "1.0.0", "workspace_id": "valmora-linac-demo"}
 {"$row": 305, "checksum": "a88a5db154ed8a4a0b4047ea12dbadb99d3774a1f3576376c0937c8766dd97b0", "options": {"scope": "all"}, "package_id": "optics-alignment", "version": "1.0.0", "workspace_id": "valmora-linac-demo"}
-{"$row": 306, "checksum": "4780e587b970b4185d63bda37b5b537871ef50e166911606526c2b48d6b2e1fe", "options": {"scope": "all"}, "package_id": "accelerator", "version": "2.2.0", "workspace_id": "valmora-linac-demo"}
+{"$row": 306, "checksum": "36b744552185ac71ad012a78fbbe66a36375fb564f86993e87f7fab28b7e8b41", "options": {"scope": "all"}, "package_id": "accelerator", "version": "2.3.0", "workspace_id": "valmora-linac-demo"}
 {"$row": 307, "checksum": "63cbf6d75cfd60e16df819c2f8bdf793ffe7e9c0a38382bf53416e7ca07830e4", "options": {"scope": "all"}, "package_id": "civil-access", "version": "1.0.0", "workspace_id": "valmora-linac-demo"}
 {"$row": 308, "checksum": "ddf40e9ee864b4c531021191808eae93625f58fd8c38d080d94c2ee7f4b9d979", "options": {"scope": "all"}, "package_id": "electrical", "version": "1.1.0", "workspace_id": "valmora-linac-demo"}
 {"$row": 309, "checksum": "fe9521c6fb31b1cb2c3639b4e20ca693a705eedd4500f9bc86fbe3d20e5d7aac", "options": {"scope": "all"}, "package_id": "hvac", "version": "1.1.0", "workspace_id": "valmora-linac-demo"}

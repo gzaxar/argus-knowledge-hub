@@ -103,6 +103,11 @@ class MemberCandidateOut(BaseModel):
     member: bool
 
 
+class SiteRef(BaseModel):
+    id: str
+    name: str
+
+
 class MeOut(BaseModel):
     auth_type: Literal["pat", "oidc"]
     workspace_id: Optional[str] = None
@@ -112,6 +117,8 @@ class MeOut(BaseModel):
     is_admin: bool = False
     # May maintain the installation's catalogue (an administrator, or its workspace's Curator or Owner)
     catalogue_maintainer: bool = False
+    # The sites this person may administer: every site for an administrator, else those they were named for
+    administered_sites: list[SiteRef] = []
 
 
 class UserOut(BaseModel):

@@ -10,18 +10,27 @@ the sign-in service only says who they are.
 
 ## The administration pages
 
-**Administration** (**⚙ Workspace** menu, top right) has two groups, and every page says which it is in:
-**This workspace** (Access, Members, Packages, Keys, Imports, GLPI, icons, transfer, migration, the AI endpoint,
-robot tokens) changes only the workspace named there; **Whole installation** changes every workspace and is for
-administrators:
+**Administration** (**⚙ Workspace** menu, top right) has one section per scope, and every page says which one it
+is in:
+
+- **Workspace**: changes only the workspace named there. Its pages are grouped under **People & access** (Access,
+  Groups, Area permissions, Access reviews), **Content** (Imports, Packages, Keys, Icon library, GLPI, Transfer,
+  Migration from Jira, Data integrity) and **Integrations** (AI endpoint, Robot tokens).
+- **Site** *name*: for the site's administrators, whichever workspace is open, and for administrators of the
+  installation when the open workspace is at that site. **Administrators**, **Site-wide group access** (with its
+  changes to access) and **Facilities** apply to every facility currently at the site.
+- **Installation**: changes every workspace, and is for administrators.
+- **Groups you administer**: **My groups**, for group administrators.
 
 | Page | For |
 |---|---|
+
 | **Workspaces** | every workspace; **New workspace** |
 | **Users** | everyone who has signed in; who is an administrator |
 | **Settings** | how workspace identifiers are made from names (prefix, case, separator, length) |
-| **AI** | the AI settings every workspace without its own uses (see *AI settings*) |
-| **API tokens** | every personal and robot token: who made it, what it may do, expiry, last use; revoke any |
+| **Packages (all workspaces)** | upgrade a package everywhere it is behind (see *Domain packages*) |
+| **AI settings** | the AI settings every workspace without its own uses (see *AI settings*) |
+| **All tokens** | every personal and robot token: who made it, what it may do, expiry, last use; revoke any |
 | **Portability** | exports and imports (see *Export and import*) |
 | **Statistics** | how ARGUS is used, anonymously (below) |
 
