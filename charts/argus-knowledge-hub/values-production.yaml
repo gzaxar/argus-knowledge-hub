@@ -38,7 +38,9 @@ api:
   oidc:
     issuer: https://idp-test.app.infn.it/auth/realms/aai
     jwksUri: https://idp-test.app.infn.it/auth/realms/aai/protocol/openid-connect/certs
-    audience: argus-knowledge-hub
+    # The web's own client first; then LibreChat's, whose INFN AAI tokens call /mcp as the signed-in person
+    # (epik8s-platform argus-hub, argus-mcp-server KNOWLEDGE_HUB_AS_CALLER).
+    audience: argus-knowledge-hub,argus-librechat
   # Google sign-in (Firebase), as before Keycloak, so existing accounts keep working.
   extraProviders:
     - issuer: https://securetoken.google.com/seraphic-camera-479521-s5

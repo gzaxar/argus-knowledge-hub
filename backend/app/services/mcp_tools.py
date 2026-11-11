@@ -24,6 +24,8 @@ from app.models.document import Document, DocumentRevision
 from app.models.issue import Issue
 from app.models.llm_config import LLMConfig
 from app.models.schema import Schema
+from app.models.user import User
+from app.models.workspace import Workspace
 from app.services import causal_model
 from app.services.knowledge_graph import graph_summary, traverse
 from app.services.alarm_symptoms import root_cause_from_alarms as _root_cause_from_alarms
@@ -608,6 +610,38 @@ def read_help(db: Session, workspace_id: str, topic: str) -> dict:
     return {"found": True, "slug": t.slug, "title": t.title, "body": t.body}
 
 
+def workspace_access(db: Session, workspace_id: str, person: str = "") -> dict:
+    """Who can get into this workspace and how. The whole list only to whoever manages access here; to anyone
+    else, their own access and nothing about other people."""
+    from app.services import who_has_access as wha
+    viewer = wha.current_viewer()
+    wanted = str(person or "").strip().lower()
+    if viewer is not None and viewer.may_manage:
+        out = wha.who_has_access(db, workspace_id)
+        if wanted:
+            out["people"] = [p for p in out["people"] if wanted in (p["email"] or "").lower()
+                             or wanted in (p["name"] or "").lower()]
+            out["filtered_by"] = person
+        else:
+            # The installation's administrators reach every workspace: named, not detailed, so the list stays
+            # about this workspace.
+            admins = [p for p in out["people"] if p["installation_administrator"] and len(p["routes"]) == 1]
+            out["people"] = [p for p in out["people"] if p not in admins]
+            out["installation_administrators_only"] = [p["email"] for p in admins]
+        return out
+    user = db.get(User, viewer.user_id) if viewer is not None and viewer.user_id else None
+    if user is None:
+        return {"allowed": False, "reason": "Only a signed-in person can ask about access, and only someone who "
+                                            "manages access to this workspace can ask about other people."}
+    own = wha.person_access(db, user, workspace_id)
+    out = {"scope": "only your own access: who else has access is shown only to those who manage access here",
+           "you": own or {"email": user.email, "rights": {}, "routes": []},
+           "anyone_signed_in": wha.defaults(db.get(Workspace, workspace_id))}
+    if wanted and wanted not in (user.email or "").lower() and wanted not in (user.name or "").lower():
+        out["not_shown"] = f"Access of {person!r} is shown only to those who manage access to this workspace."
+    return out
+
+
 TOOLS: list[dict[str, Any]] = [
     {
         "name": "search_objects",
@@ -846,6 +880,21 @@ TOOLS: list[dict[str, Any]] = [
                 "limit": {"type": "integer", "description": "Passages to return; default 8, at most 20"},
             },
             "required": ["query"],
+        },
+    },
+    {
+        "name": "workspace_access",
+        "description": "Who can get into this workspace and how: each person, what they may do (objects, tickets, "
+                       "documents, managing access) and every route that gives it — administrator of the "
+                       "installation, a role of their own, a group's role here, a group's role site-wide at the "
+                       "site, area permissions, administering the site — plus what anyone signed in gets. Use it "
+                       "for 'who can access/edit/approve here', 'why can X …', 'who manages access'. Someone who "
+                       "does not manage access gets only their own access back: say so, do not guess the rest.",
+        "handler": workspace_access,
+        "inputSchema": {
+            "type": "object",
+            "properties": {"person": {"type": "string",
+                                      "description": "Part of a name or e-mail, to ask about one person"}},
         },
     },
     {

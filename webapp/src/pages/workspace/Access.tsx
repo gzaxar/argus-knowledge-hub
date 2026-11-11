@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError, directoryApi, membersApi, rolesApi, sitesApi, workspacesApi } from "../../api/client";
 import { Role } from "../../api/types";
+import { WhoHasAccess } from "./WhoHasAccess";
 
 const RESOURCE_LABELS: [string, string][] = [
   ["objects", "Objects & types"],
@@ -57,6 +58,7 @@ export function WorkspaceAccess() {
     onSuccess: () => {
       setSubjectId("");
       queryClient.invalidateQueries({ queryKey: ["bindings", workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["who-has-access", workspaceId] });
       queryClient.invalidateQueries({ queryKey: ["member-directory", workspaceId] });
     },
   });
@@ -65,6 +67,7 @@ export function WorkspaceAccess() {
     mutationFn: (bindingId: number) => rolesApi.deleteBinding(workspaceId!, bindingId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bindings", workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["who-has-access", workspaceId] });
       queryClient.invalidateQueries({ queryKey: ["member-directory", workspaceId] });
     },
   });
@@ -114,12 +117,14 @@ export function WorkspaceAccess() {
 
       {directory.data?.is_test_data && (
         <div className="mt-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <strong>Built-in test directory.</strong> No LDAP is configured, so the people and groups
-          below are fictional examples ({directory.data.active_groups} groups,{" "}
-          {directory.data.users} people) meant for trying things out. Granting them access is safe
-          but meaningless — they can't sign in.
+          <strong>Example directory.</strong> No LDAP is configured, so ARGUS carries a built-in directory of
+          fictional people and groups ({directory.data.active_groups} groups, {directory.data.users} people) for
+          trying things out: granting them access is safe but meaningless, as they can't sign in. Groups made
+          here and the people who sign in are real, and so is their access.
         </div>
       )}
+
+      <WhoHasAccess workspaceId={workspaceId!} />
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
@@ -270,6 +275,7 @@ export function WorkspaceAccess() {
 
       <Invite workspaceId={workspaceId!} roles={roles.data ?? []} onDone={() => {
         queryClient.invalidateQueries({ queryKey: ["bindings", workspaceId] });
+        queryClient.invalidateQueries({ queryKey: ["who-has-access", workspaceId] });
         queryClient.invalidateQueries({ queryKey: ["member-directory", workspaceId] });
       }} />
 

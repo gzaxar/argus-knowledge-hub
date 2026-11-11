@@ -203,6 +203,8 @@ async def rpc(
                     "isError": True,
                 })
             set_current_grants(grants_of(db, identity, target))
+        from app.services.who_has_access import set_viewer, viewer_for
+        set_viewer(viewer_for(db, identity, target))
         try:
             text = call(db, target, name, arguments, link_base=web_url())
         except KeyError:

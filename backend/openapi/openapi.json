@@ -70532,6 +70532,84 @@
           "workspace bundles"
         ]
       }
+    },
+    "/v1/workspaces/{workspace_id}/who-has-access": {
+      "get": {
+        "description": "Everyone who can get into this workspace, by any route — installation administrator, own role, a group's\nrole, a group's role site-wide, area permissions, administering the site — with what they may do and why;\nand what anyone signed in gets. For those who manage access here.",
+        "operationId": "who_has_access_v1_workspaces__workspace_id__who_has_access_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Who Has Access",
+        "tags": [
+          "roles"
+        ]
+      }
     }
   }
 }

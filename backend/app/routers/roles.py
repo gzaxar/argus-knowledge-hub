@@ -118,6 +118,23 @@ def inherited_grants(
     return site_group_grants.inherited(db, workspace_id)
 
 
+@router.get("/workspaces/{workspace_id}/who-has-access")
+def who_has_access(
+    workspace_id: str,
+    identity: Identity = Depends(get_identity),
+    db: Session = Depends(get_db),
+):
+    """Everyone who can get into this workspace, by any route — installation administrator, own role, a group's
+    role, a group's role site-wide, area permissions, administering the site — with what they may do and why;
+    and what anyone signed in gets. For those who manage access here."""
+    from app.services import who_has_access as wha
+    _require_manage_members(workspace_id, identity, db)
+    try:
+        return wha.who_has_access(db, workspace_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="No such workspace")
+
+
 @router.post("/workspaces/{workspace_id}/invitations", response_model=InvitationOut)
 def invite_people(
     workspace_id: str,

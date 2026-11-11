@@ -19,6 +19,14 @@ the first; any others go in OIDC_EXTRA_PROVIDERS as a JSON list:
 A token is checked against the provider whose issuer it names, never tried
 against each in turn: a token signed by one provider must not be accepted
 because another provider's key happened to verify it.
+
+An audience may name several clients of the same provider, comma-separated
+(or a list in OIDC_EXTRA_PROVIDERS): `argus-knowledge-hub,argus-librechat`
+also accepts the access tokens INFN AAI issues to LibreChat, so an assistant
+there calls ARGUS as the signed-in person. A token is accepted when its `aud`
+names one of them or, for an access token issued to one of them, its `azp`
+(Keycloak's access tokens carry the client in `azp`, and often only `account`
+in `aud`). Clients not named stay refused.
 """
 import json
 import os
@@ -46,9 +54,19 @@ def load_providers() -> dict:
             extra = []
         candidates += [p for p in extra if isinstance(p, dict)]
     for p in candidates:
-        if p.get("issuer") and p.get("jwks_uri") and p.get("audience"):
-            found[p["issuer"]] = {"jwks_uri": p["jwks_uri"], "audience": p["audience"]}
+        audiences = audiences_of(p.get("audience"))
+        if p.get("issuer") and p.get("jwks_uri") and audiences:
+            found[p["issuer"]] = {"jwks_uri": p["jwks_uri"], "audience": audiences}
     return found
+
+
+def audiences_of(value) -> tuple:
+    """The clients a provider's tokens may be for: "a,b", ["a", "b"] or "a"."""
+    if isinstance(value, str):
+        value = value.split(",")
+    if not isinstance(value, (list, tuple)):
+        return ()
+    return tuple(str(v).strip() for v in value if str(v).strip())
 
 
 PROVIDERS = load_providers()
@@ -76,10 +94,17 @@ def verify_oidc_token(raw_token: str) -> dict:
     if provider is None:
         raise jwt.InvalidIssuerError("Token issuer is not a configured provider")
     signing_key = _jwk_client(provider["jwks_uri"]).get_signing_key_from_jwt(raw_token)
-    return jwt.decode(
+    claims = jwt.decode(
         raw_token,
         signing_key.key,
         algorithms=["RS256"],
-        audience=provider["audience"],
         issuer=issuer,
+        options={"verify_aud": False, "require": ["exp", "iss"]},
     )
+    # The audience by hand: one of the provider's clients in `aud`, or as the party the token was issued to.
+    allowed = set(audiences_of(provider["audience"]))
+    aud = claims.get("aud")
+    auds = {aud} if isinstance(aud, str) else set(aud or [])
+    if not (auds & allowed or claims.get("azp") in allowed):
+        raise jwt.InvalidAudienceError("Token is not for this application")
+    return claims
