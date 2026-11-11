@@ -54,7 +54,8 @@ def exchange(endpoint, data):
 @router.post("/token")
 async def token(request: Request):
     endpoint = os.environ.get("OIDC_TOKEN_ENDPOINT", "")
-    client = os.environ.get("OIDC_CLIENT_ID") or os.environ.get("OIDC_AUDIENCE", "")
+    # OIDC_AUDIENCE may also name other clients the API trusts (LibreChat's): the web's own is the first.
+    client = os.environ.get("OIDC_CLIENT_ID") or os.environ.get("OIDC_AUDIENCE", "").split(",")[0].strip()
     secret = os.environ.get("OIDC_CLIENT_SECRET", "")
     redirects = {uri.strip() for uri in os.environ.get("OIDC_REDIRECT_URIS", "").split(",") if uri.strip()}
     if not (endpoint and client and secret and redirects):

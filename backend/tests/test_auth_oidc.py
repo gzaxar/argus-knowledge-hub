@@ -98,3 +98,28 @@ def test_a_malformed_extra_list_is_ignored_not_fatal(monkeypatch):
     monkeypatch.setattr(auth_oidc, "OIDC_ISSUER", None)
     monkeypatch.setenv("OIDC_EXTRA_PROVIDERS", "not json")
     assert auth_oidc.load_providers() == {}
+
+
+def test_one_provider_may_name_several_clients_and_only_those(monkeypatch):
+    """INFN AAI's tokens for LibreChat call ARGUS as the person: accepted when the client is named, by aud or azp."""
+    key = Key()
+    monkeypatch.setattr(auth_oidc, "PROVIDERS", {INFN["issuer"]: {
+        "jwks_uri": INFN["jwks_uri"], "audience": auth_oidc.audiences_of("argus-webapp, argus-librechat")}})
+    monkeypatch.setattr(auth_oidc, "_jwk_client", lambda uri: FakeClient(key))
+    assert auth_oidc.verify_oidc_token(key.token(INFN, aud="argus-librechat"))["sub"] == "u1"
+    # Keycloak's access token: the client in azp, only "account" in aud.
+    assert auth_oidc.verify_oidc_token(key.token(INFN, aud="account", azp="argus-librechat"))["sub"] == "u1"
+    assert auth_oidc.verify_oidc_token(key.token(INFN, aud=["account", "argus-webapp"]))["sub"] == "u1"
+    for claims in ({"aud": "account", "azp": "someone-else"}, {"aud": "account"}, {"aud": "other", "azp": None}):
+        with pytest.raises(jwt.InvalidAudienceError):
+            auth_oidc.verify_oidc_token(key.token(INFN, **claims))
+
+
+def test_audiences_are_read_from_a_comma_list_or_a_json_list(monkeypatch):
+    monkeypatch.setattr(auth_oidc, "OIDC_ISSUER", INFN["issuer"])
+    monkeypatch.setattr(auth_oidc, "OIDC_JWKS_URI", INFN["jwks_uri"])
+    monkeypatch.setattr(auth_oidc, "OIDC_AUDIENCE", "argus-knowledge-hub, argus-librechat")
+    monkeypatch.setenv("OIDC_EXTRA_PROVIDERS", '[{"issuer": "x", "jwks_uri": "y", "audience": ["a", "b"]}]')
+    found = auth_oidc.load_providers()
+    assert found[INFN["issuer"]]["audience"] == ("argus-knowledge-hub", "argus-librechat")
+    assert found["x"]["audience"] == ("a", "b")

@@ -152,5 +152,18 @@ class TokenMediationTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(post.call_args.kwargs["timeout"], (5, 15))
 
 
+class SeveralAudiencesTests(TokenMediationTests):
+    """OIDC_AUDIENCE naming other trusted clients too: the login stays the first one's, and only it."""
+
+    def setUp(self):
+        super().setUp()
+        patch.dict("os.environ", {"OIDC_AUDIENCE": "argus-librechat, another-trusted-client"}).start()
+
+    async def test_the_first_audience_is_the_login_client(self):
+        self.assertEqual((await self.call()).status_code, 200)
+        self.assertEqual((await self.call({**FORM, "client_id": "another-trusted-client"})).status_code, 400)
+
+
+
 if __name__ == "__main__":
     unittest.main()

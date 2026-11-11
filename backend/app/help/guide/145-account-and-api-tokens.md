@@ -73,6 +73,14 @@ administrator holds no role, and restricted records are visible to it — keep i
 secrets are kept. Without the *Administer* scope, the same administrator's token reaches only their own
 workspaces.
 
+### With your INFN login instead of a token
+
+An assistant that signs you in with INFN AAI (the control room's LibreChat) can call ARGUS with **your own
+login** instead of a token: you paste nothing, and it sees exactly what you may see in ARGUS, workspace by
+workspace, as on the web. An administrator lets ARGUS trust that assistant by adding its client to
+`OIDC_AUDIENCE` (`argus-knowledge-hub,argus-librechat`: the web's own client first). The ARGUS MCP server asks
+the same way with `KNOWLEDGE_HUB_AS_CALLER`, and then needs no administrator token.
+
 ## If an API request is refused
 
 Check the token's expiry, whether it was revoked, its scopes and kinds of record, and the workspace it names (or the

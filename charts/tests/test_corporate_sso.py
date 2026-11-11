@@ -54,6 +54,8 @@ class DirectOidcTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(f'name: OIDC_ISSUER, value: "{BASE}"', result.stdout)
         self.assertIn("name: argus-keycloak", result.stdout)                    # still deployed
+        # The web's own client first, then LibreChat's, whose INFN AAI tokens call /mcp as the person.
+        self.assertIn('name: OIDC_AUDIENCE, value: "argus-knowledge-hub,argus-librechat"', result.stdout)
         raw = re.search(r"name: OIDC_EXTRA_PROVIDERS\n\s+value: (\".*\")", result.stdout).group(1)
         issuers = {p["issuer"]: p["audience"] for p in json.loads(json.loads(raw))}
         self.assertEqual(issuers["https://securetoken.google.com/seraphic-camera-479521-s5"], "seraphic-camera-479521-s5")

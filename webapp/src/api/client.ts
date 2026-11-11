@@ -84,6 +84,7 @@ import type {
   SiteGroupGrant,
   SiteGroupGrantPreview,
   AccessEvent,
+  WhoHasAccess,
   SiteMoveAccess,
   GroupMovePreview,
   DirectoryGroup,
@@ -952,6 +953,7 @@ export const rolesApi = {
     request<RoleBinding[]>(`/v1/workspaces/${workspaceId}/bindings`),
   inherited: (workspaceId: string) => request<SiteGroupGrant[]>(`/v1/workspaces/${workspaceId}/inherited-grants`),
   accessEvents: (workspaceId: string) => request<AccessEvent[]>(`/v1/workspaces/${workspaceId}/access-events`),
+  whoHasAccess: (workspaceId: string) => request<WhoHasAccess>(`/v1/workspaces/${workspaceId}/who-has-access`),
   invite: (workspaceId: string, input: { emails: string; role_id?: string; send_email: boolean; message?: string;
                                           group_uid?: string; new_group?: string }) =>
     request<InvitationResult>(`/v1/workspaces/${workspaceId}/invitations`, { method: "POST", body: json(input) }),

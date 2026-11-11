@@ -1,7 +1,7 @@
 ---
 title: Workspaces, people and roles
 summary: Creating workspaces, adding people, giving roles, groups, API tokens and access reviews.
-keywords: [workspace, create workspace, users, people, roles, permissions, admin, administrator, members, groups, access, tokens, keys, access review, grant, revoke, owner, keycloak]
+keywords: [who has access, who can access, workspace, create workspace, users, people, roles, permissions, admin, administrator, members, groups, access, tokens, keys, access review, grant, revoke, owner, keycloak]
 order: 20
 ---
 
@@ -126,8 +126,18 @@ choose their own).
 ## Check every route to access
 
 Removing one role may not remove access: another role, a group, or administrator status may still give it.
-Check every route when you review access. **My account** shows the signed-in person's roles; **Access
-reviews** gives the whole workspace.
+Check every route when you review access.
+
+**Who has access**, at the top of **Access**, lists everyone who can open the workspace by any route, with what
+they may do and **why**: a role of their own, a group's role here (*Workspace administrator via IT-LNF*), a
+group's role site-wide, area permissions, administering the site, or administering the installation. The
+installation's administrators, who reach every workspace, are folded under one line. A line under the title says
+whether anyone signed in to ARGUS gets something here (the *Anonymous* row of **Area permissions**) or nobody else
+does. It is computed by the same rules that decide each request, so it shows what really happens.
+
+Ask ARGUS answers the same ("who can approve documents here?", "why can Anna edit?"), to whoever manages access
+here; anyone else hears only about their own access. **My account** shows the signed-in person's roles; **Access
+reviews** gives the whole workspace for signed re-certification.
 
 ## Make someone an administrator
 

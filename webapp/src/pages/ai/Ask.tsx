@@ -38,6 +38,7 @@ const TOOL_WORDS: Record<string, string> = {
   knowledge_summary: "Counting what this workspace holds",
   search_help: "Reading the user guide",
   read_help: "Opening a guide topic",
+  workspace_access: "Checking who has access",
   propose_create_record: "Proposing a new record",
   propose_update_record: "Proposing a change",
   propose_relation: "Proposing a relation",

@@ -558,6 +558,7 @@ def draft_a_ticket(
 def ask_the_knowledge(
     body: AskIn,
     workspace_id: str = Depends(require_permission("read")),
+    identity=Depends(get_identity),
     db: Session = Depends(get_db),
 ):
     """A question answered from this workspace's records, showing its working.
@@ -569,6 +570,8 @@ def ask_the_knowledge(
     if not question:
         raise HTTPException(status_code=400, detail="Ask something.")
     config = _usable_config(db, workspace_id)
+    from app.services.who_has_access import set_viewer, viewer_for
+    set_viewer(viewer_for(db, identity, workspace_id))
     try:
         return AskOut(**run_ask(db, workspace_id, endpoint_for(config), question))
     except LLMError as e:
@@ -589,7 +592,7 @@ def _sse(event: dict) -> str:
 
 def _chat_events(workspace_id: str, owner: str, question: str, conversation_id: Optional[str],
                  endpoint: Endpoint, grants, can_propose: bool = False, voice: bool = False,
-                 attachments: Optional[list] = None):
+                 attachments: Optional[list] = None, viewer=None):
     """The chat turn as server-sent events, saved as it ends. Runs after the request's own session is
     gone, so it has its own, and the viewer's restricted-class grants are set again here: the lookups
     must see what the person may see, no more."""
@@ -597,7 +600,9 @@ def _chat_events(workspace_id: str, owner: str, question: str, conversation_id: 
     from app.db import SessionLocal
     from app.models.ask_conversation import AskConversation, AskMessage
     from app.services.visibility import set_current_grants
+    from app.services.who_has_access import set_viewer
     set_current_grants(grants)
+    set_viewer(viewer)        # who is asking, for the lookups that answer per person (workspace_access)
     db = SessionLocal()
     steps: list = []
     final: Optional[dict] = None
@@ -671,6 +676,7 @@ def chat(
     from fastapi.responses import StreamingResponse
     from app.models.ask_conversation import AskConversation
     from app.services.visibility import current_grants
+    from app.services.who_has_access import viewer_for
     question = (body.question or "").strip()
     if not question and body.attachments:
         question = "What does the attached file show, and how does it compare with the records?"
@@ -685,7 +691,8 @@ def chat(
     return StreamingResponse(
         _chat_events(workspace_id, owner, question, body.conversation_id, endpoint_for(config), current_grants(),
                      can_propose=_may_change(db, identity, workspace_id), voice=body.voice,
-                     attachments=[a.model_dump() for a in body.attachments]),
+                     attachments=[a.model_dump() for a in body.attachments],
+                     viewer=viewer_for(db, identity, workspace_id)),
         media_type="text/event-stream",
         # Proxies (the cluster's ingress, nginx) would otherwise hold the events back until the end.
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
