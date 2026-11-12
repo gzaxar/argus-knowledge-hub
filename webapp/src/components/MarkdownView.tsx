@@ -1,4 +1,5 @@
 import { headingAnchors } from "../lib/markdownHeadingAnchors";
+import { confluencePanelStyle } from "../lib/confluencePanelPresentation";
 import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -48,6 +49,10 @@ export function MarkdownView({
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], headingAnchors]}
         components={{
+          div: ({ className: panelClass, children, id }) => {
+            const style = confluencePanelStyle(panelClass);
+            return <div id={id} className={style ? `my-2 rounded px-3 py-1 ${panelClass ?? ""}` : panelClass} style={style}>{children}</div>;
+          },
           h1: ({ children, id }) => (
             <h1 id={id} className="mb-2 mt-5 border-b border-slate-200 pb-1 text-xl font-semibold text-slate-900 first:mt-0">
               {children}

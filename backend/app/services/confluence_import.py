@@ -31,6 +31,9 @@ from app.models.import_job import ImportJob
 from app.services.document_types import ensure_document_kinds, type_uid
 from app.services.confluence_file_macros import FILE_VIEWER_MACROS, render_file_macro
 from app.services.confluence_presentation import prepare_presentation
+from app.services.confluence_contents import collect_headings, render_contents, toc_placeholder
+from app.services.confluence_visuals import panel_placeholder, render_emoticons, render_panel_wrappers
+from app.services.confluence_page_fields import normalize_document_status, render_user_mentions, resolve_user_names, status_html
 from app.services.confluence_auth import configure_confluence_session, confluence_json, reject_confluence_login
 from app.services.import_merge import effective_strategy
 from app.services.jira_import import (
@@ -106,10 +109,14 @@ def _macro_body(block: str) -> str:
     return re.sub(r"^<!\[CDATA\[|\]\]>$", "", body.strip())
 
 
-def _convert_macro(match: re.Match, files: Optional[dict] = None) -> str:
+def _convert_macro(match: re.Match, files: Optional[dict] = None, toc_slots: Optional[dict] = None,
+                   visual_slots: Optional[dict] = None) -> str:
     block = match.group(0)
     name = (match.group(1) or "").lower()
     body = _macro_body(block)
+
+    if name == "status":
+        return status_html(block)
 
     if name in FILE_VIEWER_MACROS:
         return render_file_macro(block, name, files)
@@ -119,8 +126,14 @@ def _convert_macro(match: re.Match, files: Optional[dict] = None) -> str:
         css = f' class="language-{language}"' if language else ""
         return f"<pre><code{css}>{body}</code></pre>"
     if name in _PANEL_MACROS:
+        if visual_slots is not None:
+            return panel_placeholder(name, body, block, visual_slots)
         return f"<blockquote><p>{_PANEL_MACROS[name]} <strong>{name.title()}</strong></p>{body}</blockquote>"
-    if name in ("toc", "children", "pagetree", "excerpt-include"):
+    if name == "panel" and visual_slots is not None:
+        return panel_placeholder(name, body, block, visual_slots)
+    if name == "toc":
+        return toc_placeholder(block, toc_slots) if toc_slots is not None else ""
+    if name in ("children", "pagetree", "excerpt-include"):
         # Navigation furniture that means nothing outside Confluence.
         return ""
     if body:
@@ -141,16 +154,25 @@ _INNERMOST_MACRO = re.compile(
 )
 
 
-def _confluence_macros_to_html(storage: str, files: Optional[dict] = None) -> str:
-    html = storage
+def _confluence_macros_to_html(storage: str, files: Optional[dict] = None,
+                              toc_slots: Optional[dict] = None,
+                              user_names: Optional[dict] = None,
+                              visual_slots: Optional[dict] = None) -> str:
+    html = render_emoticons(render_user_mentions(storage, user_names))
+    # A self-closing TOC inside a panel must not be mistaken for an opening
+    # macro that consumes the enclosing panel's closing tag and following text.
+    html = re.sub(
+        r'<ac:structured-macro[^>]*ac:name="(toc|status)"[^>]*/>',
+        lambda m: _convert_macro(m, files, toc_slots, visual_slots), html, flags=re.I,
+    )
     for _ in range(10):  # nesting this deep is already pathological
-        converted = _INNERMOST_MACRO.sub(lambda match: _convert_macro(match, files), html)
+        converted = _INNERMOST_MACRO.sub(lambda match: _convert_macro(match, files, toc_slots, visual_slots), html)
         if converted == html:
             break
         html = converted
     html = re.sub(
         r'<ac:structured-macro[^>]*ac:name="([^"]+)"[^>]*/>',
-        lambda m: "", html,
+        lambda m: _convert_macro(m, files, toc_slots) if m.group(1).lower() == "toc" else "", html,
     )
 
     # A link to another page keeps its title; the URL is resolved by
@@ -212,7 +234,8 @@ def _code_language(pre_element) -> str:
     return ""
 
 
-def storage_to_markdown(storage: str, files: Optional[dict] = None) -> str:
+def storage_to_markdown(storage: str, files: Optional[dict] = None, *, title: Optional[str] = None,
+                        user_names: Optional[dict] = None) -> str:
     """A Confluence page as Markdown.
 
     Macros become ordinary HTML first (above), then markdownify does the
@@ -227,11 +250,17 @@ def storage_to_markdown(storage: str, files: Optional[dict] = None) -> str:
         return ""
     from markdownify import markdownify
 
-    html = _confluence_macros_to_html(storage, files)
+    toc_slots = {}
+    visual_slots = {}
+    html = _confluence_macros_to_html(storage, files, toc_slots, user_names, visual_slots)
+    headings = collect_headings(html) if toc_slots else []
     text = markdownify(
         html,
         heading_style="ATX",       # "## Heading", matching everything else here
         bullets="-",
+        # markdownify otherwise converts table images to their alt text. Native
+        # ac:image conversion wraps each image in <p>, including inside cells.
+        keep_inline_images_in=["td", "th", "p"],
         # markdownify hands this the <pre>; the language is on the <code>
         # inside it, which is where the macro conversion put it.
         code_language_callback=_code_language,
@@ -243,7 +272,10 @@ def storage_to_markdown(storage: str, files: Optional[dict] = None) -> str:
     text = unescape(text)
     # markdownify is generous with blank lines around block elements.
     text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+    text = render_contents(text, toc_slots, headings, title)
+    text = normalize_document_status(text)
+    text = render_panel_wrappers(text, visual_slots)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def choose_document_type(labels: list[str], title: str) -> str:
@@ -626,6 +658,7 @@ def run_confluence_import(
     db.commit()
 
     seen: set = set()
+    user_name_cache: dict = {}
 
     try:
         link = parse_page_link(page_url) if page_url else None
@@ -780,7 +813,12 @@ def run_confluence_import(
                         document.uid, revision.uid, page_id, job, seen,
                     )
                     attachments_copied += copied
-                    markdown = storage_to_markdown(body, files)
+                    user_names = resolve_user_names(
+                        body, session, base_url, user_name_cache, confluence_json,
+                        on_warning=lambda message: _record_diagnostic(
+                            job, seen, "user_lookup_failed", f"page {page_id}: {message}"),
+                    )
+                    markdown = storage_to_markdown(body, files, title=document.title, user_names=user_names)
                     revision.body_markdown, revision.attributes = prepare_presentation(
                         title, markdown, attributes, body,
                     )
