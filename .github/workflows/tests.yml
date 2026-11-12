@@ -21,24 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: read          # the database image (ghcr.io) for the test service
-    services:
-      postgres:
-        # As in docker-compose.yml: Ask ARGUS's search needs pgvector. From Google's Docker Hub mirror: Docker
-        # Hub limits anonymous pulls by address, and the shared runners hit it.
-        # With PostGIS too (the spatial model): the database image every release publishes (deploy/postgres),
-        # which production runs since the switch rehearsed with tools/db-image-rehearsal.
-        image: ghcr.io/infn-argus/argus-knowledge-hub-postgres:latest
-        credentials:   # a new GitHub package is private: the workflow's own token reads it
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: app
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+      packages: read
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -46,6 +29,22 @@ jobs:
           # BuildKit itself from Google's Docker Hub mirror, as the images: Docker Hub refuses or times out the
           # shared runners' anonymous pulls.
           driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1
+      # The database the tests run against is the database image this commit would publish (deploy/postgres:
+      # PostgreSQL 16 with pgvector and PostGIS), built here rather than pulled: a published `latest` that turned
+      # out broken would otherwise fail every test run, including the release meant to replace it.
+      - uses: docker/build-push-action@v6
+        with:
+          context: deploy/postgres
+          load: true
+          tags: argus-postgres:ci
+          cache-from: type=gha,scope=postgres
+          cache-to: type=gha,mode=max,scope=postgres
+      - name: Start the database
+        run: |
+          docker run -d --name postgres -p 5432:5432 \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=app argus-postgres:ci
+          for i in $(seq 1 60); do docker exec postgres pg_isready -U postgres -q && exit 0; sleep 2; done
+          docker logs postgres; exit 1
       # The tests run in the image that will be shipped, with its system tools (dwg2dxf, fonts, git).
       - uses: docker/build-push-action@v6
         with:
