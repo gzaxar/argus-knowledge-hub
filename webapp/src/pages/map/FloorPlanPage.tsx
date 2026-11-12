@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { FullPage, useFullPage } from "../../components/FullPage";
 import { indoorApi, type FloorPlanShow } from "../../api/client";
 import { PlanView, type PlanLine, type PlanPin } from "../../components/PlanView";
 
@@ -16,6 +18,7 @@ export function FloorPlanPage() {
   const wanted = (params.get("show") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const q = useQuery({ queryKey: ["floor-plan-show", wanted.join(",")], queryFn: () => indoorApi.show(wanted),
                        enabled: wanted.length > 0 });
+  const [full, setFull] = useState<string | null>(null);
 
   if (wanted.length === 0) return <p className="p-6 text-sm text-slate-500">Nothing to show: no record was named.</p>;
   if (q.isLoading) return <p className="p-6 text-sm text-slate-500">Loading the floor plans…</p>;
@@ -63,13 +66,32 @@ export function FloorPlanPage() {
               id: `${origin.uid}-${r.uid}`, from: { x: origin.spot!.x, y: origin.spot!.y }, to: { x: r.spot!.x, y: r.spot!.y },
               label: `${r.from_first!.metres} m` }))
           : [];
+        const legend = (
+          <ul className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            {here.map((r) => (
+              <li key={r.uid} className="flex items-center gap-1">
+                <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: colour.get(r.uid) }} aria-hidden="true" />
+                <span className="font-medium">{r.key || r.name}</span>
+                {r.from_first && <span className="text-slate-500">{r.from_first.metres} m{r.from_first.direction ? ` ${r.from_first.direction}` : ""}</span>}
+              </li>
+            ))}
+          </ul>
+        );
         return (
           <section key={plan.uid} aria-label={plan.name} className="rounded-lg border border-slate-200 bg-white p-3">
-            <h2 className="mb-2 text-sm font-semibold text-slate-900">
-              {plan.name}{plan.level && <span className="font-normal text-slate-500"> · {plan.level.name}</span>}
-            </h2>
-            <PlanView planUid={plan.uid} width={plan.width_px} height={plan.height_px} pins={pins} lines={lines}
-                      northDeg={plan.north_deg} className="h-[60vh] min-h-[18rem]" />
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-slate-900">
+                {plan.name}{plan.level && <span className="font-normal text-slate-500"> · {plan.level.name}</span>}
+              </h2>
+              {full !== plan.uid && (
+                <button type="button" onClick={() => setFull(plan.uid)}
+                        className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-50">Full screen</button>
+              )}
+            </div>
+            <FullPage open={full === plan.uid} title={plan.name} onClose={() => setFull(null)}>
+              {full === plan.uid && legend}
+              <Plan plan={plan} pins={pins} lines={lines} />
+            </FullPage>
           </section>
         );
       })}
@@ -77,5 +99,15 @@ export function FloorPlanPage() {
         <p className="text-sm text-slate-500">None of them is on a floor plan, nor is any place they are in.</p>
       )}
     </div>
+  );
+}
+
+/** The plan, zoomed to the records shown; as tall as the screen in a full-screen window. */
+function Plan({ plan, pins, lines }: { plan: FloorPlanShow["plans"][number]; pins: PlanPin[]; lines: PlanLine[] }) {
+  const full = useFullPage();
+  return (
+    <PlanView planUid={plan.uid} width={plan.width_px} height={plan.height_px} pins={pins} lines={lines}
+              northDeg={plan.north_deg} focus={pins.map((p) => ({ x: p.x, y: p.y }))}
+              className={full ? "h-[calc(100vh-7rem)] min-h-[20rem]" : "h-[60vh] min-h-[18rem]"} />
   );
 }
