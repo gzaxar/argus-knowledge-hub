@@ -90,3 +90,4 @@ from app.models import catalogue_entry  # noqa: F401,E402
 
 import app.catalogue.system  # noqa: E402,F401  (the catalogue workspace's guard)
 import app.services.sites  # noqa: E402,F401  (keeps a site's places shared with its facilities)
+from app.models import ask_eval  # noqa: F401,E402

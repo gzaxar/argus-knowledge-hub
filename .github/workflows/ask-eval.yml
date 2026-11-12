@@ -1,0 +1,131 @@
+# Ask ARGUS evaluation (docs/ask-eval.md), started by hand: the release-quality run with the production candidate,
+# or a benchmark of the approved chat models, for one released version. It runs the released backend image against
+# its own empty database, so nothing of a real installation is touched; the report is attached to the GitHub
+# release (the public version: synthetic data only) and, when ARGUS_URL is set, stored in that ARGUS.
+#
+# Secrets (repository or environment "ask-eval"): ASK_EVAL_API_BASE_URL, ASK_EVAL_API_KEY, optionally
+# ASK_EVAL_JUDGE_API_KEY, ARGUS_URL and ARGUS_REPORT_TOKEN (an administrator's personal token). Variables:
+# ASK_EVAL_MODELS, ASK_EVAL_RELEASE_MODEL, ASK_EVAL_EMBEDDING_MODEL, ASK_EVAL_RERANK_MODEL, ASK_EVAL_JUDGE_MODEL,
+# ASK_EVAL_APPROVED_HOSTS. A runner that can reach the INFN AI server is chosen with the `runner` input (a
+# self-hosted runner's label).
+name: ask-eval
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: The release tag to evaluate (v1.35.94)
+        required: true
+      kind:
+        description: release (the production candidate) or benchmark (the selected models)
+        type: choice
+        options: [release, benchmark, simulated]
+        default: benchmark
+      models:
+        description: Comma-separated chat models for a benchmark (empty = ASK_EVAL_MODELS)
+        required: false
+      repeats:
+        description: How many times each case is asked
+        default: "3"
+      runner:
+        description: The runner (ubuntu-latest, or a self-hosted label that reaches the model server)
+        default: ubuntu-latest
+      attach:
+        description: Attach the public report to the GitHub release
+        type: boolean
+        default: true
+
+concurrency:
+  group: ask-eval
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  evaluate:
+    runs-on: ${{ inputs.runner }}
+    environment: ask-eval
+    timeout-minutes: 360
+    services:
+      postgres:
+        image: ghcr.io/infn-argus/argus-knowledge-hub-postgres:latest
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: askeval
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - name: The released backend image
+        run: |
+          version="${{ inputs.release }}"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker pull "ghcr.io/infn-argus/argus-knowledge-hub-backend:${version#v}"
+          echo "IMAGE=ghcr.io/infn-argus/argus-knowledge-hub-backend:${version#v}" >> "$GITHUB_ENV"
+      - name: Run the evaluation
+        env:
+          ASK_EVAL_API_BASE_URL: ${{ secrets.ASK_EVAL_API_BASE_URL }}
+          ASK_EVAL_API_KEY: ${{ secrets.ASK_EVAL_API_KEY }}
+          ASK_EVAL_JUDGE_API_KEY: ${{ secrets.ASK_EVAL_JUDGE_API_KEY }}
+          ASK_EVAL_MODELS: ${{ inputs.models || vars.ASK_EVAL_MODELS }}
+          ASK_EVAL_RELEASE_MODEL: ${{ vars.ASK_EVAL_RELEASE_MODEL }}
+          ASK_EVAL_EMBEDDING_MODEL: ${{ vars.ASK_EVAL_EMBEDDING_MODEL }}
+          ASK_EVAL_RERANK_MODEL: ${{ vars.ASK_EVAL_RERANK_MODEL }}
+          ASK_EVAL_JUDGE_MODEL: ${{ vars.ASK_EVAL_JUDGE_MODEL }}
+          ASK_EVAL_APPROVED_HOSTS: ${{ vars.ASK_EVAL_APPROVED_HOSTS }}
+          ASK_EVAL_REPEATS: ${{ inputs.repeats }}
+        run: |
+          mkdir -p out
+          set +e
+          docker run --rm --network host \
+            -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/askeval -e TOKEN_PEPPER=ask-eval \
+            -e ASK_EVAL_API_BASE_URL -e ASK_EVAL_API_KEY -e ASK_EVAL_JUDGE_API_KEY -e ASK_EVAL_MODELS \
+            -e ASK_EVAL_RELEASE_MODEL -e ASK_EVAL_EMBEDDING_MODEL -e ASK_EVAL_RERANK_MODEL -e ASK_EVAL_JUDGE_MODEL \
+            -e ASK_EVAL_APPROVED_HOSTS -e ASK_EVAL_REPEATS \
+            -v "$PWD/out:/out" "$IMAGE" \
+            python -m app.ask_eval run --migrate --kind "${{ inputs.kind }}" --release "${{ inputs.release }}" --out /out
+          echo "EXIT=$?" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ask-eval-${{ inputs.release }}-${{ inputs.kind }}-${{ github.run_id }}
+          path: out/
+          if-no-files-found: warn
+      - name: Store the report in ARGUS
+        if: env.EXIT != '2' && hashFiles('out/report.json') != ''
+        env:
+          ARGUS_URL: ${{ secrets.ARGUS_URL }}
+          ARGUS_REPORT_TOKEN: ${{ secrets.ARGUS_REPORT_TOKEN }}
+        run: |
+          if [ -z "$ARGUS_URL" ]; then echo "ARGUS_URL not set: not stored"; exit 0; fi
+          docker run --rm --network host -e ARGUS_URL -e ARGUS_REPORT_TOKEN -v "$PWD/out:/out" "$IMAGE" \
+            python -m app.ask_eval upload /out/report.json
+      - name: Attach the public report to the release
+        if: inputs.attach && hashFiles('out/report.public.json') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release }}
+          KIND: ${{ inputs.kind }}
+        run: |
+          cp out/report.public.json "ask-eval-$KIND-$TAG.json"
+          cp out/report.public.md "ask-eval-$KIND-$TAG.md"
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "$TAG" --notes "Release $TAG." --verify-tag
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" --clobber "ask-eval-$KIND-$TAG.json" "ask-eval-$KIND-$TAG.md"
+          table=$(sed -n '/^| Model/,/^$/p' out/report.public.md)
+          sha=$(head -c 64 out/SHA256SUMS | tail -c 64)
+          body=$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json body -q .body)
+          body=$(printf '%s' "$body" | sed '/^## Ask ARGUS evaluation/,$d')
+          printf '%s\n\n## Ask ARGUS evaluation\n\n%s run %s (report `ask-eval-%s-%s.json`, SHA-256 of the full report %s):\n\n%s\n' \
+            "$body" "$KIND" "$(date -u +%F)" "$KIND" "$TAG" "$sha" "$table" > notes.md
+          gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file notes.md
+      - name: Fail when the run failed
+        if: env.EXIT != '0'
+        run: |
+          echo "the evaluation exited with $EXIT (2: configuration, 3: incomplete run)"; exit 1

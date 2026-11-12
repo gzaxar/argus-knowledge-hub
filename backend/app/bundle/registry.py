@@ -289,6 +289,8 @@ NOT_CARRIED = {
     "access_events": "the record of changes to access is this installation's own, kept where they were made",
     "alembic_version": "the database's own schema revision",
     "spatial_ref_sys": "PostGIS's catalogue of coordinate systems, the same in every installation",
+    "ask_eval_runs": "Ask evaluation reports belong to the installation and the ARGUS release they tested",
+    "ask_eval_settings": "the evaluation's model server and its keys are this installation's own",
     **{t: "the meaning-search index is built from the records with the target's own embedding model "
           "(Administration → AI → index), never copied"
        for t in ("knowledge_chunks", "knowledge_index_runs")},

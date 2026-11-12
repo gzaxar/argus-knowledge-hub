@@ -67,6 +67,7 @@ export function AdminShell() {
       { to: "/admin/portability", label: "Portability" },
       { to: "/admin/type-migrations", label: "Type migrations" },
       { to: "/admin/statistics", label: "Statistics" },
+      { to: "/admin/ask-evaluation", label: "Ask evaluation" },
       { to: "/admin/settings", label: "Settings" },
     );
   } else if (me.data?.catalogue_maintainer) {
