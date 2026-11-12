@@ -549,3 +549,78 @@ def test_document_links_and_the_tour_follow_renamed_records(tmp_path):
         assert linked and all(x in uids for x in linked)
     finally:
         _drop(a, b)
+
+
+def test_in_the_it_demo_a_failed_host_stops_the_services_on_it_and_only_degrades_a_redundant_one(tmp_path):
+    from app.services.root_cause import impact_of
+    ws = f"it-impact-{secrets.token_hex(3)}"
+    try:
+        assert _apply(DEMOS / "it-services", ws, tmp_path)["ok"]
+        db = SessionLocal()
+        try:
+            out = impact_of(db, ws, "NF-HV-01")
+            losses = {a["name"]: set(a["losses"]) for a in out["affected"]}
+            # Mail runs only on MAIL-01, on this host; the service desk needs mail.
+            assert "function" in losses["Mail server MAIL-01"]
+            assert "function" in losses["Email"] and "function" in losses["Service Desk"]
+            # Hosting runs on four hosts: one of them gone degrades it, and that goes no further.
+            assert losses["Virtual Hosting"] == {"degradation"}
+            assert "function" not in losses.get("File Storage", set())
+            assert not out["unclassified_relations"], out["unclassified_relations"]
+        finally:
+            db.close()
+    finally:
+        _drop(ws)
+
+
+def test_in_the_it_demo_each_unit_is_in_its_rack_each_rack_in_its_room_each_room_in_its_building(tmp_path):
+    from app.models.asset import Asset, Relation
+    ws = f"it-where-{secrets.token_hex(3)}"
+    try:
+        assert _apply(DEMOS / "it-services", ws, tmp_path)["ok"]
+        db = SessionLocal()
+        try:
+            names = {a.uid: a.name for a in db.scalars(select(Asset).where(Asset.workspace_id == ws))}
+            inside = {(names[r.from_asset_uid], names[r.to_asset_uid]) for r in db.scalars(
+                select(Relation).where(Relation.workspace_id == ws, Relation.relation_type == "located in"))}
+            assert ("Core switch 01", "Rack R-MDF1") in inside
+            assert ("Rack R-MDF1", "Network Room (MDF)") in inside
+            assert ("Network Room (MDF)", "Hub Building") in inside
+            assert ("Reading Hall", "Library") in inside
+        finally:
+            db.close()
+    finally:
+        _drop(ws)
+
+
+def test_in_the_it_demo_the_causes_of_a_fault_come_from_the_graph(tmp_path):
+    """The three troubleshooting cases of the IT demo: four units silent behind one serial converter, one access point
+    dark on a switch whose other ports work, and what an attack on the VPN would take down."""
+    from app.services.root_cause import impact_of, root_causes
+    ws = f"it-rca-{secrets.token_hex(3)}"
+    try:
+        assert _apply(DEMOS / "it-services", ws, tmp_path)["ok"]
+        db = SessionLocal()
+        try:
+            out = root_causes(db, ws, ["NF-CRAC-01", "NF-CRAC-02", "NF-UPS-01", "NF-UPS-02"],
+                              healthy=["NF-VM-MONITOR"], symptom_kind={k: "control" for k in
+                                                                       ("NF-CRAC-01", "NF-CRAC-02", "NF-UPS-01",
+                                                                        "NF-UPS-02")})
+            best = {c["name"] for c in out["candidates"] if c["coverage"] == 1}
+            # What all four share: the converter, the process, the VM and the switch port on the way.
+            assert {"Serial converter SC-DH1", "Facility agent (process on BMS-01)"} <= best, best
+            assert not any(n.startswith("Serial converter SC-DH1 · serial port") for n in best)
+            converter = next(c for c in out["candidates"] if c["name"] == "Serial converter SC-DH1")
+            assert converter["history"]["tickets"] >= 1, "the June outage is evidence"
+
+            port = root_causes(db, ws, ["NF-AP-LIB-03"], healthy=["NF-AP-LIB-01", "NF-AP-LIB-02", "NF-AP-LIB-04"])
+            names = [c["name"] for c in port["candidates"]]
+            assert "Library access switch · port ge1/3" in names
+            assert "Library access switch" not in names[:3], "its other access points work"
+
+            vpn = {a["name"] for a in impact_of(db, ws, "NF-VM-VPN")["affected"]}
+            assert "Remote Access VPN" in vpn
+        finally:
+            db.close()
+    finally:
+        _drop(ws)

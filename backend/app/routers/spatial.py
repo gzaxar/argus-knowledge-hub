@@ -358,6 +358,23 @@ def map_features(bbox: str = Query(..., description="west,south,east,north in WG
     return {"type": "FeatureCollection", "features": out, "truncated": len(out) >= 2000}
 
 
+@router.get("/map/extent")
+def map_extent(workspaces: Optional[str] = Query(None, description="comma-separated; the current one if left out"),
+               workspace_id: str = Depends(require_permission("read")), identity=Depends(get_identity),
+               db: Session = Depends(get_db)):
+    """Where the workspace's located records are: the box (west, south, east, north) that holds the approved
+    locations the person may list, for the map to open on them; null when nothing has a location."""
+    spaces = _workspaces(db, identity, workspaces, workspace_id)
+    cond = _scope(db, identity, spaces, None, None)
+    cache: dict = {}
+    boxes = [(w, s, e, n) for asset, w, s, e, n in spatial.extents(db, cond)
+             if _permitted(db, identity, asset, spaces, cache)]
+    if not boxes:
+        return {"bbox": None}
+    return {"bbox": [min(b[0] for b in boxes), min(b[1] for b in boxes),
+                     max(b[2] for b in boxes), max(b[3] for b in boxes)]}
+
+
 @router.get("/map/nearby")
 def map_nearby(latitude: float, longitude: float, radius_m: float = Query(500, gt=0, le=100_000),
                workspaces: Optional[str] = None, types: Optional[str] = None, status: Optional[str] = None,

@@ -424,6 +424,16 @@ def within(db: Session, asset_filter, bbox: tuple[float, float, float, float], l
     return list(db.execute(q))
 
 
+def extents(db: Session, asset_filter, limit: int = 20000):
+    """(asset, west, south, east, north) of each approved location of the records `asset_filter` selects."""
+    g = SpatialFeature.geometry
+    q = (select(Asset, func.ST_XMin(g), func.ST_YMin(g), func.ST_XMax(g), func.ST_YMax(g))
+         .join(SpatialFeature, (SpatialFeature.subject_uid == Asset.uid) & (SpatialFeature.subject_kind == "asset"))
+         .where(SpatialFeature.state == "confirmed", asset_filter)
+         .limit(limit))
+    return list(db.execute(q))
+
+
 def feature_out(f: SpatialFeature, db: Optional[Session] = None) -> dict:
     """A feature as the API gives it; a point's latitude and longitude, a shape's measures (given a database)."""
     point_ = f.geometry_type == "Point"

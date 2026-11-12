@@ -55245,6 +55245,93 @@
         ]
       }
     },
+    "/v1/map/extent": {
+      "get": {
+        "description": "Where the workspace's located records are: the box (west, south, east, north) that holds the approved\nlocations the person may list, for the map to open on them; null when nothing has a location.",
+        "operationId": "map_extent_v1_map_extent_get",
+        "parameters": [
+          {
+            "description": "comma-separated; the current one if left out",
+            "in": "query",
+            "name": "workspaces",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "comma-separated; the current one if left out",
+              "title": "Workspaces"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Map Extent",
+        "tags": [
+          "locations"
+        ]
+      }
+    },
     "/v1/map/features": {
       "get": {
         "description": "The records with an approved location inside the box, as GeoJSON, that the person may see — with the\nsame rules as a list: their workspaces, restricted records and a restricted location left out.",

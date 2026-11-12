@@ -13,11 +13,12 @@ import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
  * obvious at a glance. The answer is written as it arrives, a follow-up continues the conversation with
  * the earlier turns as context, and every key an answer cites links to its record. */
 
+// For any workspace, whatever it holds: an accelerator, an IT service, a building.
 const STARTERS = [
   "How many objects, tickets and documents are in this workspace?",
-  "Can you list the magnets?",
-  "Which procedures cover the vacuum system?",
-  "What has gone wrong with the BTF line before?",
+  "Which tickets are still open, and on what equipment?",
+  "What has gone wrong most often, and how was it fixed?",
+  "Which procedures do we have, and what do they cover?",
 ];
 
 /** What each lookup is, in words. */
@@ -704,7 +705,7 @@ export function Ask() {
                 }
               }}
               rows={Math.min(6, Math.max(1, draft.split("\n").length))}
-              placeholder={turns.length ? "Ask a follow-up…" : "What has gone wrong with this magnet before?"}
+              placeholder={turns.length ? "Ask a follow-up…" : "What has gone wrong with this unit before?"}
               disabled={!usable}
               className="min-h-[2.5rem] flex-1 resize-none rounded border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
             />

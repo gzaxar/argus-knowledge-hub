@@ -189,6 +189,9 @@ def test_the_map_and_nearby_search_show_only_what_the_person_may_see(world):
                       headers=world["headers"]).json()["features"] == []
     assert client.get("/v1/map/features", params={"bbox": box, "status": "Retired"},
                       headers=world["headers"]).json()["features"] == []
+    # The map opens on the workspace's own records: not another workspace's, nor a restricted location.
+    box_of = client.get("/v1/map/extent", headers=world["headers"]).json()["bbox"]
+    assert box_of == [pytest.approx(12.5), pytest.approx(LNF[0]), pytest.approx(LNF[1]), pytest.approx(41.9)]
     secret = client.get(f"/v1/assets/{world['secret']}/location", headers=world["headers"]).json()
     assert secret["hidden"] is True and secret["location"] is None
     layers = client.get("/v1/map/layers", headers=world["headers"]).json()

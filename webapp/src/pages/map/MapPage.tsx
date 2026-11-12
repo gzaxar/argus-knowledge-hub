@@ -18,7 +18,7 @@ const LAYER_COLOURS: Record<string, string> = { equipment: "#2563eb", places: "#
 const STATUSES = ["Active", "Provisional", "Retired"];
 const ORDER = { outline: 0, route: 1, position: 2 } as const;
 const RADII = [50, 200, 1000, 5000];
-// LNF, Frascati: where the map opens before it knows better.
+// LNF, Frascati: where the map opens when the workspace has nothing located yet.
 const START: [number, number] = [41.8217, 12.6726];
 
 function Bounds({ onChange }: { onChange: (b: LatLngBounds, map: LeafletMap) => void }) {
@@ -59,6 +59,15 @@ export function MapPage() {
     enabled: centre !== null,
   });
   const reviews = useQuery({ queryKey: ["location-reviews", here], queryFn: () => placesApi.reviews() });
+  // Open on where this workspace's records are, once: after that the view is the person's.
+  const extent = useQuery({ queryKey: ["map-extent", here], queryFn: () => placesApi.extent() });
+  const [framed, setFramed] = useState(false);
+  useEffect(() => {
+    const box = extent.data?.bbox;
+    if (!map || framed || !extent.isFetched) return;
+    setFramed(true);
+    if (box) map.fitBounds([[box[1], box[0]], [box[3], box[2]]], { padding: [24, 24], maxZoom: 18 });
+  }, [map, framed, extent.isFetched, extent.data]);
   // Indoors: the plans placed on the map in view, by floor (every building's floor of the same order together).
   const plans = useQuery({ queryKey: ["map-plans", bbox], queryFn: () => indoorApi.mapPlans(bbox!), enabled: bbox !== null,
                            placeholderData: (prev) => prev });
