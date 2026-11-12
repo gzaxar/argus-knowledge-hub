@@ -22,6 +22,7 @@ import { AssetForm } from "./pages/assets/Form";
 import { AssetSearch } from "./pages/assets/Search";
 import { AdvancedSearch } from "./pages/search/Advanced";
 import { MapPage } from "./pages/map/MapPage";
+import { FloorPlanPage } from "./pages/map/FloorPlanPage";
 import { DocumentDetail } from "./pages/documents/Detail";
 import { AttachmentPage } from "./pages/attachments/AttachmentPage";
 import { DocumentForm } from "./pages/documents/Form";
@@ -118,6 +119,7 @@ export function App() {
           <Route path="/assets" element={<KeepQuery to="/assets/search" />} />
           <Route path="/search/advanced" element={<AdvancedSearch />} />
           <Route path="/map" element={<MapPage />} />
+          <Route path="/floor-plan" element={<FloorPlanPage />} />
           <Route path="/assets/new" element={<AssetForm />} />
           <Route path="/assets/import" element={<SpreadsheetImportPage />} />
           <Route path="/assets/:uid" element={<AssetDetail />} />

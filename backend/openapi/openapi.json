@@ -41561,6 +41561,86 @@
         ]
       }
     },
+    "/v1/floor-plan/show": {
+      "get": {
+        "description": "Records on their floor plans: each one's point, or that of the nearest place it is in that has one (its\nrack, its room); the plans they are on; and from the first to each other on the same plan, how far and which\nway. Only records and places this person may see.",
+        "operationId": "show_on_plans_v1_floor_plan_show_get",
+        "parameters": [
+          {
+            "description": "comma-separated record uids or keys, the first one asked about",
+            "in": "query",
+            "name": "records",
+            "required": true,
+            "schema": {
+              "description": "comma-separated record uids or keys, the first one asked about",
+              "title": "Records",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Show On Plans",
+        "tags": [
+          "indoors"
+        ]
+      }
+    },
     "/v1/global-values": {
       "get": {
         "operationId": "list_global_values_v1_global_values_get",

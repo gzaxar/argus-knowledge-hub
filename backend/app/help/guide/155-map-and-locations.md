@@ -1,7 +1,7 @@
 ---
 title: Map and locations
 summary: Where equipment and places are: positions, routes (cables, pipes, beamlines) and outlines (buildings, halls, rooms, zones, with heights a volume) and their history, what lies inside or crosses an area, the map, searching near a point, reporting a position from the phone, reviewing what the field saw, and importing locations from a file.
-keywords: [north, north arrow, compass, heading, facing, orientation, turn with me, calibrate, declination, site, sites, laboratory, facility, facilities, LNF, shared places, not shared with the facilities, withhold, transfer preview, reconciliation, indoors, indoor, floor, floors, level, storey, floor plan, plan, room, hall, building, place on the plan, control points, georeference, residual, dxf plan, pdf plan,  line, cable route, pipe route, outline, polygon, area, footprint, building outline, hall, zone, volume, height, inside, crossing, along, draw, map, gis, location, locations, coordinates, latitude, longitude, gps, position, where is, near me, nearby, distance, radius, review, observation, import locations, csv, geojson, wgs84, layer, place]
+keywords: [show on the floor plan, show on plan, where is it, rack position, north, north arrow, compass, heading, facing, orientation, turn with me, calibrate, declination, site, sites, laboratory, facility, facilities, LNF, shared places, not shared with the facilities, withhold, transfer preview, reconciliation, indoors, indoor, floor, floors, level, storey, floor plan, plan, room, hall, building, place on the plan, control points, georeference, residual, dxf plan, pdf plan,  line, cable route, pipe route, outline, polygon, area, footprint, building outline, hall, zone, volume, height, inside, crossing, along, draw, map, gis, location, locations, coordinates, latitude, longitude, gps, position, where is, near me, nearby, distance, radius, review, observation, import locations, csv, geojson, wgs84, layer, place]
 order: 155
 ---
 
@@ -68,6 +68,15 @@ a plan (the place's, or that of a place it is in — a room's plan is usually it
 A point on a plan placed on the map gives the record its **position** too (*from the plan*, as accurate as the
 plan's fit). The record then says **which is in** — its room, the hall the room is in, the building — and the
 place lists it; the record's *It is in* and the place's *Inside it* include them.
+
+**Show on the floor plan.** A record with a point on a plan shows it there, ringed in red; the button opens the
+plan full page. A record with no point of its own — a converter mounted in a rack, a spare on a shelf — is shown
+**where the nearest place it is in has one**: its rack, else the rack's room. The page says so (*No point of its
+own on a plan: shown where its rack R-A01 is*), so nobody takes the rack's point for the record's. What it is in
+comes from its placement inside, its **location** attribute or a `located in` relation, whichever it has. Asked
+*where is SC-DH1?*, **Ask ARGUS** answers with the same chain (rack, room, floor, building) and a **Show SC-DH1 on
+the floor plan** button under the answer; asked where it is *with respect to* other records, it shows them all on
+their plans, with the distance and direction from the first.
 
 ### Which way am I facing (the phone)
 

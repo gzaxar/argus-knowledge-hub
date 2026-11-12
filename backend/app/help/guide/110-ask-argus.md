@@ -1,7 +1,7 @@
 ---
 title: Ask ARGUS
 summary: Asking questions from workspace records, access information and the user guide; document hierarchy and Confluence walkthroughs, checking answers and revisions, confirmed proposals and mobile use.
-keywords: [hierarchy help, document navigation, WP, unfiled, confluence import, folder, revision preview, search help, ask, ask argus, attach, attachment, file, screenshot, upload, paperclip, rate, rating, feedback, thumbs up, thumbs down, not useful, wrong answer, chat, voice, speak, microphone, hands-free, orb, repeat, slower, show the source, interrupt, read aloud, phone, mobile, assistant, ai, question, answer, conversation, propose, proposal, apply, discard, create with ai, help, how to, register from a photo, dictate, transcribe, document from a photo, who has access, permissions]
+keywords: [diagnose, diagnosis, fault, troubleshoot, root cause, symptom, where is, floor plan, hierarchy help, document navigation, WP, unfiled, confluence import, folder, revision preview, search help, ask, ask argus, attach, attachment, file, screenshot, upload, paperclip, rate, rating, feedback, thumbs up, thumbs down, not useful, wrong answer, chat, voice, speak, microphone, hands-free, orb, repeat, slower, show the source, interrupt, read aloud, phone, mobile, assistant, ai, question, answer, conversation, propose, proposal, apply, discard, create with ai, help, how to, register from a photo, dictate, transcribe, document from a photo, who has access, permissions]
 order: 110
 ---
 
@@ -17,6 +17,22 @@ in (and what is shared with it), and finds only what you may read yourself.
    Each record key in the answer opens its record.
 3. **Follow up** in the same conversation ("which of those are in AC1?"): earlier turns are its context.
    **New chat** starts afresh. Conversations are kept, for you only.
+
+## Diagnose a fault
+
+Describe what you see, not what you think broke: "Since last night the data hall dashboard shows no temperatures
+and the UPS panel says no data", "No Wi-Fi on the east side of the reading room". Ask finds the equipment showing
+the symptom and what still works, looks for **what they all share** (*Looking for root causes*), then opens the
+suspects: their **tickets** (the same fault before, a recent change on them), the **runbooks** that describe
+them, and a ticket's **comments** (what was found while working on it). It answers with the likely cause and
+why, the checks in the runbook's order, where the part is and whether there is a spare.
+
+**Where is it?** "Where is SC-DH1?", "Show me AP-LIB-03 on the floor plan" give the rack, room, floor and
+building, and a **Show … on the floor plan** button under the answer that opens the plan with it ringed. A record
+without its own point on a plan is shown where its rack (or room) is, and the page says so. "Where is SC-DH1 with
+respect to the UPSs?" places them all: each in its colour, a dashed line from the first to each other one with
+the distance in metres, and which way (*50 m east*) — when they are on the same plan and the plan is placed on
+the map; otherwise it says which plan each is on.
 
 ## Ask who has access
 

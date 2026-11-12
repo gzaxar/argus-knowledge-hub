@@ -191,7 +191,7 @@
     "floor_plans": {
       "file": "records/floor_plans.jsonl",
       "rows": 4,
-      "sha256": "d44f3da00774cfbdd670d8e1a1090ca4ac851c5184a9edf72784a496346c6aff"
+      "sha256": "0c8507eaadb98ad7c5717efa566cd1734528192a4e42eb2814377293464e65e1"
     },
     "global_values": {
       "file": "records/global_values.jsonl",
@@ -220,8 +220,8 @@
     },
     "indoor_placements": {
       "file": "records/indoor_placements.jsonl",
-      "rows": 70,
-      "sha256": "52833359b72ef652a289af65022107b35902feeb04c96ba2d9e543ad6f61ce5b"
+      "rows": 71,
+      "sha256": "5e1fd2c99f40b09e61aab9a96f134e2b25db00168d42dc17f87282691fbbbc4c"
     },
     "llm_configs": {
       "file": "records/llm_configs.jsonl",
@@ -316,7 +316,7 @@
     "tickets": {
       "file": "records/tickets.jsonl",
       "rows": 24,
-      "sha256": "7d483c7894f2bb370b81dcacf6ec688ee7efe4bf988a7eb100c58a74b0f225be"
+      "sha256": "67550dddd306f5cdfe029129e6aeb9c2690441e13be4f9c5751a8a7d81185075"
     },
     "types": {
       "file": "records/types.jsonl",
@@ -511,11 +511,6 @@
       "size": 604
     },
     {
-      "path": "files/80/80066a4ca930240bb15e1a7e313918d5576b232c5fe10b5596b5784fd1e6d551",
-      "sha256": "80066a4ca930240bb15e1a7e313918d5576b232c5fe10b5596b5784fd1e6d551",
-      "size": 1956
-    },
-    {
       "path": "files/81/819d15c4ef99ea62d71e4335a03f52ba887c247767f843cdfc37cc540f3eb518",
       "sha256": "819d15c4ef99ea62d71e4335a03f52ba887c247767f843cdfc37cc540f3eb518",
       "size": 609
@@ -619,6 +614,11 @@
       "path": "files/d0/d096b8a4a329dfef6a5325d1789860536bdadf9896a9189a60fcf594813d77a5",
       "sha256": "d096b8a4a329dfef6a5325d1789860536bdadf9896a9189a60fcf594813d77a5",
       "size": 535
+    },
+    {
+      "path": "files/d5/d5544a89198c12c4816c6fb2dc09eacdc59fe9c490fc6c2a1ed6017e7be58b78",
+      "sha256": "d5544a89198c12c4816c6fb2dc09eacdc59fe9c490fc6c2a1ed6017e7be58b78",
+      "size": 2182
     },
     {
       "path": "files/d6/d689cd6c01d72a1bd0ebb2cf90dd34fce868aa6d49d397aee598f5106a344b27",
@@ -797,7 +797,7 @@
     },
     {
       "path": "records/floor_plans.jsonl",
-      "sha256": "d44f3da00774cfbdd670d8e1a1090ca4ac851c5184a9edf72784a496346c6aff",
+      "sha256": "0c8507eaadb98ad7c5717efa566cd1734528192a4e42eb2814377293464e65e1",
       "size": 4446
     },
     {
@@ -827,8 +827,8 @@
     },
     {
       "path": "records/indoor_placements.jsonl",
-      "sha256": "52833359b72ef652a289af65022107b35902feeb04c96ba2d9e543ad6f61ce5b",
-      "size": 34322
+      "sha256": "5e1fd2c99f40b09e61aab9a96f134e2b25db00168d42dc17f87282691fbbbc4c",
+      "size": 34812
     },
     {
       "path": "records/llm_configs.jsonl",
@@ -922,8 +922,8 @@
     },
     {
       "path": "records/tickets.jsonl",
-      "sha256": "7d483c7894f2bb370b81dcacf6ec688ee7efe4bf988a7eb100c58a74b0f225be",
-      "size": 16637
+      "sha256": "67550dddd306f5cdfe029129e6aeb9c2690441e13be4f9c5751a8a7d81185075",
+      "size": 16683
     },
     {
       "path": "records/types.jsonl",

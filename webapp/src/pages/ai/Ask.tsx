@@ -32,6 +32,7 @@ const TOOL_WORDS: Record<string, string> = {
   search_knowledge: "Reading what is written",
   get_document: "Opening a document",
   graph_neighbours: "Following connections",
+  where_is: "Finding where it is",
   impact_analysis: "Working out what depends on it",
   root_cause_analysis: "Looking for root causes",
   root_cause_from_alarms: "Looking for the cause of the alarms",
@@ -97,6 +98,27 @@ function summaryOf(step: AskStep & { summary?: string }): string {
     /* not JSON: nothing to summarise */
   }
   return "";
+}
+
+/** The floor-plan views an answer can open: where_is gave a link to its records on their plans. */
+function planButtons(steps: AskStep[]): { label: string; to: string }[] {
+  const out = new Map<string, { label: string; to: string }>();
+  for (const s of steps) {
+    if (s.tool !== "where_is") continue;
+    try {
+      const r = JSON.parse(s.result) as { key?: string; name?: string; show_on_plan?: string;
+                                          relative_to?: { key?: string; name?: string; floor_plan?: unknown }[] };
+      if (r.show_on_plan && r.show_on_plan.startsWith("/floor-plan?")) {
+        const names = [r.key || r.name, ...(r.relative_to ?? []).filter((o) => o.floor_plan).map((o) => o.key || o.name)]
+          .filter(Boolean);
+        const label = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ");
+        out.set(r.show_on_plan, { label: label || "it", to: r.show_on_plan });
+      }
+    } catch {
+      /* a truncated result: no button */
+    }
+  }
+  return [...out.values()];
 }
 
 /** Every record the lookups returned, by the key or code an answer cites it with, to its page. */
@@ -348,6 +370,7 @@ function AssistantTurn({ turn, actions, conversationId, answerIndex }: {
 }) {
   const [showThinking, setShowThinking] = useState(false);
   const links = useMemo(() => recordLinks(turn.steps), [turn.steps]);
+  const onPlan = useMemo(() => (turn.live ? [] : planButtons(turn.steps)), [turn.steps, turn.live]);
   const working = turn.live && !turn.content;
   return (
     <div className="rounded-lg border border-slate-200 bg-white">
@@ -375,6 +398,16 @@ function AssistantTurn({ turn, actions, conversationId, answerIndex }: {
       {turn.content && (
         <div className="px-4 py-3">
           <MarkdownView markdown={linkPlainCodes(turn.content, links)} codeLink={(t) => links.get(t)} />
+        </div>
+      )}
+      {onPlan.length > 0 && (
+        <div className="flex flex-wrap gap-2 px-4 pb-3">
+          {onPlan.map((b) => (
+            <Link key={b.to} to={b.to}
+                  className="rounded border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100">
+              Show {b.label} on the floor plan
+            </Link>
+          ))}
         </div>
       )}
       {actions.length > 0 && <ProposedChanges actions={actions} conversationId={conversationId} />}

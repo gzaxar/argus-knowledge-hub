@@ -491,3 +491,103 @@ def placement_out(db: Session, p: IndoorPlacement) -> dict:
                      "north_deg": north_deg(plan)} if plan else None,
             "x": p.plan_x, "y": p.plan_y, "source": p.source, "note": p.note, "state": p.state,
             "valid_from": p.valid_from, "valid_until": p.valid_until, "confirmed_by": p.confirmed_by}
+
+
+def _container_of(db: Session, asset: Asset) -> Optional[str]:
+    """What a record is in, by whichever way it was said: placed inside a place, its location attribute, or a
+    `located in` relation (derived or asserted). A converter in a rack is usually only the last two."""
+    from app.models.asset import Relation
+    p = current(db, asset.uid)
+    if p is not None and p.place_uid:
+        return p.place_uid
+    loc = (asset.attributes or {}).get("argus_location")
+    if isinstance(loc, str) and loc.strip():
+        target = db.get(Asset, loc.strip()) or db.scalar(select(Asset).where(Asset.key == loc.strip()))
+        if target is not None:
+            return target.uid
+    return db.scalar(select(Relation.to_asset_uid).where(Relation.from_asset_uid == asset.uid,
+                                                         Relation.relation_type == "located in").limit(1))
+
+
+def spot(db: Session, asset_uid: str, may=None, depth: int = 8) -> Optional[dict]:
+    """Where to show a record on a floor plan: its own point, or else the point of the nearest place it is in
+    that has one (the rack a converter is mounted in, the room the rack is in). `via` names that place, so a
+    page says "shown where its rack is" rather than pretending the record itself was placed. `may(asset)` says
+    whether the person may see a place on the way; the walk stops at one they may not."""
+    asset = db.get(Asset, asset_uid)
+    if asset is None:
+        return None
+    path: list[Asset] = []
+    seen = {asset.uid}
+    node = asset
+    for _ in range(depth + 1):
+        p = current(db, node.uid)
+        if p is not None and p.plan_uid and p.plan_x is not None and p.plan_y is not None:
+            plan = db.get(FloorPlan, p.plan_uid)
+            if plan is not None:
+                level = db.get(PlaceLevel, p.level_uid or plan.level_uid) if (p.level_uid or plan.level_uid) else None
+                via = path[-1] if path else None
+                return {
+                    "plan": {"uid": plan.uid, "name": plan.name, "width_px": plan.width_px,
+                             "height_px": plan.height_px, "north_deg": north_deg(plan)},
+                    "x": p.plan_x, "y": p.plan_y, "level": level_out(level) if level else None,
+                    "via": {"uid": via.uid, "key": via.key, "name": via.name, "type": via.type} if via else None,
+                    "path": [{"uid": a.uid, "key": a.key, "name": a.name, "type": a.type} for a in path],
+                }
+        nxt = _container_of(db, node)
+        if not nxt or nxt in seen:
+            return None
+        rec = db.get(Asset, nxt)
+        if rec is None or rec.deleted_at is not None or (may is not None and not may(rec)):
+            return None
+        seen.add(rec.uid)
+        path.append(rec)
+        node = rec
+    return None
+
+
+_COMPASS = ("north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west")
+
+
+def between(db: Session, a: dict, b: dict) -> Optional[dict]:
+    """How far b is from a, and which way, for two spots on the same plan placed on the map: metres on the
+    ground and a compass direction. None when they are on different plans or the plan is not on the map — a
+    distance in pixels would be a guess about the drawing's scale."""
+    if a["plan"]["uid"] != b["plan"]["uid"]:
+        return None
+    plan = db.get(FloorPlan, a["plan"]["uid"])
+    if plan is None or not plan.transform:
+        return None
+    lon1, lat1 = to_lonlat(plan.transform, a["x"], a["y"])
+    lon2, lat2 = to_lonlat(plan.transform, b["x"], b["y"])
+    east = (lon2 - lon1) * math.cos(math.radians((lat1 + lat2) / 2)) * M_PER_DEG_LON_EQUATOR
+    north = (lat2 - lat1) * M_PER_DEG_LAT
+    metres = math.hypot(east, north)
+    if metres < 0.5:
+        return {"metres": round(metres, 1), "direction": None}
+    bearing = math.degrees(math.atan2(east, north)) % 360
+    return {"metres": round(metres, 1), "direction": _COMPASS[int((bearing + 22.5) // 45) % 8]}
+
+
+def show(db: Session, uids: list[str], may=None) -> dict:
+    """Several records on their floor plans at once — "where is SC-DH1 with respect to the UPSs": each one's spot
+    (its own point or its rack's), grouped by plan, and from the first to each other on the same plan how far and
+    which way."""
+    records, plans = [], {}
+    first = None
+    for uid in uids[:20]:
+        asset = db.get(Asset, uid)
+        if asset is None or asset.deleted_at is not None or (may is not None and not may(asset)):
+            continue
+        s = spot(db, uid, may)
+        row = {"uid": asset.uid, "key": asset.key, "name": asset.name, "type": asset.type, "spot": s}
+        if s:
+            plan = db.get(FloorPlan, s["plan"]["uid"])
+            if plan is not None and plan.uid not in plans:
+                plans[plan.uid] = plan_out(db, plan)
+            if first is None:
+                first = s
+            elif first is not None:
+                row["from_first"] = between(db, first, s)
+        records.append(row)
+    return {"records": records, "plans": list(plans.values())}

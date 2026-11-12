@@ -627,20 +627,22 @@ def test_in_the_it_demo_the_causes_of_a_fault_come_from_the_graph(tmp_path):
 
 
 def test_in_the_it_demo_ask_finds_the_history_from_the_words_of_a_report(tmp_path):
-    """What an assistant does with "no Wi-Fi in the reading room east": the words of a report are not the
+    """What an assistant does with "no Wi-Fi in the south-west corner of the reading room": the words of a report are not the
     words of the ticket, the key it read is not the uid, and the history it needs is linked to the object."""
-    from app.services.mcp_tools import get_object, graph_neighbours, search_documents, search_tickets
+    from app.services.mcp_tools import get_object, get_ticket, graph_neighbours, search_documents, search_tickets
     ws = f"it-ask-{secrets.token_hex(3)}"
     try:
         assert _apply(DEMOS / "it-services", ws, tmp_path)["ok"]
         db = SessionLocal()
         try:
-            found = search_tickets(db, ws, "Wi-Fi reading room east no connection")
-            assert found["tickets"][0]["title"] == "Reading hall east: no Wi-Fi", found["tickets"][:3]
+            found = search_tickets(db, ws, "Wi-Fi reading room south-west corner no connection")
+            assert found["tickets"][0]["title"] == "Reading hall, south-west corner: no Wi-Fi", found["tickets"][:3]
             assert {t["state"] for t in search_tickets(db, ws, "Wi-Fi", state="open")["tickets"]} <= {
                 "new", "in_progress", "pending"}
             assert search_tickets(db, ws, "Wi-Fi", state="open")["total"] >= 1
             assert search_tickets(db, ws, "zebra giraffe unicorn")["total"] == 0
+            report = get_ticket(db, ws, found["tickets"][0]["key"])
+            assert any("LIB-03" in c["body"] for c in report["comments"]), "the diagnosis is in the comments"
 
             converter = get_object(db, ws, "NF-SC-DH1")
             assert any("power-room" in t["title"] for t in converter["tickets"]), "the June outage"
@@ -651,6 +653,46 @@ def test_in_the_it_demo_ask_finds_the_history_from_the_words_of_a_report(tmp_pat
 
             runbook = search_documents(db, ws, "replace failed switch port")
             assert runbook["documents"] and runbook["documents"][0]["code"] == "NF-RB-005", runbook["documents"][:3]
+        finally:
+            db.close()
+    finally:
+        _drop(ws)
+
+
+def test_in_the_it_demo_a_device_without_a_point_is_shown_where_its_rack_is(tmp_path):
+    """SC-DH1 has no point of its own on a plan: it is in rack R-A01, which has one. The record's page and Ask
+    show it there, and say it is the rack's point; a spare is found in R-SP01 on the Annex plan the same way."""
+    from app.services import indoor
+    from app.services.mcp_tools import where_is
+    ws = f"it-plan-{secrets.token_hex(3)}"
+    try:
+        assert _apply(DEMOS / "it-services", ws, tmp_path)["ok"]
+        db = SessionLocal()
+        try:
+            spot = indoor.spot(db, "nf-sc-dh1")
+            assert spot and spot["via"]["uid"] == "nf-rack-a01", spot
+            assert spot["plan"]["name"] == "Hub Building — ground floor" and (spot["x"], spot["y"]) == (60.0, 100.0)
+            own = indoor.spot(db, "nf-rack-a01")
+            assert own["via"] is None and own["path"] == []
+
+            spare = indoor.spot(db, "nf-sw-spare-cx48")
+            assert spare and spare["via"]["uid"] == "nf-rack-sp01" and spare["plan"]["name"].startswith("Annex"), spare
+
+            where = where_is(db, ws, "NF-SC-DH1")
+            assert [c["uid"] for c in where["in"]][:2] == ["nf-rack-a01", "nf-room-datahall"], where["in"]
+            assert where["show_on_plan"] == "/floor-plan?show=nf-sc-dh1"
+            ups = where_is(db, ws, "NF-SC-DH1", relative_to="NF-UPS-01, NF-UPS-02")
+            assert ups["show_on_plan"] == "/floor-plan?show=nf-sc-dh1,nf-ups-01,nf-ups-02"
+            ups1 = ups["relative_to"][0]
+            # R-A01 is at (60, 100) on the Hub ground floor, UPS-01 at (540, 250): 1 m = 10 px, north up.
+            assert ups1["from_it"].startswith("50.") and ups1["from_it"].endswith("east"), ups1
+            shown = indoor.show(db, ["nf-sc-dh1", "nf-ups-01", "nf-ap-lib-03"])
+            assert [r["spot"]["plan"]["name"] for r in shown["records"]][:2] == ["Hub Building — ground floor"] * 2
+            assert shown["records"][2].get("from_first") is None and len(shown["plans"]) == 2
+            assert "R-A01" in where["floor_plan"]["shown_at"] or "RACK-A01" in where["floor_plan"]["shown_at"].upper()
+
+            assert indoor.spot(db, "nf-rack-a01", may=lambda a: False) is not None, "its own point needs no place"
+            assert indoor.spot(db, "nf-sc-dh1", may=lambda a: False) is None, "a place it may not see is not shown"
         finally:
             db.close()
     finally:

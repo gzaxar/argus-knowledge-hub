@@ -2475,8 +2475,21 @@ export interface IndoorPlacementView {
   x: number | null; y: number | null; source: string; note: string | null; state: string;
   valid_from: string | null; valid_until: string | null; confirmed_by: string | null;
 }
+/** Where a record is shown on a floor plan: its own point, or that of the nearest place it is in (`via`). */
+export interface PlanSpot {
+  plan: { uid: string; name: string; width_px: number; height_px: number; north_deg?: number | null };
+  x: number; y: number; level: PlaceLevel | null;
+  via: { uid: string; key: string; name: string; type: string } | null;
+  path: { uid: string; key: string; name: string; type: string }[];
+}
+export interface FloorPlanShow {
+  records: { uid: string; key: string; name: string; type: string; spot: PlanSpot | null;
+             from_first?: { metres: number; direction: string | null } | null }[];
+  plans: FloorPlanView[];
+}
 export interface IndoorView {
   uid: string; placement: IndoorPlacementView | null;
+  spot?: PlanSpot | null;
   in: { uid: string; key: string; name: string; type: string }[];
   contents: { uid: string; key: string; name: string; type: string; level_uid: string | null; plan_uid: string | null }[];
   history: IndoorPlacementView[];
@@ -2517,6 +2530,9 @@ export const indoorApi = {
                                       x?: number | null; y?: number | null; note?: string | null }) =>
     request<IndoorPlacementView>(`/v1/assets/${uid}/indoors`, { method: "PUT", body: json(input) }),
   removeIndoors: (uid: string) => request<void>(`/v1/assets/${uid}/indoors`, { method: "DELETE" }),
+  /** Records on their floor plans (their own point, or their rack's or room's), grouped by plan, with how far
+   *  and which way each is from the first. */
+  show: (records: string[]) => request<FloorPlanShow>(`/v1/floor-plan/show?records=${encodeURIComponent(records.join(","))}`),
   mapPlans: (bbox: [number, number, number, number]) =>
     request<FloorPlanView[]>(`/v1/map/plans?bbox=${bbox.map((n) => n.toFixed(6)).join(",")}`),
   /** Records whose key, name, label, serial… contains this (to choose the place something is in). */
