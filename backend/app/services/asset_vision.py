@@ -31,8 +31,8 @@ MAX_IMAGE_BYTES = 8 * 1024 * 1024
 KEY_PATTERN = re.compile(r"\b[A-Z][A-Z0-9]{1,9}-\d{1,8}\b")
 
 SYSTEM_PROMPT = (
-    "You identify equipment in photographs taken in a particle accelerator "
-    "laboratory, for an inventory.\n"
+    "You identify equipment in photographs taken in a laboratory or technical facility, "
+    "for an inventory.\n"
     "Answer with JSON only, no prose and no markdown fences:\n"
     '{"type": "<one of the given type names, or null>", '
     '"name": "<a short descriptive name>", '

@@ -27,7 +27,7 @@ from app.services.ticket_types import (
 )
 
 DRAFT_SYSTEM = (
-    "You write technical documentation for a particle accelerator laboratory.\n"
+    "You write technical documentation for a laboratory or technical facility.\n"
     "Write in Markdown. Be concrete and brief: headings, numbered steps where the "
     "document is a sequence, a table where there are parameters and values.\n"
     "Write only what follows from what you are told. Where a number, a setpoint or a "
@@ -38,7 +38,7 @@ DRAFT_SYSTEM = (
 )
 
 REVIEW_SYSTEM = (
-    "You review technical documentation for a particle accelerator laboratory, for "
+    "You review technical documentation for a laboratory or technical facility, for "
     "whoever has to follow it under pressure.\n"
     "Answer with JSON only: a list of objects "
     '{"severity": "high|medium|low", "message": "<one sentence>"}.\n'
@@ -50,7 +50,7 @@ REVIEW_SYSTEM = (
 )
 
 TICKET_SYSTEM = (
-    "You read fault reports from a particle accelerator laboratory and fill in the "
+    "You read fault reports from a laboratory or technical facility and fill in the "
     "structured fields an operations database needs.\n"
     "Answer with JSON only, no prose and no fences:\n"
     '{"category": "<id or null>", "impact": "<id or null>", '
