@@ -20,7 +20,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.asset import Asset, Relation
-from app.models.document import Document, DocumentRevision
+from app.models.document import Document, DocumentRelation, DocumentRevision
 from app.models.issue import Issue
 from app.models.llm_config import LLMConfig
 from app.models.schema import Schema
@@ -91,17 +91,21 @@ def _asset_summary(asset: Asset) -> dict:
     return out
 
 
-def _issue_summary(issue: Issue) -> dict:
+def _issue_summary(issue: Issue, asset: Optional[Asset] = None) -> dict:
     attributes = issue.attributes or {}
-    return {
+    out = {
         "uid": issue.uid,
         "key": issue.key,
         "title": issue.title,
         "state": issue.state,
+        "created": issue.created_at.date().isoformat() if issue.created_at else None,
         "source_key": attributes.get("argus_source_key"),
         "category": attributes.get("argus_category"),
         "impact": attributes.get("argus_impact"),
     }
+    if asset is not None and can_see(asset):
+        out["on"] = asset.key or asset.uid
+    return out
 
 
 def _document_summary(document: Document, type_name: Optional[str]) -> dict:
@@ -326,31 +330,85 @@ def get_object(db: Session, workspace_id: str, uid_or_key: str) -> dict:
             else {"uid": other_uid},
         })
 
+    # Its history and its paperwork. "What has gone wrong with this before" and "which procedure covers it"
+    # are the next questions about any object, and the answer is linked to it, not findable by its words.
+    tickets = db.scalars(
+        select(Issue).where(Issue.workspace_id == workspace_id, Issue.asset_uid == asset.uid,
+                            visible_issues_clause(), Issue.deleted_at.is_(None))
+        .order_by(Issue.created_at.desc()).limit(15)
+    ).all()
+    documents = []
+    stmt = (select(Document, DocumentRelation.relation_type)
+            .join(DocumentRelation, DocumentRelation.from_document_uid == Document.uid)
+            .where(DocumentRelation.to_type == "asset", DocumentRelation.to_uid == asset.uid,
+                   _document_visible(workspace_id)))
+    if not _confidential_allowed(db, workspace_id):
+        stmt = stmt.where(Document.confidentiality != "riservato")
+    for document, relation_type in db.execute(stmt.limit(15)):
+        documents.append({**_document_summary(document, None), "relation": relation_type})
+
     return {
         "found": True,
         **_asset_summary(asset),
         "attributes": redacted_attributes(db, asset),
         "relations": relations,
+        "tickets": [_issue_summary(i) for i in tickets],
+        "documents": documents,
     }
+
+
+def _text_score(needle: str, *texts: str) -> int:
+    """How well a free-text query matches some text: the whole query found scores highest, otherwise
+    the number of its words found. A person reporting a fault writes "no Wi-Fi in the reading room
+    east"; the ticket says "Reading hall east: no Wi-Fi". Matching the whole sentence finds nothing,
+    and an assistant told nothing concludes there is no history."""
+    haystack = " ".join(t for t in texts if t).lower()
+    if not needle:
+        return 1
+    if needle in haystack:
+        return 1000
+    words = _search_words(needle)
+    found = sum(1 for w in words if w in haystack or _singular(w) in haystack)
+    # One word in five is chance; two of a short query, or a third of a long one, is a match.
+    return found if words and found >= max(1, min(2, len(words)), -(-len(words) // 3)) else 0
+
+
+# What a person or an assistant means by a state, against the states a ticket has.
+_STATE_GROUPS = {
+    "open": ("new", "in_progress", "pending"),
+    "active": ("new", "in_progress", "pending"),
+    "unresolved": ("new", "in_progress", "pending"),
+    "done": ("resolved", "closed"),
+    "finished": ("resolved", "closed"),
+    "past": ("resolved", "closed"),
+}
 
 
 def search_tickets(db: Session, workspace_id: str, query: str = "",
                    state: Optional[str] = None, limit: int = DEFAULT_LIMIT) -> dict:
-    """Work: faults, maintenance, requests."""
+    """Work: faults, maintenance, requests. A query of several words matches tickets with most of them,
+    best first; `state` is a ticket state, or "open" (not yet resolved) or "done" (resolved or closed)."""
     needle = (query or "").strip().lower()
-    stmt = select(Issue).where(Issue.workspace_id == workspace_id, visible_issues_clause())
+    stmt = select(Issue).where(Issue.workspace_id == workspace_id, visible_issues_clause(),
+                               Issue.deleted_at.is_(None))
     if state:
-        stmt = stmt.where(Issue.state == state)
-    rows = [
-        i for i in db.scalars(stmt)
-        if not needle
-        or needle in (i.title or "").lower()
-        or needle in (i.description or "").lower()
-        or needle in (i.key or "").lower()
-    ]
+        wanted = _STATE_GROUPS.get(state.strip().lower(), (state.strip().lower(),))
+        stmt = stmt.where(Issue.state.in_(wanted))
+    issues = list(db.scalars(stmt))
+    on = {a.uid: a for a in db.scalars(select(Asset).where(
+        Asset.uid.in_({i.asset_uid for i in issues if i.asset_uid})))} if needle else {}
+    scored = []
+    for i in issues:
+        asset = on.get(i.asset_uid)
+        score = _text_score(needle, i.title, i.description, i.key,
+                            asset.key if asset else "", asset.name if asset else "")
+        if score:
+            scored.append((score, i))
+    scored.sort(key=lambda s: (-s[0], -(s[1].created_at.timestamp() if s[1].created_at else 0)))
+    rows = [i for _, i in scored]
     return {
         "total": len(rows),
-        "tickets": [_issue_summary(i) for i in rows[: min(limit, MAX_LIMIT)]],
+        "tickets": [_issue_summary(i, on.get(i.asset_uid)) for i in rows[: min(limit, MAX_LIMIT)]],
     }
 
 
@@ -387,34 +445,35 @@ def search_documents(db: Session, workspace_id: str, query: str = "",
     if not _confidential_allowed(db, workspace_id):
         stmt = stmt.where(Document.confidentiality != "riservato")
 
-    rows = []
+    scored = []
     for document in db.scalars(stmt):
         type_name = names.get(document.document_type_uid or "")
         if type and (type_name or "").lower() != type.lower():
             continue
         if not needle:
-            rows.append(_document_summary(document, type_name))
+            scored.append((0, 0, _document_summary(document, type_name)))
             continue
-        if needle in (document.title or "").lower() or needle in (document.code or "").lower():
-            rows.append({**_document_summary(document, type_name), "matched": "title"})
-            continue
+        title_score = _text_score(needle, document.title, document.code)
         # The body too. A documentation search that only reads titles
         # answers "nothing about vacuum" for a library full of it.
         revision = (
             db.get(DocumentRevision, document.current_revision_uid)
             if document.current_revision_uid else None
         )
-        body = (revision.body_markdown or "").lower() if revision else ""
-        if needle in body:
-            where = body.find(needle)
-            excerpt = (revision.body_markdown or "")[max(0, where - 80): where + 160]
-            rows.append({
-                **_document_summary(document, type_name),
-                "matched": "text",
-                "excerpt": " ".join(excerpt.split()),
-            })
-    # Title matches first: they are what somebody meant.
-    rows.sort(key=lambda r: r.get("matched") != "title")
+        text = (revision.body_markdown or "") if revision else ""
+        body_score = _text_score(needle, document.title, document.code, text)
+        if not (title_score or body_score):
+            continue
+        row = {**_document_summary(document, type_name), "matched": "title" if title_score else "text"}
+        if not title_score:
+            lower = text.lower()
+            at = [lower.find(w) for w in ([needle] + _search_words(needle)) if w in lower]
+            where = at[0] if at else 0
+            row["excerpt"] = " ".join(text[max(0, where - 80): where + 160].split())
+        scored.append((title_score, body_score, row))
+    # Title matches first: they are what somebody meant. Then the text that matches most of the query.
+    scored.sort(key=lambda s: (-s[0], -s[1]))
+    rows = [r for _, _, r in scored]
     return {"total": len(rows), "documents": rows[: min(limit, MAX_LIMIT)]}
 
 
@@ -455,6 +514,15 @@ def graph_neighbours(db: Session, workspace_id: str, kind: str, uid: str,
                      depth: int = 1, kinds: Optional[str] = None,
                      max_nodes: int = 60) -> dict:
     """Everything within a few hops: the question RAG cannot answer."""
+    # An assistant names a record by the key it read (NF-AP-LIB-01, IT-TCK-0022, NF-RB-005), not by the
+    # internal uid: an empty graph for a record that exists reads as "connected to nothing".
+    if kind == "asset" and db.get(Asset, uid) is None:
+        found = db.scalar(select(Asset.uid).where(Asset.key == uid)) or getattr(_by_former_key(db, uid), "uid", None)
+        uid = found or uid
+    elif kind == "ticket" and db.get(Issue, uid) is None:
+        uid = db.scalar(select(Issue.uid).where(Issue.workspace_id == workspace_id, Issue.key == uid)) or uid
+    elif kind == "document" and db.get(Document, uid) is None:
+        uid = db.scalar(select(Document.uid).where(_document_visible(workspace_id), Document.code == uid)) or uid
     graph = traverse(
         db, workspace_id, kind, uid, depth=max(1, min(depth, 4)),
         kinds=[k.strip() for k in kinds.split(",")] if kinds else None,
@@ -692,8 +760,9 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "get_object",
-        "description": "One object by uid or key, with its attributes and the objects it "
-                       "is physically connected to.",
+        "description": "One object by uid or key, with its attributes, the objects it "
+                       "is physically connected to, the tickets about it (its fault history) and the "
+                       "documents that describe it (runbooks, procedures).",
         "handler": get_object,
         "inputSchema": {
             "type": "object",
@@ -703,14 +772,16 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "search_tickets",
-        "description": "Search tickets — faults, maintenance, requests — by text, "
-                       "optionally filtered by state.",
+        "description": "Search tickets — faults, maintenance, requests, changes — by text, best match "
+                       "first, optionally filtered by state. Leave state out to include past, closed tickets: "
+                       "they hold how the same fault was fixed before.",
         "handler": search_tickets,
         "inputSchema": {
             "type": "object",
             "properties": {
                 "query": {"type": "string"},
-                "state": {"type": "string"},
+                "state": {"type": "string", "description": "new | in_progress | pending | resolved | closed, "
+                          "or open (not yet resolved) or done (resolved or closed)"},
                 "limit": {"type": "integer"},
             },
         },
@@ -764,7 +835,7 @@ TOOLS: list[dict[str, Any]] = [
             "type": "object",
             "properties": {
                 "kind": {"type": "string", "description": "asset | ticket | document | group | person"},
-                "uid": {"type": "string"},
+                "uid": {"type": "string", "description": "The record's uid or key"},
                 "depth": {"type": "integer", "description": "1 to 4, default 1"},
                 "kinds": {"type": "string", "description": "Comma-separated kinds to keep"},
                 "max_nodes": {"type": "integer"},

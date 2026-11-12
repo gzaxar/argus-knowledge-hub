@@ -624,3 +624,34 @@ def test_in_the_it_demo_the_causes_of_a_fault_come_from_the_graph(tmp_path):
             db.close()
     finally:
         _drop(ws)
+
+
+def test_in_the_it_demo_ask_finds_the_history_from_the_words_of_a_report(tmp_path):
+    """What an assistant does with "no Wi-Fi in the reading room east": the words of a report are not the
+    words of the ticket, the key it read is not the uid, and the history it needs is linked to the object."""
+    from app.services.mcp_tools import get_object, graph_neighbours, search_documents, search_tickets
+    ws = f"it-ask-{secrets.token_hex(3)}"
+    try:
+        assert _apply(DEMOS / "it-services", ws, tmp_path)["ok"]
+        db = SessionLocal()
+        try:
+            found = search_tickets(db, ws, "Wi-Fi reading room east no connection")
+            assert found["tickets"][0]["title"] == "Reading hall east: no Wi-Fi", found["tickets"][:3]
+            assert {t["state"] for t in search_tickets(db, ws, "Wi-Fi", state="open")["tickets"]} <= {
+                "new", "in_progress", "pending"}
+            assert search_tickets(db, ws, "Wi-Fi", state="open")["total"] >= 1
+            assert search_tickets(db, ws, "zebra giraffe unicorn")["total"] == 0
+
+            converter = get_object(db, ws, "NF-SC-DH1")
+            assert any("power-room" in t["title"] for t in converter["tickets"]), "the June outage"
+            assert {d["code"] for d in converter["documents"]} >= {"NF-RB-004"}, converter["documents"]
+
+            switch = graph_neighbours(db, ws, "asset", "NF-SW-ACC-LIB")
+            assert len(switch["nodes"]) > 1, "a key works as well as a uid"
+
+            runbook = search_documents(db, ws, "replace failed switch port")
+            assert runbook["documents"] and runbook["documents"][0]["code"] == "NF-RB-005", runbook["documents"][:3]
+        finally:
+            db.close()
+    finally:
+        _drop(ws)
