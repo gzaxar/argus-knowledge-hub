@@ -43,6 +43,8 @@ LAYERS = {
     "control": "the control system: hosts, IOCs, devices, networks, storage",
     "power": "electrical supply",
     "cooling": "cooling water and chillers",
+    "rf": "RF power: modulators, klystrons, waveguides and what they feed",
+    "utility": "plant services: compressed air, process water and what they supply",
     "vacuum": "pumping, gauges and valves",
     "timing": "event generators, receivers and the triggers they send",
     "interlock": "permits and machine protection",
@@ -105,10 +107,28 @@ SEMANTICS: dict = {
     "acts on": RelationSemantics("control", FORWARD, CONTROL,
                                  note="device → what it drives: it loses control, not function"),
     "drives": RelationSemantics("control", FORWARD, CONTROL, note="IOC → the unit it is"),
+    # A controller and what it commands or reads: a stopped IOC or PLC leaves its devices running but
+    # uncommanded and unread — lost control, which is what an operator sees first.
+    "controls": RelationSemantics("control", FORWARD, CONTROL,
+                                  note="IOC, PLC or controller → the device it commands"),
+    "reads": RelationSemantics("control", FORWARD, CONTROL,
+                               note="controller → the gauge or sensor it reads: its readout is lost"),
 
     # --- physical supply ------------------------------------------------------------------------
     "powers": RelationSemantics("power", FORWARD, FUNCTION, note="supply → magnet"),
     "cools": RelationSemantics("cooling", FORWARD, FUNCTION, note="chiller → what it cools"),
+    "feeds": RelationSemantics("rf", FORWARD, FUNCTION, note="klystron → the structure or gun its RF goes to"),
+    "supplies": RelationSemantics("utility", FORWARD, FUNCTION,
+                                  note="plant system (compressed air, water) → what it supplies"),
+    "actuates": RelationSemantics("mechanical", FORWARD, FUNCTION, note="actuator → the valve it moves"),
+    "air-conditions": RelationSemantics("cooling", FORWARD, DEGRADATION,
+                                        note="air handling unit or fan coil → the room it conditions"),
+    "backed up to": RelationSemantics("control", REVERSE, DEGRADATION,
+                                      note="data source → its backup target: a lost target leaves it unprotected"),
+    "regulates": RelationSemantics("cooling", FORWARD, DEGRADATION,
+                                   note="regulating valve → what it keeps at temperature: drift, not a stop"),
+    "moves": RelationSemantics("mechanical", FORWARD, DEGRADATION,
+                               note="motor axis → what it inserts or positions: stuck where it is"),
     # Stored from the consumer's reference field (a breaker's `fed_from`): the other way round from `powers`
     # and `cools`, failing the same way — the supply fails, so does what it feeds.
     "fed from": RelationSemantics("power", REVERSE, FUNCTION, note="consumer → its electrical supply"),
@@ -201,6 +221,16 @@ SEMANTICS: dict = {
     "covered by": RelationSemantics("administrative", NONE, None, note="asset → its support contract"),
     "licensed by": RelationSemantics("administrative", NONE, None, note="service → its software licence"),
     "with": RelationSemantics("administrative", NONE, None, note="contract → the other party"),
+    "views": RelationSemantics("provenance", NONE, None, note="camera → the screen it looks at"),
+    "maintained by": RelationSemantics("administrative", NONE, None, note="asset → the unit that looks after it"),
+    "purchased with": RelationSemantics("administrative", NONE, None, note="item → the purchase order that bought it"),
+    "deployed by": RelationSemantics("provenance", NONE, None,
+                                     note="service or IOC → the configuration (EPIK8s, git) that deploys it"),
+    "covers": RelationSemantics("administrative", NONE, None, note="area or zone → the room or building it covers"),
+    "for": RelationSemantics("administrative", NONE, None, note="requirement → what it is for"),
+    "in work package": RelationSemantics("administrative", NONE, None, note="item → its work package"),
+    "installed at": RelationSemantics("provenance", NONE, None, note="installation → the beam-model element"),
+    "installation of": RelationSemantics("provenance", NONE, None, note="installation → the physical unit"),
 }
 
 # The relations the model itself defines; an extension may not redefine them.
