@@ -119,3 +119,27 @@ jobs:
           git commit -am "Deploy ${VERSION}"
           for attempt in 1 2 3; do git pull --rebase origin main && git push origin HEAD:main && exit 0; sleep 5; done
           exit 1
+
+  # The release's Ask ARGUS benchmark status (docs/ask-eval.md): "not run" until the manual benchmark
+  # (ask-eval.yml) attaches its report. After the deployment, and never able to fail it: no release depends on a
+  # model server until a release gate has been adopted.
+  ask-eval-status:
+    needs: deploy
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: write
+    steps:
+      - name: Say "not run" on the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          note=$'\n\n## Ask ARGUS evaluation\n\nAsk ARGUS benchmark for '"$TAG"$': **not run**. Earlier releases\' results do not apply to this one; a live benchmark started from the `ask-eval` workflow replaces this line with its results.\n'
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            body=$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json body -q .body)
+            case "$body" in *"## Ask ARGUS evaluation"*) exit 0 ;; esac
+            gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes "$body$note"
+          else
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "$TAG" --notes "Release $TAG.$note" --verify-tag
+          fi

@@ -81,6 +81,7 @@ import { TransferStatus } from "./pages/workspace/TransferStatus";
 import { AccountPage } from "./pages/account/Account";
 import { RobotTokensPage } from "./pages/workspace/RobotTokens";
 import { AdminTokensPage } from "./pages/admin/Tokens";
+import { AskEvaluationPage } from "./pages/admin/AskEvaluation";
 import { PrintPage } from "./pages/Print";
 
 /** Sends /imports/... to the workspace-scoped equivalent, keeping whatever
@@ -215,6 +216,7 @@ export function App() {
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/ai" element={<InstallationAI />} />
           <Route path="/admin/tokens" element={<AdminTokensPage />} />
+          <Route path="/admin/ask-evaluation" element={<AskEvaluationPage />} />
           <Route path="/admin/portability" element={<PortabilityPage />} />
           <Route path="/admin/type-migrations" element={<TypeMigrationsPage />} />
           <Route path="/admin/type-migrations/:id" element={<TypeMigrationDetailPage />} />

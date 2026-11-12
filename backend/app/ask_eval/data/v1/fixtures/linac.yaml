@@ -1,0 +1,10 @@
+id: linac
+description: >-
+  The Valmora linac demo bundle (fictional), as it is: among much else, a Moxa serial device server whose port 3
+  (TCP 4003) is an RS-485 line shared by the quadrupole supplies PS-Q1, PS-Q2 and PS-Q3, with a note saying the
+  cabling between them is not recorded. The right answer to "which cables connect them" is that the records do
+  not establish it.
+workspaces:
+  - suffix: main
+    name: Ask evaluation — linac
+    bundle: medium-linac

@@ -286,6 +286,9 @@ from app.routers import activities as activities_router  # noqa: E402
 app.include_router(activities_router.router)
 for _r in portability_router.ROUTERS:
     app.include_router(_r)
+from app.routers import ask_eval as ask_eval_router  # noqa: E402
+
+app.include_router(ask_eval_router.router)
 
 
 @app.on_event("startup")

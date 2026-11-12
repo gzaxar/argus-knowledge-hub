@@ -1,0 +1,9 @@
+id: it
+description: >-
+  Northfield IT Services (the IT demo bundle, fictional): a service catalogue, three buildings with rooms and racks,
+  a port-to-port network map, a cooling control process behind a serial converter, spares, and three troubleshooting
+  stories (a silent data hall, a dead switch port, an attack on the VPN).
+workspaces:
+  - suffix: main
+    name: Ask evaluation — IT services
+    bundle: it-services

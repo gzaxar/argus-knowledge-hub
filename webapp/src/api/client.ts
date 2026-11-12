@@ -3311,3 +3311,61 @@ export const catalogueCollectionsApi = {
     request<unknown>(`${CC}/entries/${catalogueId.split("/").map(encodeURIComponent).join("/")}/fields`,
                      { method: "POST", body: json({ field, decision, reason }) }),
 };
+
+/** Administration › Ask evaluation (backend app/ask_eval, docs/ask-eval.md). */
+export interface AskEvalSettings {
+  base_url: string | null; api_key_set: boolean; models: string[]; release_model: string | null;
+  embedding_model: string | null; rerank_model: string | null; judge_model: string | null;
+  judge_base_url: string | null; judge_api_key_set: boolean; approved_hosts: string[]; repeats: number;
+  case_timeout_s: number; max_output_tokens: number | null; updated_by: string | null; updated_at: string | null;
+  database_configured: boolean;
+}
+export interface AskEvalRow {
+  model: string; status?: string; reason?: string | null; runs?: number; skipped?: number; pass_rate?: number | null;
+  factual_pass_rate?: number | null; evidence_retrieval?: number | null; citation_support?: number | null;
+  correct_abstention?: number | null; critical_failures?: number; completion_failures?: number; timeouts?: number;
+  latency_p50_s?: number | null; latency_p95_s?: number | null; tokens_mean?: number | null; flaky_cases?: string[];
+  served_models?: string[];
+}
+export interface AskEvalRun {
+  id: string; kind: string; release: string; commit: string | null; status: string; source: string;
+  requested_by: string | null; models: string[]; progress: { done?: number; total?: number; case?: string; model?: string } | null;
+  summary: AskEvalRow[] | null; report_sha256: string | null; public_sha256: string | null; error: string | null;
+  created_at: string; started_at: string | null; finished_at: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  report?: any;
+}
+export interface AskEvalRelease {
+  release: string; current: boolean; runs: number;
+  release_quality: AskEvalRun | { status: "not run" };
+  benchmark: AskEvalRun | { status: "not run" };
+}
+export const askEvalApi = {
+  settings: () => request<AskEvalSettings>("/v1/admin/ask-eval/settings"),
+  saveSettings: (input: Partial<AskEvalSettings> & { api_key?: string; clear_api_key?: boolean; judge_api_key?: string;
+                                                    clear_judge_api_key?: boolean }) =>
+    request<AskEvalSettings>("/v1/admin/ask-eval/settings", { method: "PUT", body: json(input) }),
+  releases: () => request<{ current: string; releases: AskEvalRelease[] }>("/v1/admin/ask-eval/releases"),
+  runs: () => request<AskEvalRun[]>("/v1/admin/ask-eval/runs"),
+  run: (id: string) => request<AskEvalRun>(`/v1/admin/ask-eval/runs/${encodeURIComponent(id)}`),
+  start: (input: { kind: "release" | "benchmark" | "simulated"; models?: string[]; repeats?: number }) =>
+    request<AskEvalRun>("/v1/admin/ask-eval/runs", { method: "POST", body: json(input) }),
+  /** Answers rated down, as draft evaluation cases (YAML), fetched signed in, as a URL to save. */
+  feedbackDrafts: async (since?: string): Promise<{ url: string; count: number }> => {
+    const session = await loadSession();
+    if (!session) throw new Error("Not signed in");
+    const resp = await fetch(`${session.baseUrl}/v1/admin/ask-eval/feedback-drafts.yaml${since ? `?since=${encodeURIComponent(since)}` : ""}`,
+                             { headers: authHeaders(session) });
+    if (!resp.ok) throw new ApiError(resp.status, await resp.text());
+    return { url: URL.createObjectURL(await resp.blob()), count: Number(resp.headers.get("X-Drafts") ?? 0) };
+  },
+  /** A report file, fetched signed in, as a URL to save. */
+  download: async (id: string, fmt: "json" | "md" | "html", isPublic = false): Promise<string> => {
+    const session = await loadSession();
+    if (!session) throw new Error("Not signed in");
+    const resp = await fetch(`${session.baseUrl}/v1/admin/ask-eval/runs/${encodeURIComponent(id)}/report.${fmt}${isPublic ? "?public=true" : ""}`,
+                             { headers: authHeaders(session) });
+    if (!resp.ok) throw new ApiError(resp.status, await resp.text());
+    return URL.createObjectURL(await resp.blob());
+  },
+};
