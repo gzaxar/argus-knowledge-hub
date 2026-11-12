@@ -215,7 +215,8 @@ def test_a_demo_round_trips(name, tmp_path):
         if name == "medium-linac":
             rows = core.read(DEMOS / name).manifest["families"]
             assert len(a["beam_values"]) == rows["beam_model_values"]["rows"] > 0
-            assert len(a["bindings"]) == rows["beam_asset_bindings"]["rows"] == rows["beam_model_values"]["rows"]
+            # One binding per component; a component has a value in each dataset of its path (design, test beam).
+            assert len(a["bindings"]) == rows["beam_asset_bindings"]["rows"] == len({s for s, _x, _y in a["beam_values"]})
     finally:
         _drop(first, second)
 
@@ -693,6 +694,92 @@ def test_in_the_it_demo_a_device_without_a_point_is_shown_where_its_rack_is(tmp_
 
             assert indoor.spot(db, "nf-rack-a01", may=lambda a: False) is not None, "its own point needs no place"
             assert indoor.spot(db, "nf-sc-dh1", may=lambda a: False) is None, "a place it may not see is not shown"
+        finally:
+            db.close()
+    finally:
+        _drop(ws)
+
+
+def test_in_the_linac_demo_the_failure_model_answers_the_three_troubleshooting_stories(tmp_path):
+    """The accelerator demo's stories: three quadrupole supplies silent behind one Moxa port while three others on
+    the same IOC work; frozen gauges while the ion pumps (powered by the same rack) are fine; a modulator trip and
+    what it takes down. Every relation verb of the bundle is one the failure model knows."""
+    from app.services import causal_model
+    from app.services.indoor import spot
+    from app.services.mcp_tools import get_object, get_ticket, where_is
+    from app.services.root_cause import impact_of, root_causes
+    verbs = {json.loads(x)["relation_type"] for x in (DEMOS / "medium-linac" / "records" / "relations.jsonl")
+             .read_text().splitlines() if x.strip()}
+    assert not [v for v in verbs if causal_model.classify(v) is None], "every verb has a meaning"
+    ws = f"linac-rca-{secrets.token_hex(3)}"
+    try:
+        assert _apply(DEMOS / "medium-linac", ws, tmp_path)["ok"]
+        db = SessionLocal()
+        try:
+            quads = ["VL-PS-Q1", "VL-PS-Q2", "VL-PS-Q3"]
+            out = root_causes(db, ws, quads, healthy=["VL-PS-Q4", "VL-PS-Q5", "VL-PS-Q6"],
+                              symptom_kind={k: "control" for k in quads})
+            assert "serial port 3" in out["candidates"][0]["name"], [c["name"] for c in out["candidates"][:5]]
+            ioc = next(c for c in out["candidates"] if c["name"] == "IOC magnets-ps")
+            assert set(ioc["contradicted_by"]) == {"VL-PS-Q4", "VL-PS-Q5", "VL-PS-Q6"}, "Q4–Q6 on the same IOC work"
+
+            gauges = ["VL-VG-1", "VL-VG-2", "VL-VG-3"]
+            vac = root_causes(db, ws, gauges, healthy=[f"VL-IP-{i}" for i in range(1, 6)],
+                              symptom_kind={k: "control" for k in gauges})
+            names = [c["name"] for c in vac["candidates"] if c["coverage"] == 1]
+            assert names and names[0].startswith("Gauge controller module"), names
+
+            lost = {a["name"]: a for a in impact_of(db, ws, "VL-MOD-2")["affected"]}
+            assert "Klystron K-2" in lost
+            assert any(n.startswith(("ACC02", "VL-U-ACC02")) or "ACC02" in n for n in lost), sorted(lost)[:15]
+            ioc = {a["name"] for a in impact_of(db, ws, "VL-SRV-IOC")["affected"]}
+            assert {"Quadrupole power supply PS-Q1", "Vacuum controller rack"} <= ioc, sorted(ioc)[:20]
+
+            moxa = get_object(db, ws, "VL-MOXA-01")
+            assert {d["code"] for d in moxa["documents"]} >= {"VL-NT-003", "VL-RB-001"}
+            q2 = get_object(db, ws, "VL-PS-Q2")
+            assert any("PS-Q2 readback frozen" in t["title"] for t in q2["tickets"])
+            today = get_ticket(db, ws, next(t["key"] for t in get_object(db, ws, "VL-PS-Q1")["tickets"]
+                                            if t["title"].startswith("Quadrupoles Q1")))
+            assert any("Q4, Q5, Q6" in c["body"] for c in today["comments"])
+            assert spot(db, "vl-moxa-01")["plan"]["name"] == "Accelerator Building — ground floor"
+            assert where_is(db, ws, "VL-MOXA-SPARE")["in"][0]["key"] == "VL-ROOM-A0.12"
+
+            # The rest of the laboratory: racks, IT, the external data centre, cooling, purchasing, the MAD-X model.
+            node = [c["key"] for c in where_is(db, ws, "VL-K8S-N1")["in"]]
+            assert node[:3] == ["VL-RK-S01", "VL-ROOM-D0.02", "VL-BLD-ADM"], node
+            assert where_is(db, ws, "VL-PS-Q1")["in"][0]["key"] == "VL-RK-A12-1"
+            fibre = {a["name"] for a in impact_of(db, ws, "VL-FO-DC2")["affected"]}
+            assert "Backup server BKP-01" in fibre, fibre
+            backups = {a["name"]: a for a in impact_of(db, ws, "VL-BKP-01")["affected"]}
+            assert "degradation" in backups["Archiver server SRV-ARCH"]["losses"], sorted(backups)
+            water = {a["name"] for a in impact_of(db, ws, "VL-MCW-LOOP")["affected"]}
+            assert "Quadrupole power supply PS-Q1" in water
+            node1 = get_object(db, ws, "VL-K8S-N1")
+            assert node1["attributes"]["purchase_order"] == "VL-PO-2026-0501"
+            assert any(r["relation"] == "purchased with" for r in node1["relations"])
+
+            from app.beam_converters.common import Options
+            from app.beam_converters.madx import convert_madx
+            from app.models.beam_model import BeamModelValue
+            from app.models.document import Document, DocumentRevision
+            from app.models.asset import Asset
+            madx_doc = db.scalar(select(Document).where(Document.workspace_id == ws, Document.title ==
+                                                        "MAD-X model of the Valmora linac"))
+            body = db.get(DocumentRevision, madx_doc.current_revision_uid).body_markdown
+            source = body.split("```")[1]
+            converted = convert_madx(source, "valmora-linac.madx", Options())
+            placed = {c["id"].upper(): v["s"] for d in converted.get("datasets", []) for c in converted["components"]
+                      for k, v in d["values"].items() if k == c["id"]}
+            assert {"QUA01", "QUA06", "ACC04", "SCR02"} <= set(placed), sorted(placed)[:10]
+            assert abs(placed["QUA03"] - 14.0) < 1e-6 and abs(placed["SCR02"] - 21.2) < 1e-6
+            datasets = {a.name for a in db.scalars(select(Asset).where(Asset.workspace_id == ws,
+                                                                       Asset.type == "Model Dataset"))}
+            assert any(n.startswith("Test beam TB-2026-11") for n in datasets)
+            tb = db.scalar(select(Asset.uid).where(Asset.workspace_id == ws, Asset.name.like("Test beam TB-2026-11%")))
+            waist = [v.optics for v in db.scalars(select(BeamModelValue).where(BeamModelValue.dataset_uid == tb))
+                     if v.optics and abs(v.optics.get("alfx", 9)) < 0.2 and abs(v.optics.get("betx", 0) - 2.45) < 0.1]
+            assert waist, "the test beam waist at SCR02 is in the dataset"
         finally:
             db.close()
     finally:
