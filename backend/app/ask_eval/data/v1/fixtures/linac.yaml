@@ -1,48 +1,10 @@
 id: linac
 description: >-
-  The Valmora linac demo bundle (fictional), plus a Moxa serial device server whose port 3 (TCP 4003) is an RS-485
-  line shared by three quadrupole power supplies. No cable record says how they are wired: the right answer to
-  "which cables connect them" is that the records do not establish it.
+  The Valmora linac demo bundle (fictional), as it is: among much else, a Moxa serial device server whose port 3
+  (TCP 4003) is an RS-485 line shared by the quadrupole supplies PS-Q1, PS-Q2 and PS-Q3, with a note saying the
+  cabling between them is not recorded. The right answer to "which cables connect them" is that the records do
+  not establish it.
 workspaces:
   - suffix: main
     name: Ask evaluation — linac
     bundle: medium-linac
-    records:
-      assets:
-        - uid: ev-moxa-01
-          key: VL-MOXA-01
-          name: Moxa NPort 5650-8 (magnet power supply line)
-          type: Serial Device Server
-          attributes: {manufacturer: Moxa, model: NPort 5650-8, ip_address: 10.20.3.41}
-        - uid: ev-moxa-01-p3
-          key: VL-MOXA-01-P3
-          name: Moxa NPort 5650-8 · serial port 3 (TCP 4003)
-          type: Serial Port
-          attributes: {tcp_port: 4003, mode: RS-485 2-wire, baud: 9600}
-        - uid: ev-moxa-01-p4
-          key: VL-MOXA-01-P4
-          name: Moxa NPort 5650-8 · serial port 4 (TCP 4004)
-          type: Serial Port
-          attributes: {tcp_port: 4004, mode: RS-232, baud: 19200}
-      relations:
-        - {from: ev-moxa-01-p3, to: ev-moxa-01, type: port of}
-        - {from: ev-moxa-01-p4, to: ev-moxa-01, type: port of}
-        - {from: vl-ps-q1, to: ev-moxa-01-p3, type: reached through}
-        - {from: vl-ps-q2, to: ev-moxa-01-p3, type: reached through}
-        - {from: vl-ps-q3, to: ev-moxa-01-p3, type: reached through}
-        - {from: vl-ps-dip, to: ev-moxa-01-p4, type: reached through}
-      documents:
-        - uid: ev-doc-serial-lines
-          code: VL-NT-003
-          title: Magnet power supply serial lines
-          type: Technical Note
-          describes: [ev-moxa-01, ev-moxa-01-p3]
-          body: |
-            # Magnet power supply serial lines
-
-            The quadrupole power supplies PS-Q1, PS-Q2 and PS-Q3 share one RS-485 line on serial port 3 of the
-            Moxa NPort VL-MOXA-01 (TCP port 4003), at Modbus addresses 1, 2 and 3. The spectrometer dipole supply
-            PS-DM1 has its own RS-232 line on port 4 (TCP 4004).
-
-            How the line is cabled between the supplies — cable labels, routing and the order of the drops — is not
-            recorded in ARGUS yet: the cable database has not been imported.
