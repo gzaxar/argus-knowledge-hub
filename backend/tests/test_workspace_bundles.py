@@ -686,7 +686,7 @@ def test_in_the_it_demo_a_device_without_a_point_is_shown_where_its_rack_is(tmp_
             assert ups["show_on_plan"] == "/floor-plan?show=nf-sc-dh1,nf-ups-01,nf-ups-02"
             ups1 = ups["relative_to"][0]
             # R-A01 is at (60, 100) on the Hub ground floor, UPS-01 at (540, 250): 1 m = 10 px, north up.
-            assert ups1["from_it"].startswith("50.") and ups1["from_it"].endswith("east"), ups1
+            assert ups1["from_it"].startswith("NF-UPS-01 is 50.") and ups1["from_it"].endswith("east of NF-SC-DH1"), ups1
             shown = indoor.show(db, ["nf-sc-dh1", "nf-ups-01", "nf-ap-lib-03"])
             assert [r["spot"]["plan"]["name"] for r in shown["records"]][:2] == ["Hub Building — ground floor"] * 2
             assert shown["records"][2].get("from_first") is None and len(shown["plans"]) == 2

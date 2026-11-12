@@ -433,8 +433,9 @@ def where_is(db: Session, workspace_id: str, uid_or_key: str, relative_to: Optio
         row = {**_asset_summary(other), "in": chain_of(other), "floor_plan": on_plan(s)}
         if first and s:
             rel = indoor.between(db, first, s)
-            row["from_it"] = (f"{rel['metres']} m {rel['direction']}" if rel and rel["direction"]
-                              else f"{rel['metres']} m" if rel
+            this, that = other.key or other.name, asset.key or asset.name
+            row["from_it"] = (f"{this} is {rel['metres']} m {rel['direction']} of {that}" if rel and rel["direction"]
+                              else f"{this} is {rel['metres']} m from {that}" if rel
                               else "on another floor plan" if s["plan"]["uid"] != first["plan"]["uid"]
                               else "same plan, not placed on the map: no distance")
             shown.append(other.uid)
@@ -847,7 +848,8 @@ TOOLS: list[dict[str, Any]] = [
         "description": "Where an object physically is: the places it is in, nearest first (rack, room, floor, "
                        "building), and whether it can be shown on a floor plan — its own point or its rack's. "
                        "With relative_to (other objects, comma-separated keys), where they are too and how far "
-                       "from the first and which way. The page offers a 'Show on the floor plan' button for "
+                       "from the first and which way, said as '<other> is N m <direction> of <first>' — keep "
+                       "that direction as it is, never turn it round. The page offers a 'Show on the floor plan' button for "
                        "them, so say it is there; say when a point is the rack's rather than the object's own.",
         "handler": where_is,
         "inputSchema": {
