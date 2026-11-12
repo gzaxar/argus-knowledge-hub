@@ -519,20 +519,21 @@ def ticket_fields() -> dict[str, Field]:
     def key_match(ctx: Ctx, op: str, vals: list[Value]):
         words = _str_values(vals, ctx)
         lowered = [w.lower() for w in words]
-        hit = or_(Issue.uid.in_(words), func.lower(source_key).in_(lowered))
+        hit = or_(Issue.uid.in_(words), func.lower(Issue.key).in_(lowered), func.lower(source_key).in_(lowered))
         if op in ("=", "IN"):
             return hit
         if op in ("!=", "NOT IN"):
             return not_(hit)
         if op in ("~", "!~"):
-            like = or_(*[or_(Issue.uid.ilike(f"%{w}%"), source_key.ilike(f"%{w}%")) for w in words])
+            like = or_(*[or_(Issue.uid.ilike(f"%{w}%"), Issue.key.ilike(f"%{w}%"), source_key.ilike(f"%{w}%"))
+                         for w in words])
             return like if op == "~" else not_(like)
         raise JqlError(f"{op} does not apply to key")
 
     def text_match(ctx: Ctx, op: str, vals: list[Value]):
         if op not in ("~", "!~"):
             raise JqlError("text is searched with ~ (contains)")
-        return _text(func.concat_ws(" ", Issue.title, Issue.description, source_key, Issue.uid), op, vals, ctx)
+        return _text(func.concat_ws(" ", Issue.title, Issue.description, Issue.key, source_key, Issue.uid), op, vals, ctx)
 
     def category_match(ctx: Ctx, op: str, vals: list[Value]):
         words = [w.lower().replace(" ", "") for w in _str_values(vals, ctx)]
@@ -586,7 +587,8 @@ def ticket_fields() -> dict[str, Field]:
             return like if op == "~" else not_(like)
         raise JqlError(f"{op} does not apply to labels")
 
-    key = Field("special", match=key_match, order=lambda: Issue.uid, help="the ticket's key (or its Jira key)")
+    key = Field("special", match=key_match, order=lambda: func.coalesce(Issue.key, source_key, Issue.uid),
+                help="the ticket's key (or its Jira key)")
     summary = Field("text", column=lambda: Issue.title, order=lambda: Issue.title, help="the title")
     status = Field("enum", column=lambda: Issue.state, order=lambda: Issue.state, help="the state")
     kind = _schema_name_field(lambda: Issue.schema_uid)
@@ -596,7 +598,8 @@ def ticket_fields() -> dict[str, Field]:
         "description": Field("text", column=lambda: Issue.description, help="the description"),
         "text": Field("special", match=text_match, help="everything written: title, description, key"),
         "status": status, "state": status,
-        "statuscategory": Field("special", match=category_match, help="Done or To Do / In Progress"),
+        "statuscategory": Field("special", match=category_match,
+                                help="Done (closed) or not; a resolved ticket awaiting verification is not Done"),
         "priority": Field("enum", column=lambda: Issue.priority, order=lambda: _priority_rank(Issue.priority),
                           help="the priority"),
         "assignee": Field("user", column=lambda: Issue.assignee, order=lambda: Issue.assignee, help="who it is assigned to"),

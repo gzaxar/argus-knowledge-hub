@@ -123,7 +123,7 @@ records with copies of the floors and plans, placed where the originals were.
 ## The map
 
 **Assets → Map** shows the records with a location, coloured by layer: points, routes as lines and outlines as
-areas (under the points, so every point can be clicked). Narrow it to **types** (a type includes
+areas (under the points, so every point can be clicked). It opens on where the workspace's located records are. Narrow it to **types** (a type includes
 the types under it), **workspaces** you can read, and **status**. A marker opens its record (in its own
 workspace). **Near a point**: choose a distance and *of the map's centre* to list what is within it, nearest
 first — a route or an outline by its nearest part (inside an outline is 0 m). **Indoors** chooses a floor: the

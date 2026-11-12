@@ -152,6 +152,20 @@ SEMANTICS: dict = {
     "located in": RelationSemantics("environment", REVERSE, FUNCTION,
                                     note="asset → room or rack: the place fails, the asset with it"),
 
+    # --- IT services --------------------------------------------------------------------------------
+    # A service stops with the one system that delivers it, is only degraded when one of several redundant
+    # ones stops, and stops with a service it needs. A virtual machine stops with its host.
+    "depends on": RelationSemantics("function", REVERSE, FUNCTION,
+                                    note="service → a service it needs: that one stops, so does this one"),
+    "delivered by": RelationSemantics("function", REVERSE, FUNCTION,
+                                      note="service → the one system that delivers it"),
+    "redundantly delivered by": RelationSemantics("function", REVERSE, DEGRADATION,
+                                                  note="service → one of several systems that deliver it"),
+    "hosted on": RelationSemantics("control", REVERSE, FUNCTION,
+                                   note="virtual machine → its host: the host stops, so does the machine"),
+    "on segment": RelationSemantics("control", REVERSE, CONTROL,
+                                    note="port or device → its network segment (VLAN)"),
+
     # --- no failure crosses these -----------------------------------------------------------------
     "deployed on": RelationSemantics("provenance", NONE, None, note="IOC → the beamline it serves"),
     "declared in": RelationSemantics("provenance", NONE, None, note="record → the configuration it was read from"),
@@ -182,6 +196,11 @@ SEMANTICS: dict = {
     "requires": RelationSemantics("provenance", NONE, None),
     "procured under": RelationSemantics("provenance", NONE, None),
     "assigned to": RelationSemantics("provenance", NONE, None),
+    "runs": RelationSemantics("provenance", NONE, None, note="host → the software product it runs"),
+    "serves model": RelationSemantics("provenance", NONE, None, note="inference host → the model it serves"),
+    "covered by": RelationSemantics("administrative", NONE, None, note="asset → its support contract"),
+    "licensed by": RelationSemantics("administrative", NONE, None, note="service → its software licence"),
+    "with": RelationSemantics("administrative", NONE, None, note="contract → the other party"),
 }
 
 # The relations the model itself defines; an extension may not redefine them.

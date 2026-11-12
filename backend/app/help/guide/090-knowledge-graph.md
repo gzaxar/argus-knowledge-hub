@@ -1,7 +1,7 @@
 ---
 title: The knowledge graph
 summary: Seeing how records are connected, what is about the same thing by meaning, what stops if something fails, and what could cause a fault.
-keywords: [graph, knowledge graph, connections, relations, impact, what depends, root cause, causes, failure, blast radius, single point of failure, semantic, similar, related by meaning, meaning, rag]
+keywords: [graph, knowledge graph, connections, relations, impact, what depends, root cause, causes, failure, blast radius, single point of failure, depends on, delivered by, redundant, hosted on, it service, semantic, similar, related by meaning, meaning, rag]
 order: 90
 ---
 
@@ -44,6 +44,12 @@ updated when a document is published and on a schedule (*AI settings*).
 Pick a record and ask **What stops if it fails?**: ARGUS follows the recorded dependencies the way a failure
 travels and lists what could be affected and by which path. Losing a power supply and losing an IOC have
 different effects: a magnet stops without its supply, while devices an IOC reads keep working, unread.
+
+IT services follow the same rules. A service **depends on** another: that one stops, so does this one. It is
+**delivered by** the one system it cannot run without (a mail service by its mail server), and **redundantly
+delivered by** each of several that share the work (a Wi-Fi service by its access points): losing one of those
+only degrades it. A virtual machine is **hosted on** its host, and stops with it. Contracts, licences and the
+software a host runs carry no failure.
 
 ## It misbehaves: find causes
 

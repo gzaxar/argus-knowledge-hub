@@ -2,7 +2,7 @@
   "created_at": "2026-10-24T15:37:56.038124+00:00",
   "created_by": "ARGUS demo authors",
   "demo": {
-    "description": "A medium-sized IT organisation: a service catalogue (network, internet, Wi-Fi, mail, DNS, hosting, storage, backup, monitoring, service desk, VPN, HPC, LLM inference), three buildings with floors, rooms and racks, a GPU cluster for HPC and LLM inference, user workstations, a port-to-port network map, mapped and placed equipment, dependencies, incidents, requests and changes, maintenance activities, runbooks, contracts and SLAs.",
+    "description": "A medium-sized IT organisation: a service catalogue (network, internet, Wi-Fi, mail, DNS, hosting, storage, backup, monitoring, service desk, VPN, HPC, LLM inference), three buildings with floors, rooms and racks, a GPU cluster for HPC and LLM inference, user workstations, a port-to-port network map, a cooling control process reaching its units through a serial converter, mapped and placed equipment, dependencies, incidents, requests and changes, maintenance activities, runbooks, contracts and SLAs.",
     "notice": "Synthetic demo: Northfield IT Services, its people, suppliers, addresses and figures are fictional. Nothing here describes a real organisation or real equipment.",
     "organisation": "Northfield IT Services (fictional)",
     "steps": [
@@ -45,6 +45,21 @@
         "link": "/tickets/nf-t-001",
         "text": "Library Wi-Fi drops: traced to access point LIB-02, linked to a problem record and to the completed replacement.",
         "title": "An incident and its cause"
+      },
+      {
+        "link": "/tickets/nf-t-020",
+        "text": "A vague report — the data hall temperatures stopped updating — and Ask ARGUS works out what could cause it: the facility agent, the VM, the switch port, the serial converter, with the tickets and runbooks that say which is most likely.",
+        "title": "Diagnose a fault"
+      },
+      {
+        "link": "/tickets/nf-t-024",
+        "text": "Failed VPN logins from abroad, then a success: the incident procedure, the account left without MFA by an earlier change, and what depends on the VPN and the firewalls.",
+        "title": "An attack from outside"
+      },
+      {
+        "link": "/tickets/nf-t-022",
+        "text": "One access point dark, the others fine: Ask ARGUS narrows it to the switch port, finds the storm that hit it, the free ports to move to and the spare switch in rack R-SP01.",
+        "title": "A switch port that died"
       },
       {
         "link": "/activities",
@@ -115,8 +130,8 @@
     },
     "assets": {
       "file": "records/assets.jsonl",
-      "rows": 284,
-      "sha256": "b3663f0e3069ffa8c602a19de25ffdb31febd2ca451caa9434e05c01ca0f0294"
+      "rows": 299,
+      "sha256": "6662e47c255e7af6615af9774503a692e4c71fce8a80bb40a8cbb635901e43f5"
     },
     "attachments": {
       "file": "records/attachments.jsonl",
@@ -145,13 +160,13 @@
     },
     "document_relations": {
       "file": "records/document_relations.jsonl",
-      "rows": 100,
-      "sha256": "feef6eaa3c66d77739bf9b6bdedc0753727107b054639d26f18c445dac171d59"
+      "rows": 119,
+      "sha256": "33c7f1a415ba4ac5de30b8c601816189fb8b5b2e82237bbbc55b5b0b78f17d0c"
     },
     "document_revisions": {
       "file": "records/document_revisions.jsonl",
-      "rows": 13,
-      "sha256": "97798472434a349b0260157df4af916ad32124bff53ece83ff4bf5e3b7ce8544"
+      "rows": 17,
+      "sha256": "cf44dc0ec7dce0cfcbebd358f4373757f445481fb92131784eed7941606f471a"
     },
     "document_template_versions": {
       "file": "records/document_template_versions.jsonl",
@@ -165,8 +180,8 @@
     },
     "documents": {
       "file": "records/documents.jsonl",
-      "rows": 13,
-      "sha256": "eaae21145231cc1cb59239f093a2ec17d90236b3961fb41f1f9a8ac861b4b7ed"
+      "rows": 17,
+      "sha256": "6d30661646922bf9f191bdcb52c6e0a1afcd3673d896f6114d6736724ac35ff2"
     },
     "equipment_class_requests": {
       "file": "records/equipment_class_requests.jsonl",
@@ -245,8 +260,8 @@
     },
     "relations": {
       "file": "records/relations.jsonl",
-      "rows": 416,
-      "sha256": "fe853d2852cc0295d651174409628e759ad1aea50e5e034fcfd8a6ec4230574d"
+      "rows": 524,
+      "sha256": "32e837d6a98448c9253d4e29fb8b21d7828907314930ddec5cadac06dc38d2e1"
     },
     "review_escalations": {
       "file": "records/review_escalations.jsonl",
@@ -270,8 +285,8 @@
     },
     "ticket_comments": {
       "file": "records/ticket_comments.jsonl",
-      "rows": 5,
-      "sha256": "8ff25ecb7e918302f968a206cab83473d23ee1944a141f2cde2a8e8a17291d81"
+      "rows": 12,
+      "sha256": "8739e8e24666312c9df7dacc4fba5bafc4808bee94a296f2113ad3ce03fed151"
     },
     "ticket_escalations": {
       "file": "records/ticket_escalations.jsonl",
@@ -280,8 +295,8 @@
     },
     "ticket_history": {
       "file": "records/ticket_history.jsonl",
-      "rows": 27,
-      "sha256": "613aa01b1995b14fcdb791d7db802122649f48d2f607ff83c4db93d1291c6416"
+      "rows": 42,
+      "sha256": "1bf71c8c6b9690d5a0942396a0a951ebe05e93e2f21d9de31e7a8ef2a1c9f2ea"
     },
     "ticket_links": {
       "file": "records/ticket_links.jsonl",
@@ -300,8 +315,8 @@
     },
     "tickets": {
       "file": "records/tickets.jsonl",
-      "rows": 16,
-      "sha256": "38db9b29f2bb4e1a48ae6bd75fc70f861bc7d1c54bea83de9a568c2e14b53bb3"
+      "rows": 24,
+      "sha256": "7d483c7894f2bb370b81dcacf6ec688ee7efe4bf988a7eb100c58a74b0f225be"
     },
     "types": {
       "file": "records/types.jsonl",
@@ -722,8 +737,8 @@
     },
     {
       "path": "records/assets.jsonl",
-      "sha256": "b3663f0e3069ffa8c602a19de25ffdb31febd2ca451caa9434e05c01ca0f0294",
-      "size": 198382
+      "sha256": "6662e47c255e7af6615af9774503a692e4c71fce8a80bb40a8cbb635901e43f5",
+      "size": 210137
     },
     {
       "path": "records/attachments.jsonl",
@@ -752,13 +767,13 @@
     },
     {
       "path": "records/document_relations.jsonl",
-      "sha256": "feef6eaa3c66d77739bf9b6bdedc0753727107b054639d26f18c445dac171d59",
-      "size": 21559
+      "sha256": "33c7f1a415ba4ac5de30b8c601816189fb8b5b2e82237bbbc55b5b0b78f17d0c",
+      "size": 25546
     },
     {
       "path": "records/document_revisions.jsonl",
-      "sha256": "97798472434a349b0260157df4af916ad32124bff53ece83ff4bf5e3b7ce8544",
-      "size": 24393
+      "sha256": "cf44dc0ec7dce0cfcbebd358f4373757f445481fb92131784eed7941606f471a",
+      "size": 33400
     },
     {
       "path": "records/document_template_versions.jsonl",
@@ -772,8 +787,8 @@
     },
     {
       "path": "records/documents.jsonl",
-      "sha256": "eaae21145231cc1cb59239f093a2ec17d90236b3961fb41f1f9a8ac861b4b7ed",
-      "size": 7535
+      "sha256": "6d30661646922bf9f191bdcb52c6e0a1afcd3673d896f6114d6736724ac35ff2",
+      "size": 9863
     },
     {
       "path": "records/equipment_class_requests.jsonl",
@@ -852,8 +867,8 @@
     },
     {
       "path": "records/relations.jsonl",
-      "sha256": "fe853d2852cc0295d651174409628e759ad1aea50e5e034fcfd8a6ec4230574d",
-      "size": 98450
+      "sha256": "32e837d6a98448c9253d4e29fb8b21d7828907314930ddec5cadac06dc38d2e1",
+      "size": 124987
     },
     {
       "path": "records/review_escalations.jsonl",
@@ -877,8 +892,8 @@
     },
     {
       "path": "records/ticket_comments.jsonl",
-      "sha256": "8ff25ecb7e918302f968a206cab83473d23ee1944a141f2cde2a8e8a17291d81",
-      "size": 1216
+      "sha256": "8739e8e24666312c9df7dacc4fba5bafc4808bee94a296f2113ad3ce03fed151",
+      "size": 3116
     },
     {
       "path": "records/ticket_escalations.jsonl",
@@ -887,8 +902,8 @@
     },
     {
       "path": "records/ticket_history.jsonl",
-      "sha256": "613aa01b1995b14fcdb791d7db802122649f48d2f607ff83c4db93d1291c6416",
-      "size": 6653
+      "sha256": "1bf71c8c6b9690d5a0942396a0a951ebe05e93e2f21d9de31e7a8ef2a1c9f2ea",
+      "size": 10311
     },
     {
       "path": "records/ticket_links.jsonl",
@@ -907,8 +922,8 @@
     },
     {
       "path": "records/tickets.jsonl",
-      "sha256": "38db9b29f2bb4e1a48ae6bd75fc70f861bc7d1c54bea83de9a568c2e14b53bb3",
-      "size": 9940
+      "sha256": "7d483c7894f2bb370b81dcacf6ec688ee7efe4bf988a7eb100c58a74b0f225be",
+      "size": 16637
     },
     {
       "path": "records/types.jsonl",

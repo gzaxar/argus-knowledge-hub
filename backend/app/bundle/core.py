@@ -739,6 +739,10 @@ def _load(db: Session, b: Bundle, rep: Report, new_ws: str, name: str, actor: Op
     for issue in db.scalars(select(Issue).where(Issue.workspace_id == new_ws)):
         derive_for_ticket(db, issue)
     db.flush()
+    # ---- rebuilt: the edges that follow from what records say (`located in` from `argus_location`, …)
+    from app.ledger.engine import derive_all
+    derive_all(db, [new_ws])
+    db.flush()
     rep.dependencies = _check_dependencies(db, b, ids)
     if b.manifest.get("demo"):
         from app.models.app_setting import AppSetting

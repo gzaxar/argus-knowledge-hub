@@ -215,6 +215,37 @@ def test_the_semantic_graph_links_what_is_about_the_same_thing_and_only_what_may
         db.close()
 
 
+def test_a_shared_record_is_listed_only_when_it_is_about_as_close_as_the_workspaces_own(world):
+    db = SessionLocal()
+    other, t = world["other"], secrets.token_hex(3)
+    for code, title, body in (
+            ("TWIN", "Ion pump replacement, shared", "# Isolate\nClose the gate valves.\n\n# Replace\n"
+                                                    "Replace the ion pump and bake the sector."),
+            ("FAR", "Catalogue entry", "invoice shipping warranty terms")):
+        d = Document(uid=f"{other}-{code}", workspace_id=other, code=f"{code}-{t}", title=title, is_global=True)
+        db.add(d)
+        db.flush()
+        r = DocumentRevision(uid=f"{d.uid}-r1", document_uid=d.uid, revision_number=1, state="published",
+                             body_markdown=body)
+        db.add(r)
+        db.flush()
+        d.current_revision_uid = r.uid
+    db.commit()
+    db.close()
+    run(world)
+    run(world, other)
+    db = SessionLocal()
+    try:
+        ws = world["ws"]
+        found = ki.related(db, ws, "document", f"{ws}-PROC-1", min_score=0.05)
+        got = {r["uid"]: r["score"] for r in found["related"]}
+        assert f"{other}-TWIN" in got, "another workspace's shared copy of the same procedure is listed"
+        own_best = max(v for k, v in got.items() if not k.startswith(other))
+        assert f"{other}-FAR" not in got and own_best > 0.05, "a shared record far below the workspace's own is not"
+    finally:
+        db.close()
+
+
 def test_the_semantic_graph_through_the_api(world):
     from fastapi.testclient import TestClient
     from app.main import app

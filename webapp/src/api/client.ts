@@ -2546,6 +2546,8 @@ export const placesApi = {
     request<{ type: "FeatureCollection"; features: MapFeature[] }>(
       `/v1/map/nearby?latitude=${latitude}&longitude=${longitude}&radius_m=${radius}&${mapQuery(filters)}`),
   layers: () => request<{ id: string; name: string; description?: string; package: string }[]>("/v1/map/layers"),
+  /** [west, south, east, north] around the workspace's located records, or null. */
+  extent: () => request<{ bbox: [number, number, number, number] | null }>("/v1/map/extent"),
   /** A CSV or (Geo)JSON file of locations: dry_run says what would happen, row by row. */
   importLocations: (file: File, dryRun: boolean) => {
     const form = new FormData();

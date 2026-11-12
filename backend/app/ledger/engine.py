@@ -1478,8 +1478,8 @@ LOCATION_TYPES = {"Location", "Room", "Rack", "Building", "Area", "Storage"}
 
 def derive_located_in(db: Session, workspace_ids: Optional[Iterable[str]] = None) -> dict:
     """`located in` (derived): a record whose `argus_location` names a
-    Location record — by key or name, in its own workspace first — points
-    at it. The value stays the fact; the edge follows it."""
+    Location record — by uid, key or name, in its own workspace first —
+    points at it. The value stays the fact; the edge follows it."""
     q = select(Asset).where(Asset.attributes["argus_location"].astext.isnot(None))
     rq = select(Relation).where(Relation.derivation == "derived", Relation.relation_type == "located in")
     if workspace_ids is not None:
@@ -1488,7 +1488,7 @@ def derive_located_in(db: Session, workspace_ids: Optional[Iterable[str]] = None
         rq = rq.where(Relation.workspace_id.in_(ids))
     locations: dict[str, list[Asset]] = defaultdict(list)
     for loc in db.scalars(select(Asset).where(Asset.type.in_(LOCATION_TYPES), Asset.record_status != "Retired")):
-        for label in {loc.key, loc.name}:
+        for label in {loc.uid, loc.key, loc.name}:
             if label:
                 locations[label.strip().lower()].append(loc)
     wanted: dict[tuple, str] = {}

@@ -539,6 +539,9 @@ def _describe(db: Session, kind: str, uid: str) -> Optional[str]:
     return None
 
 
+SHARED_MARGIN = 0.05
+
+
 def related(db: Session, workspace_id: str, kind: str, uid: str, endpoint: Optional[Endpoint] = None,
             limit: int = 10, min_score: float = 0.3, confidential_ok: bool = False) -> dict:
     """The records whose written knowledge is about the same thing as this one's — the semantic graph beside
@@ -564,7 +567,7 @@ def related(db: Session, workspace_id: str, kind: str, uid: str, endpoint: Optio
     best: dict[tuple, dict] = {}
     for mine in own:
         for row in db.execute(text(
-                "SELECT source_kind, source_uid, parent_kind, parent_uid, title, body, "
+                "SELECT source_kind, source_uid, parent_kind, parent_uid, title, body, workspace_id, "
                 "1 - (embedding <=> CAST(:v AS vector)) AS score FROM knowledge_chunks "
                 "WHERE (workspace_id = :w OR shared) AND model = :m AND embedding IS NOT NULL "
                 "ORDER BY embedding <=> CAST(:v AS vector) LIMIT 40"),
@@ -578,8 +581,16 @@ def related(db: Session, workspace_id: str, kind: str, uid: str, endpoint: Optio
             if record is None:
                 continue
             best[target] = {"kind": target[0], "uid": target[1], "record": record, "score": round(float(row["score"]), 3),
-                            "excerpt": row["body"][:400], "matched": mine["body"][:400], "title": row["title"]}
-    ranked = sorted(best.values(), key=lambda r: r["score"], reverse=True)[:max(1, min(limit, 30))]
+                            "excerpt": row["body"][:400], "matched": mine["body"][:400], "title": row["title"],
+                            "_shared": row["workspace_id"] != workspace_id}
+    # What another workspace shares (a catalogue of product models, say) is listed only when it is about as close as
+    # this workspace's own best match: a shared catalogue must not crowd out the records of the workspace itself.
+    own_best = max((r["score"] for r in best.values() if not r["_shared"]), default=None)
+    floor = own_best - SHARED_MARGIN if own_best is not None else min_score
+    kept = [r for r in best.values() if not r["_shared"] or r["score"] >= floor]
+    for r in kept:
+        r.pop("_shared")
+    ranked = sorted(kept, key=lambda r: r["score"], reverse=True)[:max(1, min(limit, 30))]
     return {"available": True, "related": ranked, "from": basis if own else "nothing indexed"}
 
 

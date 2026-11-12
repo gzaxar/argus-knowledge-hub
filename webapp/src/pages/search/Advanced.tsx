@@ -222,7 +222,7 @@ export function AdvancedSearch() {
               )}
               {result.data.items.map((i) => {
                 const path = entity === "tickets" ? `/tickets/${i.uid}` : entity === "assets" ? `/assets/${i.uid}` : `/documents/${i.uid}`;
-                const key = entity === "tickets" ? i.source_key ?? "" : entity === "assets" ? i.key : i.code;
+                const key = entity === "tickets" ? i.key ?? i.source_key ?? "" : entity === "assets" ? i.key : i.code;
                 return (
                   <tr key={i.uid} className="hover:bg-slate-50">
                     {showKeys && <td className="px-4 py-2 font-mono text-xs text-slate-500">{key}</td>}

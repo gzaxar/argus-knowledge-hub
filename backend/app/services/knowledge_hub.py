@@ -68,7 +68,7 @@ def asset_summary(a: Asset) -> dict:
 def ticket_summary(i: Issue) -> dict:
     return {
         "uid": i.uid, "title": i.title, "state": i.state, "priority": i.priority,
-        "assignee": i.assignee, "asset_uid": i.asset_uid, "open": is_open(i),
+        "assignee": i.assignee, "asset_uid": i.asset_uid, "open": is_open(i), "key": i.key,
         "source_key": (i.attributes or {}).get("argus_source_key"),
         "created_at": i.created_at, "updated_at": i.updated_at, "due_date": i.due_date,
     }

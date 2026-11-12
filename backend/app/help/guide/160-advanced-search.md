@@ -40,9 +40,9 @@ the whole day: `created = 2026-10-01`.
 
 | Tickets | |
 |---|---|
-| `key` (`issuekey`) | the ticket, or the Jira key it came from |
+| `key` (`issuekey`) | the ticket's key (`BTF-TCK-0042`), or the Jira key it came from |
 | `summary` (`title`), `description`, `text` | `text ~` looks in title, description and key |
-| `status` (`state`), `statusCategory` | `statusCategory = Done` / `!= Done` |
+| `status` (`state`), `statusCategory` | `statusCategory = Done` / `!= Done`. Done is closed: a resolved ticket waiting to be verified is not Done yet |
 | `priority`, `type` (`issuetype`) | ordered by priority: highest first with `DESC` |
 | `assignee`, `reporter`, `watcher` | `currentUser()`, an e-mail, a username or a name |
 | `created`, `updated`, `resolved`, `due` | dates |
