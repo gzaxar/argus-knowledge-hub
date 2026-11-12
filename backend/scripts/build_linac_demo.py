@@ -391,7 +391,7 @@ on_plan("vl-videowall", ACC, "vl-room-control", 580, 24)
 
 # ------------------------------------------------------------------------------------------------ radiation protection
 asset("vl-rm-3", "VL-RM-3", "Neutron monitor RM-3 (bunker door)", "Radiation Monitor", argus_location="vl-room-corridor",
-      detector_kind="neutron (rem counter)", alarm_threshold="10 µSv/h", calibration_due="2026-11-30")
+      detector_kind="neutron (rem counter)", alarm_threshold="10 µSv/h", calibration_due="2026-11-20")
 on_plan("vl-rm-3", ACC, "vl-room-corridor", 470, 40)
 for u in ("vl-rm-1", "vl-rm-2", "vl-rm-3"):
     rel(u, "maintained by", "vl-org-rp")
@@ -636,8 +636,8 @@ document("vl-doc-rp-tb", "VL-RP-001", "Radiation protection plan — test beam T
          """# Radiation protection plan — test beam TB-2026-11
 
 - Beam power below 1 W at 100 MeV, 5 pC, 10 Hz; bunker closed and searched; PSS interlock on the bunker door.
-- Monitors: RM-1 (gallery, γ), RM-2 (control room), **RM-3 (neutron, bunker door: calibration due 30 November —
-  must be valid before the run)**. Alarm thresholds as in their records.
+- Monitors: RM-1 (gallery, γ), RM-2 (control room), **RM-3 (neutron, bunker door: calibration expired on 20 November —
+  it must be renewed before the run)**. Alarm thresholds as in their records.
 - DetLab users: electronic dosimeters, escorted access in the gallery only; no access to the bunker with beam on.
 - Work under the radiation work permit; the Radiation Protection Service signs it off.
 """, ["vl-rm-1", "vl-rm-2", "vl-rm-3", "vl-ra-bunker"], "vl-u-amira")
@@ -675,7 +675,7 @@ ticket("vl-t-020", "Procurement Request", "new", "medium", "Second spare thyratr
        "SRF-Q-26-0921, EUR 18,900) (synthetic).", "vl-sp-thy-01", "2026-11-05T09:30:00+00:00", "vl-u-amira",
        "vl-u-jonas")
 ticket("vl-t-021", "Safety Inspection", "new", "high", "RM-3 neutron monitor: calibration due before the test beam",
-       "The calibration of RM-3 expires on 30 November; the test beam of 24 November needs it valid (synthetic).",
+       "The calibration of RM-3 expires on 20 November; the test beam of 24 November needs it renewed first (synthetic).",
        "vl-rm-3", "2026-11-06T08:00:00+00:00", "vl-u-amira", "vl-u-amira")
 ticket("vl-t-022", "Service Request", "in_progress", "high", "Test beam TB-2026-11 for DetLab: 100 MeV, round parallel beam at SCR02",
        "DetLab asks for 100 MeV electrons, 1–5 pC, a round parallel beam at SCR02, 24–26 November (synthetic).",

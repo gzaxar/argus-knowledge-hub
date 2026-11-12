@@ -59,5 +59,9 @@ describe("records on their floor plan, from a link in an answer", () => {
     expect(show).toHaveBeenCalledWith(["nf-sc-dh1", "nf-ups-01"]);
     expect(screen.getByText(/no point of its own: shown where its rack/)).toHaveTextContent("NF-RACK-A01");
     expect(screen.getByTestId("plan")).toHaveTextContent("NF-SC-DH1 (in NF-RACK-A01)@60,100! NF-UPS-01@540,250! —50.3 m");
+    fireEvent.click(screen.getByRole("button", { name: "Full screen" }));
+    const dialog = await screen.findByRole("dialog", { name: "Hub Building — ground floor" });
+    expect(dialog).toHaveTextContent("50.3 m east");                    // the legend comes along
+    expect(screen.queryByRole("button", { name: "Full screen" })).toBeNull();
   });
 });

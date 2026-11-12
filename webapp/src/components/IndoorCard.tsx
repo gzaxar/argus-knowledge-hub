@@ -194,7 +194,7 @@ function HerePlan({ plan, x, y, uid, label = "here" }: { plan: { uid: string; wi
                     x: number; y: number; uid: string; label?: string }) {
   return <PlanView planUid={plan.uid} width={plan.width_px} height={plan.height_px} className={useTall("h-56")}
                    northDeg={plan.north_deg}
-                   pins={[{ id: uid, x, y, label, colour: "#dc2626", highlight: true }]} />;
+                   pins={[{ id: uid, x, y, label, colour: "#dc2626", highlight: true }]} focus={[{ x, y }]} />;
 }
 
 /** Choose the place (a room, a hall) by searching, optionally a plan of it (or of a place it is in) and the

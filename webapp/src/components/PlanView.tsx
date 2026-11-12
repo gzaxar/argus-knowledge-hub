@@ -24,9 +24,22 @@ function Clicks({ height, onPick }: { height: number; onPick: (x: number, y: num
   return null;
 }
 
-function Fit({ width, height }: { width: number; height: number }) {
+function Fit({ width, height, focus }: { width: number; height: number; focus?: { x: number; y: number }[] }) {
   const map = useMap();
-  useEffect(() => { map.fitBounds([[0, 0], [height, width]]); }, [width, height]); // eslint-disable-line react-hooks/exhaustive-deps
+  const key = (focus ?? []).map((p) => `${p.x},${p.y}`).join(";");
+  useEffect(() => {
+    if (focus && focus.length > 0) {
+      // Around the records looked for, with room to see what is next to them: a plan full of labels is unreadable
+      // at its whole size.
+      const pad = Math.max(40, 0.12 * Math.max(width, height));
+      const xs = focus.map((p) => p.x), ys = focus.map((p) => p.y);
+      const x0 = Math.max(0, Math.min(...xs) - pad), x1 = Math.min(width, Math.max(...xs) + pad);
+      const y0 = Math.max(0, Math.min(...ys) - pad), y1 = Math.min(height, Math.max(...ys) + pad);
+      map.fitBounds([toLL(height, x0, y1), toLL(height, x1, y0)]);
+    } else {
+      map.fitBounds([[0, 0], [height, width]]);
+    }
+  }, [width, height, key]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
 
@@ -48,8 +61,10 @@ export function NorthArrow({ deg, className = "" }: { deg: number; className?: s
 
 export interface PlanLine { id: string; from: { x: number; y: number }; to: { x: number; y: number }; label?: string }
 
-export function PlanView({ planUid, width, height, pins = [], lines = [], pick, onPick, className = "h-80", northDeg }: {
+export function PlanView({ planUid, width, height, pins = [], lines = [], pick, onPick, className = "h-80", northDeg, focus }: {
   planUid: string; width: number; height: number; pins?: PlanPin[];
+  /** Points to zoom to when the plan opens (the records looked for); the whole plan when not given. */
+  focus?: { x: number; y: number }[];
   /** Dashed lines between points, with a label (a distance). */
   lines?: PlanLine[];
   pick?: { x: number; y: number } | null; onPick?: (x: number, y: number) => void; className?: string;
@@ -64,7 +79,7 @@ export function PlanView({ planUid, width, height, pins = [], lines = [], pick, 
       {image.isError ? <p className="p-3 text-xs text-red-600">The plan could not be loaded.</p> : (
         <MapContainer crs={L.CRS.Simple} bounds={bounds} minZoom={-6} maxZoom={4} zoomSnap={0.25} className="h-full w-full"
                       attributionControl={false}>
-          <Fit width={width} height={height} />
+          <Fit width={width} height={height} focus={focus} />
           {image.data && <ImageOverlay url={image.data} bounds={bounds} />}
           {lines.map((l) => (
             <Polyline key={l.id} positions={[toLL(height, l.from.x, l.from.y), toLL(height, l.to.x, l.to.y)]}
