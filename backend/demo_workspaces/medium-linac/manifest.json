@@ -1,8 +1,8 @@
 {
-  "created_at": "2026-10-24T15:29:11.099790+00:00",
+  "created_at": "2026-11-12T17:48:03.714850+00:00",
   "created_by": "ARGUS demo authors",
   "demo": {
-    "description": "A medium-sized electron linac laboratory: accelerator, civil and building, administration, radiation safety areas, IT and controls, electrical, HVAC, vacuum, optics and plant, with a site map, floor plans, a beam model from the gun to the dumps bound to its physical units, motors and actuators, PBS codes, work packages and modules, the service utilities each consumer needs, documents, issues and activities.",
+    "description": "A medium-sized electron linac (fictional Valmora): buildings, floor plans and racks, the beam model from MAD-X with design and test beam optics, RF, vacuum, magnets and their supplies, magnet cooling water, electrical distribution, civil HVAC and offices with phones and network outlets, controls on EPIK8s with backups to an external data centre, radiation protection, purchasing with inventory numbers, tickets, runbooks and contracts.",
     "notice": "Synthetic demo: the Valmora Linac Laboratory, its machine, people, suppliers, figures and procedures are fictional. Nothing here is operating, safety or radiation-protection guidance.",
     "organisation": "Valmora Linac Laboratory (fictional)",
     "steps": [
@@ -48,8 +48,43 @@
       },
       {
         "link": "/tickets/vl-t-003",
-        "text": "Modulator M-2 trips after a restart, linked to the spare klystron request and to the logbook.",
-        "title": "An open issue"
+        "text": "M-2 trips on HV overcurrent: what it takes down (klystron K-2, two structures, the beam after them), what happened in August, who to call under which contract, and where the spare thyratron is.",
+        "title": "A modulator trip"
+      },
+      {
+        "link": "/tickets/vl-t-015",
+        "text": "Three quadrupole supplies stop reading back while three others on the same IOC are fine: Ask ARGUS finds what only the three share — the Moxa and its port 4003 — the September firmware reset, the runbook and the spare.",
+        "title": "Quadrupoles go quiet"
+      },
+      {
+        "link": "/tickets/vl-t-017",
+        "text": "The bunker gauges freeze and the interlock closes the sector valves. The ion pumps say the vacuum is fine: the gauge module is the suspect, and the runbook says not to open the valves yet.",
+        "title": "Frozen vacuum readings"
+      },
+      {
+        "link": "/assets/vl-room-service",
+        "text": "Three racks hold the magnet supplies, the Moxa, the vacuum controller and its gauge module; each unit has its rack and position, and the plan shows where.",
+        "title": "Racks in the service area"
+      },
+      {
+        "link": "/assets/vl-kc",
+        "text": "The Kubernetes cluster, its nodes, the services EPIK8s deploys from git, and the nightly backups to the Campus Data Centre over the fibre link.",
+        "title": "Controls computing on EPIK8s"
+      },
+      {
+        "link": "/assets/vl-mcw-loop",
+        "text": "The circuit that cools the magnets and their supplies: chiller, heat exchanger, two pumps in duty and standby — and what stops if it does.",
+        "title": "Magnet cooling water"
+      },
+      {
+        "link": "/documents/vl-doc-tb",
+        "text": "The MAD-X model is the beam model in ARGUS; the test beam's matched optics is a dataset of it, and the magnet settings go to the machine as a proposal an operator confirms.",
+        "title": "A test beam from the MAD-X model"
+      },
+      {
+        "link": "/assets/vl-po-0501",
+        "text": "Orders, invoices and goods receipts linked to the items they bought, with inventory numbers.",
+        "title": "From purchase order to inventory number"
       },
       {
         "link": "/activities",
@@ -105,8 +140,8 @@
     },
     "asset_history": {
       "file": "records/asset_history.jsonl",
-      "rows": 546,
-      "sha256": "8cbc8b10bf897848108d9f92f9cd3eec49c4e7fb8f9e3db6b89331de3211012a"
+      "rows": 664,
+      "sha256": "36572f77e6bc7c4218daee9d70b78f108db1a4d76eec92cf490c632d7965cae2"
     },
     "asset_labels": {
       "file": "records/asset_labels.jsonl",
@@ -120,43 +155,53 @@
     },
     "assets": {
       "file": "records/assets.jsonl",
-      "rows": 304,
-      "sha256": "c988d1df9af6d97484f948aca82803444cf084b106baf5168d285a4833379bb4"
+      "rows": 392,
+      "sha256": "a857ad0b21b0ca33346a7aa168d31d12a3000e1a316839095f58b1a12c9bfcea"
     },
     "attachments": {
       "file": "records/attachments.jsonl",
       "rows": 2,
-      "sha256": "3b6c03928bb50261a7bc4e74b7c0e5d06c6ab949be9ec9ffa6b029af2afecb04"
+      "sha256": "3ac296d43fc9973abc8585473ba8cc4bad2eba6ae782baea3a50379e67c36130"
     },
     "beam_asset_bindings": {
       "file": "records/beam_asset_bindings.jsonl",
       "rows": 31,
-      "sha256": "e271ab36f5a538600fec24eb2765cd07bdd0eafff47c00daec777202dde22c63"
+      "sha256": "b9743977133ab70ebdb8e6c2d960a18b80419be7495fe71c11c69cc6a37bcef8"
     },
     "beam_model_documents": {
       "file": "records/beam_model_documents.jsonl",
-      "rows": 1,
-      "sha256": "bd98a00a2a9af72b0133f38d027b9df03662246a0d6ba8b30cf4f8793677d3dc"
+      "rows": 2,
+      "sha256": "c0ded4ed7ba3390a8b4f5971b8a874dc028fc1635aa68b560f7af152ca84ff8c"
     },
     "beam_model_values": {
       "file": "records/beam_model_values.jsonl",
-      "rows": 31,
-      "sha256": "fcbea885195f06ea5df5565e447252c5bb074a57bad0751c4afe099e4ff1fcf9"
+      "rows": 60,
+      "sha256": "8d812b47b10e8521faa3a919f3333873ea2e93212fcb93cbd01dde9bdd3ab99d"
+    },
+    "document_folders": {
+      "file": "records/document_folders.jsonl",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     "document_generations": {
       "file": "records/document_generations.jsonl",
       "rows": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
+    "document_navigation_placements": {
+      "file": "records/document_navigation_placements.jsonl",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
     "document_relations": {
       "file": "records/document_relations.jsonl",
-      "rows": 86,
-      "sha256": "2225eb9fc357813e7ee6aa0851f96860abfcf6d4c2eba74f796f1c7f4d464190"
+      "rows": 127,
+      "sha256": "0fa59bf776ed568cbfe2d35a46ee479f03303f7aee7973c2c7449061ffbdb0db"
     },
     "document_revisions": {
       "file": "records/document_revisions.jsonl",
-      "rows": 13,
-      "sha256": "cf0aef7530e15789d6604f40c39897be023259fad21d65b81f3a745c854fa50f"
+      "rows": 22,
+      "sha256": "438806c980ab2a9f876ca2c01f5e8a302e641ce3d8c735912f63eb4c2a942563"
     },
     "document_template_versions": {
       "file": "records/document_template_versions.jsonl",
@@ -170,8 +215,8 @@
     },
     "documents": {
       "file": "records/documents.jsonl",
-      "rows": 13,
-      "sha256": "df33c2795be75881b6b3a3bdb87a94445885d20a1468b7372b2fce32511f4f16"
+      "rows": 22,
+      "sha256": "19d6e08ecf2b08dc441d63b0cd34e2c76d89d039948c274db6aaf394e87956c7"
     },
     "equipment_class_requests": {
       "file": "records/equipment_class_requests.jsonl",
@@ -181,7 +226,7 @@
     "floor_plans": {
       "file": "records/floor_plans.jsonl",
       "rows": 4,
-      "sha256": "1c53c5821562df441df16f06d4c4659d2fbd6e748662a5e918446654b6a4ecde"
+      "sha256": "3cc22018ed08804f7bb576d5e796ee000b3de08b1e78e97107390c3f2230979d"
     },
     "global_values": {
       "file": "records/global_values.jsonl",
@@ -196,7 +241,7 @@
     "icons": {
       "file": "records/icons.jsonl",
       "rows": 115,
-      "sha256": "5b19c4eafb742385d66b7ebb7bd27175ca7fc6c6c42dea2a6748eefe707df958"
+      "sha256": "2fac9130d78f179e1943ec0aa7229806eca47c9b1d977372ff9e9ec664e7d1d2"
     },
     "import_configs": {
       "file": "records/import_configs.jsonl",
@@ -210,8 +255,8 @@
     },
     "indoor_placements": {
       "file": "records/indoor_placements.jsonl",
-      "rows": 154,
-      "sha256": "3c15354b5b3b910b992ed34a3722cfd8873dd90cf45a1f5ea7857122f909ecf7"
+      "rows": 219,
+      "sha256": "608ab7fa1dde7fd238bdd261926d2d339554c56714692317cc665c31fcb49c1b"
     },
     "llm_configs": {
       "file": "records/llm_configs.jsonl",
@@ -226,7 +271,7 @@
     "memberships": {
       "file": "records/memberships.jsonl",
       "rows": 5,
-      "sha256": "c6be4097fc73408bb80ab49934505302d0e919dbc04fdeea7a5aa4701468d83a"
+      "sha256": "e8201d90b85835d5c8735d2eff6257a1d3475d54f5df3405e8662f0d250edafb"
     },
     "notification_subscriptions": {
       "file": "records/notification_subscriptions.jsonl",
@@ -250,8 +295,8 @@
     },
     "relations": {
       "file": "records/relations.jsonl",
-      "rows": 828,
-      "sha256": "60142bd76795c9b437ec5375a70e454b133379fefdb35e41e60f2812ca2a18f3"
+      "rows": 1080,
+      "sha256": "dfce44d6a0e00321302d3e0f6f5b10a7a2d83fec6cfb1c3190a9ca57b815f973"
     },
     "review_escalations": {
       "file": "records/review_escalations.jsonl",
@@ -270,13 +315,13 @@
     },
     "spatial_features": {
       "file": "records/spatial_features.jsonl",
-      "rows": 161,
-      "sha256": "3d18435a7f4c53dcfe43d218b23ce79b522454df9f5bde9a5e9f2b41747a8076"
+      "rows": 218,
+      "sha256": "6edd291ef2343dd5fd4d09193345512a319024ecacee8f9ca5818d6c85f941f3"
     },
     "ticket_comments": {
       "file": "records/ticket_comments.jsonl",
-      "rows": 2,
-      "sha256": "fddc1e9e584fdce72ddbc1b09db8472b9b27f994d06bfd7482a42fe65f6cd444"
+      "rows": 11,
+      "sha256": "bb8f3a2353832064c3f64c0ed6f5ecf0fd157dd2cd18dc615bcca5d008d3d6f7"
     },
     "ticket_escalations": {
       "file": "records/ticket_escalations.jsonl",
@@ -285,8 +330,8 @@
     },
     "ticket_history": {
       "file": "records/ticket_history.jsonl",
-      "rows": 17,
-      "sha256": "f0dab29b329dcb5e9cbdf0bdad490deb5603e0c0fc4408606359737c259ed0a8"
+      "rows": 25,
+      "sha256": "9637cc66bd91b9272f918eee9bc4a09dc34cacc66728e0241977dd50dad31df4"
     },
     "ticket_links": {
       "file": "records/ticket_links.jsonl",
@@ -301,27 +346,27 @@
     "ticket_workflows": {
       "file": "records/ticket_workflows.jsonl",
       "rows": 8,
-      "sha256": "ea85b1f9ed4d3602731fda616fb6289bb137b69a748b079ab952068c86375555"
+      "sha256": "0fff218d6a957436dd5285118dea4b6c96d9a6463ab6544b0be8708808fa9798"
     },
     "tickets": {
       "file": "records/tickets.jsonl",
-      "rows": 13,
-      "sha256": "bcbc362321f3c0593d181ba5defe7b5c432c292bdde77b3d60b9605c907c6c8c"
+      "rows": 26,
+      "sha256": "a04c9a30696510ebb0509b8341fb154c82cd74e00c84353d0d050c074629b3af"
     },
     "types": {
       "file": "records/types.jsonl",
       "rows": 298,
-      "sha256": "4314cf289aee7f86874575207de8c0e074d16931978a37b6c53a19ffb834fb78"
+      "sha256": "4944c6d498f20d49160eaf8bd0153bfc857e3e28c33836e4f894532880d355ba"
     },
     "workspace": {
       "file": "records/workspace.jsonl",
       "rows": 1,
-      "sha256": "c11d10f2f01207868277d9738d35403bdf66c137c92e120d6e0e990b947a592f"
+      "sha256": "fde122f88c816fdc394e6cc70e29765770e573467d414933402fa7524bce302d"
     },
     "workspace_packages": {
       "file": "records/workspace_packages.jsonl",
       "rows": 14,
-      "sha256": "f10bbebbedd9658cfa988bda310a9c26eb46b92717ed1d3a428f49025e2603d5"
+      "sha256": "3dc61486ff668421ee9348454bf11b1e4ca32e6f9fd39a150b460ce916e4afd2"
     }
   },
   "files": [
@@ -389,6 +434,11 @@
       "path": "files/17/1770a651a8a42004866cd4c22a24324194b1f1c39937b3ea5fa9bd275e837a3c",
       "sha256": "1770a651a8a42004866cd4c22a24324194b1f1c39937b3ea5fa9bd275e837a3c",
       "size": 649
+    },
+    {
+      "path": "files/18/1856f790a47bcd75bac8dea25972fbd2b5ce41497f639d3af0706880cd20b797",
+      "sha256": "1856f790a47bcd75bac8dea25972fbd2b5ce41497f639d3af0706880cd20b797",
+      "size": 31621
     },
     {
       "path": "files/18/186de978429dc77e47f6cacdb04cb3dd4498d34a5ff1a67a4b3bf9673e13308e",
@@ -746,11 +796,6 @@
       "size": 694
     },
     {
-      "path": "files/b9/b938301632778dc6b9a733050a2560fb4672a2e5d1ba14ed987ce023b3926a8a",
-      "sha256": "b938301632778dc6b9a733050a2560fb4672a2e5d1ba14ed987ce023b3926a8a",
-      "size": 2582
-    },
-    {
       "path": "files/bb/bb93c8284b6da432fafa0c9d210df3d43e4cc3b537aaf85cb4a2351933cd43b1",
       "sha256": "bb93c8284b6da432fafa0c9d210df3d43e4cc3b537aaf85cb4a2351933cd43b1",
       "size": 407
@@ -791,11 +836,6 @@
       "size": 511
     },
     {
-      "path": "files/ce/ce5023cf5cb49cbba5e29accc5d60ac52f1743e8de94ed43437a4af1c072d213",
-      "sha256": "ce5023cf5cb49cbba5e29accc5d60ac52f1743e8de94ed43437a4af1c072d213",
-      "size": 30712
-    },
-    {
       "path": "files/cf/cfa00f0cfd6200f851d9559e8223e0ad877b7ed138f3d9683f2d598fcc0cdda0",
       "sha256": "cfa00f0cfd6200f851d9559e8223e0ad877b7ed138f3d9683f2d598fcc0cdda0",
       "size": 914
@@ -809,6 +849,11 @@
       "path": "files/d0/d096b8a4a329dfef6a5325d1789860536bdadf9896a9189a60fcf594813d77a5",
       "sha256": "d096b8a4a329dfef6a5325d1789860536bdadf9896a9189a60fcf594813d77a5",
       "size": 535
+    },
+    {
+      "path": "files/d2/d262a1c6392c38e48a6cee0fe9318afcd97ee656066b6141d5fdc9499868af09",
+      "sha256": "d262a1c6392c38e48a6cee0fe9318afcd97ee656066b6141d5fdc9499868af09",
+      "size": 3260
     },
     {
       "path": "files/d6/d689cd6c01d72a1bd0ebb2cf90dd34fce868aa6d49d397aee598f5106a344b27",
@@ -962,8 +1007,8 @@
     },
     {
       "path": "records/asset_history.jsonl",
-      "sha256": "8cbc8b10bf897848108d9f92f9cd3eec49c4e7fb8f9e3db6b89331de3211012a",
-      "size": 134397
+      "sha256": "36572f77e6bc7c4218daee9d70b78f108db1a4d76eec92cf490c632d7965cae2",
+      "size": 169247
     },
     {
       "path": "records/asset_labels.jsonl",
@@ -977,28 +1022,33 @@
     },
     {
       "path": "records/assets.jsonl",
-      "sha256": "c988d1df9af6d97484f948aca82803444cf084b106baf5168d285a4833379bb4",
-      "size": 234483
+      "sha256": "a857ad0b21b0ca33346a7aa168d31d12a3000e1a316839095f58b1a12c9bfcea",
+      "size": 312540
     },
     {
       "path": "records/attachments.jsonl",
-      "sha256": "3b6c03928bb50261a7bc4e74b7c0e5d06c6ab949be9ec9ffa6b029af2afecb04",
-      "size": 1239
+      "sha256": "3ac296d43fc9973abc8585473ba8cc4bad2eba6ae782baea3a50379e67c36130",
+      "size": 1326
     },
     {
       "path": "records/beam_asset_bindings.jsonl",
-      "sha256": "e271ab36f5a538600fec24eb2765cd07bdd0eafff47c00daec777202dde22c63",
-      "size": 23903
+      "sha256": "b9743977133ab70ebdb8e6c2d960a18b80419be7495fe71c11c69cc6a37bcef8",
+      "size": 23863
     },
     {
       "path": "records/beam_model_documents.jsonl",
-      "sha256": "bd98a00a2a9af72b0133f38d027b9df03662246a0d6ba8b30cf4f8793677d3dc",
-      "size": 8735
+      "sha256": "c0ded4ed7ba3390a8b4f5971b8a874dc028fc1635aa68b560f7af152ca84ff8c",
+      "size": 24053
     },
     {
       "path": "records/beam_model_values.jsonl",
-      "sha256": "fcbea885195f06ea5df5565e447252c5bb074a57bad0751c4afe099e4ff1fcf9",
-      "size": 11251
+      "sha256": "8d812b47b10e8521faa3a919f3333873ea2e93212fcb93cbd01dde9bdd3ab99d",
+      "size": 25026
+    },
+    {
+      "path": "records/document_folders.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
     },
     {
       "path": "records/document_generations.jsonl",
@@ -1006,14 +1056,19 @@
       "size": 0
     },
     {
+      "path": "records/document_navigation_placements.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
       "path": "records/document_relations.jsonl",
-      "sha256": "2225eb9fc357813e7ee6aa0851f96860abfcf6d4c2eba74f796f1c7f4d464190",
-      "size": 18680
+      "sha256": "0fa59bf776ed568cbfe2d35a46ee479f03303f7aee7973c2c7449061ffbdb0db",
+      "size": 27180
     },
     {
       "path": "records/document_revisions.jsonl",
-      "sha256": "cf0aef7530e15789d6604f40c39897be023259fad21d65b81f3a745c854fa50f",
-      "size": 17855
+      "sha256": "438806c980ab2a9f876ca2c01f5e8a302e641ce3d8c735912f63eb4c2a942563",
+      "size": 34808
     },
     {
       "path": "records/document_template_versions.jsonl",
@@ -1027,8 +1082,8 @@
     },
     {
       "path": "records/documents.jsonl",
-      "sha256": "df33c2795be75881b6b3a3bdb87a94445885d20a1468b7372b2fce32511f4f16",
-      "size": 7747
+      "sha256": "19d6e08ecf2b08dc441d63b0cd34e2c76d89d039948c274db6aaf394e87956c7",
+      "size": 13075
     },
     {
       "path": "records/equipment_class_requests.jsonl",
@@ -1037,8 +1092,8 @@
     },
     {
       "path": "records/floor_plans.jsonl",
-      "sha256": "1c53c5821562df441df16f06d4c4659d2fbd6e748662a5e918446654b6a4ecde",
-      "size": 4548
+      "sha256": "3cc22018ed08804f7bb576d5e796ee000b3de08b1e78e97107390c3f2230979d",
+      "size": 4644
     },
     {
       "path": "records/global_values.jsonl",
@@ -1052,8 +1107,8 @@
     },
     {
       "path": "records/icons.jsonl",
-      "sha256": "5b19c4eafb742385d66b7ebb7bd27175ca7fc6c6c42dea2a6748eefe707df958",
-      "size": 52201
+      "sha256": "2fac9130d78f179e1943ec0aa7229806eca47c9b1d977372ff9e9ec664e7d1d2",
+      "size": 55421
     },
     {
       "path": "records/import_configs.jsonl",
@@ -1067,8 +1122,8 @@
     },
     {
       "path": "records/indoor_placements.jsonl",
-      "sha256": "3c15354b5b3b910b992ed34a3722cfd8873dd90cf45a1f5ea7857122f909ecf7",
-      "size": 75456
+      "sha256": "608ab7fa1dde7fd238bdd261926d2d339554c56714692317cc665c31fcb49c1b",
+      "size": 108510
     },
     {
       "path": "records/llm_configs.jsonl",
@@ -1082,8 +1137,8 @@
     },
     {
       "path": "records/memberships.jsonl",
-      "sha256": "c6be4097fc73408bb80ab49934505302d0e919dbc04fdeea7a5aa4701468d83a",
-      "size": 2338
+      "sha256": "e8201d90b85835d5c8735d2eff6257a1d3475d54f5df3405e8662f0d250edafb",
+      "size": 2328
     },
     {
       "path": "records/notification_subscriptions.jsonl",
@@ -1107,8 +1162,8 @@
     },
     {
       "path": "records/relations.jsonl",
-      "sha256": "60142bd76795c9b437ec5375a70e454b133379fefdb35e41e60f2812ca2a18f3",
-      "size": 205778
+      "sha256": "dfce44d6a0e00321302d3e0f6f5b10a7a2d83fec6cfb1c3190a9ca57b815f973",
+      "size": 262786
     },
     {
       "path": "records/review_escalations.jsonl",
@@ -1127,13 +1182,13 @@
     },
     {
       "path": "records/spatial_features.jsonl",
-      "sha256": "3d18435a7f4c53dcfe43d218b23ce79b522454df9f5bde9a5e9f2b41747a8076",
-      "size": 131132
+      "sha256": "6edd291ef2343dd5fd4d09193345512a319024ecacee8f9ca5818d6c85f941f3",
+      "size": 178023
     },
     {
       "path": "records/ticket_comments.jsonl",
-      "sha256": "fddc1e9e584fdce72ddbc1b09db8472b9b27f994d06bfd7482a42fe65f6cd444",
-      "size": 441
+      "sha256": "bb8f3a2353832064c3f64c0ed6f5ecf0fd157dd2cd18dc615bcca5d008d3d6f7",
+      "size": 2889
     },
     {
       "path": "records/ticket_escalations.jsonl",
@@ -1142,8 +1197,8 @@
     },
     {
       "path": "records/ticket_history.jsonl",
-      "sha256": "f0dab29b329dcb5e9cbdf0bdad490deb5603e0c0fc4408606359737c259ed0a8",
-      "size": 4216
+      "sha256": "9637cc66bd91b9272f918eee9bc4a09dc34cacc66728e0241977dd50dad31df4",
+      "size": 6173
     },
     {
       "path": "records/ticket_links.jsonl",
@@ -1157,45 +1212,34 @@
     },
     {
       "path": "records/ticket_workflows.jsonl",
-      "sha256": "ea85b1f9ed4d3602731fda616fb6289bb137b69a748b079ab952068c86375555",
+      "sha256": "0fff218d6a957436dd5285118dea4b6c96d9a6463ab6544b0be8708808fa9798",
       "size": 9899
     },
     {
       "path": "records/tickets.jsonl",
-      "sha256": "bcbc362321f3c0593d181ba5defe7b5c432c292bdde77b3d60b9605c907c6c8c",
-      "size": 7976
+      "sha256": "a04c9a30696510ebb0509b8341fb154c82cd74e00c84353d0d050c074629b3af",
+      "size": 18864
     },
     {
       "path": "records/types.jsonl",
-      "sha256": "4314cf289aee7f86874575207de8c0e074d16931978a37b6c53a19ffb834fb78",
+      "sha256": "4944c6d498f20d49160eaf8bd0153bfc857e3e28c33836e4f894532880d355ba",
       "size": 374862
     },
     {
       "path": "records/workspace.jsonl",
-      "sha256": "c11d10f2f01207868277d9738d35403bdf66c137c92e120d6e0e990b947a592f",
-      "size": 699
+      "sha256": "fde122f88c816fdc394e6cc70e29765770e573467d414933402fa7524bce302d",
+      "size": 730
     },
     {
       "path": "records/workspace_packages.jsonl",
-      "sha256": "f10bbebbedd9658cfa988bda310a9c26eb46b92717ed1d3a428f49025e2603d5",
-      "size": 2911
+      "sha256": "3dc61486ff668421ee9348454bf11b1e4ca32e6f9fd39a150b460ce916e4afd2",
+      "size": 2888
     }
   ],
   "format": "argus-workspace-bundle",
   "format_version": 1,
   "missing_files": [],
-  "not_reproduced": [
-    {
-      "reason": "the evidence ledger keeps the source installation's sequence and proof; a bundle carries the records' current state and history — move the ledger with the signed portable archive",
-      "rows": 31,
-      "table": "ledger_decisions"
-    },
-    {
-      "reason": "the evidence ledger keeps the source installation's sequence and proof; a bundle carries the records' current state and history — move the ledger with the signed portable archive",
-      "rows": 3,
-      "table": "ledger_streams"
-    }
-  ],
+  "not_reproduced": [],
   "packages": [
     {
       "checksum": "d45c176e4d9c99917e36703a4a679cfc938f777fd7c472c84e56089169c5dc1a",
@@ -1270,8 +1314,8 @@
   ],
   "source": {
     "argus_version": "dev",
-    "instance": "cb401222-e942-400f-ba8f-e3f06fb30508",
-    "schema_revision": "e4a6c8e0f2a3"
+    "instance": "ec35a49b-3eb5-49a1-acb3-9199867daa19",
+    "schema_revision": "a5e7c9b1d3f2"
   },
   "workspace": {
     "id": "valmora-linac-demo",

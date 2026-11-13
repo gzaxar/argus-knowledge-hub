@@ -593,6 +593,31 @@ def _sse(event: dict) -> str:
 def _chat_events(workspace_id: str, owner: str, question: str, conversation_id: Optional[str],
                  endpoint: Endpoint, grants, can_propose: bool = False, voice: bool = False,
                  attachments: Optional[list] = None, viewer=None):
+    """The turn, with who is asking set again before every step. A streamed response is advanced one step at a
+    time, each in a fresh copy of the request's context: what one step sets is gone at the next, so a lookup
+    late in the turn would see neither the person's restricted-class grants nor who they are."""
+    from app.services.visibility import set_current_grants
+    from app.services.who_has_access import set_viewer
+    turn = _chat_turn(workspace_id, owner, question, conversation_id, endpoint, grants, can_propose, voice,
+                      attachments, viewer)
+    try:
+        while True:
+            set_current_grants(grants)
+            set_viewer(viewer)
+            try:
+                event = next(turn)
+            except StopIteration:
+                return
+            yield event
+    finally:
+        set_current_grants(grants)
+        set_viewer(viewer)
+        turn.close()                # a client gone mid-turn: the turn still ends, and is saved, as it would alone
+
+
+def _chat_turn(workspace_id: str, owner: str, question: str, conversation_id: Optional[str],
+               endpoint: Endpoint, grants, can_propose: bool = False, voice: bool = False,
+               attachments: Optional[list] = None, viewer=None):
     """The chat turn as server-sent events, saved as it ends. Runs after the request's own session is
     gone, so it has its own, and the viewer's restricted-class grants are set again here: the lookups
     must see what the person may see, no more."""

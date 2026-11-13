@@ -93,10 +93,34 @@ def end(holder: dict, function: str, status: int) -> None:
     _start()
 
 
+# An evaluation run (app/ask_eval) listens to its own calls: each one's tokens, time and outcome, and the model the
+# server said answered. None outside a run.
+_capture: ContextVar[Optional[list]] = ContextVar("llm_capture", default=None)
+
+
+def capture(into: Optional[list]):
+    """Collect this context's model calls into `into` (None stops); returns the token to reset it."""
+    return _capture.set(into)
+
+
+def note_served(model: Optional[str]) -> None:
+    """The model a server reports having answered with (it may differ from the one asked for: an alias)."""
+    sink = _capture.get()
+    if sink is not None and model:
+        sink.append({"served_model": str(model)[:200]})
+
+
 def note_llm(model: Optional[str], purpose: str, *, prompt_tokens: Optional[int] = None,
              completion_tokens: Optional[int] = None, prompt_text: str = "", completion_text: str = "",
              seconds: float = 0.0, failed: bool = False) -> None:
     """One call to the language model. Tokens the provider did not report are estimated from the text."""
+    sink = _capture.get()
+    if sink is not None:
+        sink.append({"model": model, "purpose": purpose, "failed": failed, "seconds": round(seconds, 3),
+                     "prompt_tokens": prompt_tokens if prompt_tokens is not None else len(prompt_text) // 4,
+                     "completion_tokens": (completion_tokens if completion_tokens is not None
+                                           else len(completion_text) // 4),
+                     "estimated": prompt_tokens is None and completion_tokens is None})
     if not enabled():
         return
     estimated = prompt_tokens is None and completion_tokens is None and not failed

@@ -323,7 +323,10 @@ def index_workspace(db: Session, workspace_id: str, endpoint: Endpoint, log=None
             except OSError as e:
                 failed.append(f"{source.title}: {e}")
                 continue
-        pieces = _chunks(source.parts)
+        # A NUL byte (some PDFs and old Word files carry them) is refused by PostgreSQL text and would stop the
+        # whole workspace's run: it says nothing, so it goes.
+        pieces = [(loc.replace("\x00", "") if loc else loc, body.replace("\x00", "")) for loc, body in _chunks(source.parts)]
+        pieces = [(loc, body) for loc, body in pieces if body.strip()]
         db.execute(text("DELETE FROM knowledge_chunks WHERE workspace_id = :w AND source_kind = :k AND source_uid = :u"),
                    {"w": workspace_id, "k": source.kind, "u": source.uid})
         if not pieces:
@@ -343,7 +346,7 @@ def index_workspace(db: Session, workspace_id: str, endpoint: Endpoint, log=None
                     parent_kind, parent_uid, title, locator, seq, body, content_hash, model, embedding)
                 VALUES (:w, :shared, :conf, :k, :u, :pk, :pu, :title, :loc, :seq, :body, :hash, :model, CAST(:vec AS vector))"""),
                        {"w": workspace_id, "shared": source.shared, "conf": source.confidential, "k": source.kind,
-                        "u": source.uid, "pk": source.parent_kind, "pu": source.parent_uid, "title": source.title[:500],
+                        "u": source.uid, "pk": source.parent_kind, "pu": source.parent_uid, "title": (source.title or "").replace("\x00", "")[:500],
                         "loc": locator, "seq": seq, "body": body, "hash": digest, "model": model,
                         "vec": _vector(vector)})
         db.commit()
@@ -402,7 +405,9 @@ def _visible(db: Session, workspace_id: str, row, confidential_ok: bool) -> Opti
         if issue is None or issue.workspace_id != workspace_id or not can_see(issue):
             return None
         key = (issue.attributes or {}).get("argus_source_key")
-        return {"uid": issue.uid, **({"source_key": key} if key else {}), "title": issue.title}
+        # Its key too, so an answer cites the ticket as people know it rather than guessing one.
+        return {"uid": issue.uid, **({"key": issue.key} if issue.key else {}),
+                **({"source_key": key} if key else {}), "title": issue.title}
     if row["parent_kind"] == "asset":
         asset = db.get(Asset, row["parent_uid"])
         if asset is None or not asset_visible_in(asset, workspace_id):

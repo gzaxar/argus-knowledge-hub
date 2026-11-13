@@ -5,8 +5,10 @@
 FROM mirror.gcr.io/pgvector/pgvector:pg16-trixie
 
 # The official image already has the PostgreSQL apt repository (apt.postgresql.org): PostGIS 3 built for 16.
+# The server is upgraded with it: the repository's PostGIS is built against its latest PostgreSQL 16 minor, and a
+# base image one minor behind cannot load it ("undefined symbol: heap_datum_check" with 16.15 and PostGIS 3.7).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends postgresql-16-postgis-3 postgresql-16-postgis-3-scripts \
+ && apt-get install -y --no-install-recommends postgresql-16 postgresql-16-postgis-3 postgresql-16-postgis-3-scripts \
  && rm -rf /var/lib/apt/lists/*
 
 LABEL org.opencontainers.image.title="argus-knowledge-hub-postgres" \

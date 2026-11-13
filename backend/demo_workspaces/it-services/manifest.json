@@ -5,6 +5,107 @@
     "description": "A medium-sized IT organisation: a service catalogue (network, internet, Wi-Fi, mail, DNS, hosting, storage, backup, monitoring, service desk, VPN, HPC, LLM inference), three buildings with floors, rooms and racks, a GPU cluster for HPC and LLM inference, user workstations, a port-to-port network map, a cooling control process reaching its units through a serial converter, mapped and placed equipment, dependencies, incidents, requests and changes, maintenance activities, runbooks, contracts and SLAs.",
     "notice": "Synthetic demo: Northfield IT Services, its people, suppliers, addresses and figures are fictional. Nothing here describes a real organisation or real equipment.",
     "organisation": "Northfield IT Services (fictional)",
+    "provenance": {
+      "about": "Access point LIB-02 was replaced on 15 October; GLPI still lists the unit returned under RMA. The Provenance tab shows both sources, and the Review queue the two values they disagree on.",
+      "sources": [
+        {
+          "id": "glpi:northfield",
+          "kind": "glpi",
+          "label": "GLPI (Northfield, synthetic)"
+        }
+      ],
+      "steps": [
+        {
+          "cause": "GLPI import",
+          "claims": [
+            {
+              "evidence": {
+                "id": 412,
+                "itemtype": "NetworkEquipment",
+                "url": "https://glpi.northfield-it.example/front/networkequipment.form.php?id=412"
+              },
+              "predicate": "attr:serial",
+              "record": "nf-ap-lib-02",
+              "rule": "glpi.record/1",
+              "value": "SYN92601188"
+            },
+            {
+              "evidence": {
+                "id": 412,
+                "itemtype": "NetworkEquipment",
+                "url": "https://glpi.northfield-it.example/front/networkequipment.form.php?id=412"
+              },
+              "predicate": "attr:installed_on",
+              "record": "nf-ap-lib-02",
+              "rule": "glpi.record/1",
+              "value": "2024-05-10"
+            },
+            {
+              "evidence": {
+                "id": 412,
+                "itemtype": "NetworkEquipment",
+                "url": "https://glpi.northfield-it.example/front/networkequipment.form.php?id=412"
+              },
+              "predicate": "attr:condition",
+              "record": "nf-ap-lib-02",
+              "rule": "glpi.record/1",
+              "value": "good"
+            }
+          ],
+          "observed_at": "2026-09-01T06:00:00+02:00",
+          "source": "glpi:northfield"
+        },
+        {
+          "changes": {
+            "attr:installed_on": "2026-10-15",
+            "attr:serial": "SYN92604956"
+          },
+          "person": "teo.lindqvist@northfield-it.example",
+          "reason": "AP replaced after repeated reboots; old unit returned under RMA (IT-SERVICES ticket on LIB-02)",
+          "record": "nf-ap-lib-02"
+        },
+        {
+          "cause": "GLPI import",
+          "claims": [
+            {
+              "evidence": {
+                "id": 412,
+                "itemtype": "NetworkEquipment",
+                "url": "https://glpi.northfield-it.example/front/networkequipment.form.php?id=412"
+              },
+              "predicate": "attr:serial",
+              "record": "nf-ap-lib-02",
+              "rule": "glpi.record/1",
+              "value": "SYN92601188"
+            },
+            {
+              "evidence": {
+                "id": 412,
+                "itemtype": "NetworkEquipment",
+                "url": "https://glpi.northfield-it.example/front/networkequipment.form.php?id=412"
+              },
+              "predicate": "attr:installed_on",
+              "record": "nf-ap-lib-02",
+              "rule": "glpi.record/1",
+              "value": "2024-05-10"
+            },
+            {
+              "evidence": {
+                "id": 412,
+                "itemtype": "NetworkEquipment",
+                "url": "https://glpi.northfield-it.example/front/networkequipment.form.php?id=412"
+              },
+              "predicate": "attr:condition",
+              "record": "nf-ap-lib-02",
+              "rule": "glpi.record/1",
+              "value": "good"
+            }
+          ],
+          "observed_at": "2026-11-12T06:00:00+01:00",
+          "source": "glpi:northfield"
+        }
+      ]
+    },
     "steps": [
       {
         "link": "/map",
@@ -131,7 +232,7 @@
     "assets": {
       "file": "records/assets.jsonl",
       "rows": 299,
-      "sha256": "6662e47c255e7af6615af9774503a692e4c71fce8a80bb40a8cbb635901e43f5"
+      "sha256": "213f764174ea67bc6229c3933fb7203db689e316cddec87c08700c2ca510c67d"
     },
     "attachments": {
       "file": "records/attachments.jsonl",
@@ -166,7 +267,7 @@
     "document_revisions": {
       "file": "records/document_revisions.jsonl",
       "rows": 17,
-      "sha256": "cf44dc0ec7dce0cfcbebd358f4373757f445481fb92131784eed7941606f471a"
+      "sha256": "63c4ec22a0b774554b6228f30c0ba30527421b7b255c33b8b33fe4f2dffc1955"
     },
     "document_template_versions": {
       "file": "records/document_template_versions.jsonl",
@@ -191,7 +292,7 @@
     "floor_plans": {
       "file": "records/floor_plans.jsonl",
       "rows": 4,
-      "sha256": "d44f3da00774cfbdd670d8e1a1090ca4ac851c5184a9edf72784a496346c6aff"
+      "sha256": "0c8507eaadb98ad7c5717efa566cd1734528192a4e42eb2814377293464e65e1"
     },
     "global_values": {
       "file": "records/global_values.jsonl",
@@ -220,8 +321,8 @@
     },
     "indoor_placements": {
       "file": "records/indoor_placements.jsonl",
-      "rows": 70,
-      "sha256": "52833359b72ef652a289af65022107b35902feeb04c96ba2d9e543ad6f61ce5b"
+      "rows": 71,
+      "sha256": "5e1fd2c99f40b09e61aab9a96f134e2b25db00168d42dc17f87282691fbbbc4c"
     },
     "llm_configs": {
       "file": "records/llm_configs.jsonl",
@@ -261,7 +362,7 @@
     "relations": {
       "file": "records/relations.jsonl",
       "rows": 524,
-      "sha256": "32e837d6a98448c9253d4e29fb8b21d7828907314930ddec5cadac06dc38d2e1"
+      "sha256": "a078aa2d734d9b2b2a740e74bc5a7dd2d7d52d93bd12cc7af0ea82a98186dd4c"
     },
     "review_escalations": {
       "file": "records/review_escalations.jsonl",
@@ -316,7 +417,7 @@
     "tickets": {
       "file": "records/tickets.jsonl",
       "rows": 24,
-      "sha256": "7d483c7894f2bb370b81dcacf6ec688ee7efe4bf988a7eb100c58a74b0f225be"
+      "sha256": "7e60436795cb5dc2392b948d82c4166532c5b966f5995fb888b77663b567e037"
     },
     "types": {
       "file": "records/types.jsonl",
@@ -511,11 +612,6 @@
       "size": 604
     },
     {
-      "path": "files/80/80066a4ca930240bb15e1a7e313918d5576b232c5fe10b5596b5784fd1e6d551",
-      "sha256": "80066a4ca930240bb15e1a7e313918d5576b232c5fe10b5596b5784fd1e6d551",
-      "size": 1956
-    },
-    {
       "path": "files/81/819d15c4ef99ea62d71e4335a03f52ba887c247767f843cdfc37cc540f3eb518",
       "sha256": "819d15c4ef99ea62d71e4335a03f52ba887c247767f843cdfc37cc540f3eb518",
       "size": 609
@@ -619,6 +715,11 @@
       "path": "files/d0/d096b8a4a329dfef6a5325d1789860536bdadf9896a9189a60fcf594813d77a5",
       "sha256": "d096b8a4a329dfef6a5325d1789860536bdadf9896a9189a60fcf594813d77a5",
       "size": 535
+    },
+    {
+      "path": "files/d5/d5544a89198c12c4816c6fb2dc09eacdc59fe9c490fc6c2a1ed6017e7be58b78",
+      "sha256": "d5544a89198c12c4816c6fb2dc09eacdc59fe9c490fc6c2a1ed6017e7be58b78",
+      "size": 2182
     },
     {
       "path": "files/d6/d689cd6c01d72a1bd0ebb2cf90dd34fce868aa6d49d397aee598f5106a344b27",
@@ -737,8 +838,8 @@
     },
     {
       "path": "records/assets.jsonl",
-      "sha256": "6662e47c255e7af6615af9774503a692e4c71fce8a80bb40a8cbb635901e43f5",
-      "size": 210137
+      "sha256": "213f764174ea67bc6229c3933fb7203db689e316cddec87c08700c2ca510c67d",
+      "size": 210139
     },
     {
       "path": "records/attachments.jsonl",
@@ -772,8 +873,8 @@
     },
     {
       "path": "records/document_revisions.jsonl",
-      "sha256": "cf44dc0ec7dce0cfcbebd358f4373757f445481fb92131784eed7941606f471a",
-      "size": 33400
+      "sha256": "63c4ec22a0b774554b6228f30c0ba30527421b7b255c33b8b33fe4f2dffc1955",
+      "size": 33393
     },
     {
       "path": "records/document_template_versions.jsonl",
@@ -797,7 +898,7 @@
     },
     {
       "path": "records/floor_plans.jsonl",
-      "sha256": "d44f3da00774cfbdd670d8e1a1090ca4ac851c5184a9edf72784a496346c6aff",
+      "sha256": "0c8507eaadb98ad7c5717efa566cd1734528192a4e42eb2814377293464e65e1",
       "size": 4446
     },
     {
@@ -827,8 +928,8 @@
     },
     {
       "path": "records/indoor_placements.jsonl",
-      "sha256": "52833359b72ef652a289af65022107b35902feeb04c96ba2d9e543ad6f61ce5b",
-      "size": 34322
+      "sha256": "5e1fd2c99f40b09e61aab9a96f134e2b25db00168d42dc17f87282691fbbbc4c",
+      "size": 34812
     },
     {
       "path": "records/llm_configs.jsonl",
@@ -867,8 +968,8 @@
     },
     {
       "path": "records/relations.jsonl",
-      "sha256": "32e837d6a98448c9253d4e29fb8b21d7828907314930ddec5cadac06dc38d2e1",
-      "size": 124987
+      "sha256": "a078aa2d734d9b2b2a740e74bc5a7dd2d7d52d93bd12cc7af0ea82a98186dd4c",
+      "size": 124989
     },
     {
       "path": "records/review_escalations.jsonl",
@@ -922,8 +1023,8 @@
     },
     {
       "path": "records/tickets.jsonl",
-      "sha256": "7d483c7894f2bb370b81dcacf6ec688ee7efe4bf988a7eb100c58a74b0f225be",
-      "size": 16637
+      "sha256": "7e60436795cb5dc2392b948d82c4166532c5b966f5995fb888b77663b567e037",
+      "size": 16690
     },
     {
       "path": "records/types.jsonl",

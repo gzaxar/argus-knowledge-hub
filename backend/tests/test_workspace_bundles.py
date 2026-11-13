@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import inspect as sa_inspect, select
+from sqlalchemy import func, inspect as sa_inspect, select
 
 from app.auth import OidcIdentity, get_identity
 from app.bundle import core, registry
@@ -198,10 +198,20 @@ def test_a_demo_round_trips(name, tmp_path):
         assert core.verify(core.read(out)) == []
         assert m["missing_files"] == []
         source = core.read(DEMOS / name).manifest
+        # The demo's replayed provenance (manifest demo.provenance) can add the edges a record's first ledger facts
+        # imply (`instance of` from its product model): exported, they are rows like any other.
+        from app.models.asset import Relation
+        db = SessionLocal()
+        projected = db.scalar(select(func.count()).select_from(Relation).where(
+            Relation.workspace_id == first, Relation.derivation == "ledger"))
+        db.close()
+        projected -= sum(1 for line in (DEMOS / name / "records" / "relations.jsonl").read_text().splitlines()
+                         if line.strip() and json.loads(line).get("derivation") == "ledger")
         for fam, meta in source["families"].items():
             if fam not in ("people", "icons", "types", "workspace_packages", "ticket_workflows", "roles", "global_values",
                            "memberships"):
-                assert m["families"].get(fam, {}).get("rows", 0) == meta["rows"], fam
+                extra = projected if fam == "relations" else 0
+                assert m["families"].get(fam, {}).get("rows", 0) == meta["rows"] + extra, fam
         zip_path = core.zip_dir(out, tmp_path / "rt.zip")
         unpacked = core.unpack(zip_path, tmp_path / "unpacked")
         view = _apply(unpacked, second, tmp_path)
@@ -215,7 +225,8 @@ def test_a_demo_round_trips(name, tmp_path):
         if name == "medium-linac":
             rows = core.read(DEMOS / name).manifest["families"]
             assert len(a["beam_values"]) == rows["beam_model_values"]["rows"] > 0
-            assert len(a["bindings"]) == rows["beam_asset_bindings"]["rows"] == rows["beam_model_values"]["rows"]
+            # One binding per component; a component has a value in each dataset of its path (design, test beam).
+            assert len(a["bindings"]) == rows["beam_asset_bindings"]["rows"] == len({s for s, _x, _y in a["beam_values"]})
     finally:
         _drop(first, second)
 
@@ -627,20 +638,32 @@ def test_in_the_it_demo_the_causes_of_a_fault_come_from_the_graph(tmp_path):
 
 
 def test_in_the_it_demo_ask_finds_the_history_from_the_words_of_a_report(tmp_path):
-    """What an assistant does with "no Wi-Fi in the reading room east": the words of a report are not the
+    """What an assistant does with "no Wi-Fi in the south-west corner of the reading room": the words of a report are not the
     words of the ticket, the key it read is not the uid, and the history it needs is linked to the object."""
-    from app.services.mcp_tools import get_object, graph_neighbours, search_documents, search_tickets
+    from app.services.mcp_tools import get_object, get_ticket, graph_neighbours, search_documents, search_tickets
     ws = f"it-ask-{secrets.token_hex(3)}"
     try:
         assert _apply(DEMOS / "it-services", ws, tmp_path)["ok"]
         db = SessionLocal()
         try:
-            found = search_tickets(db, ws, "Wi-Fi reading room east no connection")
-            assert found["tickets"][0]["title"] == "Reading hall east: no Wi-Fi", found["tickets"][:3]
-            assert {t["state"] for t in search_tickets(db, ws, "Wi-Fi", state="open")["tickets"]} <= {
-                "new", "in_progress", "pending"}
+            found = search_tickets(db, ws, "Wi-Fi reading room south-west corner no connection")
+            assert found["tickets"][0]["title"] == "Reading hall, south-west corner: no Wi-Fi", found["tickets"][:3]
+            assert not {t["state"] for t in search_tickets(db, ws, "Wi-Fi", state="open")["tickets"]} & {
+                "resolved", "closed"}
             assert search_tickets(db, ws, "Wi-Fi", state="open")["total"] >= 1
             assert search_tickets(db, ws, "zebra giraffe unicorn")["total"] == 0
+            library = {t["title"] for t in search_tickets(db, ws, "library wifi")["tickets"]}
+            assert "Library Wi-Fi drops in the reading hall" in library, library           # wifi finds Wi-Fi
+            open_changes = {t["title"] for t in search_tickets(db, ws, "core switch firmware", state="open")["tickets"]}
+            assert "Core switch firmware upgrade 10.4 → 10.6" in open_changes, "a change assessed is open"
+            high = search_tickets(db, ws, state="open", priority="high")["tickets"]
+            assert high and all(t["priority"] == "high" for t in high), high
+            wifi = next(t for t in high if t["title"] == "Reading hall, south-west corner: no Wi-Fi")
+            assert wifi["on"] == "NF-AP-LIB-03" and wifi["on_name"], "the equipment comes with the list"
+            done = {t["title"] for t in search_tickets(db, ws, "core switch firmware", state="done")["tickets"]}
+            assert "Core switch firmware upgrade 10.4 → 10.6" not in done
+            report = get_ticket(db, ws, found["tickets"][0]["key"])
+            assert any("LIB-03" in c["body"] for c in report["comments"]), "the diagnosis is in the comments"
 
             converter = get_object(db, ws, "NF-SC-DH1")
             assert any("power-room" in t["title"] for t in converter["tickets"]), "the June outage"
@@ -651,6 +674,203 @@ def test_in_the_it_demo_ask_finds_the_history_from_the_words_of_a_report(tmp_pat
 
             runbook = search_documents(db, ws, "replace failed switch port")
             assert runbook["documents"] and runbook["documents"][0]["code"] == "NF-RB-005", runbook["documents"][:3]
+        finally:
+            db.close()
+    finally:
+        _drop(ws)
+
+
+def test_in_the_it_demo_a_device_without_a_point_is_shown_where_its_rack_is(tmp_path):
+    """SC-DH1 has no point of its own on a plan: it is in rack R-A01, which has one. The record's page and Ask
+    show it there, and say it is the rack's point; a spare is found in R-SP01 on the Annex plan the same way."""
+    from app.services import indoor
+    from app.services.mcp_tools import where_is
+    ws = f"it-plan-{secrets.token_hex(3)}"
+    try:
+        assert _apply(DEMOS / "it-services", ws, tmp_path)["ok"]
+        db = SessionLocal()
+        try:
+            spot = indoor.spot(db, "nf-sc-dh1")
+            assert spot and spot["via"]["uid"] == "nf-rack-a01", spot
+            assert spot["plan"]["name"] == "Hub Building — ground floor" and (spot["x"], spot["y"]) == (60.0, 100.0)
+            own = indoor.spot(db, "nf-rack-a01")
+            assert own["via"] is None and own["path"] == []
+
+            spare = indoor.spot(db, "nf-sw-spare-cx48")
+            assert spare and spare["via"]["uid"] == "nf-rack-sp01" and spare["plan"]["name"].startswith("Annex"), spare
+
+            where = where_is(db, ws, "NF-SC-DH1")
+            assert [c["uid"] for c in where["in"]][:2] == ["nf-rack-a01", "nf-room-datahall"], where["in"]
+            assert where["show_on_plan"] == "/floor-plan?show=nf-sc-dh1"
+            ups = where_is(db, ws, "NF-SC-DH1", relative_to="NF-UPS-01, NF-UPS-02")
+            assert ups["show_on_plan"] == "/floor-plan?show=nf-sc-dh1,nf-ups-01,nf-ups-02"
+            ups1 = ups["relative_to"][0]
+            # R-A01 is at (60, 100) on the Hub ground floor, UPS-01 at (540, 250): 1 m = 10 px, north up.
+            assert ups1["from_it"].startswith("NF-UPS-01 is 50.") and ups1["from_it"].endswith("east of NF-SC-DH1"), ups1
+            shown = indoor.show(db, ["nf-sc-dh1", "nf-ups-01", "nf-ap-lib-03"])
+            assert [r["spot"]["plan"]["name"] for r in shown["records"]][:2] == ["Hub Building — ground floor"] * 2
+            assert shown["records"][2].get("from_first") is None and len(shown["plans"]) == 2
+            assert "R-A01" in where["floor_plan"]["shown_at"] or "RACK-A01" in where["floor_plan"]["shown_at"].upper()
+
+            assert indoor.spot(db, "nf-rack-a01", may=lambda a: False) is not None, "its own point needs no place"
+            assert indoor.spot(db, "nf-sc-dh1", may=lambda a: False) is None, "a place it may not see is not shown"
+        finally:
+            db.close()
+    finally:
+        _drop(ws)
+
+
+def test_in_the_linac_demo_the_failure_model_answers_the_three_troubleshooting_stories(tmp_path):
+    """The accelerator demo's stories: three quadrupole supplies silent behind one Moxa port while three others on
+    the same IOC work; frozen gauges while the ion pumps (powered by the same rack) are fine; a modulator trip and
+    what it takes down. Every relation verb of the bundle is one the failure model knows."""
+    from app.services import causal_model
+    from app.services.indoor import spot
+    from app.services.mcp_tools import get_object, get_ticket, where_is
+    from app.services.root_cause import impact_of, root_causes
+    verbs = {json.loads(x)["relation_type"] for x in (DEMOS / "medium-linac" / "records" / "relations.jsonl")
+             .read_text().splitlines() if x.strip()}
+    assert not [v for v in verbs if causal_model.classify(v) is None], "every verb has a meaning"
+    ws = f"linac-rca-{secrets.token_hex(3)}"
+    try:
+        assert _apply(DEMOS / "medium-linac", ws, tmp_path)["ok"]
+        db = SessionLocal()
+        try:
+            quads = ["VL-PS-Q1", "VL-PS-Q2", "VL-PS-Q3"]
+            out = root_causes(db, ws, quads, healthy=["VL-PS-Q4", "VL-PS-Q5", "VL-PS-Q6"],
+                              symptom_kind={k: "control" for k in quads})
+            assert "serial port 3" in out["candidates"][0]["name"], [c["name"] for c in out["candidates"][:5]]
+            ioc = next(c for c in out["candidates"] if c["name"] == "IOC magnets-ps")
+            assert set(ioc["contradicted_by"]) == {"VL-PS-Q4", "VL-PS-Q5", "VL-PS-Q6"}, "Q4–Q6 on the same IOC work"
+
+            gauges = ["VL-VG-1", "VL-VG-2", "VL-VG-3"]
+            vac = root_causes(db, ws, gauges, healthy=[f"VL-IP-{i}" for i in range(1, 6)],
+                              symptom_kind={k: "control" for k in gauges})
+            names = [c["name"] for c in vac["candidates"] if c["coverage"] == 1]
+            assert names and names[0].startswith("Gauge controller module"), names
+
+            lost = {a["name"]: a for a in impact_of(db, ws, "VL-MOD-2")["affected"]}
+            assert "Klystron K-2" in lost
+            assert any(n.startswith(("ACC02", "VL-U-ACC02")) or "ACC02" in n for n in lost), sorted(lost)[:15]
+            ioc = {a["name"] for a in impact_of(db, ws, "VL-SRV-IOC")["affected"]}
+            assert {"Quadrupole power supply PS-Q1", "Vacuum controller rack"} <= ioc, sorted(ioc)[:20]
+
+            moxa = get_object(db, ws, "VL-MOXA-01")
+            assert {d["code"] for d in moxa["documents"]} >= {"VL-NT-003", "VL-RB-001"}
+            q2 = get_object(db, ws, "VL-PS-Q2")
+            assert any("PS-Q2 readback frozen" in t["title"] for t in q2["tickets"])
+            today = get_ticket(db, ws, next(t["key"] for t in get_object(db, ws, "VL-PS-Q1")["tickets"]
+                                            if t["title"].startswith("Quadrupoles Q1")))
+            assert any("Q4, Q5, Q6" in c["body"] for c in today["comments"])
+            assert spot(db, "vl-moxa-01")["plan"]["name"] == "Accelerator Building — ground floor"
+            assert where_is(db, ws, "VL-MOXA-SPARE")["in"][0]["key"] == "VL-ROOM-A0.12"
+
+            # The rest of the laboratory: racks, IT, the external data centre, cooling, purchasing, the MAD-X model.
+            node = [c["key"] for c in where_is(db, ws, "VL-K8S-N1")["in"]]
+            assert node[:3] == ["VL-RK-S01", "VL-ROOM-D0.02", "VL-BLD-ADM"], node
+            assert where_is(db, ws, "VL-PS-Q1")["in"][0]["key"] == "VL-RK-A12-1"
+            fibre = {a["name"] for a in impact_of(db, ws, "VL-FO-DC2")["affected"]}
+            assert "Backup server BKP-01" in fibre, fibre
+            backups = {a["name"]: a for a in impact_of(db, ws, "VL-BKP-01")["affected"]}
+            assert "degradation" in backups["Archiver server SRV-ARCH"]["losses"], sorted(backups)
+            water = {a["name"] for a in impact_of(db, ws, "VL-MCW-LOOP")["affected"]}
+            assert "Quadrupole power supply PS-Q1" in water
+            node1 = get_object(db, ws, "VL-K8S-N1")
+            assert node1["attributes"]["purchase_order"] == "VL-PO-2026-0501"
+            assert any(r["relation"] == "purchased with" for r in node1["relations"])
+
+            from app.beam_converters.common import Options
+            from app.beam_converters.madx import convert_madx
+            from app.models.beam_model import BeamModelValue
+            from app.models.document import Document, DocumentRevision
+            from app.models.asset import Asset
+            madx_doc = db.scalar(select(Document).where(Document.workspace_id == ws, Document.title ==
+                                                        "MAD-X model of the Valmora linac"))
+            body = db.get(DocumentRevision, madx_doc.current_revision_uid).body_markdown
+            source = body.split("```")[1]
+            converted = convert_madx(source, "valmora-linac.madx", Options())
+            placed = {c["id"].upper(): v["s"] for d in converted.get("datasets", []) for c in converted["components"]
+                      for k, v in d["values"].items() if k == c["id"]}
+            assert {"QUA01", "QUA06", "ACC04", "SCR02"} <= set(placed), sorted(placed)[:10]
+            assert abs(placed["QUA03"] - 14.0) < 1e-6 and abs(placed["SCR02"] - 21.2) < 1e-6
+            datasets = {a.name for a in db.scalars(select(Asset).where(Asset.workspace_id == ws,
+                                                                       Asset.type == "Model Dataset"))}
+            assert any(n.startswith("Test beam TB-2026-11") for n in datasets)
+            tb = db.scalar(select(Asset.uid).where(Asset.workspace_id == ws, Asset.name.like("Test beam TB-2026-11%")))
+            waist = [v.optics for v in db.scalars(select(BeamModelValue).where(BeamModelValue.dataset_uid == tb))
+                     if v.optics and abs(v.optics.get("alfx", 9)) < 0.2 and abs(v.optics.get("betx", 0) - 2.45) < 0.1]
+            assert waist, "the test beam waist at SCR02 is in the dataset"
+        finally:
+            db.close()
+    finally:
+        _drop(ws)
+
+
+@pytest.mark.parametrize("bundle", sorted(p.name for p in (Path(__file__).resolve().parents[1] / "demo_workspaces").iterdir()
+                                          if (p / "records" / "tickets.jsonl").exists()))
+def test_every_demo_ticket_is_in_a_state_its_workflow_has(bundle):
+    """A ticket in a state its workflow does not know shows "No move is possible from here" on stage."""
+    records = Path(__file__).resolve().parents[1] / "demo_workspaces" / bundle / "records"
+    rows = lambda name: [json.loads(l) for l in (records / name).read_text().splitlines() if l.strip()]  # noqa: E731
+    flows = {w["uid"]: w for w in rows("ticket_workflows.jsonl")} if (records / "ticket_workflows.jsonl").exists() else {}
+    types = {t["uid"]: t for t in rows("types.jsonl")}
+    default = next((w for w in flows.values() if w.get("is_default")), None)
+
+    def flow_of(uid):
+        seen = set()
+        while uid and uid not in seen:
+            seen.add(uid)
+            t = types.get(uid) or {}
+            if (t.get("metadata") or {}).get("workflow_uid") in flows:
+                return flows[t["metadata"]["workflow_uid"]]
+            uid = t.get("parent_schema_uid")
+        return default
+
+    wrong = []
+    for t in rows("tickets.jsonl"):
+        wf = flow_of(t.get("schema_uid"))
+        if wf is not None and t["state"] not in {s["key"] for s in wf["states"]}:
+            wrong.append((t["uid"], t["state"], wf["name"]))
+    assert not wrong, wrong
+
+
+def test_in_the_it_demo_glpi_and_a_technician_disagree_and_both_are_kept(tmp_path):
+    """Ledger facts are never copied by a bundle; the demo replays its story instead: GLPI lists LIB-02's old unit,
+    the technician records the replacement, GLPI's next reading still has the old one. The record shows the
+    technician's values, both sources stay, and the two differences wait in the review queue."""
+    from app.models.asset import Asset, Relation
+    from app.models.ledger import Claim, Conflict, LedgerStream
+    ws = f"it-prov-{secrets.token_hex(3)}"
+    try:
+        assert _apply(DEMOS / "it-services", ws, tmp_path)["ok"]
+        db = SessionLocal()
+        try:
+            ap = db.scalar(select(Asset).where(Asset.workspace_id == ws, Asset.name == "Access point LIB-02"))
+            assert (ap.attributes["serial"], ap.attributes["installed_on"]) == ("SYN92604956", "2026-10-15")
+            assert ap.attributes["hostname"] == "ap-lib-02", "the values no source spoke about are untouched"
+            streams = {s.id.rsplit("@", 1)[0] for s in db.scalars(select(LedgerStream).join(
+                Claim, Claim.stream_id == LedgerStream.id).where(Claim.source_ref == f"uid:{ap.uid}"))}
+            assert streams == {"glpi:northfield", "person:teo.lindqvist@northfield-it.example"}, streams
+            open_ = {c.predicate for c in db.scalars(select(Conflict).where(
+                Conflict.subject_uid == ap.uid, Conflict.conflict_type == "source_vs_confirmed"))}
+            assert open_ == {"attr:serial", "attr:installed_on"}, open_
+            located = [r for r in db.scalars(select(Relation).where(
+                Relation.from_asset_uid == ap.uid, Relation.relation_type == "located in"))]
+            assert len(located) == 1, "the first ledger fact does not make the room a second time"
+        finally:
+            db.close()
+        _drop(ws)
+        # Deleted and installed again, as a demo is before an event: the earlier install's facts stay behind
+        # with their streams gone, and the new one replays as cleanly.
+        again = _apply(DEMOS / "it-services", ws, tmp_path)
+        assert again["ok"], again["blockers"]
+        db = SessionLocal()
+        try:
+            ap = db.scalar(select(Asset).where(Asset.workspace_id == ws, Asset.name == "Access point LIB-02"))
+            assert (ap.attributes["serial"], ap.attributes["installed_on"]) == ("SYN92604956", "2026-10-15")
+            assert {c.predicate for c in db.scalars(select(Conflict).where(
+                Conflict.subject_uid == ap.uid, Conflict.conflict_type == "source_vs_confirmed"))} == {
+                "attr:serial", "attr:installed_on"}
         finally:
             db.close()
     finally:

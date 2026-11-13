@@ -109,12 +109,12 @@ def test_the_gate_refuses_what_would_break_the_model():
 
 
 def test_a_declared_relation_reaches_the_walk_and_the_registry():
-    s = sample(relations=[ext.ExtRelation("feeds", "power", causal_model.FORWARD, causal_model.FUNCTION,
+    s = sample(relations=[ext.ExtRelation("energises", "power", causal_model.FORWARD, causal_model.FUNCTION,
                                           "distribution board → load", source_types={"Fanout Cable"},
                                           at_most_per_target=1)])
-    assert ext.semantics([s])["feeds"].flows == causal_model.FORWARD
+    assert ext.semantics([s])["energises"].flows == causal_model.FORWARD
     endpoints, cardinality = ext.registry_rules([s])
-    assert endpoints["feeds"] == (("in", {"Fanout Cable"}), None) and cardinality["feeds"] == (None, 1)
+    assert endpoints["energises"] == (("in", {"Fanout Cable"}), None) and cardinality["energises"] == (None, 1)
     assert ext.semantics([sample(owner="")]) == {}                  # refused by the gate: not in the walk
 
 

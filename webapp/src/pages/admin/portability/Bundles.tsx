@@ -52,7 +52,7 @@ function Demos({ demos, onDone }: { demos: BundleSummary[]; onDone: () => void }
               <Contents s={d} />
               <ApplyForm defaults={{ workspace_id: d.name ?? "", name: d.demo?.title ?? d.workspace?.name ?? "" }}
                          preview={(b) => bundlesApi.previewDemo(d.name!, b)} apply={(b) => bundlesApi.applyDemo(d.name!, b)}
-                         onDone={onDone} people={false} />
+                         onDone={onDone} people />
             </li>
           ))}
         </ul>

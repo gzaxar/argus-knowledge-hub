@@ -19,4 +19,7 @@
 <g transform="translate(300,60)"><polygon points="0,-30 10,0 -10,0" fill="#0f172a"/><text x="0" y="22" font-family="Helvetica, Arial, sans-serif" font-size="18" text-anchor="middle">N</text></g>
 <text x="12" y="205" font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#0f172a" font-weight="bold">Administration Building — ground floor</text>
 <text x="12" y="230" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#b91c1c">Synthetic demo plan — not a real building · scale 1 m = 10 px</text>
+<rect x="266" y="142" width="12" height="12" fill="#c7d2fe" stroke="#1e293b" stroke-width="1.5"/><text x="272" y="165" font-family="Helvetica, Arial, sans-serif" font-size="7" text-anchor="middle" fill="#1e293b">RK-S01</text>
+<rect x="290" y="142" width="12" height="12" fill="#c7d2fe" stroke="#1e293b" stroke-width="1.5"/><text x="296" y="165" font-family="Helvetica, Arial, sans-serif" font-size="7" text-anchor="middle" fill="#1e293b">RK-S02</text>
+<rect x="314" y="142" width="12" height="12" fill="#c7d2fe" stroke="#1e293b" stroke-width="1.5"/><text x="320" y="165" font-family="Helvetica, Arial, sans-serif" font-size="7" text-anchor="middle" fill="#1e293b">RK-S03</text>
 </svg>

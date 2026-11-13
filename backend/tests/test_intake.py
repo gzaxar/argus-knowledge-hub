@@ -238,6 +238,19 @@ def test_a_report_becomes_a_ticket_draft_with_causes_only_as_hypotheses(world, m
     assert all(l.get("uid") != w["secret"] for c in out["guide"]["checks"] for l in c.get("links") or [])
 
 
+def test_a_report_that_says_this_morning_is_dated_from_today(world, model):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    w = world
+    answer, seen = model
+    answer({"title": "AP HUB-02 reboots", "occurred_at": None})
+    client.post("/v1/intake/assist/ticket", headers=w["headers"],
+                json={"text": "Since this morning the access point reboots every ten minutes"})
+    today = datetime.now(ZoneInfo("Europe/Rome")).date().isoformat()
+    assert "Now: " in seen["user"] and today in seen["user"], seen["user"]
+    assert "counted from Now" in seen["system"]
+
+
 # --- the outcome: what the person kept ------------------------------------------------------------------------------
 
 def test_the_outcome_records_kept_and_corrected_values_in_the_ledger(world, model):

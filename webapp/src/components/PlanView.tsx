@@ -2,7 +2,7 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { CircleMarker, ImageOverlay, MapContainer, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import { CircleMarker, ImageOverlay, MapContainer, Polyline, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { indoorApi } from "../api/client";
 
 /** The plan's picture, fetched signed in; the URL is let go when the plan is no longer shown. */
@@ -12,7 +12,9 @@ export function usePlanImage(uid: string | null | undefined) {
   return q;
 }
 
-export interface PlanPin { id: string; x: number; y: number; label: string; colour?: string; to?: string }
+export interface PlanPin { id: string; x: number; y: number; label: string; colour?: string; to?: string;
+  /** The record being looked for: a ring around it and its label always shown. */
+  highlight?: boolean }
 
 /** Plan pixels (x right, y down) to Leaflet's flat coordinates (y up) and back. */
 const toLL = (h: number, x: number, y: number): [number, number] => [h - y, x];
@@ -22,9 +24,32 @@ function Clicks({ height, onPick }: { height: number; onPick: (x: number, y: num
   return null;
 }
 
-function Fit({ width, height }: { width: number; height: number }) {
+/** [lo, hi] widened about its middle to at least half of `size`, then moved to lie inside 0..size. */
+export function span(lo: number, hi: number, size: number): [number, number] {
+  const want = Math.min(size, Math.max(hi - lo, size / 2));
+  const mid = (lo + hi) / 2;
+  const start = Math.min(Math.max(0, mid - want / 2), size - want);
+  return [start, start + want];
+}
+
+function Fit({ width, height, focus }: { width: number; height: number; focus?: { x: number; y: number }[] }) {
   const map = useMap();
-  useEffect(() => { map.fitBounds([[0, 0], [height, width]]); }, [width, height]); // eslint-disable-line react-hooks/exhaustive-deps
+  const key = (focus ?? []).map((p) => `${p.x},${p.y}`).join(";");
+  useEffect(() => {
+    if (focus && focus.length > 0) {
+      // Around the records looked for, with room to see what is next to them: a plan full of labels is unreadable
+      // at its whole size.
+      // Never less than half the plan each way, so a single record still shows its room, its corner and its
+      // neighbours rather than filling the screen with its own label.
+      const pad = Math.max(40, 0.12 * Math.max(width, height));
+      const xs = focus.map((p) => p.x), ys = focus.map((p) => p.y);
+      const [x0, x1] = span(Math.min(...xs) - pad, Math.max(...xs) + pad, width);
+      const [y0, y1] = span(Math.min(...ys) - pad, Math.max(...ys) + pad, height);
+      map.fitBounds([toLL(height, x0, y1), toLL(height, x1, y0)]);
+    } else {
+      map.fitBounds([[0, 0], [height, width]]);
+    }
+  }, [width, height, key]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
 
@@ -44,8 +69,14 @@ export function NorthArrow({ deg, className = "" }: { deg: number; className?: s
   );
 }
 
-export function PlanView({ planUid, width, height, pins = [], pick, onPick, className = "h-80", northDeg }: {
+export interface PlanLine { id: string; from: { x: number; y: number }; to: { x: number; y: number }; label?: string }
+
+export function PlanView({ planUid, width, height, pins = [], lines = [], pick, onPick, className = "h-80", northDeg, focus }: {
   planUid: string; width: number; height: number; pins?: PlanPin[];
+  /** Points to zoom to when the plan opens (the records looked for); the whole plan when not given. */
+  focus?: { x: number; y: number }[];
+  /** Dashed lines between points, with a label (a distance). */
+  lines?: PlanLine[];
   pick?: { x: number; y: number } | null; onPick?: (x: number, y: number) => void; className?: string;
   /** Where true north points on the picture (a plan placed on the map); shown as an arrow. */
   northDeg?: number | null;
@@ -58,12 +89,22 @@ export function PlanView({ planUid, width, height, pins = [], pick, onPick, clas
       {image.isError ? <p className="p-3 text-xs text-red-600">The plan could not be loaded.</p> : (
         <MapContainer crs={L.CRS.Simple} bounds={bounds} minZoom={-6} maxZoom={4} zoomSnap={0.25} className="h-full w-full"
                       attributionControl={false}>
-          <Fit width={width} height={height} />
+          <Fit width={width} height={height} focus={focus} />
           {image.data && <ImageOverlay url={image.data} bounds={bounds} />}
+          {lines.map((l) => (
+            <Polyline key={l.id} positions={[toLL(height, l.from.x, l.from.y), toLL(height, l.to.x, l.to.y)]}
+                      pathOptions={{ color: "#475569", weight: 2, dashArray: "6 6" }}>
+              {l.label && <Tooltip permanent direction="center" className="!text-[11px]">{l.label}</Tooltip>}
+            </Polyline>
+          ))}
+          {pins.filter((p) => p.highlight).map((p) => (
+            <CircleMarker key={`${p.id}-ring`} center={toLL(height, p.x, p.y)} radius={16} interactive={false}
+                          pathOptions={{ color: p.colour ?? "#2563eb", weight: 3, fillOpacity: 0.12, className: "animate-pulse" }} />
+          ))}
           {pins.map((p) => (
-            <CircleMarker key={p.id} center={toLL(height, p.x, p.y)} radius={6}
+            <CircleMarker key={p.id} center={toLL(height, p.x, p.y)} radius={p.highlight ? 8 : 6}
                           pathOptions={{ color: "#fff", weight: 2, fillColor: p.colour ?? "#2563eb", fillOpacity: 0.95 }}>
-              <Tooltip>{p.label}</Tooltip>
+              <Tooltip permanent={!!p.highlight} direction="top" offset={[0, -10]}>{p.label}</Tooltip>
             </CircleMarker>
           ))}
           {pick && <CircleMarker center={toLL(height, pick.x, pick.y)} radius={8} pathOptions={{ color: "#16a34a", fillOpacity: 0.5 }} />}

@@ -64,10 +64,16 @@ def seed(db: Session, actor: str = "catalogue") -> list[str]:
     types = _type_names(db)
     added = []
     for name in SEED:
-        if db.get(EquipmentClass, name) is not None:
-            continue
         as_type = ALREADY_A_TYPE.get(name, name)
         promoted = as_type in types and name != UNCLASSIFIED
+        existing = db.get(EquipmentClass, name)
+        if existing is not None:
+            # Seeded before the type existed (a package installed before the one that defines it): it is a type of
+            # its own now, so the class points to it, as it would have had the type come first.
+            if promoted and existing.status == "active" and existing.note == "seed":
+                existing.status, existing.promoted_type = "promoted", as_type
+                existing.note = "already a type of its own in the catalogue"
+            continue
         db.add(EquipmentClass(name=name, status="promoted" if promoted else "active",
                               promoted_type=as_type if promoted else None, added_by=actor, added_at=now(),
                               note="already a type of its own in the catalogue" if promoted else "seed"))

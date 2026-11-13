@@ -497,9 +497,13 @@ def converse(endpoint: Endpoint, messages: list[dict], tools: Optional[list[dict
             )
         raise LLMError(f"The endpoint answered {resp.status_code}: {detail}")
     try:
-        return resp.json()["choices"][0]["message"]
-    except (ValueError, KeyError, IndexError) as e:
+        body = resp.json()
+        message = body["choices"][0]["message"]
+    except (ValueError, KeyError, IndexError, TypeError) as e:
         raise LLMError("The endpoint's reply was not in the expected shape.") from e
+    from app.services import usage
+    usage.note_served(body.get("model") if isinstance(body, dict) else None)
+    return message
 
 
 def converse_stream(endpoint: Endpoint, messages: list[dict], tools: Optional[list[dict]] = None,

@@ -16,12 +16,12 @@ import re
 from collections import Counter
 from typing import Any, Callable, Optional
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.asset import Asset, Relation
 from app.models.document import Document, DocumentRelation, DocumentRevision
-from app.models.issue import Issue
+from app.models.issue import Issue, IssueComment
 from app.models.llm_config import LLMConfig
 from app.models.schema import Schema
 from app.models.user import User
@@ -98,6 +98,7 @@ def _issue_summary(issue: Issue, asset: Optional[Asset] = None) -> dict:
         "key": issue.key,
         "title": issue.title,
         "state": issue.state,
+        "priority": issue.priority,
         "created": issue.created_at.date().isoformat() if issue.created_at else None,
         "source_key": attributes.get("argus_source_key"),
         "category": attributes.get("argus_category"),
@@ -105,6 +106,7 @@ def _issue_summary(issue: Issue, asset: Optional[Asset] = None) -> dict:
     }
     if asset is not None and can_see(asset):
         out["on"] = asset.key or asset.uid
+        out["on_name"] = asset.name
     return out
 
 
@@ -368,7 +370,10 @@ def _text_score(needle: str, *texts: str) -> int:
     if needle in haystack:
         return 1000
     words = _search_words(needle)
-    found = sum(1 for w in words if w in haystack or _singular(w) in haystack)
+    # "wifi" finds "Wi-Fi" and "e-mail" finds "email": hyphens are not part of a word people search for.
+    joined = haystack.replace("-", "")
+    found = sum(1 for w in words if any(v in h for v in {w, _singular(w), w.replace("-", "")}
+                                        for h in (haystack, joined)))
     # One word in five is chance; two of a short query, or a third of a long one, is a match.
     return found if words and found >= max(1, min(2, len(words)), -(-len(words) // 3)) else 0
 
@@ -384,19 +389,106 @@ _STATE_GROUPS = {
 }
 
 
+def _is_done(db: Session, workspace_id: str, issue: Issue) -> bool:
+    """Resolved or finished, in the ticket's own workflow (resolved counts as done here, as it always has)."""
+    from app.services import workflows
+    if issue.state in ("resolved", "closed"):
+        return True
+    try:
+        wf = workflows.workflow_for(db, workspace_id, issue.schema_uid)
+        st = workflows.state_of(wf, issue.state) if wf else None
+    except Exception:  # noqa: BLE001 — no workflow to ask: only the built-in names say done
+        st = None
+    return bool(st and st.get("category") == "done")
+
+
+def _find_asset(db: Session, workspace_id: str, uid_or_key: str) -> Optional[Asset]:
+    asset = db.scalar(select(Asset).where(Asset.uid == uid_or_key)) or db.scalar(
+        select(Asset).where(Asset.key == uid_or_key)) or _by_former_key(db, uid_or_key)
+    return asset if asset is not None and _asset_visible(db, asset, workspace_id) else None
+
+
+def where_is(db: Session, workspace_id: str, uid_or_key: str, relative_to: Optional[str] = None) -> dict:
+    """Where a record physically is: the places it is in, nearest first (its rack, the room, the floor, the
+    building), and the floor plan it can be shown on — its own point, or the point of the nearest place in the
+    chain that has one. With `relative_to` (other records), where each of them is too, and — on the same plan
+    placed on the map — how far from the first and which way."""
+    from app.services import indoor
+    asset = _find_asset(db, workspace_id, uid_or_key)
+    if asset is None:
+        return {"found": False, "looked_for": uid_or_key}
+    may = lambda a: _asset_visible(db, a, workspace_id)  # noqa: E731
+
+    def chain_of(a: Asset) -> list:
+        chain, seen, node = [], {a.uid}, a
+        for _ in range(8):
+            nxt = indoor._container_of(db, node)
+            rec = db.get(Asset, nxt) if nxt and nxt not in seen else None
+            if rec is None or rec.deleted_at is not None or not may(rec):
+                break
+            chain.append(_asset_summary(rec))
+            seen.add(rec.uid)
+            node = rec
+        return chain
+
+    def on_plan(s: Optional[dict]) -> Optional[dict]:
+        if not s:
+            return None
+        return {"plan": s["plan"]["name"], "floor": s["level"]["name"] if s["level"] else None,
+                "shown_at": (f"the point of {s['via']['key'] or s['via']['name']} (it has no point of its own)"
+                             if s["via"] else "its own point")}
+
+    first = indoor.spot(db, asset.uid, may)
+    out = {"found": True, **_asset_summary(asset), "in": chain_of(asset), "floor_plan": on_plan(first)}
+    shown = [asset.uid] if first else []
+    others = []
+    for ref in [r.strip() for r in (relative_to or "").split(",") if r.strip()][:10]:
+        other = _find_asset(db, workspace_id, ref)
+        if other is None:
+            others.append({"found": False, "looked_for": ref})
+            continue
+        s = indoor.spot(db, other.uid, may)
+        row = {**_asset_summary(other), "in": chain_of(other), "floor_plan": on_plan(s)}
+        if first and s:
+            rel = indoor.between(db, first, s)
+            this, that = other.key or other.name, asset.key or asset.name
+            row["from_it"] = (f"{this} is {rel['metres']} m {rel['direction']} of {that}" if rel and rel["direction"]
+                              else f"{this} is {rel['metres']} m from {that}" if rel
+                              else "on another floor plan" if s["plan"]["uid"] != first["plan"]["uid"]
+                              else "same plan, not placed on the map: no distance")
+            shown.append(other.uid)
+        elif s:
+            shown.append(other.uid)
+        others.append(row)
+    if others:
+        out["relative_to"] = others
+    if shown:
+        out["show_on_plan"] = "/floor-plan?show=" + ",".join(shown)
+    return out
+
+
 def search_tickets(db: Session, workspace_id: str, query: str = "",
-                   state: Optional[str] = None, limit: int = DEFAULT_LIMIT) -> dict:
+                   state: Optional[str] = None, limit: int = DEFAULT_LIMIT, priority: Optional[str] = None) -> dict:
     """Work: faults, maintenance, requests. A query of several words matches tickets with most of them,
-    best first; `state` is a ticket state, or "open" (not yet resolved) or "done" (resolved or closed)."""
+    best first; `state` is a ticket state, or "open" (not yet resolved) or "done" (resolved or closed);
+    `priority` one of low, medium, high, critical. Each ticket comes with its priority and its equipment, so a
+    list needs no ticket opened one by one."""
     needle = (query or "").strip().lower()
     stmt = select(Issue).where(Issue.workspace_id == workspace_id, visible_issues_clause(),
                                Issue.deleted_at.is_(None))
-    if state:
-        wanted = _STATE_GROUPS.get(state.strip().lower(), (state.strip().lower(),))
-        stmt = stmt.where(Issue.state.in_(wanted))
+    group = _STATE_GROUPS.get((state or "").strip().lower())
+    if state and group is None:
+        stmt = stmt.where(Issue.state == state.strip().lower())
+    if priority and priority.strip():
+        stmt = stmt.where(func.lower(Issue.priority) == priority.strip().lower())
     issues = list(db.scalars(stmt))
+    if group is not None:
+        # By what the state means in the ticket's own workflow: a change "assessed" or a permit "under review"
+        # is as open as an incident "in progress".
+        done = group == _STATE_GROUPS["done"]
+        issues = [i for i in issues if _is_done(db, workspace_id, i) == done]
     on = {a.uid: a for a in db.scalars(select(Asset).where(
-        Asset.uid.in_({i.asset_uid for i in issues if i.asset_uid})))} if needle else {}
+        Asset.uid.in_({i.asset_uid for i in issues if i.asset_uid})))}
     scored = []
     for i in issues:
         asset = on.get(i.asset_uid)
@@ -431,6 +523,14 @@ def get_ticket(db: Session, workspace_id: str, uid: str) -> dict:
         "system": attributes.get("argus_system"),
         "subsystem": attributes.get("argus_subsystem"),
         "downtime_minutes": attributes.get("argus_downtime_minutes"),
+        # What was found while working on it: "LIB-03's LEDs are off", "it shows the factory address".
+        # The description is the report; the comments are the diagnosis.
+        "comments": [
+            {"author": c.author, "at": c.created_at.isoformat(timespec="minutes") if c.created_at else None,
+             "body": (c.body or "")[:1500]}
+            for c in db.scalars(select(IssueComment).where(IssueComment.issue_uid == issue.uid)
+                                .order_by(IssueComment.created_at).limit(20))
+        ],
     }
 
 
@@ -771,6 +871,23 @@ TOOLS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "where_is",
+        "description": "Where an object physically is: the places it is in, nearest first (rack, room, floor, "
+                       "building), and whether it can be shown on a floor plan — its own point or its rack's. "
+                       "With relative_to (other objects, comma-separated keys), where they are too and how far "
+                       "from the first and which way, said as '<other> is N m <direction> of <first>' — keep "
+                       "that direction as it is, never turn it round. The page offers a 'Show on the floor plan' button for "
+                       "them, so say it is there; say when a point is the rack's rather than the object's own.",
+        "handler": where_is,
+        "inputSchema": {
+            "type": "object",
+            "properties": {"uid_or_key": {"type": "string"},
+                           "relative_to": {"type": "string",
+                                           "description": "Other objects to place with respect to it, comma-separated"}},
+            "required": ["uid_or_key"],
+        },
+    },
+    {
         "name": "search_tickets",
         "description": "Search tickets — faults, maintenance, requests, changes — by text, best match "
                        "first, optionally filtered by state. Leave state out to include past, closed tickets: "
@@ -782,6 +899,7 @@ TOOLS: list[dict[str, Any]] = [
                 "query": {"type": "string"},
                 "state": {"type": "string", "description": "new | in_progress | pending | resolved | closed, "
                           "or open (not yet resolved) or done (resolved or closed)"},
+                "priority": {"type": "string", "description": "low | medium | high | critical"},
                 "limit": {"type": "integer"},
             },
         },
@@ -789,7 +907,8 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "get_ticket",
         "description": "One ticket by uid or key (BTF-TCK-0042), including root cause, corrective action, "
-                       "affected system and downtime where they are recorded.",
+                       "affected system and downtime where they are recorded, and its comments: what was "
+                       "found while working on it.",
         "handler": get_ticket,
         "inputSchema": {
             "type": "object",

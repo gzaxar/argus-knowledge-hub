@@ -112,6 +112,18 @@ def test_a_turn_streams_its_lookups_and_its_answer_and_is_kept(chat_world, monke
     assert saved["messages"][1]["stopped"] == "answered"
 
 
+def test_a_lookup_later_in_the_turn_still_knows_who_is_asking(chat_world, monkeypatch):
+    """The chat streams: each step of it runs in a fresh copy of the request's context, so who is asking must be
+    there at every step, not only at the first, or an administrator is told they may not see who has access."""
+    w = chat_world
+    as_(w["ann"])
+    scripted_stream(monkeypatch, [lookup("workspace_access", {}), answer("Done.")])
+    evs = events(client.post("/v1/ai/chat", headers=w["h"], json={"question": "Who has access here?"}))
+    step = next(e for e in evs if e["type"] == "step")
+    assert step["tool"] == "workspace_access" and not step.get("error"), step
+    assert "allowed" not in (step.get("result") or {}), step["result"]
+
+
 def test_a_follow_up_is_answered_with_the_earlier_turns(chat_world, monkeypatch):
     w = chat_world
     as_(w["ann"])

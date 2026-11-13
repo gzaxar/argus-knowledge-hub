@@ -288,6 +288,8 @@ def get_indoors(uid: str, workspace_id: str = Depends(require_permission("read")
     contents = [{"uid": a.uid, "key": a.key, "name": a.name, "type": a.type, "level_uid": p.level_uid,
                  "plan_uid": p.plan_uid} for a, p in indoor.placed_in(db, uid) if may(a)]
     return {"uid": uid, "placement": indoor.placement_out(db, now_) if now_ else None,
+            # Where to show it on a plan: its own point, or the nearest place it is in that has one.
+            "spot": indoor.spot(db, uid, may),
             "in": [{"uid": c.uid, "key": c.key, "name": c.name, "type": c.type}
                    for c in indoor.containers(db, uid) if may(c)],
             "contents": contents,
@@ -320,6 +322,22 @@ def remove_indoors(uid: str, workspace_id: str = Depends(require_permission("mod
     asset = _place(db, uid, workspace_id, grants, modify=True)
     indoor.remove(db, asset, actor_of(identity))
     db.commit()
+
+
+@router.get("/floor-plan/show")
+def show_on_plans(records: str = Query(..., description="comma-separated record uids or keys, the first one asked about"),
+                  workspace_id: str = Depends(require_permission("read")), grants=Depends(get_grants),
+                  identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """Records on their floor plans: each one's point, or that of the nearest place it is in that has one (its
+    rack, its room); the plans they are on; and from the first to each other on the same plan, how far and which
+    way. Only records and places this person may see."""
+    may = _viewer(db, identity, workspace_id)
+    uids = []
+    for ref in [r.strip() for r in records.split(",") if r.strip()][:20]:
+        a = db.get(Asset, ref) or db.scalar(select(Asset).where(Asset.key == ref))
+        if a is not None:
+            uids.append(a.uid)
+    return indoor.show(db, uids, may)
 
 
 # --------------------------------------------------------------------------- the map

@@ -2475,8 +2475,21 @@ export interface IndoorPlacementView {
   x: number | null; y: number | null; source: string; note: string | null; state: string;
   valid_from: string | null; valid_until: string | null; confirmed_by: string | null;
 }
+/** Where a record is shown on a floor plan: its own point, or that of the nearest place it is in (`via`). */
+export interface PlanSpot {
+  plan: { uid: string; name: string; width_px: number; height_px: number; north_deg?: number | null };
+  x: number; y: number; level: PlaceLevel | null;
+  via: { uid: string; key: string; name: string; type: string } | null;
+  path: { uid: string; key: string; name: string; type: string }[];
+}
+export interface FloorPlanShow {
+  records: { uid: string; key: string; name: string; type: string; spot: PlanSpot | null;
+             from_first?: { metres: number; direction: string | null } | null }[];
+  plans: FloorPlanView[];
+}
 export interface IndoorView {
   uid: string; placement: IndoorPlacementView | null;
+  spot?: PlanSpot | null;
   in: { uid: string; key: string; name: string; type: string }[];
   contents: { uid: string; key: string; name: string; type: string; level_uid: string | null; plan_uid: string | null }[];
   history: IndoorPlacementView[];
@@ -2517,6 +2530,9 @@ export const indoorApi = {
                                       x?: number | null; y?: number | null; note?: string | null }) =>
     request<IndoorPlacementView>(`/v1/assets/${uid}/indoors`, { method: "PUT", body: json(input) }),
   removeIndoors: (uid: string) => request<void>(`/v1/assets/${uid}/indoors`, { method: "DELETE" }),
+  /** Records on their floor plans (their own point, or their rack's or room's), grouped by plan, with how far
+   *  and which way each is from the first. */
+  show: (records: string[]) => request<FloorPlanShow>(`/v1/floor-plan/show?records=${encodeURIComponent(records.join(","))}`),
   mapPlans: (bbox: [number, number, number, number]) =>
     request<FloorPlanView[]>(`/v1/map/plans?bbox=${bbox.map((n) => n.toFixed(6)).join(",")}`),
   /** Records whose key, name, label, serial… contains this (to choose the place something is in). */
@@ -3294,4 +3310,62 @@ export const catalogueCollectionsApi = {
   decideField: (catalogueId: string, field: string, decision: CatalogueFieldDecision, reason?: string) =>
     request<unknown>(`${CC}/entries/${catalogueId.split("/").map(encodeURIComponent).join("/")}/fields`,
                      { method: "POST", body: json({ field, decision, reason }) }),
+};
+
+/** Administration › Ask evaluation (backend app/ask_eval, docs/ask-eval.md). */
+export interface AskEvalSettings {
+  base_url: string | null; api_key_set: boolean; models: string[]; release_model: string | null;
+  embedding_model: string | null; rerank_model: string | null; judge_model: string | null;
+  judge_base_url: string | null; judge_api_key_set: boolean; approved_hosts: string[]; repeats: number;
+  case_timeout_s: number; max_output_tokens: number | null; updated_by: string | null; updated_at: string | null;
+  database_configured: boolean;
+}
+export interface AskEvalRow {
+  model: string; status?: string; reason?: string | null; runs?: number; skipped?: number; pass_rate?: number | null;
+  factual_pass_rate?: number | null; evidence_retrieval?: number | null; citation_support?: number | null;
+  correct_abstention?: number | null; critical_failures?: number; completion_failures?: number; timeouts?: number;
+  latency_p50_s?: number | null; latency_p95_s?: number | null; tokens_mean?: number | null; flaky_cases?: string[];
+  served_models?: string[];
+}
+export interface AskEvalRun {
+  id: string; kind: string; release: string; commit: string | null; status: string; source: string;
+  requested_by: string | null; models: string[]; progress: { done?: number; total?: number; case?: string; model?: string } | null;
+  summary: AskEvalRow[] | null; report_sha256: string | null; public_sha256: string | null; error: string | null;
+  created_at: string; started_at: string | null; finished_at: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  report?: any;
+}
+export interface AskEvalRelease {
+  release: string; current: boolean; runs: number;
+  release_quality: AskEvalRun | { status: "not run" };
+  benchmark: AskEvalRun | { status: "not run" };
+}
+export const askEvalApi = {
+  settings: () => request<AskEvalSettings>("/v1/admin/ask-eval/settings"),
+  saveSettings: (input: Partial<AskEvalSettings> & { api_key?: string; clear_api_key?: boolean; judge_api_key?: string;
+                                                    clear_judge_api_key?: boolean }) =>
+    request<AskEvalSettings>("/v1/admin/ask-eval/settings", { method: "PUT", body: json(input) }),
+  releases: () => request<{ current: string; releases: AskEvalRelease[] }>("/v1/admin/ask-eval/releases"),
+  runs: () => request<AskEvalRun[]>("/v1/admin/ask-eval/runs"),
+  run: (id: string) => request<AskEvalRun>(`/v1/admin/ask-eval/runs/${encodeURIComponent(id)}`),
+  start: (input: { kind: "release" | "benchmark" | "simulated"; models?: string[]; repeats?: number }) =>
+    request<AskEvalRun>("/v1/admin/ask-eval/runs", { method: "POST", body: json(input) }),
+  /** Answers rated down, as draft evaluation cases (YAML), fetched signed in, as a URL to save. */
+  feedbackDrafts: async (since?: string): Promise<{ url: string; count: number }> => {
+    const session = await loadSession();
+    if (!session) throw new Error("Not signed in");
+    const resp = await fetch(`${session.baseUrl}/v1/admin/ask-eval/feedback-drafts.yaml${since ? `?since=${encodeURIComponent(since)}` : ""}`,
+                             { headers: authHeaders(session) });
+    if (!resp.ok) throw new ApiError(resp.status, await resp.text());
+    return { url: URL.createObjectURL(await resp.blob()), count: Number(resp.headers.get("X-Drafts") ?? 0) };
+  },
+  /** A report file, fetched signed in, as a URL to save. */
+  download: async (id: string, fmt: "json" | "md" | "html", isPublic = false): Promise<string> => {
+    const session = await loadSession();
+    if (!session) throw new Error("Not signed in");
+    const resp = await fetch(`${session.baseUrl}/v1/admin/ask-eval/runs/${encodeURIComponent(id)}/report.${fmt}${isPublic ? "?public=true" : ""}`,
+                             { headers: authHeaders(session) });
+    if (!resp.ok) throw new ApiError(resp.status, await resp.text());
+    return URL.createObjectURL(await resp.blob());
+  },
 };

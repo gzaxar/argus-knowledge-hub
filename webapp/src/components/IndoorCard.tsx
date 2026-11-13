@@ -2,7 +2,7 @@ import "leaflet/dist/leaflet.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMapEvents } from "react-leaflet";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ApiError, MAP_TILES, indoorApi, placesApi, type ControlPoint, type FloorPlanView, type IndoorView, type PlaceLevel, sitesApi, type PlacementEnding } from "../api/client";
 import type { Asset } from "../api/types";
 import { AffineImage } from "../lib/affineOverlay";
@@ -35,7 +35,9 @@ export function IndoorCard({ uid, editable }: { uid: string; editable: boolean }
   const view = useQuery({ queryKey: ["asset-indoors", uid], queryFn: () => indoorApi.indoors(uid), retry: false });
   const floors = useQuery({ queryKey: ["asset-levels", uid], queryFn: () => indoorApi.levels(uid), retry: false });
   const [editing, setEditing] = useState(false);
-  const [seeing, setSeeing] = useState(false);
+  // ?plan=1 (from "Show on the floor plan" in an Ask answer) opens the plan straight away.
+  const [params] = useSearchParams();
+  const [seeing, setSeeing] = useState(params.get("plan") === "1");
   const refresh = () => {
     for (const k of ["asset-indoors", "asset-levels", "asset-location", "asset-location-context", "asset-history"]) {
       queryClient.invalidateQueries({ queryKey: [k] });
@@ -45,6 +47,7 @@ export function IndoorCard({ uid, editable }: { uid: string; editable: boolean }
   if (!view.data || loc.data?.hidden) return null;
   const v = view.data;
   const p = v.placement;
+  const spot = v.spot ?? null;
   const isPlace = loc.data?.map_layer === "places" || (floors.data?.levels.length ?? 0) > 0 ||
     (floors.data?.plans.length ?? 0) > 0 || v.contents.length > 0;
 
@@ -66,20 +69,35 @@ export function IndoorCard({ uid, editable }: { uid: string; editable: boolean }
                 ))}
               </p>
             )}
-            {p.plan && p.x != null && p.y != null && (
-              <div className="mt-2 max-w-xl">
-                <FullPage open={seeing} title={`On the plan ${p.plan.name}`} onClose={() => setSeeing(false)}>
-                  <HerePlan plan={p.plan} x={p.x} y={p.y} uid={uid} />
-                </FullPage>
-                {!seeing && (
-                  <button type="button" onClick={() => setSeeing(true)} className="mt-1 text-xs text-indigo-700 underline">
-                    Full page
-                  </button>
-                )}
-              </div>
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-slate-500">
+            {spot?.via ? <>Not placed itself, but it is in <Link to={`/assets/${spot.path[0].uid}`}
+              className="text-indigo-700 hover:underline">{spot.path[0].name}</Link>.</> : "Not placed in a room or on a plan."}
+          </p>
+        )}
+        {spot && (
+          <div id="on-the-plan" className="mt-2 max-w-xl text-sm">
+            {spot.via && (
+              <p className="mb-1 text-xs text-slate-600">
+                No point of its own on a plan: shown where its {spot.via.type.toLowerCase()}{" "}
+                <Link to={`/assets/${spot.via.uid}`} className="text-indigo-700 hover:underline">{spot.via.key || spot.via.name}</Link>{" "}
+                is, on the plan <span className="font-medium">{spot.plan.name}</span>{spot.level && <> ({spot.level.name})</>}.
+              </p>
+            )}
+            <FullPage open={seeing} title={`${spot.via ? `${spot.via.key || spot.via.name} — ` : ""}on the plan ${spot.plan.name}`}
+                      onClose={() => setSeeing(false)}>
+              <HerePlan plan={spot.plan} x={spot.x} y={spot.y} uid={uid}
+                        label={spot.via ? `here, in ${spot.via.key || spot.via.name}` : "here"} />
+            </FullPage>
+            {!seeing && (
+              <button type="button" onClick={() => setSeeing(true)}
+                      className="mt-1 rounded border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700 hover:bg-indigo-100">
+                Show on the floor plan
+              </button>
             )}
           </div>
-        ) : <p className="mt-1 text-sm text-slate-500">Not placed in a room or on a plan.</p>}
+        )}
         {editable && !editing && (
           <div className="mt-2 flex gap-2">
             <button type="button" onClick={() => setEditing(true)} className="rounded border border-slate-300 px-3 py-1 text-xs hover:bg-slate-50">
@@ -172,11 +190,11 @@ export function SiteSharing({ uid }: { uid: string }) {
   );
 }
 
-function HerePlan({ plan, x, y, uid }: { plan: { uid: string; width_px: number; height_px: number; north_deg?: number | null };
-                    x: number; y: number; uid: string }) {
+function HerePlan({ plan, x, y, uid, label = "here" }: { plan: { uid: string; width_px: number; height_px: number; north_deg?: number | null };
+                    x: number; y: number; uid: string; label?: string }) {
   return <PlanView planUid={plan.uid} width={plan.width_px} height={plan.height_px} className={useTall("h-56")}
                    northDeg={plan.north_deg}
-                   pins={[{ id: uid, x, y, label: "here", colour: "#dc2626" }]} />;
+                   pins={[{ id: uid, x, y, label, colour: "#dc2626", highlight: true }]} focus={[{ x, y }]} />;
 }
 
 /** Choose the place (a room, a hall) by searching, optionally a plan of it (or of a place it is in) and the

@@ -22,6 +22,7 @@ import { AssetForm } from "./pages/assets/Form";
 import { AssetSearch } from "./pages/assets/Search";
 import { AdvancedSearch } from "./pages/search/Advanced";
 import { MapPage } from "./pages/map/MapPage";
+import { FloorPlanPage } from "./pages/map/FloorPlanPage";
 import { DocumentDetail } from "./pages/documents/Detail";
 import { AttachmentPage } from "./pages/attachments/AttachmentPage";
 import { DocumentForm } from "./pages/documents/Form";
@@ -80,6 +81,7 @@ import { TransferStatus } from "./pages/workspace/TransferStatus";
 import { AccountPage } from "./pages/account/Account";
 import { RobotTokensPage } from "./pages/workspace/RobotTokens";
 import { AdminTokensPage } from "./pages/admin/Tokens";
+import { AskEvaluationPage } from "./pages/admin/AskEvaluation";
 import { PrintPage } from "./pages/Print";
 
 /** Sends /imports/... to the workspace-scoped equivalent, keeping whatever
@@ -118,6 +120,7 @@ export function App() {
           <Route path="/assets" element={<KeepQuery to="/assets/search" />} />
           <Route path="/search/advanced" element={<AdvancedSearch />} />
           <Route path="/map" element={<MapPage />} />
+          <Route path="/floor-plan" element={<FloorPlanPage />} />
           <Route path="/assets/new" element={<AssetForm />} />
           <Route path="/assets/import" element={<SpreadsheetImportPage />} />
           <Route path="/assets/:uid" element={<AssetDetail />} />
@@ -213,6 +216,7 @@ export function App() {
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/ai" element={<InstallationAI />} />
           <Route path="/admin/tokens" element={<AdminTokensPage />} />
+          <Route path="/admin/ask-evaluation" element={<AskEvaluationPage />} />
           <Route path="/admin/portability" element={<PortabilityPage />} />
           <Route path="/admin/type-migrations" element={<TypeMigrationsPage />} />
           <Route path="/admin/type-migrations/:id" element={<TypeMigrationDetailPage />} />

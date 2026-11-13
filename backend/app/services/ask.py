@@ -51,6 +51,16 @@ def _answer_of(message: dict) -> str:
         text = UNCLOSED_THINK.sub("", text)
     return text.strip()
 
+def _today() -> str:
+    """Today, where the people asking are: 'last week' and 'next month' are counted from it."""
+    import os
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    zone = os.environ.get("NOTIFY_TIMEZONE", "Europe/Rome")
+    now = datetime.now(ZoneInfo(zone))
+    return f"\n\nToday is {now.strftime('%A %d %B %Y')}, {now.strftime('%H:%M')} {zone}."
+
+
 SYSTEM = (
     "You answer questions about a facility's equipment and services, the work done on "
     "them, and their documentation, using only the tools provided.\n\n"
@@ -73,9 +83,12 @@ SYSTEM = (
     "tickets are the history (the same fault before, and a recent change on them, are the strongest evidence) "
     "and their documents are the runbooks; read the runbook with get_document. Also search_tickets without a "
     "state for the words of the report, for past faults and changes. 4) Answer with the likely cause and why, "
-    "the checks in order as the runbook gives them, where the part is (its `located in` chain), and whether "
+    "the checks in order as the runbook gives them, where the part is (where_is), and whether "
     "there is a spare (search_objects for a designated spare of the same kind) and who supports it. For an "
     "attack or a security incident, follow the incident procedure the documentation has, step by step.\n"
+    "For where something is — which rack, room, floor, building, \"show me X on the plan\" — use where_is; for where "
+    "it is with respect to other things (\"where is SC-DH1 relative to the UPSs\"), give those in relative_to and say "
+    "how far and which way. The page shows them on the floor plan with a button under the answer.\n"
     "Search tools match a query word by word: use the records' words (they are in English) and a few of them.\n\n"
     "For how to use ARGUS itself — how do I create a workspace, import, export, give a role, what does a "
     "screen do — use search_help, then read_help for the whole topic, and answer from the guide: give the "
@@ -267,7 +280,7 @@ def ask_events(db: Session, workspace_id: str, endpoint: Endpoint, question: str
     person to apply; `context` says what became of the ones proposed earlier in the conversation.
     """
     from app.services import ask_actions
-    system = SYSTEM + (ask_actions.SYSTEM if proposer else "") + (VOICE if voice else "")
+    system = SYSTEM + (ask_actions.SYSTEM if proposer else "") + (VOICE if voice else "") + _today()
     messages: list[dict[str, Any]] = [{"role": "system", "content": system}, *_history(history),
                                       *([{"role": "system", "content": context}] if context else []),
                                       {"role": "user", "content": question}]

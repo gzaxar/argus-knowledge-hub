@@ -140,7 +140,10 @@ def register_stream(db: Session, stream_id: str, workspace_id: str, kind: str, *
         stream = LedgerStream(id=stream_id, workspace_id=workspace_id, kind=kind, facility=facility,
                               may_create=list(may_create), created_at=now())
         db.add(stream)
-        db.add(StreamHead(stream_id=stream_id, parsed_number=0, published_number=0))
+        # A workspace deleted and made again with the same id (a demo installed again) finds its streams' heads
+        # still there, since the history they number is kept: the stream carries on from them.
+        if db.get(StreamHead, stream_id) is None:
+            db.add(StreamHead(stream_id=stream_id, parsed_number=0, published_number=0))
         db.flush()
     return stream
 
@@ -866,6 +869,10 @@ def _claims_for_subject(db: Session, uid: str) -> list[tuple[Claim, LedgerStream
     presence_cache: dict[str, dict] = {}
     for c in db.scalars(select(Claim).where(Claim.source_ref.in_(refs))):
         stream = db.get(LedgerStream, c.stream_id)
+        if stream is None:
+            # Its stream went with a workspace that was deleted (claims are kept, streams are the workspace's): it
+            # says nothing about a record made later with the same uid, as when a demo is installed again.
+            continue
         if c.stream_id not in presence_cache:
             head = db.get(StreamHead, c.stream_id)
             presence_cache[c.stream_id] = _presence(db, c.stream_id, head.published_number if head else 0)
@@ -1213,7 +1220,12 @@ def _write_edges(db: Session, uid: str, desired: set[tuple]) -> None:
     for key, row in current.items():
         if key not in desired:
             db.delete(row)
-    for rel, target in desired - set(current):
+    # The same edge already there in another form — derived from an attribute (`located in` from argus_location),
+    # or a row a bundle or an old import made — is not made a second time: a record whose first ledger fact
+    # arrives after it was loaded would otherwise show it twice.
+    elsewhere = {(r.relation_type, r.to_asset_uid) for r in db.scalars(
+        select(Relation).where(Relation.from_asset_uid == uid, Relation.derivation.is_distinct_from("ledger")))}
+    for rel, target in desired - set(current) - elsewhere:
         db.add(Relation(workspace_id=record.workspace_id, from_asset_uid=uid, to_asset_uid=target,
                         relation_type=rel, derivation="ledger", rule=PROJECTOR_VERSION))
     db.flush()
