@@ -1,7 +1,7 @@
 ---
 title: Importing data
 summary: Bringing equipment, tickets and documents in from EPIK8s, Jira, Confluence, DokuWiki, Git and Markdown; re-running imports, by hand or on a schedule; mapping imported records.
-keywords: [confluence authentication, source metadata, source version, file viewer, missing attachment, imported parent, published import, dokuwiki, wiki, wiki.infn.it, namespace, schedule, scheduled, nightly, every day, every week, run by itself, confluence page link, share link, short link, prerequisite, missing package, install the catalogue, import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
+keywords: [confluence contents, table of contents, section links, document owner, document status, table images, emoji, panel colours, confluence authentication, source metadata, source version, file viewer, missing attachment, imported parent, published import, dokuwiki, wiki, wiki.infn.it, namespace, schedule, scheduled, nightly, every day, every week, run by itself, confluence page link, share link, short link, prerequisite, missing package, install the catalogue, import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
 order: 50
 ---
 
@@ -169,6 +169,29 @@ Imported revisions arrive **Published** as copies of source material. This is no
 review/approval decision. Check the document's source, authority and applicability before treating it as a
 controlled operating instruction.
 
+## What the native Confluence import preserves
+
+The Confluence configuration on the workspace's **Imports** page reads the source page directly. This is
+separate from **Import from Confluence — ELI-NP** on the **New document** form, which reads a Markdown export
+and selected supporting files. The following behaviour applies to the native import:
+
+- **Contents and section links**: a supported table-of-contents macro becomes links to headings in the
+  imported body. Follow a few links after import, including nested sections where present. **Page hierarchy
+  links** in the run report counts parent/child document relationships, not these links within a page.
+- **Document owner**: source user mentions are resolved to display names where Confluence permits the
+  lookup. Multiple mentions in the Document owner field are separated with ` - `. An unresolved mention is
+  shown explicitly; check the run's user-lookup diagnostics rather than assuming the owner was blank.
+- **Document status**: a supported status macro keeps its text, such as `In progress`. An unwanted leading
+  `SET a STATUS` prompt is removed from the Document status table field. This source value is body content:
+  it does not set the ARGUS revision's Draft, In review or Published state, and an owner mention does not
+  assign an ARGUS reviewer or approver.
+- **Images in tables**: successfully copied images remain images inside table cells, with their captions
+  where supplied, instead of being reduced to filenames. Files that could not be copied still need attention.
+- **Icons and panels**: supported Confluence emoji and panel background/border colours are retained. Emoji
+  appearance depends on the device; custom remote emoji, avatars and application-specific macros are not
+  recreated. Panel content inside a Markdown table is retained, but its panel background is omitted to keep
+  the table valid. The result need not have exactly the same layout as Confluence.
+
 ## Check imported Confluence content and files
 
 1. Open a representative imported page in **Documents**, then **Open full document** if you need its complete
@@ -178,10 +201,14 @@ controlled operating instruction.
    source-space information and **From Confluence** when available.
 3. Check the summary against the body. A summary is introductory text, not a replacement for the complete
    source. A page with no introductory prose can have no summary; read the import's warnings.
-4. Open a sample image and linked PDF or other attachment. Supported Confluence file-viewer macros are
-   converted into attachment links; interactive source viewers are not copied as running applications.
-5. Check the run report for attachment-list, download, size-limit and conversion warnings. A page can import
-   while a file needs attention. Do not infer that every source file was copied from the job's completion alone.
+4. Follow the contents links where present and compare the Document owner and Document status fields with
+   the source. Distinguish the source's status text from the ARGUS revision state.
+5. Open a sample image inside a table, an image outside tables and a linked PDF or other attachment, where
+   present. Check captions too. Supported Confluence file-viewer macros become attachment links; interactive
+   source viewers are not copied as running applications.
+6. Check the run report for user-lookup, attachment-list, download, size-limit and conversion warnings. A page
+   can import while a field or file needs attention. Do not infer that every source file was copied from the
+   job's completion alone.
 
 Files copied into ARGUS use ARGUS attachment links and the document's normal access checks. Open them while
 signed in to ARGUS. A source-only link can still need Confluence access. If a link fails, distinguish these two
@@ -203,9 +230,16 @@ If only a subtree was imported, a parent outside that selection is not invented.
 usable parent appear under **Unfiled documents**; root WP overview pages follow the workspace's WP naming
 convention. See *Document hierarchy and subsystem pages*.
 
-Re-running an unchanged source page is not a general attachment-repair command: the version check can skip
-its content and files. If an older import has a broken file link or conversion, give an administrator its
-document code, source page, revision, filename and run warning so the appropriate repair can be assessed.
+Installing a conversion fix does not rewrite revisions that were already imported. Re-running an unchanged
+source page is not a general repair command: the version check can skip its content and files. Do not delete
+and re-import a document or change its source version just to force a repair.
+
+For an older import with missing contents, owner/status text, images or file links, give an administrator its
+document code, source page, revision, affected field or filename and run warning. Corrections to controlled
+local content belong in an editable draft followed by the normal review workflow. A status-prompt repair
+utility can clean that prompt in one existing editable draft; it does not restore missing images or names
+or modify a published revision. A revision in review or approved must first return to Draft through the
+normal workflow before that repair can run.
 
 ## Import DokuWiki pages
 
