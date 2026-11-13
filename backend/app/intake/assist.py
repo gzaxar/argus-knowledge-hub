@@ -74,7 +74,8 @@ ASSET_SYSTEM = COMMON + (
 TICKET_SYSTEM = COMMON + (
     "The input is a fault report or a request. Shape: {\"title\": <one line saying what is wrong>, "
     "\"type\": <one of the ticket types listed, or null>, \"occurred_at\": <ISO date or date-time the "
-    "problem happened, only if the text says it, or null>, \"occurred_precision\": <\"instant\", "
+    "problem happened, only if the text says it, or null; a relative time such as 'this morning', "
+    "'since last night' or 'yesterday' is counted from Now, given before the input>, \"occurred_precision\": <\"instant\", "
     "\"day\" or \"month\">, \"attributes\": {<attribute key>: <value>}, \"hypotheses\": [<possible "
     "causes the text suggests, as short sentences>], \"evidence\": {<field>: <quote>}, "
     "\"confidence\": {<field>: <number>}}\n"
@@ -491,6 +492,16 @@ def _ports(db: Session, workspace_id: str, data: dict, text: str, from_image: bo
 
 # --------------------------------------------------------------------------- tickets
 
+def _now_local() -> str:
+    """Today and the time where the reports are written, so 'this morning' becomes a date."""
+    import os
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    zone = os.environ.get("NOTIFY_TIMEZONE", "Europe/Rome")
+    now = datetime.now(ZoneInfo(zone))
+    return f"{now.strftime('%A')} {now.isoformat(timespec='minutes')} ({zone})"
+
+
 def assist_ticket(db: Session, workspace_id: str, actor: str, endpoint: Endpoint, *, text: str,
                   draft: Optional[dict] = None, grants=None, profile_id: Optional[str] = None,
                   file_refs: Optional[list] = None, trace: Optional[list] = None) -> dict:
@@ -507,7 +518,7 @@ def assist_ticket(db: Session, workspace_id: str, actor: str, endpoint: Endpoint
     menu = {k: a for k, a in _attribute_menu(db, chosen, base).items()
             if k not in ("argus_root_cause", "argus_corrective_action", "occurred_from", "occurred_until")}
     user = ("Ticket types:\n" + (", ".join(by_name) or "(none)") + "\n\nAttributes:\n" + _describe_menu(menu)
-            + f"\n\n<input>\n{clean}\n</input>")
+            + f"\n\nNow: {_now_local()}\n\n<input>\n{clean}\n</input>")
     refs, hashes = [{"kind": "text", "chars": len(clean)}] + (file_refs or []), [_sha(clean)]
     if trace is not None:
         trace.append(user)

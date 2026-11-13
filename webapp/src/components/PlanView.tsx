@@ -24,6 +24,14 @@ function Clicks({ height, onPick }: { height: number; onPick: (x: number, y: num
   return null;
 }
 
+/** [lo, hi] widened about its middle to at least half of `size`, then moved to lie inside 0..size. */
+export function span(lo: number, hi: number, size: number): [number, number] {
+  const want = Math.min(size, Math.max(hi - lo, size / 2));
+  const mid = (lo + hi) / 2;
+  const start = Math.min(Math.max(0, mid - want / 2), size - want);
+  return [start, start + want];
+}
+
 function Fit({ width, height, focus }: { width: number; height: number; focus?: { x: number; y: number }[] }) {
   const map = useMap();
   const key = (focus ?? []).map((p) => `${p.x},${p.y}`).join(";");
@@ -31,10 +39,12 @@ function Fit({ width, height, focus }: { width: number; height: number; focus?: 
     if (focus && focus.length > 0) {
       // Around the records looked for, with room to see what is next to them: a plan full of labels is unreadable
       // at its whole size.
+      // Never less than half the plan each way, so a single record still shows its room, its corner and its
+      // neighbours rather than filling the screen with its own label.
       const pad = Math.max(40, 0.12 * Math.max(width, height));
       const xs = focus.map((p) => p.x), ys = focus.map((p) => p.y);
-      const x0 = Math.max(0, Math.min(...xs) - pad), x1 = Math.min(width, Math.max(...xs) + pad);
-      const y0 = Math.max(0, Math.min(...ys) - pad), y1 = Math.min(height, Math.max(...ys) + pad);
+      const [x0, x1] = span(Math.min(...xs) - pad, Math.max(...xs) + pad, width);
+      const [y0, y1] = span(Math.min(...ys) - pad, Math.max(...ys) + pad, height);
       map.fitBounds([toLL(height, x0, y1), toLL(height, x1, y0)]);
     } else {
       map.fitBounds([[0, 0], [height, width]]);

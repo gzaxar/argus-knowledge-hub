@@ -79,7 +79,7 @@ function WorkflowCard({ wf, onChanged, builtin = false }: { wf: WorkflowDef; onC
           {wf.is_default && !builtin && <span className="ml-2 text-xs font-normal text-emerald-700">workspace default</span>}
         </span>
       }
-      action={wf.source ? <span className="text-xs text-slate-400">from {String((wf.source as { system?: string }).system)}</span> : undefined}
+      action={sourceOf(wf.source) ? <span className="text-xs text-slate-400">from {sourceOf(wf.source)}</span> : undefined}
     >
       <ol className="flex flex-wrap items-center gap-1.5 py-2">
         {wf.states.map((s, i) => (
@@ -156,4 +156,12 @@ function RehearsalReport({ r }: { r: Rehearsal }) {
       ))}
     </div>
   );
+}
+
+/** Where a workflow came from: an import ("jira") or a package ("the it package, 1.1.0"). */
+function sourceOf(source: unknown): string | null {
+  const s = (source ?? {}) as { system?: string; package?: string; version?: string };
+  if (s.system) return s.system;
+  if (s.package) return `the ${s.package} package${s.version ? `, ${s.version}` : ""}`;
+  return null;
 }

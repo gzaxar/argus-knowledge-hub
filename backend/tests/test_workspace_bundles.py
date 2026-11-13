@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import inspect as sa_inspect, select
+from sqlalchemy import func, inspect as sa_inspect, select
 
 from app.auth import OidcIdentity, get_identity
 from app.bundle import core, registry
@@ -198,10 +198,20 @@ def test_a_demo_round_trips(name, tmp_path):
         assert core.verify(core.read(out)) == []
         assert m["missing_files"] == []
         source = core.read(DEMOS / name).manifest
+        # The demo's replayed provenance (manifest demo.provenance) can add the edges a record's first ledger facts
+        # imply (`instance of` from its product model): exported, they are rows like any other.
+        from app.models.asset import Relation
+        db = SessionLocal()
+        projected = db.scalar(select(func.count()).select_from(Relation).where(
+            Relation.workspace_id == first, Relation.derivation == "ledger"))
+        db.close()
+        projected -= sum(1 for line in (DEMOS / name / "records" / "relations.jsonl").read_text().splitlines()
+                         if line.strip() and json.loads(line).get("derivation") == "ledger")
         for fam, meta in source["families"].items():
             if fam not in ("people", "icons", "types", "workspace_packages", "ticket_workflows", "roles", "global_values",
                            "memberships"):
-                assert m["families"].get(fam, {}).get("rows", 0) == meta["rows"], fam
+                extra = projected if fam == "relations" else 0
+                assert m["families"].get(fam, {}).get("rows", 0) == meta["rows"] + extra, fam
         zip_path = core.zip_dir(out, tmp_path / "rt.zip")
         unpacked = core.unpack(zip_path, tmp_path / "unpacked")
         view = _apply(unpacked, second, tmp_path)
@@ -638,10 +648,20 @@ def test_in_the_it_demo_ask_finds_the_history_from_the_words_of_a_report(tmp_pat
         try:
             found = search_tickets(db, ws, "Wi-Fi reading room south-west corner no connection")
             assert found["tickets"][0]["title"] == "Reading hall, south-west corner: no Wi-Fi", found["tickets"][:3]
-            assert {t["state"] for t in search_tickets(db, ws, "Wi-Fi", state="open")["tickets"]} <= {
-                "new", "in_progress", "pending"}
+            assert not {t["state"] for t in search_tickets(db, ws, "Wi-Fi", state="open")["tickets"]} & {
+                "resolved", "closed"}
             assert search_tickets(db, ws, "Wi-Fi", state="open")["total"] >= 1
             assert search_tickets(db, ws, "zebra giraffe unicorn")["total"] == 0
+            library = {t["title"] for t in search_tickets(db, ws, "library wifi")["tickets"]}
+            assert "Library Wi-Fi drops in the reading hall" in library, library           # wifi finds Wi-Fi
+            open_changes = {t["title"] for t in search_tickets(db, ws, "core switch firmware", state="open")["tickets"]}
+            assert "Core switch firmware upgrade 10.4 → 10.6" in open_changes, "a change assessed is open"
+            high = search_tickets(db, ws, state="open", priority="high")["tickets"]
+            assert high and all(t["priority"] == "high" for t in high), high
+            wifi = next(t for t in high if t["title"] == "Reading hall, south-west corner: no Wi-Fi")
+            assert wifi["on"] == "NF-AP-LIB-03" and wifi["on_name"], "the equipment comes with the list"
+            done = {t["title"] for t in search_tickets(db, ws, "core switch firmware", state="done")["tickets"]}
+            assert "Core switch firmware upgrade 10.4 → 10.6" not in done
             report = get_ticket(db, ws, found["tickets"][0]["key"])
             assert any("LIB-03" in c["body"] for c in report["comments"]), "the diagnosis is in the comments"
 
@@ -780,6 +800,77 @@ def test_in_the_linac_demo_the_failure_model_answers_the_three_troubleshooting_s
             waist = [v.optics for v in db.scalars(select(BeamModelValue).where(BeamModelValue.dataset_uid == tb))
                      if v.optics and abs(v.optics.get("alfx", 9)) < 0.2 and abs(v.optics.get("betx", 0) - 2.45) < 0.1]
             assert waist, "the test beam waist at SCR02 is in the dataset"
+        finally:
+            db.close()
+    finally:
+        _drop(ws)
+
+
+@pytest.mark.parametrize("bundle", sorted(p.name for p in (Path(__file__).resolve().parents[1] / "demo_workspaces").iterdir()
+                                          if (p / "records" / "tickets.jsonl").exists()))
+def test_every_demo_ticket_is_in_a_state_its_workflow_has(bundle):
+    """A ticket in a state its workflow does not know shows "No move is possible from here" on stage."""
+    records = Path(__file__).resolve().parents[1] / "demo_workspaces" / bundle / "records"
+    rows = lambda name: [json.loads(l) for l in (records / name).read_text().splitlines() if l.strip()]  # noqa: E731
+    flows = {w["uid"]: w for w in rows("ticket_workflows.jsonl")} if (records / "ticket_workflows.jsonl").exists() else {}
+    types = {t["uid"]: t for t in rows("types.jsonl")}
+    default = next((w for w in flows.values() if w.get("is_default")), None)
+
+    def flow_of(uid):
+        seen = set()
+        while uid and uid not in seen:
+            seen.add(uid)
+            t = types.get(uid) or {}
+            if (t.get("metadata") or {}).get("workflow_uid") in flows:
+                return flows[t["metadata"]["workflow_uid"]]
+            uid = t.get("parent_schema_uid")
+        return default
+
+    wrong = []
+    for t in rows("tickets.jsonl"):
+        wf = flow_of(t.get("schema_uid"))
+        if wf is not None and t["state"] not in {s["key"] for s in wf["states"]}:
+            wrong.append((t["uid"], t["state"], wf["name"]))
+    assert not wrong, wrong
+
+
+def test_in_the_it_demo_glpi_and_a_technician_disagree_and_both_are_kept(tmp_path):
+    """Ledger facts are never copied by a bundle; the demo replays its story instead: GLPI lists LIB-02's old unit,
+    the technician records the replacement, GLPI's next reading still has the old one. The record shows the
+    technician's values, both sources stay, and the two differences wait in the review queue."""
+    from app.models.asset import Asset, Relation
+    from app.models.ledger import Claim, Conflict, LedgerStream
+    ws = f"it-prov-{secrets.token_hex(3)}"
+    try:
+        assert _apply(DEMOS / "it-services", ws, tmp_path)["ok"]
+        db = SessionLocal()
+        try:
+            ap = db.scalar(select(Asset).where(Asset.workspace_id == ws, Asset.name == "Access point LIB-02"))
+            assert (ap.attributes["serial"], ap.attributes["installed_on"]) == ("SYN92604956", "2026-10-15")
+            assert ap.attributes["hostname"] == "ap-lib-02", "the values no source spoke about are untouched"
+            streams = {s.id.rsplit("@", 1)[0] for s in db.scalars(select(LedgerStream).join(
+                Claim, Claim.stream_id == LedgerStream.id).where(Claim.source_ref == f"uid:{ap.uid}"))}
+            assert streams == {"glpi:northfield", "person:teo.lindqvist@northfield-it.example"}, streams
+            open_ = {c.predicate for c in db.scalars(select(Conflict).where(
+                Conflict.subject_uid == ap.uid, Conflict.conflict_type == "source_vs_confirmed"))}
+            assert open_ == {"attr:serial", "attr:installed_on"}, open_
+            located = [r for r in db.scalars(select(Relation).where(
+                Relation.from_asset_uid == ap.uid, Relation.relation_type == "located in"))]
+            assert len(located) == 1, "the first ledger fact does not make the room a second time"
+        finally:
+            db.close()
+        _drop(ws)
+        # Deleted and installed again, as a demo is before an event: the earlier install's facts stay behind
+        # with their streams gone, and the new one replays as cleanly.
+        again = _apply(DEMOS / "it-services", ws, tmp_path)
+        assert again["ok"], again["blockers"]
+        db = SessionLocal()
+        try:
+            ap = db.scalar(select(Asset).where(Asset.workspace_id == ws, Asset.name == "Access point LIB-02"))
+            assert (ap.attributes["serial"], ap.attributes["installed_on"]) == ("SYN92604956", "2026-10-15")
+            assert {c.predicate for c in db.scalars(select(Conflict).where(
+                Conflict.subject_uid == ap.uid, Conflict.conflict_type == "source_vs_confirmed"))} == {
+                "attr:serial", "attr:installed_on"}
         finally:
             db.close()
     finally:

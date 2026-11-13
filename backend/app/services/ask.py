@@ -51,6 +51,16 @@ def _answer_of(message: dict) -> str:
         text = UNCLOSED_THINK.sub("", text)
     return text.strip()
 
+def _today() -> str:
+    """Today, where the people asking are: 'last week' and 'next month' are counted from it."""
+    import os
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    zone = os.environ.get("NOTIFY_TIMEZONE", "Europe/Rome")
+    now = datetime.now(ZoneInfo(zone))
+    return f"\n\nToday is {now.strftime('%A %d %B %Y')}, {now.strftime('%H:%M')} {zone}."
+
+
 SYSTEM = (
     "You answer questions about a facility's equipment and services, the work done on "
     "them, and their documentation, using only the tools provided.\n\n"
@@ -270,7 +280,7 @@ def ask_events(db: Session, workspace_id: str, endpoint: Endpoint, question: str
     person to apply; `context` says what became of the ones proposed earlier in the conversation.
     """
     from app.services import ask_actions
-    system = SYSTEM + (ask_actions.SYSTEM if proposer else "") + (VOICE if voice else "")
+    system = SYSTEM + (ask_actions.SYSTEM if proposer else "") + (VOICE if voice else "") + _today()
     messages: list[dict[str, Any]] = [{"role": "system", "content": system}, *_history(history),
                                       *([{"role": "system", "content": context}] if context else []),
                                       {"role": "user", "content": question}]

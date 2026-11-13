@@ -670,7 +670,7 @@ ticket("vl-t-019", "Goods Receipt", "closed", "low", "Goods receipt: two Moxa NP
        "Two Moxa NPort 5650-8 delivered; one installed as VL-MOXA-01, one kept as spare VL-MOXA-SPARE (synthetic).",
        "vl-moxa-spare", "2026-02-24T10:00:00+00:00", "vl-u-noor", "vl-u-amira", "2026-02-24T15:00:00+00:00",
        comments=[("vl-u-amira", "Checked against PO-2026-0412; inventory numbers VL-INV-0412-01 and -02 assigned.")])
-ticket("vl-t-020", "Procurement Request", "new", "medium", "Second spare thyratron for the modulators",
+ticket("vl-t-020", "Procurement Request", "submitted", "medium", "Second spare thyratron for the modulators",
        "After the August trips and the 2026 run plan, a second spare thyratron is requested (budget line RF; quote "
        "SRF-Q-26-0921, EUR 18,900) (synthetic).", "vl-sp-thy-01", "2026-11-05T09:30:00+00:00", "vl-u-amira",
        "vl-u-jonas")
@@ -682,7 +682,7 @@ ticket("vl-t-022", "Service Request", "in_progress", "high", "Test beam TB-2026-
        "vl-unit-scr02" if db.get(Asset, "vl-unit-scr02") else None, "2026-10-28T11:00:00+00:00", "vl-u-elena",
        "vl-u-elena", comments=[("vl-u-elena", "Optics matched with MAD-X (VL-TB-001); magnet set ready as a "
                                               "proposal through the beamline MCP server.")])
-ticket("vl-t-023", "Radiation Work Permit", "pending", "high", "Radiation work permit: test beam TB-2026-11",
+ticket("vl-t-023", "Radiation Work Permit", "under_review", "high", "Radiation work permit: test beam TB-2026-11",
        "Work under beam for TB-2026-11; conditions in VL-RP-001 (synthetic).", "vl-ra-bunker",
        "2026-11-07T09:00:00+00:00", "vl-u-amira", "vl-u-elena")
 ticket("vl-t-024", "Incident", "closed", "medium", "Archiver nightly backup to the Campus Data Centre failed",

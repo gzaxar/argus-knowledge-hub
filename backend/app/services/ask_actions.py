@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.ask_conversation import AskAction
@@ -25,14 +25,14 @@ from app.models.asset import Asset, Relation
 from app.models.schema import Schema
 
 # What each kind of change needs, as the forms would.
-PERMISSION = {"create": "create", "update": "modify", "relate": "create", "unrelate": "delete",
+PERMISSION = {"create": "create", "update": "modify", "relate": "create", "unrelate": "delete", "ticket": "create",
               # Leaves ARGUS: a person who may approve in this workspace, signed in, never an API token.
               "pull_request": "approve"}
 SKIPPED_ATTRIBUTES = ("argus_source", "argus_facility")
 
 SYSTEM = (
     "\n\nYou may also propose changes, but only when the person asks for one: propose_create_record, "
-    "propose_update_record and propose_relation. A proposal changes nothing: it is shown to the person, who "
+    "propose_update_record, propose_relation, and propose_ticket to open a ticket. A proposal changes nothing: it is shown to the person, who "
     "applies or discards it. Never say a change was made; say it is proposed and waits for their confirmation. "
     "Look the records up first and use their keys — also as the value of an attribute that refers to a record "
     "(where a unit is: its Located in, the argus_location attribute, takes a Location's key). "
@@ -92,6 +92,21 @@ def tool_specs() -> list[dict]:
                 "remove": {"type": "boolean"},
                 "reason": {"type": "string"},
             }, "required": ["from", "relation_type", "to"]}}},
+        {"type": "function", "function": {
+            "name": "propose_ticket",
+            "description": "Propose opening a ticket — a fault, a request, a change, maintenance — on an object. "
+                           "Changes nothing until the person confirms. The type is one of this workspace's ticket "
+                           "types (an unknown one is refused with the list); a date the person gives as 'next "
+                           "month' or 'tomorrow' is counted from today, given in your instructions.",
+            "parameters": {"type": "object", "properties": {
+                "title": {"type": "string"},
+                "type": {"type": "string", "description": "A ticket type of this workspace, e.g. Change."},
+                "object": {"type": "string", "description": "The object it is about: its key or uid."},
+                "description": {"type": "string"},
+                "priority": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                "due_date": {"type": "string", "description": "YYYY-MM-DD, when it is wanted by."},
+                "reason": {"type": "string"},
+            }, "required": ["title"]}}},
     ] + _pull_request_specs()
 
 
@@ -122,7 +137,8 @@ def _pull_request_specs() -> list[dict]:
         }, "required": ["repository", "title", "files"]}}}]
 
 
-TOOL_NAMES = {"propose_create_record", "propose_update_record", "propose_relation", "propose_ioc_pull_request"}
+TOOL_NAMES = {"propose_create_record", "propose_update_record", "propose_relation", "propose_ioc_pull_request",
+              "propose_ticket"}
 
 
 class Refused(ValueError):
@@ -272,7 +288,8 @@ class Proposer:
 
     def __call__(self, name: str, arguments: dict) -> dict:
         handler = {"propose_create_record": self._create, "propose_update_record": self._update,
-                   "propose_relation": self._relation, "propose_ioc_pull_request": self._pull_request}[name]
+                   "propose_relation": self._relation, "propose_ioc_pull_request": self._pull_request,
+                   "propose_ticket": self._ticket}[name]
         kind, payload, summary = handler(arguments or {})
         number = (self.db.scalar(select(AskAction.number).where(AskAction.conversation_id == self.conversation_id)
                                  .order_by(AskAction.number.desc()).limit(1)) or 0) + 1
@@ -328,6 +345,42 @@ class Proposer:
             f"{k} → {'(cleared)' if v is None else _shown(self.db, v)}" for k, v in attributes.items()]
         return "update", {"uid": asset.uid, "key": asset.key, "name": name, "attributes": attributes}, \
             f"Update {asset.key}: " + ", ".join(parts)
+
+    def _ticket(self, a: dict) -> tuple[str, dict, str]:
+        from datetime import date
+        title = str(a.get("title") or "").strip()
+        if not title:
+            raise Refused("a ticket needs a title")
+        kinds = {s.name.lower(): s for s in self.db.scalars(select(Schema).where(
+            Schema.applies_to == "tickets", or_(Schema.workspace_id == self.workspace_id, Schema.is_global.is_(True))))}
+        wanted = str(a.get("type") or "").strip().lower()
+        schema = kinds.get(wanted) if wanted else None
+        if wanted and schema is None:
+            raise Refused(f"there is no ticket type {a.get('type')!r} here; the types are: "
+                          + ", ".join(sorted(s.name for s in kinds.values())))
+        asset = None
+        if a.get("object"):
+            asset = self._existing(str(a["object"]))
+            if asset is None:
+                raise Refused(f"no object {a['object']!r} here: look it up and use its key")
+        priority = str(a.get("priority") or "").strip().lower() or None
+        if priority and priority not in ("low", "medium", "high", "critical"):
+            raise Refused("priority is one of low, medium, high, critical")
+        due = str(a.get("due_date") or "").strip() or None
+        if due:
+            try:
+                due = date.fromisoformat(due[:10]).isoformat()
+            except ValueError:
+                raise Refused("due_date is a date written YYYY-MM-DD")
+        payload = {"title": title[:300], "schema_uid": schema.uid if schema else None,
+                   "type": schema.name if schema else None, "asset_uid": asset.uid if asset else None,
+                   "asset_key": asset.key if asset else None,
+                   "description": str(a.get("description") or "").strip() or None, "priority": priority,
+                   "due_date": due}
+        summary = (f"Open {schema.name if schema else 'a ticket'} “{title}”"
+                   + (f" on {asset.key}" if asset else "") + (f", {priority} priority" if priority else "")
+                   + (f", wanted by {due}" if due else ""))
+        return "ticket", payload, summary
 
     def _pull_request(self, a: dict) -> tuple[str, dict, str]:
         from app.ioc_engineer import pull_requests
@@ -443,7 +496,8 @@ def _permitted(db: Session, identity, workspace_id: str, kind: str) -> bool:
     if not isinstance(identity, OidcIdentity):
         # A token's scope was checked when it reached the workspace; but only a person opens a pull request.
         return kind != "pull_request"
-    return resolve_permission(db, identity.user, workspace_id, PERMISSION[kind], "objects")
+    return resolve_permission(db, identity.user, workspace_id, PERMISSION[kind],
+                              "tickets" if kind == "ticket" else "objects")
 
 
 def _execute(db: Session, identity, workspace_id: str, action: AskAction) -> dict:
@@ -459,6 +513,17 @@ def _execute(db: Session, identity, workspace_id: str, action: AskAction) -> dic
             return pull_requests.open_pull_request(p, actor, prior_models(db, action.conversation_id, action.number))
         except pull_requests.Refused as e:
             raise HTTPException(status_code=422, detail=str(e))
+    if action.kind == "ticket":
+        from datetime import datetime as _dt
+        from app.routers import issues
+        from app.schemas.issue import IssueCreate
+        issue = issues.create_issue(
+            IssueCreate(uid=str(uuid.uuid4()), asset_uid=p.get("asset_uid"), schema_uid=p.get("schema_uid"),
+                        title=p["title"], description=p.get("description"), priority=p.get("priority"),
+                        due_date=_dt.fromisoformat(p["due_date"]) if p.get("due_date") else None,
+                        created_by=str(user_id) if user_id else None),
+            workspace_id=workspace_id, current_user_id=user_id, db=db, x_argus_client=None)
+        return {"uid": issue.uid, "key": issue.key, "name": issue.title}
     if action.kind == "create":
         asset = forms.create_asset(
             AssetCreate(uid=str(uuid.uuid4()), schema_uid=p["schema_uid"], key=p.get("key"), name=p["name"],

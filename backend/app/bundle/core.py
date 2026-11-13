@@ -744,6 +744,8 @@ def _load(db: Session, b: Bundle, rep: Report, new_ws: str, name: str, actor: Op
     derive_all(db, [new_ws])
     db.flush()
     rep.dependencies = _check_dependencies(db, b, ids)
+    if (b.manifest.get("demo") or {}).get("provenance"):
+        _replay_provenance(db, new_ws, ids.deep(b.manifest["demo"]["provenance"]))
     if b.manifest.get("demo"):
         from app.models.app_setting import AppSetting
         key = f"demo.tour.{new_ws}"
@@ -753,6 +755,43 @@ def _load(db: Session, b: Bundle, rep: Report, new_ws: str, name: str, actor: Op
             db.add(AppSetting(key=key, value=tour))
         else:
             row.value = tour
+        db.flush()
+
+
+def _replay_provenance(db: Session, workspace_id: str, spec: dict) -> None:
+    """A demo's sources and people, replayed through the ledger in order, as they would have happened: a source's
+    dated readings (`observed_at`, its statements about records) and a person's edits. Ledger facts are never
+    copied by a bundle (they are this installation's own); a demo that wants to show where a value came from, and
+    two sources disagreeing, says so here and the facts are made anew."""
+    import hashlib
+    from app.ledger import engine, service
+    from app.ledger.policy import DEFAULT_POLICY
+    from app.models.ledger import LedgerPolicy
+    streams = {}
+    for src in spec.get("sources") or []:
+        sid = f"{src['id']}@{workspace_id}"
+        engine.register_stream(db, sid, workspace_id, src.get("kind") or "import", may_create=[])
+        streams[src["id"]] = sid
+    if streams:
+        # A stream the active policy does not know keeps its statements pending: the policy is activated again,
+        # unchanged, with them in its vocabulary — as an import does for its own streams.
+        current = db.scalar(select(LedgerPolicy).order_by(LedgerPolicy.activated_at.desc()).limit(1))
+        admitted = set(((current.vocabulary or {}).get("streams") or []) if current else [])
+        if not set(streams.values()) <= admitted:
+            engine.activate_policy(db, json.loads(json.dumps(current.body if current else DEFAULT_POLICY)),
+                                   actor="workspace bundle")
+    for step in spec.get("steps") or []:
+        if "source" in step:
+            claims = [{"source_ref": f"uid:{c['record']}", "predicate": c["predicate"], "value": c.get("value"),
+                       "rule_id": c.get("rule") or "demo.reading/1", "evidence": c.get("evidence")}
+                      for c in step.get("claims") or []]
+            content = json.dumps(claims, sort_keys=True).encode()
+            engine.ingest(db, streams[step["source"]], revision=hashlib.sha256(content).hexdigest()[:16],
+                          content=content, observed_at=step["observed_at"], parser="resolved",
+                          cause=step.get("cause") or "demo reading")
+        elif "person" in step:
+            service.edit_values(db, workspace_id, step["person"], step["record"], dict(step["changes"]),
+                                reason=step.get("reason"))
         db.flush()
 
 

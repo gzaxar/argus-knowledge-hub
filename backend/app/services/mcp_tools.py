@@ -16,7 +16,7 @@ import re
 from collections import Counter
 from typing import Any, Callable, Optional
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.asset import Asset, Relation
@@ -98,6 +98,7 @@ def _issue_summary(issue: Issue, asset: Optional[Asset] = None) -> dict:
         "key": issue.key,
         "title": issue.title,
         "state": issue.state,
+        "priority": issue.priority,
         "created": issue.created_at.date().isoformat() if issue.created_at else None,
         "source_key": attributes.get("argus_source_key"),
         "category": attributes.get("argus_category"),
@@ -105,6 +106,7 @@ def _issue_summary(issue: Issue, asset: Optional[Asset] = None) -> dict:
     }
     if asset is not None and can_see(asset):
         out["on"] = asset.key or asset.uid
+        out["on_name"] = asset.name
     return out
 
 
@@ -368,7 +370,10 @@ def _text_score(needle: str, *texts: str) -> int:
     if needle in haystack:
         return 1000
     words = _search_words(needle)
-    found = sum(1 for w in words if w in haystack or _singular(w) in haystack)
+    # "wifi" finds "Wi-Fi" and "e-mail" finds "email": hyphens are not part of a word people search for.
+    joined = haystack.replace("-", "")
+    found = sum(1 for w in words if any(v in h for v in {w, _singular(w), w.replace("-", "")}
+                                        for h in (haystack, joined)))
     # One word in five is chance; two of a short query, or a third of a long one, is a match.
     return found if words and found >= max(1, min(2, len(words)), -(-len(words) // 3)) else 0
 
@@ -382,6 +387,19 @@ _STATE_GROUPS = {
     "finished": ("resolved", "closed"),
     "past": ("resolved", "closed"),
 }
+
+
+def _is_done(db: Session, workspace_id: str, issue: Issue) -> bool:
+    """Resolved or finished, in the ticket's own workflow (resolved counts as done here, as it always has)."""
+    from app.services import workflows
+    if issue.state in ("resolved", "closed"):
+        return True
+    try:
+        wf = workflows.workflow_for(db, workspace_id, issue.schema_uid)
+        st = workflows.state_of(wf, issue.state) if wf else None
+    except Exception:  # noqa: BLE001 — no workflow to ask: only the built-in names say done
+        st = None
+    return bool(st and st.get("category") == "done")
 
 
 def _find_asset(db: Session, workspace_id: str, uid_or_key: str) -> Optional[Asset]:
@@ -450,18 +468,27 @@ def where_is(db: Session, workspace_id: str, uid_or_key: str, relative_to: Optio
 
 
 def search_tickets(db: Session, workspace_id: str, query: str = "",
-                   state: Optional[str] = None, limit: int = DEFAULT_LIMIT) -> dict:
+                   state: Optional[str] = None, limit: int = DEFAULT_LIMIT, priority: Optional[str] = None) -> dict:
     """Work: faults, maintenance, requests. A query of several words matches tickets with most of them,
-    best first; `state` is a ticket state, or "open" (not yet resolved) or "done" (resolved or closed)."""
+    best first; `state` is a ticket state, or "open" (not yet resolved) or "done" (resolved or closed);
+    `priority` one of low, medium, high, critical. Each ticket comes with its priority and its equipment, so a
+    list needs no ticket opened one by one."""
     needle = (query or "").strip().lower()
     stmt = select(Issue).where(Issue.workspace_id == workspace_id, visible_issues_clause(),
                                Issue.deleted_at.is_(None))
-    if state:
-        wanted = _STATE_GROUPS.get(state.strip().lower(), (state.strip().lower(),))
-        stmt = stmt.where(Issue.state.in_(wanted))
+    group = _STATE_GROUPS.get((state or "").strip().lower())
+    if state and group is None:
+        stmt = stmt.where(Issue.state == state.strip().lower())
+    if priority and priority.strip():
+        stmt = stmt.where(func.lower(Issue.priority) == priority.strip().lower())
     issues = list(db.scalars(stmt))
+    if group is not None:
+        # By what the state means in the ticket's own workflow: a change "assessed" or a permit "under review"
+        # is as open as an incident "in progress".
+        done = group == _STATE_GROUPS["done"]
+        issues = [i for i in issues if _is_done(db, workspace_id, i) == done]
     on = {a.uid: a for a in db.scalars(select(Asset).where(
-        Asset.uid.in_({i.asset_uid for i in issues if i.asset_uid})))} if needle else {}
+        Asset.uid.in_({i.asset_uid for i in issues if i.asset_uid})))}
     scored = []
     for i in issues:
         asset = on.get(i.asset_uid)
@@ -872,6 +899,7 @@ TOOLS: list[dict[str, Any]] = [
                 "query": {"type": "string"},
                 "state": {"type": "string", "description": "new | in_progress | pending | resolved | closed, "
                           "or open (not yet resolved) or done (resolved or closed)"},
+                "priority": {"type": "string", "description": "low | medium | high | critical"},
                 "limit": {"type": "integer"},
             },
         },

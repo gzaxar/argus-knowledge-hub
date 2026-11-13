@@ -5,6 +5,107 @@
     "description": "A medium-sized IT organisation: a service catalogue (network, internet, Wi-Fi, mail, DNS, hosting, storage, backup, monitoring, service desk, VPN, HPC, LLM inference), three buildings with floors, rooms and racks, a GPU cluster for HPC and LLM inference, user workstations, a port-to-port network map, a cooling control process reaching its units through a serial converter, mapped and placed equipment, dependencies, incidents, requests and changes, maintenance activities, runbooks, contracts and SLAs.",
     "notice": "Synthetic demo: Northfield IT Services, its people, suppliers, addresses and figures are fictional. Nothing here describes a real organisation or real equipment.",
     "organisation": "Northfield IT Services (fictional)",
+    "provenance": {
+      "about": "Access point LIB-02 was replaced on 15 October; GLPI still lists the unit returned under RMA. The Provenance tab shows both sources, and the Review queue the two values they disagree on.",
+      "sources": [
+        {
+          "id": "glpi:northfield",
+          "kind": "glpi",
+          "label": "GLPI (Northfield, synthetic)"
+        }
+      ],
+      "steps": [
+        {
+          "cause": "GLPI import",
+          "claims": [
+            {
+              "evidence": {
+                "id": 412,
+                "itemtype": "NetworkEquipment",
+                "url": "https://glpi.northfield-it.example/front/networkequipment.form.php?id=412"
+              },
+              "predicate": "attr:serial",
+              "record": "nf-ap-lib-02",
+              "rule": "glpi.record/1",
+              "value": "SYN92601188"
+            },
+            {
+              "evidence": {
+                "id": 412,
+                "itemtype": "NetworkEquipment",
+                "url": "https://glpi.northfield-it.example/front/networkequipment.form.php?id=412"
+              },
+              "predicate": "attr:installed_on",
+              "record": "nf-ap-lib-02",
+              "rule": "glpi.record/1",
+              "value": "2024-05-10"
+            },
+            {
+              "evidence": {
+                "id": 412,
+                "itemtype": "NetworkEquipment",
+                "url": "https://glpi.northfield-it.example/front/networkequipment.form.php?id=412"
+              },
+              "predicate": "attr:condition",
+              "record": "nf-ap-lib-02",
+              "rule": "glpi.record/1",
+              "value": "good"
+            }
+          ],
+          "observed_at": "2026-09-01T06:00:00+02:00",
+          "source": "glpi:northfield"
+        },
+        {
+          "changes": {
+            "attr:installed_on": "2026-10-15",
+            "attr:serial": "SYN92604956"
+          },
+          "person": "teo.lindqvist@northfield-it.example",
+          "reason": "AP replaced after repeated reboots; old unit returned under RMA (IT-SERVICES ticket on LIB-02)",
+          "record": "nf-ap-lib-02"
+        },
+        {
+          "cause": "GLPI import",
+          "claims": [
+            {
+              "evidence": {
+                "id": 412,
+                "itemtype": "NetworkEquipment",
+                "url": "https://glpi.northfield-it.example/front/networkequipment.form.php?id=412"
+              },
+              "predicate": "attr:serial",
+              "record": "nf-ap-lib-02",
+              "rule": "glpi.record/1",
+              "value": "SYN92601188"
+            },
+            {
+              "evidence": {
+                "id": 412,
+                "itemtype": "NetworkEquipment",
+                "url": "https://glpi.northfield-it.example/front/networkequipment.form.php?id=412"
+              },
+              "predicate": "attr:installed_on",
+              "record": "nf-ap-lib-02",
+              "rule": "glpi.record/1",
+              "value": "2024-05-10"
+            },
+            {
+              "evidence": {
+                "id": 412,
+                "itemtype": "NetworkEquipment",
+                "url": "https://glpi.northfield-it.example/front/networkequipment.form.php?id=412"
+              },
+              "predicate": "attr:condition",
+              "record": "nf-ap-lib-02",
+              "rule": "glpi.record/1",
+              "value": "good"
+            }
+          ],
+          "observed_at": "2026-11-12T06:00:00+01:00",
+          "source": "glpi:northfield"
+        }
+      ]
+    },
     "steps": [
       {
         "link": "/map",
@@ -316,7 +417,7 @@
     "tickets": {
       "file": "records/tickets.jsonl",
       "rows": 24,
-      "sha256": "67550dddd306f5cdfe029129e6aeb9c2690441e13be4f9c5751a8a7d81185075"
+      "sha256": "7e60436795cb5dc2392b948d82c4166532c5b966f5995fb888b77663b567e037"
     },
     "types": {
       "file": "records/types.jsonl",
@@ -922,8 +1023,8 @@
     },
     {
       "path": "records/tickets.jsonl",
-      "sha256": "67550dddd306f5cdfe029129e6aeb9c2690441e13be4f9c5751a8a7d81185075",
-      "size": 16683
+      "sha256": "7e60436795cb5dc2392b948d82c4166532c5b966f5995fb888b77663b567e037",
+      "size": 16690
     },
     {
       "path": "records/types.jsonl",

@@ -75,8 +75,8 @@ def world(monkeypatch):
     document(other, "PROC-3", "Private camera notes", "Camera ion pump calibration secrets.")
     document(ws, "PROC-4", "Confidential incident", "The ion pump exploded because of operator error.",
              confidentiality="riservato")
-    db.add(Issue(uid=f"{ws}-t1", workspace_id=ws, title="GUNSIP01 trips", description="The ion pump trips on start.",
-                 attributes={"argus_root_cause": "A failed HV cable."}))
+    db.add(Issue(uid=f"{ws}-t1", workspace_id=ws, key=f"{ws.upper()}-TCK-0007", title="GUNSIP01 trips",
+                 description="The ion pump trips on start.", attributes={"argus_root_cause": "A failed HV cable."}))
     db.add(Issue(uid=f"{ws}-t2", workspace_id=ws, title="Restricted fault", description="Ion pump sabotage.",
                  attributes={"classification": "restricted:security"}))
     db.flush()
@@ -136,6 +136,8 @@ def test_a_question_in_other_words_finds_the_passage(world):
     assert top["kind"] == "document" and top["title"].endswith("Ion pump replacement") and top["where"] == "Replace"
     manual = find(world, "TPG 366 interlock relay")["results"][0]
     assert manual["kind"] == "attachment" and manual["record"]["key"] == f"{world['ws'].upper()}:SIP01"
+    ticket = next(r for r in find(world, "ion pump trips on start", limit=20)["results"] if r["kind"] == "ticket")
+    assert ticket["record"]["key"] == f"{world['ws'].upper()}-TCK-0007"     # cited as people know it, not guessed
 
 
 def test_only_what_the_asker_may_read_is_returned(world):
@@ -288,3 +290,12 @@ def test_a_documents_summary_is_indexed_before_its_body():
     finally:
         db.rollback()
         db.close()
+
+
+def test_a_nul_byte_from_an_extracted_file_does_not_stop_the_run(world, monkeypatch):
+    """Some PDFs and old Word files carry NUL bytes, which PostgreSQL text refuses: the run once stopped there for
+    a whole workspace."""
+    real = ki._chunks
+    monkeypatch.setattr(ki, "_chunks", lambda parts: [(loc, body.replace(" ", " \x00", 1)) for loc, body in real(parts)])
+    out = run(world)
+    assert out["indexed"] == 6 and not out.get("failed"), out                # PostgreSQL took every passage

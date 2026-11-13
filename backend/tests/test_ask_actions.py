@@ -126,6 +126,41 @@ def test_proposed_changes_wait_for_the_person_and_then_are_applied(world, monkey
     assert "A1" in note and "applied" in note and station.key in note
 
 
+def test_a_ticket_is_proposed_on_an_object_and_opened_only_when_applied(world, monkeypatch):
+    from app.models.issue import Issue
+    w = world
+    db = SessionLocal()
+    db.add(Schema(uid=f"{w['ws']}:change", workspace_id=w["ws"], name="Change", applies_to="tickets"))
+    db.commit()
+    db.close()
+    sent = scripted(monkeypatch, [
+        call("propose_ticket", {"title": "Replace the camera", "type": "Rocket", "object": w["camera"]}),
+        call("propose_ticket", {"title": "Replace the camera", "type": "Change", "object": w["camera"],
+                                "priority": "medium", "due_date": "2026-12-15"}),
+        answer("Proposed a change; apply it to open the ticket."),
+    ])
+    evs = events(client.post("/v1/ai/chat", headers=w["h"], json={"question": "Open a change next month"}))
+    assert "propose_ticket" in sent[0]["tools"]
+    assert "Today is" in sent[0]["messages"][0]["content"], "next month is counted from today"
+    refused = next(e for e in evs if e["type"] == "step" and e["error"])
+    assert "Rocket" in refused["error"] and "Change" in refused["error"]       # told which types there are
+    proposal = next(e["action"] for e in evs if e["type"] == "proposal")
+    assert proposal["kind"] == "ticket" and "Change" in proposal["summary"] and w["camera"] in proposal["summary"]
+    db = SessionLocal()
+    assert db.query(Issue).filter(Issue.workspace_id == w["ws"]).count() == 0     # nothing until applied
+    db.close()
+    cid = evs[0]["id"]
+    applied = client.post(f"/v1/ai/conversations/{cid}/actions/apply", headers=w["h"],
+                          json={"ids": [proposal["id"]]}).json()
+    assert applied[0]["status"] == "applied", applied
+    db = SessionLocal()
+    issue = db.get(Issue, applied[0]["result"]["uid"])
+    camera = db.query(Asset).filter(Asset.key == w["camera"]).one()
+    assert issue.title == "Replace the camera" and issue.asset_uid == camera.uid and issue.priority == "medium"
+    assert issue.schema_uid == f"{w['ws']}:change" and issue.due_date.date().isoformat() == "2026-12-15"
+    db.close()
+
+
 def test_a_relation_to_a_record_whose_creation_failed_fails_with_it(world, monkeypatch):
     w = world
     taken = f"{w['ws'].upper()}:TAKEN"
