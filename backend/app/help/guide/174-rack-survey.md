@@ -5,6 +5,8 @@ keywords: [census, survey, rack, phone, mobile, field app, photo, nameplate, lab
 order: 174
 ---
 
+## The steps
+
 In the ARGUS Field app, **Survey a rack** walks through a rack:
 
 1. **The rack**: a rack already in ARGUS (find it), or one not recorded yet. Photograph its front, and its rear if
@@ -18,5 +20,7 @@ In the ARGUS Field app, **Survey a rack** walks through a rack:
    checked: it is another unit*. Tap a unit number on the rack drawing to say where it is.
 4. **Review and save**: the list says what is still missing, which units overlap, which may be duplicates. When it
    is empty, **Save the rack**: the rack, the new records, their positions and the photos are saved together.
+
+## Stopping and resuming
 
 You can stop at any step: the survey is kept, and **Left half-way** brings it back, on any phone.
