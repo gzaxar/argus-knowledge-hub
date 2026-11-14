@@ -267,7 +267,7 @@ function ProposedChanges({ actions, conversationId }: { actions: AskAction[]; co
                 {a.reason && <span className="block text-slate-500">{a.reason}</span>}
                 {a.status === "applied" && a.result?.uid && (
                   <Link className="ml-1 text-indigo-600 underline"
-                        to={`/${a.kind === "ticket" ? "tickets" : "assets"}/${encodeURIComponent(a.result.uid)}`}>
+                        to={`/${a.kind === "ticket" ? "tickets" : a.kind === "document" ? "documents" : "assets"}/${encodeURIComponent(a.result.uid)}`}>
                     {a.result.key ?? "open"}
                   </Link>
                 )}

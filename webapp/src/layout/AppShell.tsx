@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { directoryApi, ledgerApi, workspacesApi } from "../api/client";
+import { directoryApi, ledgerApi, proposalsApi, workspacesApi } from "../api/client";
 import { signOut } from "../api/signOut";
 import { useCurrentWorkspaceId } from "../api/useCurrentWorkspaceId";
 import { CommandPalette, useCommandPaletteShortcut } from "../components/hub/CommandPalette";
@@ -240,9 +240,12 @@ export function AppShell() {
     (managedGroups.data?.length ? "/admin/my-groups" : null));
 
   const review = useQuery({ queryKey: ["ledger-review"], queryFn: ledgerApi.review, refetchInterval: 60_000 });
-  const reviewCount = review.data
+  // Changes assistants proposed through MCP wait in the same queue.
+  const proposals = useQuery({ queryKey: ["assistant-proposals"], queryFn: () => proposalsApi.list(), refetchInterval: 60_000,
+                               retry: false });
+  const reviewCount = (review.data
     ? review.data.counts.blocking + review.data.counts.held_revisions + review.data.counts.installation_proposals
-    : 0;
+    : 0) + (proposals.data?.length ?? 0);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const openPalette = useCallback(() => setPaletteOpen(true), []);

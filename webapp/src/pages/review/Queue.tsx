@@ -1,3 +1,4 @@
+import { AssistantProposals } from "./AssistantProposals";
 import { askText } from "../../lib/dialogs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -130,6 +131,7 @@ export function ReviewQueuePage() {
         <StatTile label="Other conflicts" value={other.length} />
       </div>
       <QueueAgeingCard />
+      <AssistantProposals />
       {error && (
         <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error instanceof ApiError ? JSON.stringify((error.body as { detail?: unknown })?.detail) : "The decision failed."}

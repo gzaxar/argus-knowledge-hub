@@ -22,6 +22,10 @@ class AskConversation(Base):
         String, ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
     owner: Mapped[str] = mapped_column(String, index=True)
     title: Mapped[str] = mapped_column(String)
+    # "ask" (the web's Ask ARGUS) or "mcp" (proposals an assistant sent through the MCP server, kept for a person
+    # to review on the Proposals page: services/mcp_proposals.py); `client` names the token or the MCP client.
+    source: Mapped[str] = mapped_column(String, default="ask", server_default="ask")
+    client: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

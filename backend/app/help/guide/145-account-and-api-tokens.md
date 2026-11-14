@@ -1,7 +1,7 @@
 ---
 title: My account, API tokens and the mobile app
 summary: Seeing who you are to ARGUS and what you may do; personal access tokens for your scripts; robot tokens for machines such as a facility's daily-logbook uploader; and where the mobile app is described.
-keywords: [olog, phoebus, epik8s, elog, electronic logbook, logbook entry, account, profile, me, who am i, permissions, roles, groups, token, api token, personal access token, pat, robot, robot token, service account, bot, logbook, daily logbook, upload, script, curl, api, automation, scope, expiry, revoke, mobile, app, android, ios, flutter, field, pkce, argus-mobile, mcp, librechat, assistant, ai assistant, claude, list_workspaces]
+keywords: [olog, phoebus, epik8s, elog, electronic logbook, logbook entry, account, profile, me, who am i, permissions, roles, groups, token, api token, personal access token, pat, robot, robot token, service account, bot, logbook, daily logbook, upload, script, curl, api, automation, scope, expiry, revoke, mobile, app, android, ios, flutter, field, pkce, argus-mobile, mcp, librechat, assistant, ai assistant, claude, chatgpt, proposal, propose, review, list_workspaces]
 order: 145
 ---
 
@@ -59,6 +59,13 @@ ARGUS is an MCP server at `<api>/mcp` (transport *streamable HTTP*), so an assis
 Claude can look up equipment, tickets, documents and the knowledge graph. Give it a **personal access token
 with the read scope** — the assistant then sees exactly what you may see, and can change nothing — and the
 workspace to ask in as `X-Workspace-Id` (not needed if the token is fixed to one workspace).
+
+The assistant may also **propose** changes: a new record, a change to one, a relation, a ticket, a draft
+document. A proposal changes nothing: it waits in the **Review queue**, under *Proposed by assistants*, where a
+person chooses what to **Apply** — with their own permissions, in their name — or **Discard**. A token may
+propose only what it could do by hand: give it the *Create* scope (and *Modify* for changes) for that, or leave
+it read-only and it can only look. Records proposed the same day are referred to as `new:1`, `new:2`… by the
+next proposals, so "create the two cameras and relate each to its rack" works in one go.
 
 A token that is not fixed to a workspace can ask in **every workspace where you hold a role**: the
 `list_workspaces` tool lists them, and every tool takes an optional `workspace` to ask in another one for

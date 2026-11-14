@@ -296,7 +296,8 @@ pull request.
 | `ARGUS_IOC_PR_DRAFT` | `true` (default) opens drafts. |
 | `ARGUS_GITHUB_API` | For GitHub Enterprise; default `https://api.github.com`. |
 
-The external MCP tools stay read-only. Only Ask ARGUS, where a person confirms, can propose a pull request.
+The external MCP tools never change anything; their proposals wait for a person (docs/mcp-proposals.md), and
+only Ask ARGUS, where a person confirms, can propose a pull request.
 
 ## The catalogue
 

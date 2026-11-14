@@ -26,13 +26,15 @@ from app.models.schema import Schema
 
 # What each kind of change needs, as the forms would.
 PERMISSION = {"create": "create", "update": "modify", "relate": "create", "unrelate": "delete", "ticket": "create",
+              "document": "create",
               # Leaves ARGUS: a person who may approve in this workspace, signed in, never an API token.
               "pull_request": "approve"}
+RESOURCE = {"ticket": "tickets", "document": "documents"}
 SKIPPED_ATTRIBUTES = ("argus_source", "argus_facility")
 
 SYSTEM = (
     "\n\nYou may also propose changes, but only when the person asks for one: propose_create_record, "
-    "propose_update_record, propose_relation, and propose_ticket to open a ticket. A proposal changes nothing: it is shown to the person, who "
+    "propose_update_record, propose_relation, propose_ticket to open a ticket, and propose_document for a draft document. A proposal changes nothing: it is shown to the person, who "
     "applies or discards it. Never say a change was made; say it is proposed and waits for their confirmation. "
     "Look the records up first and use their keys — also as the value of an attribute that refers to a record "
     "(where a unit is: its Located in, the argus_location attribute, takes a Location's key). "
@@ -109,6 +111,21 @@ def tool_specs() -> list[dict]:
                 "due_date": {"type": "string", "description": "YYYY-MM-DD, when it is wanted by."},
                 "reason": {"type": "string"},
             }, "required": ["title"]}}},
+        {"type": "function", "function": {
+            "name": "propose_document",
+            "description": "Propose a new document — a procedure, a runbook, a note, a specification — as a draft "
+                           "with its text in Markdown, and the records it describes. Changes nothing until the "
+                           "person confirms; then it is a draft that goes through the workspace's review and "
+                           "approval like any other. Look the records up first and use their keys.",
+            "parameters": {"type": "object", "properties": {
+                "title": {"type": "string"},
+                "type": {"type": "string", "description": "A document type of this workspace by its name, e.g. "
+                         "Procedure, Runbook. Leave it out when unsure."},
+                "body": {"type": "string", "description": "The text, in Markdown."},
+                "describes": {"type": "array", "items": {"type": "string"},
+                              "description": "Keys of the records the document is about."},
+                "reason": {"type": "string"},
+            }, "required": ["title", "body"]}}},
     ] + _pull_request_specs()
 
 
@@ -140,7 +157,7 @@ def _pull_request_specs() -> list[dict]:
 
 
 TOOL_NAMES = {"propose_create_record", "propose_update_record", "propose_relation", "propose_ioc_pull_request",
-              "propose_ticket"}
+              "propose_ticket", "propose_document"}
 
 
 class Refused(ValueError):
@@ -291,7 +308,7 @@ class Proposer:
     def __call__(self, name: str, arguments: dict) -> dict:
         handler = {"propose_create_record": self._create, "propose_update_record": self._update,
                    "propose_relation": self._relation, "propose_ioc_pull_request": self._pull_request,
-                   "propose_ticket": self._ticket}[name]
+                   "propose_ticket": self._ticket, "propose_document": self._document}[name]
         kind, payload, summary = handler(arguments or {})
         number = (self.db.scalar(select(AskAction.number).where(AskAction.conversation_id == self.conversation_id)
                                  .order_by(AskAction.number.desc()).limit(1)) or 0) + 1
@@ -383,6 +400,34 @@ class Proposer:
                    + (f" on {asset.key}" if asset else "") + (f", {priority} priority" if priority else "")
                    + (f", wanted by {due}" if due else ""))
         return "ticket", payload, summary
+
+    def _document(self, a: dict) -> tuple[str, dict, str]:
+        title = str(a.get("title") or "").strip()
+        body = str(a.get("body") or "").strip()
+        if not title:
+            raise Refused("a document needs a title")
+        if not body:
+            raise Refused("a document needs its text (body, in Markdown)")
+        if len(body) > 200_000:
+            raise Refused("the text is too long for one document (200 000 characters at most)")
+        kinds = {s.name.lower(): s for s in self.db.scalars(select(Schema).where(
+            Schema.applies_to == "documents", or_(Schema.workspace_id == self.workspace_id, Schema.is_global.is_(True))))}
+        wanted = str(a.get("type") or "").strip().lower()
+        schema = kinds.get(wanted) if wanted else None
+        if wanted and schema is None:
+            raise Refused(f"there is no document type {a.get('type')!r} here; the types are: "
+                          + ", ".join(sorted(s.name for s in kinds.values())))
+        described = []
+        for ref in a.get("describes") or []:
+            asset = self._existing(str(ref))
+            if asset is None:
+                raise Refused(f"no record {ref!r} here: look it up and use its key")
+            described.append({"uid": asset.uid, "key": asset.key})
+        payload = {"title": title[:300], "document_type_uid": schema.uid if schema else None,
+                   "type": schema.name if schema else None, "body_markdown": body, "describes": described}
+        return "document", payload, (f"Write a draft {schema.name if schema else 'document'} “{title}”"
+                                     + (f" describing {', '.join(d['key'] for d in described)}" if described else "")
+                                     + f" ({len(body.split())} words)")
 
     def _pull_request(self, a: dict) -> tuple[str, dict, str]:
         from app.ioc_engineer import pull_requests
@@ -498,8 +543,7 @@ def _permitted(db: Session, identity, workspace_id: str, kind: str) -> bool:
     if not isinstance(identity, OidcIdentity):
         # A token's scope was checked when it reached the workspace; but only a person opens a pull request.
         return kind != "pull_request"
-    return resolve_permission(db, identity.user, workspace_id, PERMISSION[kind],
-                              "tickets" if kind == "ticket" else "objects")
+    return resolve_permission(db, identity.user, workspace_id, PERMISSION[kind], RESOURCE.get(kind, "objects"))
 
 
 def _execute(db: Session, identity, workspace_id: str, action: AskAction) -> dict:
@@ -526,6 +570,20 @@ def _execute(db: Session, identity, workspace_id: str, action: AskAction) -> dic
                         created_by=str(user_id) if user_id else None),
             workspace_id=workspace_id, current_user_id=user_id, db=db, x_argus_client=None)
         return {"uid": issue.uid, "key": issue.key, "name": issue.title}
+    if action.kind == "document":
+        from app.models.document import DocumentRelation
+        from app.routers.documents import new_document
+        from app.schemas.document import DocumentCreate
+        doc, _ = new_document(db, DocumentCreate(uid=str(uuid.uuid4()), title=p["title"],
+                                                 document_type_uid=p.get("document_type_uid"),
+                                                 body_markdown=p["body_markdown"], source="assistant"),
+                              workspace_id, identity)
+        for d in p.get("describes") or []:
+            if db.get(Asset, d["uid"]) is not None:
+                db.add(DocumentRelation(workspace_id=workspace_id, from_document_uid=doc.uid, to_type="asset",
+                                        to_uid=d["uid"], relation_type="describes"))
+        db.commit()
+        return {"uid": doc.uid, "key": doc.code, "name": doc.title, "kind": "document"}
     if action.kind == "create":
         asset = forms.create_asset(
             AssetCreate(uid=str(uuid.uuid4()), schema_uid=p["schema_uid"], key=p.get("key"), name=p["name"],
@@ -566,7 +624,7 @@ def apply(db: Session, identity, workspace_id: str, actor: str, conversation_id:
     for action in chosen:
         try:
             if not _permitted(db, identity, workspace_id, action.kind):
-                raise HTTPException(status_code=403, detail=f"you may not {PERMISSION[action.kind]} objects here")
+                raise HTTPException(status_code=403, detail=f"you may not {PERMISSION[action.kind]} {RESOURCE.get(action.kind, 'objects')} here")
             result = _execute(db, identity, workspace_id, action)
             action.status, action.result, action.error = "applied", result, None
         except HTTPException as exc:

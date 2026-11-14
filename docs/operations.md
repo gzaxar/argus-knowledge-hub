@@ -1346,7 +1346,8 @@ each one, in the order proposed, through the same code as the forms:
 Each change stands or fails on its own, and the card shows the error. A
 relation to a record whose creation failed fails with it. The model's
 next turn is told what became of each proposal. Nothing is applied
-without the person, and the external MCP server stays read-only.
+without the person. The external MCP server offers the same proposals (not pull requests): they wait in the
+Review queue for a person (docs/mcp-proposals.md).
 
 
 

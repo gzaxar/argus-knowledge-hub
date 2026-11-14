@@ -3520,3 +3520,15 @@ export interface PlanSceneView extends PlanLayersView {
   units: PlanSceneUnit[];
   relations: { from: string; to: string; type: string }[];
 }
+
+/** A change an assistant proposed through MCP, waiting for a person (docs/mcp-proposals.md). */
+export interface AssistantProposal extends AskAction {
+  conversation: { id: string; title: string; from: string | null };
+  created_at: string;
+}
+
+export const proposalsApi = {
+  list: (status: "proposed" | "all" = "proposed") => request<AssistantProposal[]>(`/v1/proposals?status=${status}`),
+  apply: (ids: string[]) => request<AssistantProposal[]>("/v1/proposals/apply", { method: "POST", body: json({ ids }) }),
+  discard: (ids: string[]) => request<AssistantProposal[]>("/v1/proposals/discard", { method: "POST", body: json({ ids }) }),
+};

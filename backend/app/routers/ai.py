@@ -763,14 +763,16 @@ def list_conversations(
     """Your conversations in this workspace, most recent first."""
     from app.models.ask_conversation import AskConversation
     return list(db.scalars(select(AskConversation).where(
-        AskConversation.workspace_id == workspace_id, AskConversation.owner == _owner(identity))
+        AskConversation.workspace_id == workspace_id, AskConversation.owner == _owner(identity),
+        AskConversation.source == "ask")         # proposals sent through MCP are on the Proposals page
         .order_by(AskConversation.updated_at.desc()).limit(200)))
 
 
 def _own_conversation(db: Session, workspace_id: str, identity, conversation_id: str):
     from app.models.ask_conversation import AskConversation
     conversation = db.get(AskConversation, conversation_id)
-    if conversation is None or conversation.workspace_id != workspace_id or conversation.owner != _owner(identity):
+    if conversation is None or conversation.workspace_id != workspace_id or conversation.owner != _owner(identity) \
+            or conversation.source != "ask":
         raise HTTPException(status_code=404, detail="No such conversation")
     return conversation
 

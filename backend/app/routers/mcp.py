@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session
 from app.auth import Identity, PatIdentity, get_identity, grants_of, require_permission
 from app.db import get_db
 from app.models.workspace import Workspace
+from app.services import mcp_proposals
+from app.services.mcp_proposals import GUIDE as PROPOSALS_GUIDE
 from app.services.mcp_tools import LOOKUP_GUIDE, call, catalogue
 from app.services.notify import web_url
 from app.services.permissions import resolve_permission
@@ -52,7 +54,8 @@ INSTRUCTIONS = (
     "across workspaces, call a tool once per workspace.\n"
     "Records come with a `url`, the page of that record in ARGUS, and a `link`, the same as a ready "
     "Markdown link: when you cite a record, write its `link` as given, so the reader can open it.\n"
-    "Everything here is read-only."
+    + PROPOSALS_GUIDE +
+    "Nothing here changes ARGUS by itself: the lookups only read, and a proposal waits for a person."
 )
 
 # Offered to MCP clients only. Ask ARGUS uses the same tools inside one
@@ -71,7 +74,7 @@ WORKSPACE_ARGUMENT = {
 
 def _tools() -> list[dict]:
     tools = [LIST_WORKSPACES]
-    for tool in catalogue():
+    for tool in catalogue() + mcp_proposals.tools():
         schema = dict(tool["inputSchema"])
         schema["properties"] = {**schema.get("properties", {}), "workspace": WORKSPACE_ARGUMENT}
         tools.append({**tool, "inputSchema": schema})
@@ -205,6 +208,16 @@ async def rpc(
             set_current_grants(grants_of(db, identity, target))
         from app.services.who_has_access import set_viewer, viewer_for
         set_viewer(viewer_for(db, identity, target))
+        if name in mcp_proposals.OFFERED:
+            from app.services.ask_actions import Refused
+            try:
+                out = mcp_proposals.propose(db, target, identity, name, arguments, link_base=web_url())
+            except Refused as e:
+                db.rollback()
+                return _result(request_id, {"content": [{"type": "text", "text": f"Refused: {e}"}], "isError": True})
+            db.commit()
+            return _result(request_id, {"content": [{"type": "text", "text": json.dumps(out, default=str)}],
+                                        "isError": False})
         try:
             text = call(db, target, name, arguments, link_base=web_url())
         except KeyError:

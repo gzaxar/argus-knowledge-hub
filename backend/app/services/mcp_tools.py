@@ -6,10 +6,9 @@ answer — "what broke this magnet before, and which procedure covers it" —
 because that is a traversal and two structured lookups, and the answer is
 in no single document.
 
-These are read-only on purpose. An assistant that can change the
-inventory is a different proposal needing a different conversation about
-who is accountable for the change; retrieval is where the value is and
-where the risk is not.
+These are read-only on purpose. An assistant does not change the
+inventory: it may only propose a change (services/mcp_proposals.py), which
+waits for a person who is accountable for applying it.
 """
 import json
 import re
