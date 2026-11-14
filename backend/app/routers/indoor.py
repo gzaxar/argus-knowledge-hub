@@ -2,7 +2,7 @@
 view on the map (services/indoor.py). Records are read and changed under the same rules as their locations.
 
 - `GET/POST /v1/assets/{uid}/levels`, `PATCH/DELETE /v1/levels/{uid}` — a place's floors.
-- `GET/POST /v1/assets/{uid}/plans`, `GET/PATCH/DELETE /v1/plans/{uid}`, `GET /v1/plans/{uid}/image`,
+- `GET/POST /v1/assets/{uid}/plans`, `GET/PATCH/DELETE /v1/plans/{uid}`, `GET /v1/plans/{uid}/image`, `GET /v1/plans/{uid}/layers`,
   `PUT/DELETE /v1/plans/{uid}/placement` — floor plans; placing one on the map by control points.
 - `GET/PUT/DELETE /v1/assets/{uid}/indoors` — where a record is inside; `GET /v1/map/plans?bbox=` — the plans
   placed on the map in view, for a floor switcher.
@@ -191,6 +191,33 @@ def get_plan(uid: str, workspace_id: str = Depends(require_permission("read")), 
             placed.append({"uid": asset.uid, "key": asset.key, "name": asset.name, "type": asset.type,
                            "x": p.plan_x, "y": p.plan_y, "place_uid": p.place_uid})
     return {**indoor.plan_out(db, plan), "placed": placed}
+
+
+@router.get("/plans/{uid}/layers")
+def plan_layers(uid: str, workspace_id: str = Depends(require_permission("read")), grants=Depends(get_grants),
+                identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """What the plan shows over its drawing, layer by layer: rooms and accesses, beamline, racks (one point each,
+    with how many units they hold), main fixed plant, other devices, cables and pipes, zones, open tickets and
+    activities (services/plan_layers.py). Only what this person may see."""
+    from datetime import datetime, timezone
+
+    from app.routers.activities import _may_cached, _viewer as activity_viewer
+    from app.services import activities as act
+    from app.services import plan_layers
+
+    plan = _plan(db, uid, workspace_id, grants)
+    may = _viewer(db, identity, workspace_id)
+    allowed = _may_cached(db, identity)
+
+    def upcoming():
+        at = datetime.now(timezone.utc)
+        lo, hi = plan_layers.ACTIVITY_WINDOW
+        found = act.in_range(db, workspace_id, activity_viewer(db, identity, workspace_id), at + lo, at + hi,
+                             basis="planned", filters=act.Filters(statuses={"planned", "in_progress"}), at=at)
+        return found["items"]
+    return plan_layers.layers(db, plan, may, may_read_tickets=lambda ws: allowed(ws, "read", "tickets"),
+                              activities_of=upcoming)
+
 
 
 @router.get("/plans/{uid}/image")

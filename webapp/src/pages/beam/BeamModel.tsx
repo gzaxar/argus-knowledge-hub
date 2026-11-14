@@ -125,6 +125,7 @@ export function BeamModelPage() {
         {graph.data && (
           <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-4 py-2 text-sm">
             <span className="font-medium text-slate-900">{graph.data.path.name}</span>
+            <Link to={`/tunnel/${graph.data.path.uid}`} className="text-xs text-indigo-700 hover:underline">Tunnel with the hardware →</Link>
             <span className="text-xs text-slate-500">
               {graph.data.topology} · {graph.data.nodes.length} elements
               {graph.data.length ? ` · ${graph.data.topology === "closed" ? "circumference" : "length"} ${graph.data.length} m` : ""}

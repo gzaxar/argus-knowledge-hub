@@ -1,0 +1,43 @@
+---
+title: Floor plans by layer, and the tunnel
+summary: A floor plan with what is on it, layer by layer — rooms and accesses, beamline, racks (one point each, opening their elevation), main fixed plant, other devices, cables and pipes, zones, open tickets and activities — and the tunnel along a beam path, with the hardware installed at each element and where it is.
+keywords: [floor plan, plan, layers, layer, rack, room, zone, cable, pipe, ticket, activity, tunnel, beamline, s, longitudinal, beam path, where is]
+order: 173
+---
+
+## A plan, layer by layer
+
+Open a plan with **With layers** (on a place's page, under its plans, or from **On the floor plan**). The
+drawing is the plan as it was uploaded; ARGUS draws the records over it and never writes on the drawing.
+
+Turn layers on and off with the chips above the plan; your choice is remembered on this browser.
+
+- On at first: **Rooms and accesses**, **Beamline**, **Racks**, **Main fixed plant** (klystrons, modulators,
+  chillers, switchboards, UPS, air handling units…).
+- Off at first: **Other devices**, **Cables and pipes**, **Zones** (radiation, fire, access), **Open tickets**
+  and **Activities** (planned or under way, from yesterday to the next 30 days). Tickets and activities show as
+  small counters next to the record they concern.
+
+A **rack is one point**, a square, however many units it holds: what is mounted in it, or said to be in it, is
+not drawn on its own. Click the square to open the rack's elevation. A ticket on a server in the rack is
+counted on the rack.
+
+Rooms, zones and cables come from their outlines and routes on the map, so they appear only on a plan that is
+placed on the map. Rooms of another floor of the same building are left out.
+
+From a record looked for — `?focus=` in the address, as the tunnel and Ask ARGUS use it — the plan opens around
+it. A unit in a rack is shown as its rack, with a link that opens the rack with that unit selected.
+
+## The tunnel
+
+**Beam model → Tunnel with the hardware** (or **/tunnel**) draws a beam path to scale along `s`: each element
+of the model, the rooms the path crosses as bands above it, and a dot under each element.
+
+- grey: no hardware installed at that position;
+- amber: hardware installed, but no room known for it;
+- green: hardware installed and placed;
+- red: the hardware has open tickets.
+
+Click an element to see the hardware installed there: its serial, its room, its rack, its point on a floor
+plan (a link opens the plan around it), what powers it and in which rack that supply is, and its open tickets.
+Nothing is guessed: an element with nothing installed says so.

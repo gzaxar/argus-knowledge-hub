@@ -83,6 +83,8 @@ export function FloorPlanPage() {
               <h2 className="text-sm font-semibold text-slate-900">
                 {plan.name}{plan.level && <span className="font-normal text-slate-500"> · {plan.level.name}</span>}
               </h2>
+              <Link to={`/plans/${plan.uid}?focus=${here.map((r) => r.uid).join(",")}`}
+                    className="text-xs text-indigo-700 hover:underline">With layers →</Link>
               {full !== plan.uid && (
                 <button type="button" onClick={() => setFull(plan.uid)}
                         className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-50">Full screen</button>

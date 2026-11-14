@@ -31518,6 +31518,100 @@
         ]
       }
     },
+    "/v1/beam-paths/{uid}/tunnel": {
+      "get": {
+        "description": "The tunnel along the path: elements by `s`, the hardware installed at each with its room, plan point, rack,\nsupplies and open tickets, and the rooms crossed as bands along `s` (services/tunnel.py).",
+        "operationId": "path_tunnel_v1_beam_paths__uid__tunnel_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dataset",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dataset"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Path Tunnel",
+        "tags": [
+          "beam-model"
+        ]
+      }
+    },
     "/v1/beam-systems": {
       "get": {
         "description": "The beam systems here, each with its beams and paths.",
@@ -61286,6 +61380,84 @@
           }
         ],
         "summary": "Plan Image",
+        "tags": [
+          "indoors"
+        ]
+      }
+    },
+    "/v1/plans/{uid}/layers": {
+      "get": {
+        "description": "What the plan shows over its drawing, layer by layer: rooms and accesses, beamline, racks (one point each,\nwith how many units they hold), main fixed plant, other devices, cables and pipes, zones, open tickets and\nactivities (services/plan_layers.py). Only what this person may see.",
+        "operationId": "plan_layers_v1_plans__uid__layers_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Plan Layers",
         "tags": [
           "indoors"
         ]

@@ -205,7 +205,39 @@ def elevation(db: Session, rack: Asset, slots: Optional[list[Slot]] = None) -> d
             "mountings": [_view(s, assets) for s in slots],
             "free": {f: free_ranges(slots, units, f) for f in ("front", "rear")},
             "used_units": used,
-            "problems": problems(slots, units, names)}
+            "problems": problems(slots, units, names),
+            "plan": _plan_of(db, rack),
+            "unplaced": unplaced(db, rack, slots)}
+
+
+def unplaced(db: Session, rack: Asset, slots: list[Slot]) -> list[dict]:
+    """Units said to be in the rack (`located in` it, or placed inside it) that have no position in it yet: to be
+    mounted, with the height their model suggests. Ports, cables and the like are not units."""
+    from app.models.asset import Relation
+    from app.models.indoor import IndoorPlacement
+    here = {s.asset_uid for s in slots if s.asset_uid}
+    uids = set(db.scalars(select(Relation.from_asset_uid).where(Relation.to_asset_uid == rack.uid,
+                                                                Relation.relation_type == "located in")))
+    uids |= set(db.scalars(select(IndoorPlacement.asset_uid).where(IndoorPlacement.place_uid == rack.uid,
+                                                                   IndoorPlacement.state == "confirmed")))
+    out = []
+    for uid in sorted(uids - here):
+        a = db.get(Asset, uid)
+        if a is None or a.deleted_at is not None or a.type in NOT_MOUNTED or mounting_of(db, uid) is not None:
+            continue
+        out.append({"uid": a.uid, "key": a.key, "name": a.name, "type": a.type,
+                    "serial": (a.attributes or {}).get("serial"), "suggested_height_u": suggested_height(db, a),
+                    "mounted": None})
+    return sorted(out, key=lambda c: c["name"])
+
+
+def _plan_of(db: Session, rack: Asset) -> Optional[dict]:
+    """The floor plan the rack is a point on, to go back to it with its layers."""
+    from app.models.indoor import FloorPlan
+    from app.services import indoor
+    p = indoor.current(db, rack.uid)
+    plan = db.get(FloorPlan, p.plan_uid) if p is not None and p.plan_uid else None
+    return {"uid": plan.uid, "name": plan.name} if plan is not None else None
 
 
 def history(db: Session, rack_uid: str, limit: int = 200) -> list[dict]:

@@ -36,6 +36,8 @@ import { GraphExplorer } from "./pages/graph/Explorer";
 import { BeamModelPage } from "./pages/beam/BeamModel";
 import { BeamModelEditorPage } from "./pages/beam/BeamModelEditor";
 import { BeamAssetSyncPage } from "./pages/beam/BeamAssetSync";
+import { TunnelPage } from "./pages/beam/TunnelPage";
+import { PlanLayersPage } from "./pages/map/PlanLayersPage";
 import { GlobalValueList } from "./pages/globalvalues/List";
 import { ImportList } from "./pages/imports/List";
 import { MarkdownImport } from "./pages/imports/Markdown";
@@ -123,6 +125,9 @@ export function App() {
           <Route path="/map" element={<MapPage />} />
           <Route path="/floor-plan" element={<FloorPlanPage />} />
           <Route path="/racks/:uid" element={<RackEditor />} />
+          <Route path="/plans/:uid" element={<PlanLayersPage />} />
+          <Route path="/tunnel" element={<TunnelPage />} />
+          <Route path="/tunnel/:pathUid" element={<TunnelPage />} />
           <Route path="/assets/new" element={<AssetForm />} />
           <Route path="/assets/import" element={<SpreadsheetImportPage />} />
           <Route path="/assets/:uid" element={<AssetDetail />} />

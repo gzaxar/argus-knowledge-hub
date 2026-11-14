@@ -4,7 +4,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { problemText, racksApi, type RackCandidate, type RackElevationView, type RackMountingView, type RackOp } from "../../api/client";
 import { RackElevation, nameOf, spanOf } from "../../components/RackElevation";
 import { Card } from "../../components/hub/ui";
@@ -29,6 +29,9 @@ export default function RackEditor() {
   const queryClient = useQueryClient();
   const [ops, setOps] = useState<RackOp[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  // `?unit=` — the unit looked for (from the floor plan, through its rack): selected until another is chosen.
+  const [params] = useSearchParams();
+  const [lookedFor, setLookedFor] = useState<string | null>(params.get("unit"));
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<{ c: RackCandidate; start: string; height: string; face: Face; kind: "device" | "zero_u"; shelf: string } | null>(null);
   const [space, setSpace] = useState<{ what: "shelf" | "reserve"; start: string; height: string; face: Face; label: string }>(
@@ -60,7 +63,11 @@ export default function RackEditor() {
   const staged = ops.length > 0 && preview.data ? preview.data : null;
   const view = staged?.elevation ?? stored.data;
   const problems = staged?.problems ?? stored.data.problems;
-  const sel = view.mountings.find((m) => m.uid === selected) ?? null;
+  const sel = view.mountings.find((m) => m.uid === selected)
+    ?? (selected === null && lookedFor ? view.mountings.find((m) => m.asset?.uid === lookedFor) : undefined) ?? null;
+  const staging = new Set(ops.map((o) => o.asset_uid).filter(Boolean));
+  const waiting = (stored.data.unplaced ?? []).filter((c) => !staging.has(c.uid));
+  const lostUnit = lookedFor && selected === null && !sel && !waiting.some((c) => c.uid === lookedFor) ? lookedFor : null;
   const shelves = view.mountings.filter((m) => m.kind === "shelf");
 
   /** The staged operation that made or moved this block, if it is not a stored one. */
@@ -114,6 +121,7 @@ export default function RackEditor() {
             <span className="font-mono">{view.rack.key}</span> · {view.rack.units} U ·{" "}
             <Link to={`/assets/${view.rack.uid}`} className="text-indigo-600 hover:underline">the rack's record</Link>
             {" · "}<Link to={`/floor-plan?show=${view.rack.uid}`} className="text-indigo-600 hover:underline">on the floor plan</Link>
+            {view.plan && <>{" · "}<Link to={`/plans/${view.plan.uid}?focus=${view.rack.uid}`} className="text-indigo-600 hover:underline">plan with layers</Link></>}
           </p>
         </div>
         <p className="text-xs text-slate-500">Drag a block to another unit, or use the forms. Nothing is saved until you confirm.</p>
@@ -121,8 +129,14 @@ export default function RackEditor() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <Card title="Elevation" action={<span className="text-xs text-slate-400">U1 at the bottom</span>}>
-          <RackElevation view={view} selected={selected} problems={problems}
-                         onSelect={(m) => setSelected(m.uid)} onDrop={drop} />
+          <RackElevation view={view} selected={sel?.uid ?? null} problems={problems}
+                         onSelect={(m) => { setLookedFor(null); setSelected(m.uid); }} onDrop={drop} />
+          {lostUnit && (
+            <p className="mt-2 text-xs text-amber-700">
+              The unit looked for is in this rack but has no position in it yet: <Link to={`/assets/${lostUnit}`}
+              className="underline">open its record</Link>, or mount it here.
+            </p>
+          )}
         </Card>
 
         <div className="space-y-4">
@@ -170,6 +184,24 @@ export default function RackEditor() {
               <button type="button" onClick={() => takeOut(sel)} className="mt-3 rounded border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50">
                 Take it out of the rack
               </button>
+            </Card>
+          )}
+
+          {waiting.length > 0 && (
+            <Card title="In this rack, no position yet">
+              <p className="text-xs text-slate-500">Said to be in this rack, but not on its drawing: give each its units.</p>
+              <ul className="mt-1 max-h-56 divide-y divide-slate-100 overflow-auto">
+                {waiting.map((c) => (
+                  <li key={c.uid} className={`flex items-center justify-between gap-2 py-1 text-xs ${c.uid === lookedFor ? "bg-amber-50" : ""}`}>
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-slate-800">{c.name}</span>
+                      <span className="block truncate text-slate-500">{c.type}{c.serial ? ` · s/n ${c.serial}` : ""}
+                        {c.suggested_height_u ? ` · ${c.suggested_height_u} U suggested` : ""}</span>
+                    </span>
+                    <button type="button" onClick={() => choose(c)} className={small}>Mount…</button>
+                  </li>
+                ))}
+              </ul>
             </Card>
           )}
 

@@ -402,6 +402,7 @@ function OpenPlan({ uid }: { uid: string }) {
       <p className="mt-1 text-slate-500">
         {(p.placed ?? []).length} record(s) placed on it.
         {!full && <button type="button" onClick={() => setFull(true)} className="ml-2 text-indigo-700 underline">Full page</button>}
+        <Link to={`/plans/${p.uid}`} className="ml-2 text-indigo-700 underline">With layers</Link>
       </p>
     </div>
   );

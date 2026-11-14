@@ -1778,6 +1778,9 @@ export const beamModelApi = {
     request<AssetSyncStatus>(`/v1/beam-models/${encodeURIComponent(model)}/asset-sync/status${filter ? `?filter=${encodeURIComponent(filter)}` : ""}`),
   syncApply: (model: string, body: AssetSyncApply) =>
     request<AssetSyncApplied>(`/v1/beam-models/${encodeURIComponent(model)}/asset-sync/apply`, { method: "POST", body: json(body) }),
+  /** The tunnel along a path: elements by s, the hardware at each and where it is (docs/plan-layers.md). */
+  tunnel: (uid: string, dataset?: string | null) =>
+    request<TunnelView>(`/v1/beam-paths/${encodeURIComponent(uid)}/tunnel${dataset ? `?dataset=${encodeURIComponent(dataset)}` : ""}`),
   assetBindings: (model: string, status?: string) =>
     request<AssetBinding[]>(`/v1/beam-models/${encodeURIComponent(model)}/asset-bindings${status ? `?status=${status}` : ""}`),
 };
@@ -2539,6 +2542,8 @@ export const indoorApi = {
   removeIndoors: (uid: string) => request<void>(`/v1/assets/${uid}/indoors`, { method: "DELETE" }),
   /** Records on their floor plans (their own point, or their rack's or room's), grouped by plan, with how far
    *  and which way each is from the first. */
+  /** What the plan shows over its drawing, layer by layer (docs/plan-layers.md). */
+  layers: (uid: string) => request<PlanLayersView>(`/v1/plans/${uid}/layers`),
   show: (records: string[]) => request<FloorPlanShow>(`/v1/floor-plan/show?records=${encodeURIComponent(records.join(","))}`),
   mapPlans: (bbox: [number, number, number, number]) =>
     request<FloorPlanView[]>(`/v1/map/plans?bbox=${bbox.map((n) => n.toFixed(6)).join(",")}`),
@@ -3405,6 +3410,10 @@ export interface RackElevationView {
   free: Record<"front" | "rear", { from_u: number; to_u: number; units: number }[]>;
   used_units: Record<"front" | "rear", number>;
   problems: RackProblem[];
+  /** The floor plan the rack is a point on. */
+  plan?: { uid: string; name: string } | null;
+  /** Units said to be in the rack that have no position in it yet. */
+  unplaced?: RackCandidate[];
 }
 export interface RackOp {
   op: "place" | "shelf" | "reserve" | "update" | "remove";
@@ -3448,3 +3457,51 @@ export const racksApi = {
               start_u: number | null; height_u: number; face: string; shelf_uid: string | null } | null>(
       `/v1/racks/of/${encodeURIComponent(assetUid)}`),
 };
+
+export type PlanLayerId = "places" | "beamline" | "racks" | "fixed" | "devices" | "paths" | "zones" | "tickets" | "activities";
+
+export interface PlanLayerItem {
+  uid: string; key: string | null; name: string; type: string; x: number; y: number; layer: PlanLayerId;
+  tickets: number; activities: number;
+  /** A rack: one point, however many units it holds. */
+  rack?: { holds: number; mounted: boolean };
+}
+
+export interface PlanShape { uid: string; key: string | null; name: string; type: string; layer: PlanLayerId; points: [number, number][] }
+
+export interface PlanLayersView extends FloorPlanView {
+  layers: { id: PlanLayerId; label: string; on: boolean; count: number }[];
+  items: PlanLayerItem[];
+  outlines: PlanShape[];
+  routes: PlanShape[];
+  tickets: { uid: string; key: string | null; title: string; state: string; priority: string | null; asset_uid: string; shown_at: string }[];
+  activities: { id: string; title: string; status: string; planned_start: string | null; asset_uid: string; shown_at: string }[];
+  /** Units held in the racks shown, not points of their own. */
+  in_racks: number;
+  /** Each of those units, and the rack on this plan that holds it. */
+  held: Record<string, string>;
+}
+
+export interface TunnelRef { uid: string; key: string | null; name: string; type: string }
+
+export interface TunnelHardware extends TunnelRef {
+  serial?: string | null;
+  room: TunnelRef | null;
+  rack: TunnelRef | null;
+  spot: { plan: { uid: string; name: string }; x: number; y: number; via: TunnelRef | null } | null;
+  supplies: (TunnelRef & { rack: TunnelRef | null; room: TunnelRef | null })[];
+  tickets: { uid: string; key: string | null; title: string; state: string }[];
+}
+
+export interface TunnelElement {
+  uid: string; name: string; key: string | null; element_kind: string | null; s: number | null; length: number | null;
+  index: number; hardware: TunnelHardware[];
+}
+
+export interface TunnelView {
+  path: TunnelRef; topology: string | null; length: number | null; dataset_uid: string | null;
+  elements: TunnelElement[];
+  rooms: (TunnelRef & { from_s: number; to_s: number })[];
+  /** Every element has its s: drawn to scale. */
+  with_s: boolean;
+}

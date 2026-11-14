@@ -2,7 +2,7 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { CircleMarker, ImageOverlay, MapContainer, Polyline, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import { CircleMarker, ImageOverlay, MapContainer, Marker, Polygon, Polyline, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { indoorApi } from "../api/client";
 
 /** The plan's picture, fetched signed in; the URL is let go when the plan is no longer shown. */
@@ -14,7 +14,27 @@ export function usePlanImage(uid: string | null | undefined) {
 
 export interface PlanPin { id: string; x: number; y: number; label: string; colour?: string; to?: string;
   /** The record being looked for: a ring around it and its label always shown. */
-  highlight?: boolean }
+  highlight?: boolean;
+  /** Drawn as a square (a rack: one point, whatever it holds). */
+  square?: boolean;
+  /** Small counters next to the point (open tickets, activities). */
+  badges?: { n: number; colour: string; title: string }[];
+  onClick?: () => void }
+
+/** A shape over the drawing, in plan pixels: an outline (a room, a zone) or a route (a cable, a pipe). */
+export interface PlanShape { id: string; points: [number, number][]; closed: boolean; label: string; colour: string;
+  dashed?: boolean; onClick?: () => void }
+
+function squareIcon(colour: string, big: boolean) {
+  const s = big ? 18 : 14;
+  return L.divIcon({ className: "", iconSize: [s, s], iconAnchor: [s / 2, s / 2],
+    html: `<div style="width:${s}px;height:${s}px;background:${colour};border:2px solid #fff;box-shadow:0 0 0 1px #1e293b;border-radius:2px"></div>` });
+}
+
+function badgeIcon(badges: { n: number; colour: string }[]) {
+  const html = badges.map((b) => `<span style="display:inline-block;min-width:16px;padding:0 4px;margin-left:2px;border-radius:8px;background:${b.colour};color:#fff;font:600 10px/16px sans-serif;text-align:center">${b.n}</span>`).join("");
+  return L.divIcon({ className: "", iconSize: [40, 16], iconAnchor: [-6, 22], html: `<div style="white-space:nowrap">${html}</div>` });
+}
 
 /** Plan pixels (x right, y down) to Leaflet's flat coordinates (y up) and back. */
 const toLL = (h: number, x: number, y: number): [number, number] => [h - y, x];
@@ -71,8 +91,10 @@ export function NorthArrow({ deg, className = "" }: { deg: number; className?: s
 
 export interface PlanLine { id: string; from: { x: number; y: number }; to: { x: number; y: number }; label?: string }
 
-export function PlanView({ planUid, width, height, pins = [], lines = [], pick, onPick, className = "h-80", northDeg, focus }: {
+export function PlanView({ planUid, width, height, pins = [], lines = [], shapes = [], pick, onPick, className = "h-80", northDeg, focus }: {
   planUid: string; width: number; height: number; pins?: PlanPin[];
+  /** Outlines and routes drawn over the drawing, under the points. */
+  shapes?: PlanShape[];
   /** Points to zoom to when the plan opens (the records looked for); the whole plan when not given. */
   focus?: { x: number; y: number }[];
   /** Dashed lines between points, with a label (a distance). */
@@ -91,6 +113,15 @@ export function PlanView({ planUid, width, height, pins = [], lines = [], pick, 
                       attributionControl={false}>
           <Fit width={width} height={height} focus={focus} />
           {image.data && <ImageOverlay url={image.data} bounds={bounds} />}
+          {shapes.map((sh) => {
+            const pos = sh.points.map(([x, y]) => toLL(height, x, y));
+            const opts = { color: sh.colour, weight: sh.closed ? 1.5 : 3, dashArray: sh.dashed ? "6 5" : undefined,
+                           fillOpacity: sh.closed ? 0.12 : 0 };
+            const events = sh.onClick ? { click: sh.onClick } : undefined;
+            return sh.closed
+              ? <Polygon key={sh.id} positions={pos} pathOptions={opts} eventHandlers={events}><Tooltip sticky>{sh.label}</Tooltip></Polygon>
+              : <Polyline key={sh.id} positions={pos} pathOptions={opts} eventHandlers={events}><Tooltip sticky>{sh.label}</Tooltip></Polyline>;
+          })}
           {lines.map((l) => (
             <Polyline key={l.id} positions={[toLL(height, l.from.x, l.from.y), toLL(height, l.to.x, l.to.y)]}
                       pathOptions={{ color: "#475569", weight: 2, dashArray: "6 6" }}>
@@ -101,11 +132,21 @@ export function PlanView({ planUid, width, height, pins = [], lines = [], pick, 
             <CircleMarker key={`${p.id}-ring`} center={toLL(height, p.x, p.y)} radius={16} interactive={false}
                           pathOptions={{ color: p.colour ?? "#2563eb", weight: 3, fillOpacity: 0.12, className: "animate-pulse" }} />
           ))}
-          {pins.map((p) => (
+          {pins.map((p) => p.square ? (
+            <Marker key={p.id} position={toLL(height, p.x, p.y)} icon={squareIcon(p.colour ?? "#4f46e5", !!p.highlight)}
+                    eventHandlers={p.onClick ? { click: p.onClick } : undefined} keyboard={!!p.onClick} title={p.label}>
+              <Tooltip permanent={!!p.highlight} direction="top" offset={[0, -10]}>{p.label}</Tooltip>
+            </Marker>
+          ) : (
             <CircleMarker key={p.id} center={toLL(height, p.x, p.y)} radius={p.highlight ? 8 : 6}
+                          eventHandlers={p.onClick ? { click: p.onClick } : undefined}
                           pathOptions={{ color: "#fff", weight: 2, fillColor: p.colour ?? "#2563eb", fillOpacity: 0.95 }}>
               <Tooltip permanent={!!p.highlight} direction="top" offset={[0, -10]}>{p.label}</Tooltip>
             </CircleMarker>
+          ))}
+          {pins.filter((p) => p.badges && p.badges.some((b) => b.n > 0)).map((p) => (
+            <Marker key={`${p.id}-badges`} position={toLL(height, p.x, p.y)} interactive={false}
+                    icon={badgeIcon(p.badges!.filter((b) => b.n > 0))} />
           ))}
           {pick && <CircleMarker center={toLL(height, pick.x, pick.y)} radius={8} pathOptions={{ color: "#16a34a", fillOpacity: 0.5 }} />}
           {onPick && <Clicks height={height} onPick={(x, y) => {

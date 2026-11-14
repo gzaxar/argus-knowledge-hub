@@ -93,6 +93,20 @@ def path_graph(uid: str, dataset: Optional[str] = None, workspace_id: str = Depe
     return bm.path_graph(db, workspace_id, uid, dataset)
 
 
+@paths_router.get("/{uid}/tunnel")
+def path_tunnel(uid: str, dataset: Optional[str] = None, workspace_id: str = Depends(require_permission("read")),
+                identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """The tunnel along the path: elements by `s`, the hardware installed at each with its room, plan point, rack,
+    supplies and open tickets, and the rooms crossed as bands along `s` (services/tunnel.py)."""
+    from app.routers.activities import _may_cached
+    from app.routers.indoor import _viewer
+    from app.services import tunnel
+    _record(db, workspace_id, uid, {"Beam Path"}, "beam path")
+    allowed = _may_cached(db, identity)
+    return tunnel.tunnel(db, workspace_id, uid, _viewer(db, identity, workspace_id),
+                         may_read_tickets=lambda ws: allowed(ws, "read", "tickets"), dataset_uid=dataset)
+
+
 @paths_router.get("/{uid}/elements")
 def path_elements(uid: str, dataset: Optional[str] = None, workspace_id: str = Depends(require_permission("read")),
                   db: Session = Depends(get_db)):
