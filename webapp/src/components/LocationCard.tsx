@@ -3,6 +3,7 @@ import "leaflet/dist/leaflet.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { CircleMarker, MapContainer, Polygon, Polyline, TileLayer, useMapEvents } from "react-leaflet";
+import { GroupedRecords } from "./GroupedRecords";
 import { Link } from "react-router-dom";
 import { ApiError, MAP_TILES, placesApi, type PlaceNeighbour, type PlacedFeature } from "../api/client";
 import { FitTo, GeoShape, drawnGeometry, fmtArea, fmtLength, parseGeometry, pointsOf, type LatLng } from "../lib/geo";
@@ -287,20 +288,14 @@ export function LocationCard({ uid, editable }: { uid: string; editable: boolean
 
 function Neighbours({ title, items, distance }: { title: string; items: PlaceNeighbour[]; distance?: boolean }) {
   if (!items.length) return null;
+  const note = (n: PlaceNeighbour) => [n.role !== "position" ? n.role : "", distance && n.distance_m != null ? `${n.distance_m.toFixed(1)} m` : "",
+                                       n.base_m != null && n.top_m != null ? `${n.base_m}–${n.top_m} m` : ""].filter(Boolean).join(" · ");
+  const listed = items.map((n) => ({ uid: n.uid, name: n.name, type: n.type, note: note(n) || undefined }));
   return (
     <div>
       <p className="text-xs font-semibold uppercase text-slate-500">{title} ({items.length})</p>
-      <ul className="mt-1 space-y-0.5 text-xs">
-        {items.slice(0, 50).map((n) => (
-          <li key={`${n.uid}:${n.role}`}>
-            <Link to={`/assets/${n.uid}`} className="text-indigo-700 hover:underline">{n.name}</Link>
-            <span className="text-slate-500"> · {n.type}{n.role !== "position" ? ` (${n.role})` : ""}
-              {distance && n.distance_m != null ? ` · ${n.distance_m.toFixed(1)} m` : ""}
-              {n.base_m != null && n.top_m != null ? ` · ${n.base_m}–${n.top_m} m` : ""}</span>
-          </li>
-        ))}
-        {items.length > 50 && <li className="text-slate-500">…and {items.length - 50} more</li>}
-      </ul>
+      {/* Along a route the order is the distance: kept as it is. */}
+      <GroupedRecords items={listed} flat={distance ? 50 : 12} />
     </div>
   );
 }

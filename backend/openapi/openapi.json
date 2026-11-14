@@ -61621,6 +61621,84 @@
         ]
       }
     },
+    "/v1/plans/{uid}/scene": {
+      "get": {
+        "description": "The plan's layers for a 3D view: also its scale in metres, the units in its racks at their units and face,\nand the relations between what it shows (services/plan_layers.scene).",
+        "operationId": "plan_scene_v1_plans__uid__scene_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Plan Scene",
+        "tags": [
+          "indoors"
+        ]
+      }
+    },
     "/v1/portability/config": {
       "get": {
         "description": "What a person can choose from, and the policy in force: registered repositories and artifact\nstores (names only, never URLs or paths), signing and verification set-up, restricted classes,\nmodes, outcomes — and every relaxed choice of the policy.",

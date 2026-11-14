@@ -3,12 +3,14 @@ import "leaflet/dist/leaflet.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMapEvents } from "react-leaflet";
-import { Link, useSearchParams } from "react-router-dom";
-import { ApiError, MAP_TILES, indoorApi, placesApi, type ControlPoint, type FloorPlanView, type IndoorView, type PlaceLevel, sitesApi, type PlacementEnding } from "../api/client";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { ApiError, MAP_TILES, indoorApi, placesApi, type ControlPoint, type FloorPlanView, type IndoorView, type PlaceLevel, type PlanLayersView, sitesApi, type PlacementEnding } from "../api/client";
 import type { Asset } from "../api/types";
 import { AffineImage } from "../lib/affineOverlay";
 import { FitTo, pointsOf, type LatLng } from "../lib/geo";
-import { PlanView, usePlanImage } from "./PlanView";
+import { PlanView, usePlanImage, type PlanPin, type PlanShape } from "./PlanView";
+import { GroupedRecords } from "./GroupedRecords";
+import { LAYER_COLOUR, drawn, initialLayers } from "../pages/map/PlanLayersPage";
 import { FullPage, useFullPage } from "./FullPage";
 
 /** A plan or map's height: modest on the page, the screen's in a full-page window. */
@@ -376,41 +378,52 @@ function FloorsAndPlans({ placeUid, levels, plans, contents, editable, onChanged
       {contents.length > 0 && (
         <div>
           <p className="text-xs font-semibold uppercase text-slate-500">Placed here ({contents.length})</p>
-          <ul className="mt-1 space-y-0.5 text-xs">
-            {contents.slice(0, 100).map((c) => (
-              <li key={c.uid}><Link to={`/assets/${c.uid}`} className="text-indigo-700 hover:underline">{c.name}</Link>
-                <span className="text-slate-500"> · {c.type}</span></li>
-            ))}
-          </ul>
+          <GroupedRecords items={contents} />
         </div>
       )}
     </div>
   );
 }
 
-/** A plan with the records placed on it. */
+/** A plan with what is on it, by layer as on its own page: rooms, beamline, racks (one square each) and the main
+ *  plant; a click opens the record, or the rack's elevation. Everything else is one click away. */
 function OpenPlan({ uid }: { uid: string }) {
-  const plan = useQuery({ queryKey: ["plan", uid], queryFn: () => indoorApi.plan(uid) });
+  const layers = useQuery({ queryKey: ["plan-layers", uid], queryFn: () => indoorApi.layers(uid) });
+  const navigate = useNavigate();
   const [full, setFull] = useState(false);
-  if (!plan.data) return null;
-  const p = plan.data;
+  if (!layers.data) return null;
+  const v = layers.data;
+  const on = initialLayers(v);
+  const { pins, shapes } = drawn(v, on, new Set(), (i) => navigate(i.rack ? `/racks/${i.uid}` : `/assets/${i.uid}`), () => {});
+  const shown = v.layers.filter((l) => on.has(l.id) && l.count > 0);
+  const hidden = v.items.length - pins.length;
   return (
     <div className="mt-1 max-w-3xl">
-      <FullPage open={full} title={`Plan ${p.name}`} onClose={() => setFull(false)}>
-        <PlacedOnPlan plan={p} />
+      <FullPage open={full} title={`Plan ${v.name}`} onClose={() => setFull(false)}>
+        <LayeredPlan v={v} pins={pins} shapes={shapes} />
       </FullPage>
+      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
+        {shown.map((l) => (
+          <span key={l.id} className="inline-flex items-center gap-1">
+            <span aria-hidden="true" className="inline-block h-2 w-2 rounded-sm" style={{ background: LAYER_COLOUR[l.id] }} />
+            {l.label} {l.count}
+          </span>
+        ))}
+        {hidden > 0 && <span>· {hidden} more on other layers</span>}
+        {v.in_racks > 0 && <span>· {v.in_racks} in racks</span>}
+      </p>
       <p className="mt-1 text-slate-500">
-        {(p.placed ?? []).length} record(s) placed on it.
-        {!full && <button type="button" onClick={() => setFull(true)} className="ml-2 text-indigo-700 underline">Full page</button>}
-        <Link to={`/plans/${p.uid}`} className="ml-2 text-indigo-700 underline">With layers</Link>
+        {!full && <button type="button" onClick={() => setFull(true)} className="text-indigo-700 underline">Full page</button>}
+        <Link to={`/plans/${v.uid}`} className="ml-3 text-indigo-700 underline">All layers</Link>
+        <Link to={`/plans/${v.uid}/3d`} className="ml-3 text-indigo-700 underline">3D</Link>
       </p>
     </div>
   );
 }
 
-function PlacedOnPlan({ plan: p }: { plan: FloorPlanView }) {
-  return <PlanView planUid={p.uid} width={p.width_px} height={p.height_px} className={useTall("h-96")} northDeg={p.north_deg}
-                   pins={(p.placed ?? []).map((r) => ({ id: r.uid, x: r.x, y: r.y, label: r.name }))} />;
+function LayeredPlan({ v, pins, shapes }: { v: PlanLayersView; pins: PlanPin[]; shapes: PlanShape[] }) {
+  return <PlanView planUid={v.uid} width={v.width_px} height={v.height_px} className={useTall("h-96")} northDeg={v.north_deg}
+                   pins={pins} shapes={shapes} />;
 }
 
 function WorldClicks({ onPick }: { onPick: (lat: number, lon: number) => void }) {

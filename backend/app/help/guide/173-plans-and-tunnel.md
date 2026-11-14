@@ -1,7 +1,7 @@
 ---
 title: Floor plans by layer, and the tunnel
 summary: A floor plan with what is on it, layer by layer — rooms and accesses, beamline, racks (one point each, opening their elevation), main fixed plant, other devices, cables and pipes, zones, open tickets and activities — and the tunnel along a beam path, with the hardware installed at each element and where it is.
-keywords: [floor plan, plan, layers, layer, rack, room, zone, cable, pipe, ticket, activity, tunnel, beamline, s, longitudinal, beam path, where is]
+keywords: [3D, three dimensions, relations, floor plan, plan, layers, layer, rack, room, zone, cable, pipe, ticket, activity, tunnel, beamline, s, longitudinal, beam path, where is]
 order: 173
 ---
 
@@ -27,6 +27,16 @@ placed on the map. Rooms of another floor of the same building are left out.
 
 From a record looked for — `?focus=` in the address, as the tunnel and Ask ARGUS use it — the plan opens around
 it. A unit in a rack is shown as its rack, with a link that opens the rack with that unit selected.
+
+## In 3D
+
+**3D view** on the plan opens the same plan in three dimensions: the drawing on the floor, rooms as glass walls,
+racks as cabinets with each unit at its height, front or rear, beamline, plant and devices. Drag to turn, scroll to
+zoom, right-drag to move; **Reset view** comes back.
+
+**Relations** draws how the records are related as coloured arcs — what powers what, what feeds, cools, controls
+or connects to what. By default only those of the record you click; untick *only those of the record selected* to
+see them all, and choose the types. Where a record is (its room, its rack) is shown by placing it, not as a line.
 
 ## The tunnel
 

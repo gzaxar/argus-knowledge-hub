@@ -2,7 +2,7 @@
 view on the map (services/indoor.py). Records are read and changed under the same rules as their locations.
 
 - `GET/POST /v1/assets/{uid}/levels`, `PATCH/DELETE /v1/levels/{uid}` — a place's floors.
-- `GET/POST /v1/assets/{uid}/plans`, `GET/PATCH/DELETE /v1/plans/{uid}`, `GET /v1/plans/{uid}/image`, `GET /v1/plans/{uid}/layers`,
+- `GET/POST /v1/assets/{uid}/plans`, `GET/PATCH/DELETE /v1/plans/{uid}`, `GET /v1/plans/{uid}/image`, `GET /v1/plans/{uid}/layers`, `GET /v1/plans/{uid}/scene`,
   `PUT/DELETE /v1/plans/{uid}/placement` — floor plans; placing one on the map by control points.
 - `GET/PUT/DELETE /v1/assets/{uid}/indoors` — where a record is inside; `GET /v1/map/plans?bbox=` — the plans
   placed on the map in view, for a floor switcher.
@@ -218,6 +218,19 @@ def plan_layers(uid: str, workspace_id: str = Depends(require_permission("read")
     return plan_layers.layers(db, plan, may, may_read_tickets=lambda ws: allowed(ws, "read", "tickets"),
                               activities_of=upcoming)
 
+
+@router.get("/plans/{uid}/scene")
+def plan_scene(uid: str, workspace_id: str = Depends(require_permission("read")), grants=Depends(get_grants),
+               identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """The plan's layers for a 3D view: also its scale in metres, the units in its racks at their units and face,
+    and the relations between what it shows (services/plan_layers.scene)."""
+    from app.routers.activities import _may_cached
+    from app.services import plan_layers
+
+    plan = _plan(db, uid, workspace_id, grants)
+    allowed = _may_cached(db, identity)
+    return plan_layers.scene(db, plan, _viewer(db, identity, workspace_id),
+                             may_read_tickets=lambda ws: allowed(ws, "read", "tickets"))
 
 
 @router.get("/plans/{uid}/image")

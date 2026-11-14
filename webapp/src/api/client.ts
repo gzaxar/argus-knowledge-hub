@@ -2544,6 +2544,8 @@ export const indoorApi = {
    *  and which way each is from the first. */
   /** What the plan shows over its drawing, layer by layer (docs/plan-layers.md). */
   layers: (uid: string) => request<PlanLayersView>(`/v1/plans/${uid}/layers`),
+  /** The same, for the 3D view: the scale, the units in the racks at their units, the relations between them. */
+  scene: (uid: string) => request<PlanSceneView>(`/v1/plans/${uid}/scene`),
   show: (records: string[]) => request<FloorPlanShow>(`/v1/floor-plan/show?records=${encodeURIComponent(records.join(","))}`),
   mapPlans: (bbox: [number, number, number, number]) =>
     request<FloorPlanView[]>(`/v1/map/plans?bbox=${bbox.map((n) => n.toFixed(6)).join(",")}`),
@@ -3504,4 +3506,17 @@ export interface TunnelView {
   rooms: (TunnelRef & { from_s: number; to_s: number })[];
   /** Every element has its s: drawn to scale. */
   with_s: boolean;
+}
+
+export interface PlanSceneUnit {
+  uid: string; key: string | null; name: string; type: string; rack_uid: string;
+  start_u: number | null; height_u: number | null; face: "front" | "rear" | "both" | null; kind: string | null;
+}
+
+export interface PlanSceneView extends PlanLayersView {
+  metres_per_px: number;
+  /** False: the plan is not placed on the map and a tenth of a metre a pixel is assumed. */
+  scale_known: boolean;
+  units: PlanSceneUnit[];
+  relations: { from: string; to: string; type: string }[];
 }

@@ -89,3 +89,24 @@ def test_a_plan_not_on_the_map_still_shows_its_points_without_shapes(world):
     v = client.get(f"/v1/plans/{plan['uid']}/layers", headers=h).json()
     assert [i["layer"] for i in v["items"]] == ["fixed"] and v["outlines"] == [] and v["routes"] == []
 
+
+def test_the_scene_has_the_scale_the_units_at_their_height_and_the_relations_between_what_is_shown(world):
+    w, h = world, world["headers"]
+    hall = _unit(w, "Hall S", "Building")
+    plan = client.post(f"/v1/assets/{hall}/plans", headers=h, files={"file": ("h.png", png(), "image/png")}).json()
+    client.put(f"/v1/plans/{plan['uid']}/placement", headers=h, json={"points": [cp(0, 0), cp(1000, 0), cp(0, 500)]})
+    rack, server, ups = _unit(w, "Rack Q", "Rack"), _unit(w, "Server Q", "Server"), _unit(w, "UPS Q", "UPS")
+    for uid, x in ((rack, 100), (ups, 300)):
+        client.put(f"/v1/assets/{uid}/indoors", headers=h, json={"place_uid": hall, "plan_uid": plan["uid"], "x": x, "y": 100})
+    assert client.post(f"/v1/racks/{rack}/apply", headers=h, json={"operations": [
+        {"op": "place", "asset_uid": server, "start_u": 10, "height_u": 2}]}).status_code == 200
+    db = SessionLocal()
+    db.add(Relation(workspace_id=w["ws"], from_asset_uid=ups, to_asset_uid=server, relation_type="powers"))
+    db.commit()
+    db.close()
+    s = client.get(f"/v1/plans/{plan['uid']}/scene", headers=h).json()
+    assert s["scale_known"] and abs(s["metres_per_px"] - 0.1) < 0.002
+    assert [(u["name"], u["rack_uid"], u["start_u"], u["height_u"], u["face"]) for u in s["units"]] == \
+        [("Server Q", rack, 10, 2, "front")]
+    # The server's place in its rack is shown by placing it; that the UPS powers it is a line.
+    assert s["relations"] == [{"from": ups, "to": server, "type": "powers"}]

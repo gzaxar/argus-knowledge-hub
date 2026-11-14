@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import RackEditor from "./pages/racks/RackEditor";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useCurrentWorkspaceId } from "./api/useCurrentWorkspaceId";
@@ -38,6 +39,8 @@ import { BeamModelEditorPage } from "./pages/beam/BeamModelEditor";
 import { BeamAssetSyncPage } from "./pages/beam/BeamAssetSync";
 import { TunnelPage } from "./pages/beam/TunnelPage";
 import { PlanLayersPage } from "./pages/map/PlanLayersPage";
+// The 3D view carries three.js: loaded only when it is opened.
+const Plan3DPage = lazy(() => import("./pages/map/Plan3DPage"));
 import { GlobalValueList } from "./pages/globalvalues/List";
 import { ImportList } from "./pages/imports/List";
 import { MarkdownImport } from "./pages/imports/Markdown";
@@ -126,6 +129,7 @@ export function App() {
           <Route path="/floor-plan" element={<FloorPlanPage />} />
           <Route path="/racks/:uid" element={<RackEditor />} />
           <Route path="/plans/:uid" element={<PlanLayersPage />} />
+          <Route path="/plans/:uid/3d" element={<Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading the 3D view…</p>}><Plan3DPage /></Suspense>} />
           <Route path="/tunnel" element={<TunnelPage />} />
           <Route path="/tunnel/:pathUid" element={<TunnelPage />} />
           <Route path="/assets/new" element={<AssetForm />} />

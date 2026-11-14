@@ -45,3 +45,19 @@ installed there now — confirmed installations of the ledger and confirmed beam
 
 `rooms` are bands along `s`: consecutive elements whose hardware is in the same room. The web page is
 `/tunnel/{path}`, linked from the beam model page.
+
+## The 3D view — `GET /v1/plans/{uid}/scene`, page `/plans/{uid}/3d`
+
+A simplified 3D view of a floor plan (three.js, loaded only when the page is opened): the drawing on the floor,
+rooms as glass walls 2.8 m high, zones tinted on the floor, cables and pipes as lines, racks as 2 m cabinets with
+their units at their units (U1 at 0.1 m, 44.45 mm a unit; front units towards the front, 0U strips at the rear),
+beamline components at 1.2 m, fixed plant as 1.6 m blocks, other devices as small cubes.
+
+`scene` is `layers` plus `metres_per_px` (from the plan's placement on the map; 0.1 m when it is not placed,
+`scale_known: false`), `units` (each unit held in a rack on the plan, with its rack, units and face) and `relations`
+between everything the plan shows. Relations that say where or what a record is (`located in`, `port of`,
+`part of`, `installed at`…: `NOT_DRAWN`) are not drawn: placing shows them.
+
+On the page, relations are arcs coloured by type, higher the farther apart their ends; they can be limited to some
+types and, by default, to those of the record selected. A click selects (a room only when nothing else is under
+the pointer); the panel says each relation in words and opens the rack, or the unit in its rack.

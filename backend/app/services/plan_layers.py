@@ -219,3 +219,47 @@ def layers(db: Session, plan: FloorPlan, may: Callable[[Asset], bool], *, may_re
 
 ACTIVITY_WINDOW = (timedelta(days=-1), timedelta(days=30))
 
+
+# --------------------------------------------------------------------------- the 3D scene
+
+# Relations that say where or what a record is, not how it works with others: the scene shows those by placing.
+NOT_DRAWN = {"located in", "installation of", "installed at", "placed on", "in work package", "supplied by",
+             "covered by", "with", "port of", "on segment", "realized by", "instance of", "part of"}
+DEFAULT_MPP = 0.1
+
+
+def metres_per_px(plan: FloorPlan) -> tuple[float, bool]:
+    """The plan's scale, from its placement on the map; a tenth of a metre a pixel when it is not placed."""
+    import math
+    if not plan.transform:
+        return DEFAULT_MPP, False
+    t = plan.transform
+    lon0, lat0 = indoor.to_lonlat(t, 0, 0)
+    lon1, lat1 = indoor.to_lonlat(t, 1, 0)
+    dx = (lon1 - lon0) * 111_320 * math.cos(math.radians(lat0))
+    dy = (lat1 - lat0) * 110_540
+    return round(math.hypot(dx, dy), 5) or DEFAULT_MPP, True
+
+
+def scene(db: Session, plan: FloorPlan, may: Callable[[Asset], bool], *, may_read_tickets: Callable[[str], bool],
+          activities_of: Optional[Callable[[], list]] = None) -> dict:
+    """The plan's layers, and for a 3D view: its scale, the units in its racks at their units and face, and the
+    relations between everything the plan shows (where things are is shown by placing them, not as lines)."""
+    view = layers(db, plan, may, may_read_tickets=may_read_tickets, activities_of=activities_of)
+    mpp, known = metres_per_px(plan)
+    units = []
+    for unit_uid, rack_uid in view["held"].items():
+        a = db.get(Asset, unit_uid)
+        m = db.scalar(select(RackMounting).where(RackMounting.asset_uid == unit_uid, RackMounting.state == "confirmed",
+                                                 RackMounting.rack_uid == rack_uid))
+        units.append({"uid": a.uid, "key": a.key, "name": a.name, "type": a.type, "rack_uid": rack_uid,
+                      "start_u": m.start_u if m else None, "height_u": m.height_u if m else None,
+                      "face": m.face if m else None, "kind": m.kind if m else None})
+    shown = {i["uid"] for i in view["items"]} | {u["uid"] for u in units} | \
+        {s["uid"] for s in view["outlines"] + view["routes"]}
+    edges = []
+    if shown:
+        for r in db.scalars(select(Relation).where(Relation.from_asset_uid.in_(shown), Relation.to_asset_uid.in_(shown),
+                                                   Relation.relation_type.notin_(NOT_DRAWN))):
+            edges.append({"from": r.from_asset_uid, "to": r.to_asset_uid, "type": r.relation_type})
+    return {**view, "metres_per_px": mpp, "scale_known": known, "units": units, "relations": edges}

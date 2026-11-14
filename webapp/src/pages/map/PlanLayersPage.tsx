@@ -88,7 +88,10 @@ export function PlanLayersPage() {
             {v.in_racks > 0 && <span className="text-slate-500"> · {v.in_racks} unit(s) in racks, shown as their rack</span>}
           </p>
         </div>
-        <p className="text-xs text-slate-500">The drawing is the plan as uploaded; the records are drawn over it.</p>
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-slate-500">The drawing is the plan as uploaded; the records are drawn over it.</p>
+          <Link to={`/plans/${v.uid}/3d`} className="rounded border border-slate-300 bg-white px-2 py-1 text-xs hover:bg-slate-50">3D view</Link>
+        </div>
       </div>
 
       <fieldset className="flex flex-wrap gap-2" aria-label="Layers">

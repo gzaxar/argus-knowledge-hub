@@ -56,3 +56,13 @@ describe("the tunnel", () => {
     expect(spreadOut([10, 12, 50, 11], 5)).toEqual([10, 20, 50, 15]);
   });
 });
+
+describe("records grouped by type", () => {
+  it("puts the most numerous type first, each type's records by name", async () => {
+    const { groupByType } = await import("../components/GroupedRecords");
+    const g = groupByType([
+      { uid: "1", name: "Pump B", type: "Pump" }, { uid: "2", name: "Room", type: "Room" }, { uid: "3", name: "Pump A", type: "Pump" },
+    ]);
+    expect(g.map(([t, xs]) => [t, xs.map((x) => x.name)])).toEqual([["Pump", ["Pump A", "Pump B"]], ["Room", ["Room"]]]);
+  });
+});
