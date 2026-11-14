@@ -1,3 +1,4 @@
+import RackEditor from "./pages/racks/RackEditor";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useCurrentWorkspaceId } from "./api/useCurrentWorkspaceId";
 import { TokenGate } from "./auth/TokenGate";
@@ -121,6 +122,7 @@ export function App() {
           <Route path="/search/advanced" element={<AdvancedSearch />} />
           <Route path="/map" element={<MapPage />} />
           <Route path="/floor-plan" element={<FloorPlanPage />} />
+          <Route path="/racks/:uid" element={<RackEditor />} />
           <Route path="/assets/new" element={<AssetForm />} />
           <Route path="/assets/import" element={<SpreadsheetImportPage />} />
           <Route path="/assets/:uid" element={<AssetDetail />} />

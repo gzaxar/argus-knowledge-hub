@@ -28,6 +28,7 @@ from app.models.document_template import DocumentGeneration, DocumentTemplate, D
 from app.models.global_value import GlobalValue
 from app.models.icon import Icon
 from app.models.indoor import FloorPlan, IndoorPlacement, PlaceLevel
+from app.models.rack import RackMounting
 from app.models.issue import Issue, IssueComment, IssueHistory, IssueLink
 from app.models.membership import Membership
 from app.models.package import WorkspacePackage
@@ -213,6 +214,7 @@ def build() -> list[Family]:
         Family("place_levels", PlaceLevel, _ws(PlaceLevel)),
         Family("floor_plans", FloorPlan, _ws(FloorPlan), files=("storage_path", "source_path")),
         Family("indoor_placements", IndoorPlacement, _ws(IndoorPlacement)),
+        Family("rack_mountings", RackMounting, _ws(RackMounting)),
         Family("beam_model_documents", BeamModelDocument, _ws(BeamModelDocument)),
         Family("beam_model_values", BeamModelValue, _ws(BeamModelValue)),
         Family("beam_asset_bindings", BeamAssetBinding, _ws(BeamAssetBinding)),

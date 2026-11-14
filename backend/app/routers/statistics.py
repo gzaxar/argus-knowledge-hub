@@ -72,6 +72,10 @@ def statistics(days: int = Query(30, ge=1, le=366), refresh_storage: bool = Fals
     start = end - timedelta(days=days - 1)
     since = datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc)
     names = dict(db.execute(select(Workspace.id, Workspace.name)).all())
+    # A workspace id no workspace has — a caller's typo or a scanner's payload — is shown as one row, not one each.
+    from app.services.usage import UNKNOWN_WORKSPACE
+    names[UNKNOWN_WORKSPACE] = "Unknown workspace (requests naming none that exists)"
+    ws_of = lambda w: w if not w or w in names else UNKNOWN_WORKSPACE  # noqa: E731
 
     # ---------------------------------------------------------------- requests and people
     per_day = {d: {c: 0 for c in CLIENTS} for d in _days(start, end)}
@@ -124,9 +128,13 @@ def statistics(days: int = Query(30, ge=1, le=366), refresh_storage: bool = Fals
                func.sum(UsageRequest.count),
                func.sum(UsageRequest.count).filter(~UsageRequest.function.like("GET %")))
         .where(UsageRequest.day >= start, UsageRequest.workspace_id != "").group_by(UsageRequest.workspace_id)).all()
-    workspaces = {w: {"workspace": w, "name": names.get(w, w), "requests": int(r), "writes": int(wr or 0),
-                      "objects_created": 0, "tickets_created": 0, "documents_created": 0, "ask_questions": 0}
-                  for w, r, wr in ws_rows}
+    workspaces: dict[str, dict] = {}
+    for w, r, wr in ws_rows:
+        row = workspaces.setdefault(ws_of(w), {"workspace": ws_of(w), "name": names.get(ws_of(w), w), "requests": 0,
+                                               "writes": 0, "objects_created": 0, "tickets_created": 0,
+                                               "documents_created": 0, "ask_questions": 0})
+        row["requests"] += int(r)
+        row["writes"] += int(wr or 0)
 
     def created(model, key):
         for w, n in db.execute(select(model.workspace_id, func.count()).where(model.created_at >= since)
@@ -165,6 +173,7 @@ def statistics(days: int = Query(30, ge=1, le=366), refresh_storage: bool = Fals
             continue
         records_day.setdefault(day.isoformat(), {})[f"{kind}_{op}"] = \
             records_day.get(day.isoformat(), {}).get(f"{kind}_{op}", 0) + int(n)
+        ws = ws_of(ws)
         if ws and op == "changed":
             row = workspaces.setdefault(ws, {"workspace": ws, "name": names.get(ws, ws), "requests": 0, "writes": 0,
                                              "objects_created": 0, "tickets_created": 0, "documents_created": 0,
@@ -182,6 +191,7 @@ def statistics(days: int = Query(30, ge=1, le=366), refresh_storage: bool = Fals
             select(UsageRequest.day, UsageRequest.workspace_id, func.sum(UsageRequest.count))
             .where(UsageRequest.day >= start, UsageRequest.workspace_id != "", ~UsageRequest.function.like("GET %"))
             .group_by(UsageRequest.day, UsageRequest.workspace_id)):
+        ws = ws_of(ws)
         activity.setdefault(ws, {})[day.isoformat()] = activity.get(ws, {}).get(day.isoformat(), 0) + int(n)
     for model in kinds.values():
         created_day = cast(func.timezone("UTC", model.created_at), Date)
@@ -241,9 +251,16 @@ def statistics(days: int = Query(30, ge=1, le=366), refresh_storage: bool = Fals
                                  func.sum(UsageLLM.estimated_calls), func.sum(UsageLLM.ms_total))
                           .where(UsageLLM.day >= start).group_by(column)
                           .order_by(func.sum(UsageLLM.prompt_tokens + UsageLLM.completion_tokens).desc())).all()
-        return [{label: (names.get(k, k) if label == "workspace" else k) or "(no workspace)", "calls": int(c),
-                 "failures": int(f), "prompt_tokens": int(p), "completion_tokens": int(o), "estimated_calls": int(e),
-                 "avg_seconds": round(int(ms) / int(c) / 1000, 1) if c else 0} for k, c, f, p, o, e, ms in rows]
+        folded: dict = {}
+        for k, c, f, p, o, e, ms in rows:
+            key = ws_of(k) if label == "workspace" else k
+            acc = folded.setdefault(key, [0, 0, 0, 0, 0, 0])
+            for i, v in enumerate((c, f, p, o, e, ms)):
+                acc[i] += int(v or 0)
+        return [{label: (names.get(k, k) if label == "workspace" else k) or "(no workspace)", "calls": c,
+                 "failures": f, "prompt_tokens": p, "completion_tokens": o, "estimated_calls": e,
+                 "avg_seconds": round(ms / c / 1000, 1) if c else 0}
+                for k, (c, f, p, o, e, ms) in sorted(folded.items(), key=lambda kv: -(kv[1][2] + kv[1][3]))]
 
     # ---------------------------------------------------------------- Ask ARGUS
     answers = select(AskMessage).where(AskMessage.role == "assistant", AskMessage.created_at >= since).subquery()

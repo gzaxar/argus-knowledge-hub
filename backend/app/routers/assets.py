@@ -500,6 +500,13 @@ def _before_erasing(db: Session, asset: Asset, actor: Optional[str]) -> None:
         db.add(IssueHistory(uid=str(uuid.uuid4()), issue_uid=issue.uid, type="updated", author=actor or "api",
                             field="Object", from_value=label, to_value="deleted",
                             timestamp=datetime.now(timezone.utc)))
+    # What it held in a rack, or held as a rack, is closed: the elevation shows what is there.
+    from sqlalchemy import or_
+    from app.models.mixins import utcnow
+    from app.models.rack import RackMounting
+    for m in db.scalars(select(RackMounting).where(RackMounting.state == "confirmed", or_(
+            RackMounting.asset_uid == asset.uid, RackMounting.rack_uid == asset.uid))):
+        m.state, m.valid_until = "removed", utcnow()
     for link in db.scalars(select(DocumentRelation).where(DocumentRelation.to_type == "asset",
                                                           DocumentRelation.to_uid == asset.uid)):
         db.delete(link)

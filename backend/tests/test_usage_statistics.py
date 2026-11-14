@@ -97,6 +97,27 @@ def test_requests_are_counted_by_client_workspace_and_function(world):
     assert rows == {"api": 1, "app": 1, "web": 1}
 
 
+def test_a_workspace_header_naming_no_workspace_is_one_unknown_row(world):
+    """A scanner sends SQL and scripts as the workspace: they are counted, under one row, never as workspaces."""
+    w = world
+    as_(w["ann"])
+    junk = [f"'; select sleep(15) -- {secrets.token_hex(3)}", f"<script>{secrets.token_hex(3)}</script>"]
+    for j in junk:
+        client.get("/v1/me", headers={"X-Workspace-Id": j})
+    client.get("/v1/me", headers=w["h"])
+    usage.flush()
+    db = SessionLocal()
+    try:
+        stored = set(db.scalars(select(UsageRequest.workspace_id).where(UsageRequest.day == date.today())))
+        assert not any(j in stored for j in junk) and usage.UNKNOWN_WORKSPACE in stored and w["ws"] in stored
+    finally:
+        db.close()
+    stats = client.get("/v1/admin/statistics", params={"days": 7}).json()
+    names = [r["name"] for r in stats["workspaces"]]
+    assert not any(j in names for j in junk)
+    assert sum(1 for r in stats["workspaces"] if r["workspace"] == usage.UNKNOWN_WORKSPACE) == 1
+
+
 def test_people_are_counted_as_a_keyed_hash_never_by_id(world):
     w = world
     holder = usage.begin({"user-agent": "Mozilla/5.0"}, "/v1/assets")

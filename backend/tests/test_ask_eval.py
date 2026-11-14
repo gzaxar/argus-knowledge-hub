@@ -4,6 +4,7 @@ stand-ins, restricted records never reach an answer or an unapproved server, fai
 reports are sealed, and the administration API keeps keys secret and starts runs only against their own database."""
 from __future__ import annotations
 
+import os
 import json
 import secrets
 import time
@@ -354,9 +355,40 @@ def test_only_administrators_see_or_start_evaluations():
         app.dependency_overrides.pop(get_identity, None)
 
 
+def test_without_a_configured_database_a_run_gets_its_own_on_the_same_server(admin, monkeypatch):
+    """No ASK_EVAL_DATABASE_URL: the evaluation makes `<this database>_ask_eval` on the same server, and the run's
+    process is pointed there — never at this installation's database."""
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import make_url
+    from app.ask_eval import service
+    monkeypatch.delenv("ASK_EVAL_DATABASE_URL", raising=False)
+    monkeypatch.delenv("ASK_EVAL_DATABASE", raising=False)
+    own = make_url(os.environ["DATABASE_URL"])
+    name = f"{own.database}{service.SUFFIX}"
+    assert client.get("/v1/admin/ask-eval/settings").json()["database"] == name
+    started = []
+    monkeypatch.setattr(service, "_child", lambda *a: started.append(a))
+    monkeypatch.setattr(service.threading, "Thread",
+                        lambda target, args, **kw: SimpleNamespace(start=lambda: target(*args)))
+    r = client.post("/v1/admin/ask-eval/runs", json={"kind": "simulated"})
+    assert r.status_code == 202, r.text
+    env = started[0][3]
+    assert make_url(env["DATABASE_URL"]).database == name and env["DATABASE_URL"] != os.environ["DATABASE_URL"]
+    engine = create_engine(own, isolation_level="AUTOCOMMIT")
+    with engine.connect() as c:
+        assert c.scalar(text("select 1 from pg_database where datname = :n"), {"n": name}) == 1
+    engine.dispose()
+    db = SessionLocal()
+    from app.models.ask_eval import AskEvalRun
+    db.get(AskEvalRun, started[0][0]).status = "failed"
+    db.commit()
+    db.close()
+
+
 def test_a_run_is_started_only_against_its_own_database(admin, monkeypatch):
     from app.ask_eval import service
     monkeypatch.delenv("ASK_EVAL_DATABASE_URL", raising=False)
+    monkeypatch.setenv("ASK_EVAL_DATABASE", "off")
     r = client.post("/v1/admin/ask-eval/runs", json={"kind": "simulated"})
     assert r.status_code == 409 and "evaluation database" in r.json()["detail"]
     monkeypatch.setenv("ASK_EVAL_DATABASE_URL", "postgresql://eval:eval@localhost:5432/askeval")

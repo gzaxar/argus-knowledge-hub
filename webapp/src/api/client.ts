@@ -3326,6 +3326,9 @@ export interface AskEvalSettings {
   judge_base_url: string | null; judge_api_key_set: boolean; approved_hosts: string[]; repeats: number;
   case_timeout_s: number; max_output_tokens: number | null; updated_by: string | null; updated_at: string | null;
   database_configured: boolean;
+  /** The evaluation database's name (never its address); where it comes from. */
+  database?: string | null;
+  database_source?: "configured" | "same server" | null;
 }
 export interface AskEvalRow {
   model: string; status?: string; reason?: string | null; runs?: number; skipped?: number; pass_rate?: number | null;
@@ -3375,4 +3378,73 @@ export const askEvalApi = {
     if (!resp.ok) throw new ApiError(resp.status, await resp.text());
     return URL.createObjectURL(await resp.blob());
   },
+};
+
+// --- rack elevations (docs/rack-elevation.md) ---------------------------------------------------------------------
+
+export interface RackMountingView {
+  uid: string;
+  kind: "device" | "shelf" | "reserved" | "zero_u";
+  start_u: number | null;
+  height_u: number;
+  top_u: number | null;
+  face: "front" | "rear" | "both";
+  shelf_uid: string | null;
+  label: string | null;
+  note: string | null;
+  source: string;
+  evidence: Record<string, unknown> | null;
+  asset: { uid: string; key: string | null; name: string; type: string } | null;
+  /** When the stored mounting began; null for one a preview would make. */
+  since: string | null;
+}
+export interface RackProblem { code: string; message: string; mounting?: string; with?: string; asset_uid?: string | null }
+export interface RackElevationView {
+  rack: { uid: string; key: string | null; name: string; units: number; workspace_id: string };
+  mountings: RackMountingView[];
+  free: Record<"front" | "rear", { from_u: number; to_u: number; units: number }[]>;
+  used_units: Record<"front" | "rear", number>;
+  problems: RackProblem[];
+}
+export interface RackOp {
+  op: "place" | "shelf" | "reserve" | "update" | "remove";
+  asset_uid?: string;
+  mounting_uid?: string;
+  kind?: "device" | "zero_u";
+  start_u?: number;
+  height_u?: number;
+  face?: "front" | "rear" | "both";
+  shelf_uid?: string;
+  ref?: string;
+  label?: string;
+  note?: string;
+  source?: string;
+  evidence?: Record<string, unknown>;
+}
+export interface RackChangeResult {
+  ok: boolean;
+  changes: { op: string; mounting: string; asset_uid: string | null; name: string; before: string | null; after: string | null; text: string }[];
+  problems: RackProblem[];
+  elevation: RackElevationView;
+  notes?: string[];
+}
+export interface RackCandidate {
+  uid: string; key: string | null; name: string; type: string; serial: string | null; suggested_height_u: number | null;
+  mounted: { rack_uid: string; rack: string | null; start_u: number | null; height_u: number; face: string } | null;
+}
+export interface RackHistoryRow extends RackMountingView { state: string; by: string | null; from: string | null; until: string | null }
+
+export const racksApi = {
+  get: (uid: string) => request<RackElevationView>(`/v1/racks/${encodeURIComponent(uid)}`),
+  history: (uid: string) => request<RackHistoryRow[]>(`/v1/racks/${encodeURIComponent(uid)}/history`),
+  preview: (uid: string, operations: RackOp[]) =>
+    request<RackChangeResult>(`/v1/racks/${encodeURIComponent(uid)}/preview`, { method: "POST", body: json({ operations }) }),
+  apply: (uid: string, operations: RackOp[]) =>
+    request<RackChangeResult>(`/v1/racks/${encodeURIComponent(uid)}/apply`, { method: "POST", body: json({ operations }) }),
+  candidates: (q: string) => request<RackCandidate[]>(`/v1/racks/candidates?q=${encodeURIComponent(q)}`),
+  /** Where a unit is mounted now; null when it is in no rack. */
+  of: (assetUid: string) =>
+    request<{ mounting_uid: string; rack: { uid: string; key: string | null; name: string }; kind: string;
+              start_u: number | null; height_u: number; face: string; shelf_uid: string | null } | null>(
+      `/v1/racks/of/${encodeURIComponent(assetUid)}`),
 };

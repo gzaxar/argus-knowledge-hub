@@ -2,8 +2,10 @@
 a report uploaded from a CI job, and the history per release.
 
 A run started here does not touch this installation's data: it runs as a separate process (``python -m
-app.ask_eval run``) against the evaluation's own database, ``ASK_EVAL_DATABASE_URL``, which the operator provides.
-Without it, starting a run is refused. The process gets the model server's key in its environment only; the key is
+app.ask_eval run``) against the evaluation's own database. That is ``ASK_EVAL_DATABASE_URL`` when the operator
+gives one; otherwise a database of its own on this installation's PostgreSQL server, named after this one with
+``_ask_eval`` (``argus`` → ``argus_ask_eval``), made the first time it is needed. ``ASK_EVAL_DATABASE=off`` turns
+that off. A run never uses this installation's own database. The process gets the model server's key in its environment only; the key is
 read from the encrypted settings, never written anywhere else, and taken out of anything the process prints.
 """
 from __future__ import annotations
@@ -42,6 +44,55 @@ def settings(db: Session) -> AskEvalSettings:
     return row
 
 
+SUFFIX = "_ask_eval"
+
+
+def _derived_url() -> Optional[str]:
+    """This installation's server, a database of the evaluation's own: same host, user and password."""
+    from sqlalchemy.engine import make_url
+    own = os.environ.get("DATABASE_URL")
+    if not own or os.environ.get("ASK_EVAL_DATABASE", "").lower() in ("off", "0", "false", "no"):
+        return None
+    url = make_url(own)
+    if not url.drivername.startswith("postgresql") or not url.database:
+        return None
+    return url.set(database=f"{url.database}{SUFFIX}").render_as_string(hide_password=False)
+
+
+def database_url() -> Optional[str]:
+    return os.environ.get("ASK_EVAL_DATABASE_URL") or _derived_url()
+
+
+def database_name() -> Optional[str]:
+    """Only the name, for the page: never the address or the password."""
+    from sqlalchemy.engine import make_url
+    url = database_url()
+    return make_url(url).database if url else None
+
+
+def ensure_database(url: str) -> None:
+    """The evaluation's database exists, made on this server when it does not. Refused with the reason when the
+    installation's account may not make databases."""
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import make_url
+    target = make_url(url)
+    own = os.environ.get("DATABASE_URL")
+    if os.environ.get("ASK_EVAL_DATABASE_URL") or not own:
+        return                                   # the operator's database: theirs to make
+    engine = create_engine(make_url(own), isolation_level="AUTOCOMMIT", pool_pre_ping=True)
+    try:
+        with engine.connect() as c:
+            if c.scalar(text("select 1 from pg_database where datname = :n"), {"n": target.database}):
+                return
+            name = target.database.replace('"', '""')
+            c.execute(text(f'create database "{name}"'))
+    except Exception as exc:  # noqa: BLE001 — no CREATEDB right, a managed server
+        raise ServiceError(f"the evaluation's database {target.database} could not be made on this server ({exc.__class__.__name__}): "
+                           "make it, or set ASK_EVAL_DATABASE_URL (docs/ask-eval.md)")
+    finally:
+        engine.dispose()
+
+
 def settings_out(row: AskEvalSettings) -> dict:
     return {"base_url": row.base_url, "api_key_set": bool(row.encrypted_key), "models": row.models or [],
             "release_model": row.release_model, "embedding_model": row.embedding_model,
@@ -49,7 +100,9 @@ def settings_out(row: AskEvalSettings) -> dict:
             "judge_api_key_set": bool(row.encrypted_judge_key), "approved_hosts": row.approved_hosts or [],
             "repeats": row.repeats, "case_timeout_s": row.case_timeout_s,
             "max_output_tokens": row.max_output_tokens, "updated_by": row.updated_by,
-            "updated_at": row.updated_at, "database_configured": bool(os.environ.get("ASK_EVAL_DATABASE_URL"))}
+            "updated_at": row.updated_at, "database_configured": bool(database_url()),
+            "database": database_name(),
+            "database_source": "configured" if os.environ.get("ASK_EVAL_DATABASE_URL") else "same server" if database_url() else None}
 
 
 def save_settings(db: Session, values: dict, actor: str) -> AskEvalSettings:
@@ -163,12 +216,15 @@ def start(db: Session, *, kind: str, models: list[str], repeats: Optional[int], 
     """A run, started in the background against the evaluation database. One at a time."""
     if kind not in KINDS:
         raise ServiceError(f"kind is one of {', '.join(KINDS)}")
-    scratch = os.environ.get("ASK_EVAL_DATABASE_URL")
+    scratch = database_url()
     if not scratch:
-        raise ServiceError("no evaluation database: set ASK_EVAL_DATABASE_URL (docs/ask-eval.md). A run never "
-                           "uses this installation's own database.")
-    if scratch == os.environ.get("DATABASE_URL"):
-        raise ServiceError("ASK_EVAL_DATABASE_URL is this installation's own database: give the evaluation its own")
+        raise ServiceError("no evaluation database: set ASK_EVAL_DATABASE_URL, or let ARGUS make one on its own server "
+                           "(unset ASK_EVAL_DATABASE=off; docs/ask-eval.md). A run never uses this installation's own database.")
+    from sqlalchemy.engine import make_url
+    own = os.environ.get("DATABASE_URL")
+    if own and make_url(scratch).set(query={}) == make_url(own).set(query={}):
+        raise ServiceError("the evaluation's database is this installation's own database: give the evaluation its own")
+    ensure_database(scratch)
     row = settings(db)
     if kind != "simulated":
         if not row.base_url:

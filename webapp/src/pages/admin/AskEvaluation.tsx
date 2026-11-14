@@ -261,6 +261,12 @@ export function AskEvaluationPage() {
           <p className="text-xs text-amber-700">No evaluation database is configured (ASK_EVAL_DATABASE_URL): runs can only be
             made from a CI job or a cluster job and uploaded (docs/ask-eval.md).</p>
         )}
+        {s?.database_configured && s.database_source === "same server" && (
+          <p className="text-xs text-slate-500">
+            Runs use the database <span className="font-mono">{s.database}</span> on this installation's PostgreSQL server,
+            made the first time a run starts — never this installation's own data.
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <button type="button" disabled={start.isPending || !s?.base_url}
                   onClick={() => start.mutate({ kind: "release" })}

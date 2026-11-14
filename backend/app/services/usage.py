@@ -11,6 +11,7 @@ ARGUS_USAGE_STATS=0 switches it off.
 """
 from __future__ import annotations
 
+from sqlalchemy import select
 import atexit
 import hashlib
 import hmac
@@ -35,6 +36,8 @@ STORAGE_SECONDS = 3600       # storage is measured hourly (the day keeps its las
 _request: ContextVar[Optional[dict]] = ContextVar("argus_usage_request", default=None)
 
 _lock = threading.Lock()
+# Requests that named a workspace that does not exist (a typo, a stale client, a scanner's payload) are counted here.
+UNKNOWN_WORKSPACE = "?"
 _requests: dict[tuple, list[int]] = {}          # (day, client, workspace, function) -> [count, errors, ms]
 _presence: set[tuple] = set()                   # (bucket, client, user id)
 _llm: dict[tuple, list[int]] = {}               # (day, workspace, model, purpose) -> [calls, failures, in, out, est, ms]
@@ -174,6 +177,24 @@ def flush() -> None:
     from app.models.usage import UsageLLM, UsagePresence, UsageRequest
     db = SessionLocal()
     try:
+        # A workspace header is whatever the caller sent: a scanner sends SQL, scripts and URLs. What names no
+        # workspace is counted under one bucket, not as a workspace of its own.
+        from app.models.workspace import Workspace
+        named = {k[2] for k in requests_} | {k[1] for k in llm}
+        real = set(db.scalars(select(Workspace.id).where(Workspace.id.in_(named - {""})))) if named - {""} else set()
+        fold = lambda w: w if not w or w in real else UNKNOWN_WORKSPACE  # noqa: E731
+        merged: dict[tuple, list[int]] = {}
+        for k, v in requests_.items():
+            row = merged.setdefault((k[0], k[1], fold(k[2]), k[3]), [0, 0, 0])
+            for i in range(3):
+                row[i] += v[i]
+        requests_ = merged
+        merged_llm: dict[tuple, list[int]] = {}
+        for k, v in llm.items():
+            row = merged_llm.setdefault((k[0], fold(k[1]), k[2], k[3]), [0] * len(v))
+            for i in range(len(v)):
+                row[i] += v[i]
+        llm = merged_llm
         if requests_:
             stmt = insert(UsageRequest).values([
                 {"day": k[0], "client": k[1], "workspace_id": k[2], "function": k[3], "count": v[0], "errors": v[1],

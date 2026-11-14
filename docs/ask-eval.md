@@ -71,10 +71,11 @@ end, whatever happens. It **refuses a database where another workspace holds rec
 records would be visible to the questions and the run would write beside real data. Use an empty database:
 
 * CI: the workflow's own PostgreSQL service;
-* a cluster: a separate database on the same server (`CREATE DATABASE argus_askeval`), given to ARGUS as
-  `ASK_EVAL_DATABASE_URL` — a run started from Administration runs as a separate process with
-  `DATABASE_URL` set to it, migrates it, and copies only the report back. Without it, starting a run from
-  Administration is refused. `--allow-shared-database` exists for development only and is written in the report.
+* a cluster: nothing to configure. A run started from Administration runs as a separate process against a
+  database of its own on the installation's PostgreSQL server, named after the installation's with `_ask_eval`
+  (`argus` → `argus_ask_eval`) and made the first time a run starts (the installation's account needs the right
+  to create databases). It migrates it and copies only the report back. To use another server or account, set
+  `ASK_EVAL_DATABASE_URL`; to forbid runs from Administration, set `ASK_EVAL_DATABASE=off`. `--allow-shared-database` exists for development only and is written in the report.
 
 ## Configuration and secrets
 
