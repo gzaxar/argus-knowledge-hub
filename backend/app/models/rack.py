@@ -39,3 +39,20 @@ class RackMounting(Base):
     valid_until = mapped_column(DateTime(timezone=True), nullable=True)
     confirmed_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class RackCensus(Base):
+    """A rack being surveyed from a phone (docs/rack-census.md): the rack's photos and the one recognised or proposed,
+    each unit's photos and what was read from them — proposals with their evidence and confidence — and what the
+    person decided. Nothing in the inventory changes until it is applied; until then it can be left and resumed."""
+    __tablename__ = "rack_censuses"
+
+    uid: Mapped[str] = mapped_column(String, primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String, ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    rack_uid: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    state: Mapped[str] = mapped_column(String, default="open", index=True)        # open | applied | abandoned
+    created_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    data: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    applied_at = mapped_column(DateTime(timezone=True), nullable=True)

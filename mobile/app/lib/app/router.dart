@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../core/problem.dart';
 import '../domain/capture.dart' show DocumentSeed;
 import '../domain/models.dart' show RecordKind;
+import '../features/census/census_screens.dart';
 import '../features/ask/ask_screen.dart';
 import '../features/assets/asset_list_screen.dart';
 import '../features/graph/graph_record_screen.dart';
@@ -138,7 +139,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/nearby', builder: (_, _) => const NearbyScreen()),
       GoRoute(
           path: '/plan/:uid',
-          builder: (_, s) => PlanScreen(planUid: s.pathParameters['uid']!, assetUid: s.uri.queryParameters['asset'])),
+          builder: (_, s) => PlanScreen(planUid: s.pathParameters['uid']!, assetUid: s.uri.queryParameters['asset'],
+              pick: s.uri.queryParameters['pick'] == '1')),
       GoRoute(path: '/map', builder: (_, s) {
         final lat = double.tryParse(s.uri.queryParameters['lat'] ?? '');
         final lon = double.tryParse(s.uri.queryParameters['lon'] ?? '');
@@ -166,6 +168,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           builder: (_, st) => CaptureScreen(
               assetUid: st.uri.queryParameters['asset'], assetLabel: st.uri.queryParameters['label'])),
       GoRoute(path: '/activities', builder: (_, _) => const ActivitiesScreen()),
+      GoRoute(path: '/census', builder: (_, _) => const CensusListScreen()),
+      GoRoute(path: '/census/:uid', builder: (_, st) => CensusScreen(uid: st.pathParameters['uid']!)),
+      GoRoute(
+          path: '/census/:uid/unit/:item',
+          builder: (_, st) => CensusUnitScreen(uid: st.pathParameters['uid']!, item: st.pathParameters['item']!)),
       GoRoute(path: '/activity/:id', builder: (_, st) => ActivityScreen(id: st.pathParameters['id']!)),
       GoRoute(
           path: '/documents/reshape',

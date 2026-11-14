@@ -262,6 +262,7 @@ NOT_CARRIED = {
                  "transfer_jobs", "import_jobs")},
     **{t: "assistant conversations and their feedback are personal, and stay where they were held"
        for t in ("ask_conversations", "ask_messages", "ask_actions", "ask_feedback")},
+    "rack_censuses": "a rack survey in progress on a phone; what it applied travels as records, mountings and photos",
     **{t: "evaluations and runs of the source installation's AI models: evaluate the models again where they run"
        for t in ("intake_runs", "intake_outcomes", "intake_profiles")},
     **{t: "secret or runtime state of the source installation"

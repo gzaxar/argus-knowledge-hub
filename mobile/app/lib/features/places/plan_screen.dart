@@ -17,10 +17,13 @@ import 'compass.dart';
 /// north: a dial shows it, and the way the phone faces by its compass; "Turn with me" turns the plan so the way
 /// the phone faces is up.
 class PlanScreen extends ConsumerStatefulWidget {
-  const PlanScreen({super.key, required this.planUid, this.assetUid});
+  const PlanScreen({super.key, required this.planUid, this.assetUid, this.pick = false});
 
   final String planUid;
   final String? assetUid;
+
+  /// Choosing a point for something not recorded yet (a rack being surveyed): a tap, confirmed, returns the point.
+  final bool pick;
 
   @override
   ConsumerState<PlanScreen> createState() => _PlanScreenState();
@@ -51,6 +54,22 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
   }
 
   Future<void> _tapped(PlanInfo plan, Offset at) async {
+    if (widget.pick) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (d) => AlertDialog(
+          title: const Text('Is it here?'),
+          content: Text('On ${plan.ref.name}, at ${at.dx.round()}, ${at.dy.round()}. Confirm only what you see on site.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
+            FilledButton(key: const Key('plan-pick-confirm'), onPressed: () => Navigator.pop(d, true),
+                child: const Text('Yes, here')),
+          ],
+        ),
+      );
+      if (ok == true && mounted) Navigator.of(context).pop(Offset(double.parse(at.dx.toStringAsFixed(1)), double.parse(at.dy.toStringAsFixed(1))));
+      return;
+    }
     final asset = widget.assetUid;
     if (asset == null || _saving) return;
     final ok = await showDialog<bool>(
@@ -104,9 +123,11 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                   ListTile(
                     dense: true,
                     title: Text([plan.placeName, plan.levelName].whereType<String>().join(' · ')),
-                    subtitle: Text((widget.assetUid == null
-                            ? '${plan.placed.length} placed on it'
-                            : 'Tap where it is to place it there.') +
+                    subtitle: Text((widget.pick
+                            ? 'Tap where it stands.'
+                            : widget.assetUid == null
+                                ? '${plan.placed.length} placed on it'
+                                : 'Tap where it is to place it there.') +
                         (plan.onMap ? '' : ' Not placed on the map: it has no north.')),
                   ),
                   if (_saving) const LinearProgressIndicator(),

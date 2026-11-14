@@ -18,6 +18,8 @@ import '../data/api_service.dart';
 import '../data/ask_repository.dart';
 import '../data/reshape_repository.dart';
 import '../data/activity_repository.dart';
+import '../data/census_repository.dart';
+import '../domain/census.dart';
 import '../data/browse_repository.dart';
 import '../data/capture_repositories.dart';
 import '../data/graph_repository.dart';
@@ -563,6 +565,13 @@ final myReviewItemsProvider = FutureProvider.autoDispose<List<ReviewItem>>((ref)
 final askRepositoryProvider = Provider((ref) => AskRepository(ref.watch(apiServiceProvider)));
 final reshapeRepositoryProvider = Provider((ref) => ReshapeRepository(ref.watch(apiServiceProvider)));
 final activityRepositoryProvider = Provider((ref) => ActivityRepository(ref.watch(apiServiceProvider)));
+
+// A rack surveyed from the phone (docs/rack-census.md).
+final censusRepositoryProvider = Provider((ref) => CensusRepository(ref.watch(apiServiceProvider)));
+final openCensusesProvider = FutureProvider.autoDispose<List<OpenCensus>>((ref) => ref.watch(censusRepositoryProvider).open());
+final censusProvider = FutureProvider.autoDispose.family<Census, String>((ref, uid) => ref.watch(censusRepositoryProvider).get(uid));
+final censusReviewProvider =
+    FutureProvider.autoDispose.family<CensusReview, String>((ref, uid) => ref.watch(censusRepositoryProvider).review(uid));
 
 /// The phone's time zone (IANA, e.g. Europe/Rome): what "today", "tomorrow" and a recurrence's local time are
 /// read in. UTC when the platform cannot say.

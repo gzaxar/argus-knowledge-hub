@@ -205,6 +205,16 @@ class _Cockpit extends ConsumerWidget {
             ),
           ]),
         ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+          child: OutlinedButton.icon(
+            key: const Key('home-census'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+            onPressed: () => context.push('/census'),
+            icon: const Icon(Icons.dns_outlined),
+            label: const Text('Survey a rack'),
+          ),
+        ),
         if (c != null) ...[
           _Kpis(c),
           _MyWork(fallback: c.mine),
