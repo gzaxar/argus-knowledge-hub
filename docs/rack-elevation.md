@@ -62,3 +62,48 @@ confirmed. A mounted unit's page says which rack and units it is in.
 
 `rack_mountings` is a family of the workspace bundle, so an export and import reproduces the racks with their
 history.
+
+## The demos
+
+Both demo bundles (`backend/demo_workspaces/it-services`, `medium-linac`) come with their units in their racks:
+
+- **IT services:** ten racks — hypervisors, storage, GPU servers, core and access switches, firewalls, WAN routers,
+  a spares rack with a shelf — each unit at its units; rear-door coolers as 0U; space reserved for the fifth
+  hypervisor host a ticket asks for. Every rack of the data hall, the network room and the backup room has a PDU A
+  and a PDU B (0U, rear) fed by UPS-01 and UPS-02 and feeding each unit.
+- **Medium linac:** eight racks — magnet supplies (3U each) and the Moxa in A12-1/A12-2, vacuum controllers and
+  PLC in A12-3, controls in CTRL, Kubernetes nodes, storage, core network and the IOC host in the server room, the
+  backup rack in the external data centre — with PDUs fed by the server-room and controls UPS. The Kubernetes
+  cluster is its nodes (`part of`), not a box in a rack.
+
+Their floor plans' drawings show the building only (rooms, room numbers, beam axis, north, title): the records
+are drawn over them by layer (docs/plan-layers.md). A unit in a rack is not a point of its own: its rack is.
+
+They are made by `backend/scripts/rack_demos.py` from the previous bundle and a layout file
+(`backend/scripts/demo_rack_layouts/<demo>.json`), through the application, in an empty database:
+
+    PYTHONPATH=/app python scripts/rack_demos.py <bundle dir> scripts/demo_rack_layouts/<demo>.json <output dir>
+
+Identifiers, relations, tickets, documents and attachments of the previous bundle are all kept; the script adds the
+PDUs, their relations, the mountings, and the tour's steps for the plan by layer, a rack and the tunnel.
+
+## Updating an imported demo
+
+A bundle is imported as a clone into a new workspace; importing it again into the same workspace is refused (docs/
+workspace-bundle.md). To bring a demo that was imported before — and may have been worked on since — up to the
+new rack positions **without losing anything**:
+
+    # inside the API container
+    PYTHONPATH=/app python scripts/apply_rack_layout.py <workspace id> scripts/demo_rack_layouts/<demo>.json --dry-run
+    PYTHONPATH=/app python scripts/apply_rack_layout.py <workspace id> scripts/demo_rack_layouts/<demo>.json
+
+- The layout names records by the bundle's identifiers; in a clone where they were renamed
+  (`uuid5(<workspace>, <identifier>)`), the renamed ones are found too.
+- Only what differs changes: a unit already where the layout says is left alone, one elsewhere is moved (with its
+  history), shelves and reserved spaces are matched by their label. Running it twice changes nothing the second time.
+- Nothing is deleted or rewritten: records, relations, tickets, documents, attachments, photos, comments and the
+  positions people set on plans stay. A unit mounted by the layout stops being a point of its own on a plan.
+- A rack whose result would overlap or stick out is refused whole and reported; the others are applied.
+- What the layout names but the workspace lacks is listed as *not found*: records the new bundle adds (the PDUs)
+  and the cleaned drawings come only with the new bundle. To have them, import the new bundle into a new workspace
+  and move people to it; positions set by hand in the old one can be read from its racks' history.

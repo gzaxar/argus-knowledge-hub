@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-10-24T15:37:56.038124+00:00",
+  "created_at": "2026-11-14T16:39:11.783999+00:00",
   "created_by": "ARGUS demo authors",
   "demo": {
     "description": "A medium-sized IT organisation: a service catalogue (network, internet, Wi-Fi, mail, DNS, hosting, storage, backup, monitoring, service desk, VPN, HPC, LLM inference), three buildings with floors, rooms and racks, a GPU cluster for HPC and LLM inference, user workstations, a port-to-port network map, a cooling control process reaching its units through a serial converter, mapped and placed equipment, dependencies, incidents, requests and changes, maintenance activities, runbooks, contracts and SLAs.",
@@ -123,6 +123,16 @@
         "title": "Look inside a rack"
       },
       {
+        "link": "/plans/cb773dd2-ef44-4510-9b55-b2d3fde0bca9",
+        "text": "Hub Building — ground floor: the drawing shows the building; rooms, racks and plant are drawn over it and can be turned on and off, with open tickets and activities. A rack is one point: click it to open it.",
+        "title": "The plan, layer by layer"
+      },
+      {
+        "link": "/racks/nf-rack-mdf1",
+        "text": "Rack R-MDF1: front and rear, what takes which units, the free space and the space kept for what is coming. Moving a unit is previewed before it is saved, and the rack keeps its history.",
+        "title": "Inside a rack, unit by unit"
+      },
+      {
         "link": "/assets/nf-sw-core-01",
         "text": "Core switch 01: where it stands, what it connects to, its contract, its change ticket.",
         "title": "Follow a piece of equipment"
@@ -231,13 +241,13 @@
     },
     "assets": {
       "file": "records/assets.jsonl",
-      "rows": 299,
-      "sha256": "213f764174ea67bc6229c3933fb7203db689e316cddec87c08700c2ca510c67d"
+      "rows": 315,
+      "sha256": "203be6475271b9a12568f1cb78538d0cce80a49e89a881ae248807289af61f00"
     },
     "attachments": {
       "file": "records/attachments.jsonl",
       "rows": 2,
-      "sha256": "cf82fcf889fb3da7087502b4a70ea697cb41f10daead9040f962849a22e66981"
+      "sha256": "f9c62b1401e1b93670ec96210681662ed5b3a0b7ef974e6dac572db12f85256e"
     },
     "beam_asset_bindings": {
       "file": "records/beam_asset_bindings.jsonl",
@@ -254,20 +264,30 @@
       "rows": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
+    "document_folders": {
+      "file": "records/document_folders.jsonl",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
     "document_generations": {
       "file": "records/document_generations.jsonl",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "document_navigation_placements": {
+      "file": "records/document_navigation_placements.jsonl",
       "rows": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     "document_relations": {
       "file": "records/document_relations.jsonl",
       "rows": 120,
-      "sha256": "0449287c3dab4f64e517797a165b958be7fd8cd36947b0ffcbb1beb4abf6b4ef"
+      "sha256": "ed66c421482684ce77ff386f853109e0c32d333759ee17ff99e3de5cc238ea7c"
     },
     "document_revisions": {
       "file": "records/document_revisions.jsonl",
       "rows": 17,
-      "sha256": "63c4ec22a0b774554b6228f30c0ba30527421b7b255c33b8b33fe4f2dffc1955"
+      "sha256": "d1d8bcf9bf59d0597e297b081824b21ea0e44d6add4b75d21bc5c2c1c2008058"
     },
     "document_template_versions": {
       "file": "records/document_template_versions.jsonl",
@@ -282,7 +302,7 @@
     "documents": {
       "file": "records/documents.jsonl",
       "rows": 17,
-      "sha256": "6d30661646922bf9f191bdcb52c6e0a1afcd3673d896f6114d6736724ac35ff2"
+      "sha256": "5ff478b92645d289cbdd8d64953e0b66f5536c06b4fa8e93c3c0a3d13e47988d"
     },
     "equipment_class_requests": {
       "file": "records/equipment_class_requests.jsonl",
@@ -292,7 +312,7 @@
     "floor_plans": {
       "file": "records/floor_plans.jsonl",
       "rows": 4,
-      "sha256": "0c8507eaadb98ad7c5717efa566cd1734528192a4e42eb2814377293464e65e1"
+      "sha256": "785e64e7a4c2ecd7c95c2146c5a1b73399726d04fc29b98d5f162b6a1fab10b0"
     },
     "global_values": {
       "file": "records/global_values.jsonl",
@@ -307,7 +327,7 @@
     "icons": {
       "file": "records/icons.jsonl",
       "rows": 66,
-      "sha256": "cf434e1e9b4722fa7f1e9aa073b923b0a272557ac1a8db2091f2fa31eaf65fe0"
+      "sha256": "704d9d31cc79aabe275494c084b4fc93ffe1c3c68e467d957bdf91a4a1d257c8"
     },
     "import_configs": {
       "file": "records/import_configs.jsonl",
@@ -322,7 +342,7 @@
     "indoor_placements": {
       "file": "records/indoor_placements.jsonl",
       "rows": 71,
-      "sha256": "5e1fd2c99f40b09e61aab9a96f134e2b25db00168d42dc17f87282691fbbbc4c"
+      "sha256": "eadc7b96d6beea6114366cb2f5b205012957ed6efb8d1550eb54d6e9dfb4e440"
     },
     "llm_configs": {
       "file": "records/llm_configs.jsonl",
@@ -337,7 +357,7 @@
     "memberships": {
       "file": "records/memberships.jsonl",
       "rows": 5,
-      "sha256": "9f1a676273b328484696f81db6f5809e5d9489bc752ff4ba90b278d5cbe75529"
+      "sha256": "e89e83a8e9a52c589c152dcd91de4ee0443b0e87490f7a10a9e0442d5fec59be"
     },
     "notification_subscriptions": {
       "file": "records/notification_subscriptions.jsonl",
@@ -354,6 +374,11 @@
       "rows": 4,
       "sha256": "5bf624be99f6c96e919ddad25b079efe3aee255b30dd6988b500c1a4b5834d9c"
     },
+    "rack_mountings": {
+      "file": "records/rack_mountings.jsonl",
+      "rows": 51,
+      "sha256": "a2c03c43058f70689f23beb1d523aa7666172b69978ec1e6df59d6377ee2c6b8"
+    },
     "record_watchers": {
       "file": "records/record_watchers.jsonl",
       "rows": 0,
@@ -361,8 +386,8 @@
     },
     "relations": {
       "file": "records/relations.jsonl",
-      "rows": 524,
-      "sha256": "a078aa2d734d9b2b2a740e74bc5a7dd2d7d52d93bd12cc7af0ea82a98186dd4c"
+      "rows": 613,
+      "sha256": "24239a281da67596695d312f90f015506c1bb4f2f9492853937c6d381137bd3e"
     },
     "review_escalations": {
       "file": "records/review_escalations.jsonl",
@@ -412,27 +437,27 @@
     "ticket_workflows": {
       "file": "records/ticket_workflows.jsonl",
       "rows": 4,
-      "sha256": "059d64312162ba384013311621fbbf1e39a4ed56cabcd2ebdc77a753d26e29d1"
+      "sha256": "0d8b2fc86e4d429ce9c1b7f0cc94322dab57406433706fa797df9f498f29a0cc"
     },
     "tickets": {
       "file": "records/tickets.jsonl",
       "rows": 24,
-      "sha256": "7e60436795cb5dc2392b948d82c4166532c5b966f5995fb888b77663b567e037"
+      "sha256": "f300e3a2548278316bd4a051b3097084eff25f3998224008be9fb41b01fb2b12"
     },
     "types": {
       "file": "records/types.jsonl",
-      "rows": 115,
-      "sha256": "b21a19ae21d90812edc8b71b760fca74e82c5917ac6d08f77d864b371f76346c"
+      "rows": 116,
+      "sha256": "1aca76a90e42d8a0ff09fb9283820b868b684cf7b16e63b3d972c36a84d514b3"
     },
     "workspace": {
       "file": "records/workspace.jsonl",
       "rows": 1,
-      "sha256": "142724c3a79b00db0debee7b186e36a74a5bf4a562e06f65bbb6ed13c1fb1b5b"
+      "sha256": "26c75e3053a72c5bce50592f39d9f63084ccd111cdce95823203c504d7b1b99a"
     },
     "workspace_packages": {
       "file": "records/workspace_packages.jsonl",
       "rows": 8,
-      "sha256": "c7b654cdea80a3b3b3f8de7f38b51300e38f74cd0ad186dd3192435c8108c19e"
+      "sha256": "a15979b934d82951f75825a571b75ba80663fdb7d5b3b9c38c0c106c1c25c42d"
     }
   },
   "files": [
@@ -482,11 +507,6 @@
       "size": 622
     },
     {
-      "path": "files/25/258984b1191288e918a8c3a0a9b34dbe4b45241c29858a93b85d13398c047e07",
-      "sha256": "258984b1191288e918a8c3a0a9b34dbe4b45241c29858a93b85d13398c047e07",
-      "size": 4776
-    },
-    {
       "path": "files/2c/2c5c314146b58060112f6a6e17d8654a9b4a9225fd123887ec4476b25f0f4c21",
       "sha256": "2c5c314146b58060112f6a6e17d8654a9b4a9225fd123887ec4476b25f0f4c21",
       "size": 625
@@ -525,6 +545,11 @@
       "path": "files/47/474c95a16e5ccaffa820030f8d6362b51fbfbe542c57dd409eb153da5b0e53bf",
       "sha256": "474c95a16e5ccaffa820030f8d6362b51fbfbe542c57dd409eb153da5b0e53bf",
       "size": 511
+    },
+    {
+      "path": "files/47/474e03b0487ec967b8054eb1c23b75420f603e60f6c60c2be1617c7c0769f5ed",
+      "sha256": "474e03b0487ec967b8054eb1c23b75420f603e60f6c60c2be1617c7c0769f5ed",
+      "size": 1519
     },
     {
       "path": "files/4c/4c87684f3af8824efa448c9268ab6b338fbeccdf11225828c40e66f6f4c09cb9",
@@ -570,6 +595,11 @@
       "path": "files/64/6420d831dfe55992360e7712b409187ea0bfc353ce9a538f6b2c632099452230",
       "sha256": "6420d831dfe55992360e7712b409187ea0bfc353ce9a538f6b2c632099452230",
       "size": 441
+    },
+    {
+      "path": "files/70/70a5bac858e61aa99e9e07d32a90e7f5c32965c37eb3513cb932337f406b328b",
+      "sha256": "70a5bac858e61aa99e9e07d32a90e7f5c32965c37eb3513cb932337f406b328b",
+      "size": 1513
     },
     {
       "path": "files/72/729d3e264f4e2e9670cd86f4531141baa78eb94e975198228a8167c8a1eb0572",
@@ -627,6 +657,11 @@
       "size": 618
     },
     {
+      "path": "files/93/930e7a9d899644f72cfbe7dd3d596b34fa0339079bc43cd105bd491ac781b4f3",
+      "sha256": "930e7a9d899644f72cfbe7dd3d596b34fa0339079bc43cd105bd491ac781b4f3",
+      "size": 2293
+    },
+    {
       "path": "files/95/95afa21025a2c5dbb7efda5ff74250ab1606b0fb11e0a6979d1a2c8a277c22fb",
       "sha256": "95afa21025a2c5dbb7efda5ff74250ab1606b0fb11e0a6979d1a2c8a277c22fb",
       "size": 544
@@ -645,11 +680,6 @@
       "path": "files/a1/a18c2a33a20de14bacbff9df97b7896006fb166379da84eb12c304abbd803286",
       "sha256": "a18c2a33a20de14bacbff9df97b7896006fb166379da84eb12c304abbd803286",
       "size": 502
-    },
-    {
-      "path": "files/a3/a3be13169a20482a6f290df310017eb60c43204235ecceaf0613ea8ed8c53954",
-      "sha256": "a3be13169a20482a6f290df310017eb60c43204235ecceaf0613ea8ed8c53954",
-      "size": 4677
     },
     {
       "path": "files/a4/a45d86c493173f0129412077c89f6bb5d65c20fc9b02c73cd30e9f73c52f1688",
@@ -687,6 +717,11 @@
       "size": 470
     },
     {
+      "path": "files/ba/bad5eea2ec37c28929af01bbb068caffb80c26570c4d8446cf721d29556d1ed4",
+      "sha256": "bad5eea2ec37c28929af01bbb068caffb80c26570c4d8446cf721d29556d1ed4",
+      "size": 1509
+    },
+    {
       "path": "files/bc/bcec2a1228e483c91c6bdec3d18ef82b8381e6b00a60794cc90a95fb97d4b6a1",
       "sha256": "bcec2a1228e483c91c6bdec3d18ef82b8381e6b00a60794cc90a95fb97d4b6a1",
       "size": 517
@@ -715,11 +750,6 @@
       "path": "files/d0/d096b8a4a329dfef6a5325d1789860536bdadf9896a9189a60fcf594813d77a5",
       "sha256": "d096b8a4a329dfef6a5325d1789860536bdadf9896a9189a60fcf594813d77a5",
       "size": 535
-    },
-    {
-      "path": "files/d5/d5544a89198c12c4816c6fb2dc09eacdc59fe9c490fc6c2a1ed6017e7be58b78",
-      "sha256": "d5544a89198c12c4816c6fb2dc09eacdc59fe9c490fc6c2a1ed6017e7be58b78",
-      "size": 2182
     },
     {
       "path": "files/d6/d689cd6c01d72a1bd0ebb2cf90dd34fce868aa6d49d397aee598f5106a344b27",
@@ -787,11 +817,6 @@
       "size": 541
     },
     {
-      "path": "files/fc/fce06885893bcb3a7c573759e16bd51c23fb64efb4b480417b0e43e2720ac322",
-      "sha256": "fce06885893bcb3a7c573759e16bd51c23fb64efb4b480417b0e43e2720ac322",
-      "size": 2653
-    },
-    {
       "path": "records/access_reviews.jsonl",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
@@ -838,13 +863,13 @@
     },
     {
       "path": "records/assets.jsonl",
-      "sha256": "213f764174ea67bc6229c3933fb7203db689e316cddec87c08700c2ca510c67d",
-      "size": 210139
+      "sha256": "203be6475271b9a12568f1cb78538d0cce80a49e89a881ae248807289af61f00",
+      "size": 234415
     },
     {
       "path": "records/attachments.jsonl",
-      "sha256": "cf82fcf889fb3da7087502b4a70ea697cb41f10daead9040f962849a22e66981",
-      "size": 1217
+      "sha256": "f9c62b1401e1b93670ec96210681662ed5b3a0b7ef974e6dac572db12f85256e",
+      "size": 1302
     },
     {
       "path": "records/beam_asset_bindings.jsonl",
@@ -862,18 +887,28 @@
       "size": 0
     },
     {
+      "path": "records/document_folders.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
       "path": "records/document_generations.jsonl",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     {
+      "path": "records/document_navigation_placements.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
       "path": "records/document_relations.jsonl",
-      "sha256": "0449287c3dab4f64e517797a165b958be7fd8cd36947b0ffcbb1beb4abf6b4ef",
-      "size": 25752
+      "sha256": "ed66c421482684ce77ff386f853109e0c32d333759ee17ff99e3de5cc238ea7c",
+      "size": 25524
     },
     {
       "path": "records/document_revisions.jsonl",
-      "sha256": "63c4ec22a0b774554b6228f30c0ba30527421b7b255c33b8b33fe4f2dffc1955",
+      "sha256": "d1d8bcf9bf59d0597e297b081824b21ea0e44d6add4b75d21bc5c2c1c2008058",
       "size": 33393
     },
     {
@@ -888,8 +923,8 @@
     },
     {
       "path": "records/documents.jsonl",
-      "sha256": "6d30661646922bf9f191bdcb52c6e0a1afcd3673d896f6114d6736724ac35ff2",
-      "size": 9863
+      "sha256": "5ff478b92645d289cbdd8d64953e0b66f5536c06b4fa8e93c3c0a3d13e47988d",
+      "size": 9891
     },
     {
       "path": "records/equipment_class_requests.jsonl",
@@ -898,8 +933,8 @@
     },
     {
       "path": "records/floor_plans.jsonl",
-      "sha256": "0c8507eaadb98ad7c5717efa566cd1734528192a4e42eb2814377293464e65e1",
-      "size": 4446
+      "sha256": "785e64e7a4c2ecd7c95c2146c5a1b73399726d04fc29b98d5f162b6a1fab10b0",
+      "size": 4542
     },
     {
       "path": "records/global_values.jsonl",
@@ -913,8 +948,8 @@
     },
     {
       "path": "records/icons.jsonl",
-      "sha256": "cf434e1e9b4722fa7f1e9aa073b923b0a272557ac1a8db2091f2fa31eaf65fe0",
-      "size": 29748
+      "sha256": "704d9d31cc79aabe275494c084b4fc93ffe1c3c68e467d957bdf91a4a1d257c8",
+      "size": 31596
     },
     {
       "path": "records/import_configs.jsonl",
@@ -928,7 +963,7 @@
     },
     {
       "path": "records/indoor_placements.jsonl",
-      "sha256": "5e1fd2c99f40b09e61aab9a96f134e2b25db00168d42dc17f87282691fbbbc4c",
+      "sha256": "eadc7b96d6beea6114366cb2f5b205012957ed6efb8d1550eb54d6e9dfb4e440",
       "size": 34812
     },
     {
@@ -943,8 +978,8 @@
     },
     {
       "path": "records/memberships.jsonl",
-      "sha256": "9f1a676273b328484696f81db6f5809e5d9489bc752ff4ba90b278d5cbe75529",
-      "size": 2323
+      "sha256": "e89e83a8e9a52c589c152dcd91de4ee0443b0e87490f7a10a9e0442d5fec59be",
+      "size": 2313
     },
     {
       "path": "records/notification_subscriptions.jsonl",
@@ -962,14 +997,19 @@
       "size": 1065
     },
     {
+      "path": "records/rack_mountings.jsonl",
+      "sha256": "a2c03c43058f70689f23beb1d523aa7666172b69978ec1e6df59d6377ee2c6b8",
+      "size": 24663
+    },
+    {
       "path": "records/record_watchers.jsonl",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     {
       "path": "records/relations.jsonl",
-      "sha256": "a078aa2d734d9b2b2a740e74bc5a7dd2d7d52d93bd12cc7af0ea82a98186dd4c",
-      "size": 124989
+      "sha256": "24239a281da67596695d312f90f015506c1bb4f2f9492853937c6d381137bd3e",
+      "size": 144691
     },
     {
       "path": "records/review_escalations.jsonl",
@@ -1018,34 +1058,50 @@
     },
     {
       "path": "records/ticket_workflows.jsonl",
-      "sha256": "059d64312162ba384013311621fbbf1e39a4ed56cabcd2ebdc77a753d26e29d1",
+      "sha256": "0d8b2fc86e4d429ce9c1b7f0cc94322dab57406433706fa797df9f498f29a0cc",
       "size": 5178
     },
     {
       "path": "records/tickets.jsonl",
-      "sha256": "7e60436795cb5dc2392b948d82c4166532c5b966f5995fb888b77663b567e037",
-      "size": 16690
+      "sha256": "f300e3a2548278316bd4a051b3097084eff25f3998224008be9fb41b01fb2b12",
+      "size": 17554
     },
     {
       "path": "records/types.jsonl",
-      "sha256": "b21a19ae21d90812edc8b71b760fca74e82c5917ac6d08f77d864b371f76346c",
-      "size": 143336
+      "sha256": "1aca76a90e42d8a0ff09fb9283820b868b684cf7b16e63b3d972c36a84d514b3",
+      "size": 143746
     },
     {
       "path": "records/workspace.jsonl",
-      "sha256": "142724c3a79b00db0debee7b186e36a74a5bf4a562e06f65bbb6ed13c1fb1b5b",
-      "size": 687
+      "sha256": "26c75e3053a72c5bce50592f39d9f63084ccd111cdce95823203c504d7b1b99a",
+      "size": 718
     },
     {
       "path": "records/workspace_packages.jsonl",
-      "sha256": "c7b654cdea80a3b3b3f8de7f38b51300e38f74cd0ad186dd3192435c8108c19e",
-      "size": 1643
+      "sha256": "a15979b934d82951f75825a571b75ba80663fdb7d5b3b9c38c0c106c1c25c42d",
+      "size": 1627
     }
   ],
   "format": "argus-workspace-bundle",
   "format_version": 1,
   "missing_files": [],
-  "not_reproduced": [],
+  "not_reproduced": [
+    {
+      "reason": "the evidence ledger keeps the source installation's sequence and proof; a bundle carries the records' current state and history — move the ledger with the signed portable archive",
+      "rows": 2,
+      "table": "ledger_conflicts"
+    },
+    {
+      "reason": "the evidence ledger keeps the source installation's sequence and proof; a bundle carries the records' current state and history — move the ledger with the signed portable archive",
+      "rows": 2,
+      "table": "ledger_decisions"
+    },
+    {
+      "reason": "the evidence ledger keeps the source installation's sequence and proof; a bundle carries the records' current state and history — move the ledger with the signed portable archive",
+      "rows": 3,
+      "table": "ledger_streams"
+    }
+  ],
   "packages": [
     {
       "checksum": "d45c176e4d9c99917e36703a4a679cfc938f777fd7c472c84e56089169c5dc1a",
@@ -1090,8 +1146,8 @@
   ],
   "source": {
     "argus_version": "dev",
-    "instance": "e42203eb-3759-41c6-98cb-e8e2dd2136be",
-    "schema_revision": "e4a6c8e0f2a3"
+    "instance": "a81a3ca6-2f2f-4de8-afe8-98fb351a47f9",
+    "schema_revision": "b1c3d5e7f9a2"
   },
   "workspace": {
     "id": "it-services-demo",

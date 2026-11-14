@@ -1,0 +1,289 @@
+{
+ "racks": [
+  {
+   "rack": "vl-rk-a12-1",
+   "units": [
+    {
+     "asset": "vl-ps-q1",
+     "start_u": 40,
+     "height_u": 3,
+     "face": "front"
+    },
+    {
+     "asset": "vl-ps-q2",
+     "start_u": 37,
+     "height_u": 3,
+     "face": "front"
+    },
+    {
+     "asset": "vl-ps-q3",
+     "start_u": 34,
+     "height_u": 3,
+     "face": "front"
+    },
+    {
+     "asset": "vl-moxa-01",
+     "start_u": 31,
+     "height_u": 1,
+     "face": "front"
+    }
+   ]
+  },
+  {
+   "rack": "vl-rk-a12-2",
+   "units": [
+    {
+     "asset": "vl-ps-q4",
+     "start_u": 40,
+     "height_u": 3,
+     "face": "front"
+    },
+    {
+     "asset": "vl-ps-q5",
+     "start_u": 37,
+     "height_u": 3,
+     "face": "front"
+    },
+    {
+     "asset": "vl-ps-q6",
+     "start_u": 34,
+     "height_u": 3,
+     "face": "front"
+    },
+    {
+     "asset": "vl-ps-dip",
+     "start_u": 31,
+     "height_u": 3,
+     "face": "front"
+    },
+    {
+     "asset": "vl-ps-sol",
+     "start_u": 28,
+     "height_u": 3,
+     "face": "front"
+    },
+    {
+     "asset": "vl-ps-cor",
+     "start_u": 25,
+     "height_u": 3,
+     "face": "front"
+    }
+   ]
+  },
+  {
+   "rack": "vl-rk-a12-3",
+   "units": [
+    {
+     "asset": "vl-vac-ctl",
+     "start_u": 40,
+     "height_u": 3,
+     "face": "front"
+    },
+    {
+     "asset": "vl-vac-ctl-gm",
+     "start_u": 37,
+     "height_u": 3,
+     "face": "front"
+    },
+    {
+     "asset": "vl-plc-vac",
+     "start_u": 34,
+     "height_u": 3,
+     "face": "front"
+    },
+    {
+     "asset": "vl-rk-a12-3-pdu-a",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed A from Server room UPS UPS-SRV"
+    },
+    {
+     "asset": "vl-rk-a12-3-pdu-b",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed B from Controls UPS UPS-CTL"
+    }
+   ]
+  },
+  {
+   "rack": "vl-rk-ctrl",
+   "units": [
+    {
+     "asset": "vl-sw-ctl",
+     "start_u": 40,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "vl-plc-pss",
+     "start_u": 37,
+     "height_u": 3,
+     "face": "front"
+    },
+    {
+     "asset": "vl-timing",
+     "start_u": 33,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "asset": "vl-rk-ctrl-pdu-a",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed A from Server room UPS UPS-SRV"
+    },
+    {
+     "asset": "vl-rk-ctrl-pdu-b",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed B from Controls UPS UPS-CTL"
+    }
+   ]
+  },
+  {
+   "rack": "vl-rk-dc2",
+   "units": [
+    {
+     "asset": "vl-rtr-dc2",
+     "start_u": 40,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "vl-bkp-01",
+     "start_u": 36,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "asset": "vl-tape-01",
+     "start_u": 20,
+     "height_u": 6,
+     "face": "front"
+    }
+   ]
+  },
+  {
+   "rack": "vl-rk-s01",
+   "units": [
+    {
+     "asset": "vl-kn1",
+     "start_u": 38,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "asset": "vl-kn2",
+     "start_u": 36,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "asset": "vl-kn3",
+     "start_u": 34,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "asset": "vl-nas-01",
+     "start_u": 28,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "asset": "vl-rk-s01-pdu-a",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed A from Server room UPS UPS-SRV"
+    },
+    {
+     "asset": "vl-rk-s01-pdu-b",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed B from Controls UPS UPS-CTL"
+    }
+   ]
+  },
+  {
+   "rack": "vl-rk-s02",
+   "units": [
+    {
+     "asset": "vl-pp-fo",
+     "start_u": 42,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "vl-fw",
+     "start_u": 40,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "vl-sw-core",
+     "start_u": 38,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "vl-sw-adm",
+     "start_u": 36,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "vl-pp-adm",
+     "start_u": 35,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "vl-rk-s02-pdu-a",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed A from Server room UPS UPS-SRV"
+    },
+    {
+     "asset": "vl-rk-s02-pdu-b",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed B from Controls UPS UPS-CTL"
+    }
+   ]
+  },
+  {
+   "rack": "vl-rk-s03",
+   "units": [
+    {
+     "asset": "vl-srv-ioc",
+     "start_u": 40,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "asset": "vl-srv-arch",
+     "start_u": 37,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "reserve": "Second archiver (planned)",
+     "start_u": 33,
+     "height_u": 2
+    },
+    {
+     "asset": "vl-rk-s03-pdu-a",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed A from Server room UPS UPS-SRV"
+    },
+    {
+     "asset": "vl-rk-s03-pdu-b",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed B from Controls UPS UPS-CTL"
+    }
+   ]
+  }
+ ]
+}

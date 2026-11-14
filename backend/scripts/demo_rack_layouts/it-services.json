@@ -1,0 +1,351 @@
+{
+ "racks": [
+  {
+   "rack": "nf-rack-a01",
+   "units": [
+    {
+     "asset": "nf-sw-dist-dh",
+     "start_u": 42,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "nf-sc-dh1",
+     "start_u": 40,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "reserve": "Patch panel (planned)",
+     "start_u": 41,
+     "height_u": 1
+    },
+    {
+     "asset": "nf-rack-a01-pdu-a",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed A from UPS-01 (feed A)"
+    },
+    {
+     "asset": "nf-rack-a01-pdu-b",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed B from UPS-02 (feed B)"
+    }
+   ]
+  },
+  {
+   "rack": "nf-rack-a02",
+   "units": [
+    {
+     "asset": "nf-hv-01",
+     "start_u": 20,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "asset": "nf-hv-02",
+     "start_u": 23,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "asset": "nf-rack-a02-pdu-a",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed A from UPS-01 (feed A)"
+    },
+    {
+     "asset": "nf-rack-a02-pdu-b",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed B from UPS-02 (feed B)"
+    }
+   ]
+  },
+  {
+   "rack": "nf-rack-a03",
+   "units": [
+    {
+     "asset": "nf-hv-03",
+     "start_u": 20,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "asset": "nf-hv-04",
+     "start_u": 23,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "reserve": "Hypervisor host 05 (requested)",
+     "start_u": 26,
+     "height_u": 2
+    },
+    {
+     "asset": "nf-rack-a03-pdu-a",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed A from UPS-01 (feed A)"
+    },
+    {
+     "asset": "nf-rack-a03-pdu-b",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed B from UPS-02 (feed B)"
+    }
+   ]
+  },
+  {
+   "rack": "nf-rack-a04",
+   "units": [
+    {
+     "asset": "nf-stor-01",
+     "start_u": 10,
+     "height_u": 4,
+     "face": "front"
+    },
+    {
+     "asset": "nf-nas-01",
+     "start_u": 16,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "asset": "nf-rack-a04-pdu-a",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed A from UPS-01 (feed A)"
+    },
+    {
+     "asset": "nf-rack-a04-pdu-b",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed B from UPS-02 (feed B)"
+    }
+   ]
+  },
+  {
+   "rack": "nf-rack-a05",
+   "units": [
+    {
+     "asset": "nf-gpu-01",
+     "start_u": 4,
+     "height_u": 4,
+     "face": "front"
+    },
+    {
+     "asset": "nf-gpu-02",
+     "start_u": 9,
+     "height_u": 4,
+     "face": "front"
+    },
+    {
+     "asset": "nf-stor-models",
+     "start_u": 15,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "asset": "nf-sw-fabric",
+     "start_u": 42,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "nf-rdhx-a05",
+     "kind": "zero_u",
+     "face": "rear"
+    },
+    {
+     "asset": "nf-rack-a05-pdu-a",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed A from UPS-01 (feed A)"
+    },
+    {
+     "asset": "nf-rack-a05-pdu-b",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed B from UPS-02 (feed B)"
+    }
+   ]
+  },
+  {
+   "rack": "nf-rack-a06",
+   "units": [
+    {
+     "asset": "nf-gpu-03",
+     "start_u": 4,
+     "height_u": 4,
+     "face": "front"
+    },
+    {
+     "asset": "nf-gpu-04",
+     "start_u": 9,
+     "height_u": 4,
+     "face": "front"
+    },
+    {
+     "asset": "nf-hpc-login",
+     "start_u": 15,
+     "height_u": 2,
+     "face": "front"
+    },
+    {
+     "asset": "nf-stor-scratch",
+     "start_u": 18,
+     "height_u": 4,
+     "face": "front"
+    },
+    {
+     "asset": "nf-rdhx-a06",
+     "kind": "zero_u",
+     "face": "rear"
+    },
+    {
+     "asset": "nf-rack-a06-pdu-a",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed A from UPS-01 (feed A)"
+    },
+    {
+     "asset": "nf-rack-a06-pdu-b",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed B from UPS-02 (feed B)"
+    }
+   ]
+  },
+  {
+   "rack": "nf-rack-b01",
+   "units": [
+    {
+     "asset": "nf-stor-backup",
+     "start_u": 10,
+     "height_u": 4,
+     "face": "front"
+    },
+    {
+     "asset": "nf-sw-acc-anx",
+     "start_u": 42,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "nf-rack-b01-pdu-a",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed A from UPS-01 (feed A)"
+    },
+    {
+     "asset": "nf-rack-b01-pdu-b",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed B from UPS-02 (feed B)"
+    }
+   ]
+  },
+  {
+   "rack": "nf-rack-idf2",
+   "units": [
+    {
+     "asset": "nf-sw-acc-lib",
+     "start_u": 42,
+     "height_u": 1,
+     "face": "front"
+    }
+   ]
+  },
+  {
+   "rack": "nf-rack-mdf1",
+   "units": [
+    {
+     "asset": "nf-pp-mdf-01",
+     "start_u": 42,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "nf-sw-core-01",
+     "start_u": 40,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "nf-sw-core-02",
+     "start_u": 39,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "nf-sw-acc-hub1",
+     "start_u": 37,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "nf-fw-01",
+     "start_u": 34,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "nf-fw-02",
+     "start_u": 33,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "nf-rtr-wan-01",
+     "start_u": 31,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "nf-rtr-wan-02",
+     "start_u": 30,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "asset": "nf-rack-mdf1-pdu-a",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed A from UPS-01 (feed A)"
+    },
+    {
+     "asset": "nf-rack-mdf1-pdu-b",
+     "kind": "zero_u",
+     "face": "rear",
+     "note": "feed B from UPS-02 (feed B)"
+    }
+   ]
+  },
+  {
+   "rack": "nf-rack-sp01",
+   "units": [
+    {
+     "asset": "nf-sw-spare-cx48",
+     "start_u": 30,
+     "height_u": 1,
+     "face": "front"
+    },
+    {
+     "shelf": "Spares shelf",
+     "start_u": 20,
+     "height_u": 1
+    },
+    {
+     "asset": "nf-ap-spare-01",
+     "on_shelf": "Spares shelf"
+    },
+    {
+     "asset": "nf-sc-spare-01",
+     "on_shelf": "Spares shelf"
+    }
+   ]
+  }
+ ]
+}

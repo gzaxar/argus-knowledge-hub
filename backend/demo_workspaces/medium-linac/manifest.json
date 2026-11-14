@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-11-12T17:48:03.714850+00:00",
+  "created_at": "2026-11-14T16:41:49.610544+00:00",
   "created_by": "ARGUS demo authors",
   "demo": {
     "description": "A medium-sized electron linac (fictional Valmora): buildings, floor plans and racks, the beam model from MAD-X with design and test beam optics, RF, vacuum, magnets and their supplies, magnet cooling water, electrical distribution, civil HVAC and offices with phones and network outlets, controls on EPIK8s with backups to an external data centre, radiation protection, purchasing with inventory numbers, tickets, runbooks and contracts.",
@@ -65,6 +65,21 @@
         "link": "/assets/vl-room-service",
         "text": "Three racks hold the magnet supplies, the Moxa, the vacuum controller and its gauge module; each unit has its rack and position, and the plan shows where.",
         "title": "Racks in the service area"
+      },
+      {
+        "link": "/plans/9725cd2b-a190-4a3c-a088-14c6482c1642",
+        "text": "Accelerator Building — ground floor: the drawing shows the building; rooms, racks and plant are drawn over it and can be turned on and off, with open tickets and activities. A rack is one point: click it to open it.",
+        "title": "The plan, layer by layer"
+      },
+      {
+        "link": "/racks/vl-rk-s02",
+        "text": "Rack S02 — core network and firewall: front and rear, what takes which units, the free space and the space kept for what is coming. Moving a unit is previewed before it is saved, and the rack keeps its history.",
+        "title": "Inside a rack, unit by unit"
+      },
+      {
+        "link": "/tunnel",
+        "text": "The beam model to scale along s, the rooms it crosses, and at each element the hardware installed there: its room, its rack, the supply that powers it and that supply's rack.",
+        "title": "The tunnel along the beam"
       },
       {
         "link": "/assets/vl-kc",
@@ -140,8 +155,8 @@
     },
     "asset_history": {
       "file": "records/asset_history.jsonl",
-      "rows": 664,
-      "sha256": "36572f77e6bc7c4218daee9d70b78f108db1a4d76eec92cf490c632d7965cae2"
+      "rows": 665,
+      "sha256": "c7e6af33cc398619d5320287478c842634df6a28500e10143d79d3ff70b2c8a5"
     },
     "asset_labels": {
       "file": "records/asset_labels.jsonl",
@@ -155,8 +170,8 @@
     },
     "assets": {
       "file": "records/assets.jsonl",
-      "rows": 392,
-      "sha256": "a857ad0b21b0ca33346a7aa168d31d12a3000e1a316839095f58b1a12c9bfcea"
+      "rows": 402,
+      "sha256": "6bb622229ee9d2eeebd401d1cd8dddc1533ebf9663001364c4567a349116b946"
     },
     "attachments": {
       "file": "records/attachments.jsonl",
@@ -166,7 +181,7 @@
     "beam_asset_bindings": {
       "file": "records/beam_asset_bindings.jsonl",
       "rows": 31,
-      "sha256": "b9743977133ab70ebdb8e6c2d960a18b80419be7495fe71c11c69cc6a37bcef8"
+      "sha256": "edeb5030e68f050e27b98af4343357bf715b61c1e43f7d3ee17c0da268f188bb"
     },
     "beam_model_documents": {
       "file": "records/beam_model_documents.jsonl",
@@ -176,7 +191,7 @@
     "beam_model_values": {
       "file": "records/beam_model_values.jsonl",
       "rows": 60,
-      "sha256": "8d812b47b10e8521faa3a919f3333873ea2e93212fcb93cbd01dde9bdd3ab99d"
+      "sha256": "1e795cb909ec4df075c1fbca4411364b2da9629af9b94fec0ef6d2f538377e83"
     },
     "document_folders": {
       "file": "records/document_folders.jsonl",
@@ -196,7 +211,7 @@
     "document_relations": {
       "file": "records/document_relations.jsonl",
       "rows": 127,
-      "sha256": "0fa59bf776ed568cbfe2d35a46ee479f03303f7aee7973c2c7449061ffbdb0db"
+      "sha256": "be3c87e8a9d8c86e3b40519ce919d9522b4214ec8983eff70398507e2e045233"
     },
     "document_revisions": {
       "file": "records/document_revisions.jsonl",
@@ -216,7 +231,7 @@
     "documents": {
       "file": "records/documents.jsonl",
       "rows": 22,
-      "sha256": "19d6e08ecf2b08dc441d63b0cd34e2c76d89d039948c274db6aaf394e87956c7"
+      "sha256": "7e86d4c49f817d1aef5255625313917145cedcfbd61e2d8f869199688697328b"
     },
     "equipment_class_requests": {
       "file": "records/equipment_class_requests.jsonl",
@@ -226,7 +241,7 @@
     "floor_plans": {
       "file": "records/floor_plans.jsonl",
       "rows": 4,
-      "sha256": "3cc22018ed08804f7bb576d5e796ee000b3de08b1e78e97107390c3f2230979d"
+      "sha256": "55c2ec888edb4b19dce9686a226be58a81f06681194a0acdb9737a4b4df261fa"
     },
     "global_values": {
       "file": "records/global_values.jsonl",
@@ -255,8 +270,8 @@
     },
     "indoor_placements": {
       "file": "records/indoor_placements.jsonl",
-      "rows": 219,
-      "sha256": "608ab7fa1dde7fd238bdd261926d2d339554c56714692317cc665c31fcb49c1b"
+      "rows": 220,
+      "sha256": "352db03102a0ae9b1c7cf6594aef491f7472d73186adf34b3df5d4d146e29681"
     },
     "llm_configs": {
       "file": "records/llm_configs.jsonl",
@@ -288,6 +303,11 @@
       "rows": 4,
       "sha256": "c9d724452a48fa94577ccde07e32a0b66c0305aecfc52255723094779bc3924f"
     },
+    "rack_mountings": {
+      "file": "records/rack_mountings.jsonl",
+      "rows": 41,
+      "sha256": "1aa34c3e0ca9f69a7f776950f2c7bd2577acd66177254725b00b57a9b78fa0f9"
+    },
     "record_watchers": {
       "file": "records/record_watchers.jsonl",
       "rows": 0,
@@ -295,8 +315,8 @@
     },
     "relations": {
       "file": "records/relations.jsonl",
-      "rows": 1080,
-      "sha256": "dfce44d6a0e00321302d3e0f6f5b10a7a2d83fec6cfb1c3190a9ca57b815f973"
+      "rows": 1153,
+      "sha256": "d7d40fea28fa235a4f45b204d532cc0e929d870d48ca341b4b7bb77dc17d7dcf"
     },
     "review_escalations": {
       "file": "records/review_escalations.jsonl",
@@ -346,7 +366,7 @@
     "ticket_workflows": {
       "file": "records/ticket_workflows.jsonl",
       "rows": 8,
-      "sha256": "0fff218d6a957436dd5285118dea4b6c96d9a6463ab6544b0be8708808fa9798"
+      "sha256": "a229a7ea407f003b90174b8e83e292c3968fff304026477b25d52b7ec9dccb29"
     },
     "tickets": {
       "file": "records/tickets.jsonl",
@@ -355,13 +375,13 @@
     },
     "types": {
       "file": "records/types.jsonl",
-      "rows": 298,
-      "sha256": "4944c6d498f20d49160eaf8bd0153bfc857e3e28c33836e4f894532880d355ba"
+      "rows": 299,
+      "sha256": "27f937b40dd06a10d7f1e5ac484abe473b46be5becb0c949421b4723bfb9edbe"
     },
     "workspace": {
       "file": "records/workspace.jsonl",
       "rows": 1,
-      "sha256": "fde122f88c816fdc394e6cc70e29765770e573467d414933402fa7524bce302d"
+      "sha256": "736250f0f6781d6e81a49b8d4215a716eac1d5157c24f8cc4918484f0d5d5379"
     },
     "workspace_packages": {
       "file": "records/workspace_packages.jsonl",
@@ -384,11 +404,6 @@
       "path": "files/08/08fab0a511eee773e02fb528a43343f9141b823ccc186253ad663bdad94bbe71",
       "sha256": "08fab0a511eee773e02fb528a43343f9141b823ccc186253ad663bdad94bbe71",
       "size": 444
-    },
-    {
-      "path": "files/0a/0a6a36470d0f1457dc90f27b74d4751975fa8e01514264c14686494a148358f1",
-      "sha256": "0a6a36470d0f1457dc90f27b74d4751975fa8e01514264c14686494a148358f1",
-      "size": 5154
     },
     {
       "path": "files/0c/0cda9851c753d44bfe5b2da46e2dfda74c471239438a2cbd515ccbb91cee9d14",
@@ -436,11 +451,6 @@
       "size": 649
     },
     {
-      "path": "files/18/1856f790a47bcd75bac8dea25972fbd2b5ce41497f639d3af0706880cd20b797",
-      "sha256": "1856f790a47bcd75bac8dea25972fbd2b5ce41497f639d3af0706880cd20b797",
-      "size": 31621
-    },
-    {
       "path": "files/18/186de978429dc77e47f6cacdb04cb3dd4498d34a5ff1a67a4b3bf9673e13308e",
       "sha256": "186de978429dc77e47f6cacdb04cb3dd4498d34a5ff1a67a4b3bf9673e13308e",
       "size": 586
@@ -459,6 +469,11 @@
       "path": "files/22/22ec3959929457600950c78ddf17b03747216fc2c816024fc65dd6595aaa5936",
       "sha256": "22ec3959929457600950c78ddf17b03747216fc2c816024fc65dd6595aaa5936",
       "size": 409
+    },
+    {
+      "path": "files/24/2436b16e538cc47e401797bb539e80184a5bf2c81a7240d9ee48975457ae46e1",
+      "sha256": "2436b16e538cc47e401797bb539e80184a5bf2c81a7240d9ee48975457ae46e1",
+      "size": 1893
     },
     {
       "path": "files/24/245e1e2e61cf8ecaeaf99d8717c1aa059cf6a759c3aaf47a8d99f364c5a5554d",
@@ -539,6 +554,11 @@
       "path": "files/43/4393c90f7c98e68b64b0716f89657664b63cd7daa257bcd7ae0a1871a22591e7",
       "sha256": "4393c90f7c98e68b64b0716f89657664b63cd7daa257bcd7ae0a1871a22591e7",
       "size": 578
+    },
+    {
+      "path": "files/46/46a108ec346e0424f7801ecbd3e62c1f4693a987ec1facce94b989c0078d879a",
+      "sha256": "46a108ec346e0424f7801ecbd3e62c1f4693a987ec1facce94b989c0078d879a",
+      "size": 1501
     },
     {
       "path": "files/47/474c95a16e5ccaffa820030f8d6362b51fbfbe542c57dd409eb153da5b0e53bf",
@@ -731,6 +751,11 @@
       "size": 431
     },
     {
+      "path": "files/9d/9d85097faf7c07f38b1664dddcee4400af9bc718e59c90927d38e5e74e60ca56",
+      "sha256": "9d85097faf7c07f38b1664dddcee4400af9bc718e59c90927d38e5e74e60ca56",
+      "size": 3810
+    },
+    {
       "path": "files/9e/9e551f1fcd0ce935e07076576acb50b8197697525f23d5e354ed64402f054d1c",
       "sha256": "9e551f1fcd0ce935e07076576acb50b8197697525f23d5e354ed64402f054d1c",
       "size": 463
@@ -849,11 +874,6 @@
       "path": "files/d0/d096b8a4a329dfef6a5325d1789860536bdadf9896a9189a60fcf594813d77a5",
       "sha256": "d096b8a4a329dfef6a5325d1789860536bdadf9896a9189a60fcf594813d77a5",
       "size": 535
-    },
-    {
-      "path": "files/d2/d262a1c6392c38e48a6cee0fe9318afcd97ee656066b6141d5fdc9499868af09",
-      "sha256": "d262a1c6392c38e48a6cee0fe9318afcd97ee656066b6141d5fdc9499868af09",
-      "size": 3260
     },
     {
       "path": "files/d6/d689cd6c01d72a1bd0ebb2cf90dd34fce868aa6d49d397aee598f5106a344b27",
@@ -1007,8 +1027,8 @@
     },
     {
       "path": "records/asset_history.jsonl",
-      "sha256": "36572f77e6bc7c4218daee9d70b78f108db1a4d76eec92cf490c632d7965cae2",
-      "size": 169247
+      "sha256": "c7e6af33cc398619d5320287478c842634df6a28500e10143d79d3ff70b2c8a5",
+      "size": 169522
     },
     {
       "path": "records/asset_labels.jsonl",
@@ -1022,8 +1042,8 @@
     },
     {
       "path": "records/assets.jsonl",
-      "sha256": "a857ad0b21b0ca33346a7aa168d31d12a3000e1a316839095f58b1a12c9bfcea",
-      "size": 312540
+      "sha256": "6bb622229ee9d2eeebd401d1cd8dddc1533ebf9663001364c4567a349116b946",
+      "size": 319049
     },
     {
       "path": "records/attachments.jsonl",
@@ -1032,7 +1052,7 @@
     },
     {
       "path": "records/beam_asset_bindings.jsonl",
-      "sha256": "b9743977133ab70ebdb8e6c2d960a18b80419be7495fe71c11c69cc6a37bcef8",
+      "sha256": "edeb5030e68f050e27b98af4343357bf715b61c1e43f7d3ee17c0da268f188bb",
       "size": 23863
     },
     {
@@ -1042,7 +1062,7 @@
     },
     {
       "path": "records/beam_model_values.jsonl",
-      "sha256": "8d812b47b10e8521faa3a919f3333873ea2e93212fcb93cbd01dde9bdd3ab99d",
+      "sha256": "1e795cb909ec4df075c1fbca4411364b2da9629af9b94fec0ef6d2f538377e83",
       "size": 25026
     },
     {
@@ -1062,7 +1082,7 @@
     },
     {
       "path": "records/document_relations.jsonl",
-      "sha256": "0fa59bf776ed568cbfe2d35a46ee479f03303f7aee7973c2c7449061ffbdb0db",
+      "sha256": "be3c87e8a9d8c86e3b40519ce919d9522b4214ec8983eff70398507e2e045233",
       "size": 27180
     },
     {
@@ -1082,7 +1102,7 @@
     },
     {
       "path": "records/documents.jsonl",
-      "sha256": "19d6e08ecf2b08dc441d63b0cd34e2c76d89d039948c274db6aaf394e87956c7",
+      "sha256": "7e86d4c49f817d1aef5255625313917145cedcfbd61e2d8f869199688697328b",
       "size": 13075
     },
     {
@@ -1092,7 +1112,7 @@
     },
     {
       "path": "records/floor_plans.jsonl",
-      "sha256": "3cc22018ed08804f7bb576d5e796ee000b3de08b1e78e97107390c3f2230979d",
+      "sha256": "55c2ec888edb4b19dce9686a226be58a81f06681194a0acdb9737a4b4df261fa",
       "size": 4644
     },
     {
@@ -1122,8 +1142,8 @@
     },
     {
       "path": "records/indoor_placements.jsonl",
-      "sha256": "608ab7fa1dde7fd238bdd261926d2d339554c56714692317cc665c31fcb49c1b",
-      "size": 108510
+      "sha256": "352db03102a0ae9b1c7cf6594aef491f7472d73186adf34b3df5d4d146e29681",
+      "size": 109008
     },
     {
       "path": "records/llm_configs.jsonl",
@@ -1156,14 +1176,19 @@
       "size": 1067
     },
     {
+      "path": "records/rack_mountings.jsonl",
+      "sha256": "1aa34c3e0ca9f69a7f776950f2c7bd2577acd66177254725b00b57a9b78fa0f9",
+      "size": 19667
+    },
+    {
       "path": "records/record_watchers.jsonl",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     {
       "path": "records/relations.jsonl",
-      "sha256": "dfce44d6a0e00321302d3e0f6f5b10a7a2d83fec6cfb1c3190a9ca57b815f973",
-      "size": 262786
+      "sha256": "d7d40fea28fa235a4f45b204d532cc0e929d870d48ca341b4b7bb77dc17d7dcf",
+      "size": 279924
     },
     {
       "path": "records/review_escalations.jsonl",
@@ -1212,7 +1237,7 @@
     },
     {
       "path": "records/ticket_workflows.jsonl",
-      "sha256": "0fff218d6a957436dd5285118dea4b6c96d9a6463ab6544b0be8708808fa9798",
+      "sha256": "a229a7ea407f003b90174b8e83e292c3968fff304026477b25d52b7ec9dccb29",
       "size": 9899
     },
     {
@@ -1222,12 +1247,12 @@
     },
     {
       "path": "records/types.jsonl",
-      "sha256": "4944c6d498f20d49160eaf8bd0153bfc857e3e28c33836e4f894532880d355ba",
-      "size": 374862
+      "sha256": "27f937b40dd06a10d7f1e5ac484abe473b46be5becb0c949421b4723bfb9edbe",
+      "size": 375276
     },
     {
       "path": "records/workspace.jsonl",
-      "sha256": "fde122f88c816fdc394e6cc70e29765770e573467d414933402fa7524bce302d",
+      "sha256": "736250f0f6781d6e81a49b8d4215a716eac1d5157c24f8cc4918484f0d5d5379",
       "size": 730
     },
     {
@@ -1314,8 +1339,8 @@
   ],
   "source": {
     "argus_version": "dev",
-    "instance": "ec35a49b-3eb5-49a1-acb3-9199867daa19",
-    "schema_revision": "a5e7c9b1d3f2"
+    "instance": "f2f24f72-87de-4c48-8647-a0a4ff682b50",
+    "schema_revision": "b1c3d5e7f9a2"
   },
   "workspace": {
     "id": "valmora-linac-demo",
