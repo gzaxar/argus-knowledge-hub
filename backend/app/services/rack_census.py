@@ -488,6 +488,23 @@ def review(db: Session, workspace_id: str, uid: str) -> dict:
 
 # --------------------------------------------------------------------------- applying
 
+def _takes_product_model(db: Session, schema: Schema, pm_uid: str) -> bool:
+    """Whether the catalogue entry fits the type's product model field. One the field cannot hold (it points at another
+    kind of record) is left out rather than refusing the unit; a type without the field keeps it as written."""
+    from app.services.attribute_validation import _descendant_schema_uids, effective_attributes
+    attr = next((a for a in effective_attributes(db, schema) if isinstance(a, dict) and a.get("key") == "product_model"), None)
+    target = db.get(Asset, pm_uid)
+    if target is None:
+        return False
+    if attr is None:
+        return True
+    ref = attr.get("referenceSchemaUid")
+    if attr.get("type") != "reference" or not ref:
+        return True
+    allowed = {ref} | (_descendant_schema_uids(db, ref) if attr.get("includeChildren") else set())
+    return target.schema_uid in allowed
+
+
 def apply(db: Session, workspace_id: str, uid: str, identity, actor: str) -> dict:
     """Make it so — or, if the review still finds something, nothing at all."""
     from app.auth import get_current_user_id
@@ -527,15 +544,16 @@ def apply(db: Session, workspace_id: str, uid: str, identity, actor: str) -> dic
             continue
         if item["decision"] == "create":
             attrs = {k: _value(item, k) for k in ("serial", "manufacturer", "model") if _value(item, k)}
-            pm = _value(item, "product_model")              # taken from the catalogue's proposal, or chosen
-            if pm:
-                attrs["product_model"] = pm
             schema = db.get(Schema, _value(item, "type"))
             if schema is None:
                 schema = db.scalar(select(Schema).where(Schema.name == _value(item, "type"),
-                                                        or_(Schema.workspace_id == workspace_id, Schema.is_global.is_(True))))
+                                                        or_(Schema.workspace_id == workspace_id, Schema.is_global.is_(True)))
+                                   .order_by(Schema.is_global))      # the workspace's own type before a global one
             if schema is None:
                 raise CensusError(f"{_value(item, 'name')}: there is no type {_value(item, 'type')!r} here")
+            pm = _value(item, "product_model")              # taken from the catalogue's proposal, or chosen
+            if pm and _takes_product_model(db, schema, pm):
+                attrs["product_model"] = pm
             asset = forms.create_asset(AssetCreate(uid=str(uuid.uuid4()), schema_uid=schema.uid, name=_value(item, "name"),
                                                    attributes=attrs),
                                        identity=identity, workspace_id=workspace_id, current_user_id=user_id, db=db)

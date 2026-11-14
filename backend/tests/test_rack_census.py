@@ -17,6 +17,7 @@ from app.models.asset import Asset
 from app.models.attachment import Attachment
 from app.models.llm_config import LLMConfig
 from app.models.rack import RackMounting
+from app.models.schema import Schema
 from app.models.workspace import Workspace
 from app.services import indoor
 from tests.test_indoor import png
@@ -33,6 +34,10 @@ def site():
     db = SessionLocal()
     db.add(Workspace(id=ws, name=ws))
     db.flush()
+    for name in ("Room", "Product Model", "Server", "Switch"):
+        db.add(Schema(uid=f"{ws}:ledger:{name.lower().replace(' ', '-')}", workspace_id=ws, name=name,
+                      applies_to="objects"))
+    db.flush()
 
     def rec(type_, name, **attrs):
         a = Asset(uid=str(uuid.uuid4()), workspace_id=ws, schema_uid=engine.ensure_type(db, ws, type_).uid,
@@ -47,9 +52,10 @@ def site():
          "old": rec("Server", "Backup host", serial="SN-OLD"),
          "spare": rec("Switch", "Spare switch")}
     engine.ensure_type(db, ws, "Rack")
-    # A Server type as the packages give it: what is written on a unit's nameplate.
-    engine.ensure_type(db, ws, "Server").attributes = [
-        {"key": k, "name": k.title(), "type": "string"} for k in ("manufacturer", "model", "serial")]
+    # A Server type of this workspace's own, as the packages give it: what is written on a unit's nameplate. (Not
+    # ensure_type, which could hand back a global Server another test left, and this would change it.)
+    server = db.get(Schema, f"{ws}:ledger:server")
+    server.attributes = [{"key": k, "name": k.title(), "type": "string"} for k in ("manufacturer", "model", "serial")]
     db.add(LLMConfig(workspace_id=ws, base_url="https://gateway.example/v1", model="m", vision_model="v",
                      enabled=True, last_check_ok=True))
     w["h"] = token(db, ws)
