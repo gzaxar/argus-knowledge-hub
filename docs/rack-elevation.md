@@ -55,7 +55,8 @@ mounting stands and the response's `notes` say so.
 
 A Rack's page shows its elevation; **Edit the rack** (`/racks/{uid}`) opens the editor: front and rear, units
 numbered from the bottom, blocks dragged with the mouse or a finger or placed by a form, shelves, reserved spaces,
-0U devices, and the history. Every change is staged and shown as a preview; nothing is saved until it is
+0U devices (a strip the whole height along the side of their face, with their note, such as the feed of a PDU),
+and the history. Every change is staged and shown as a preview; nothing is saved until it is
 confirmed. A mounted unit's page says which rack and units it is in.
 
 ## Bundles

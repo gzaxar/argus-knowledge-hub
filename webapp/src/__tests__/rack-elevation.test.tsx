@@ -23,8 +23,17 @@ describe("a rack elevation", () => {
   it("draws each face with what is on it and lists what takes no unit", () => {
     renderWith(<RackElevation view={view} />, {});
     expect(screen.getByRole("img", { name: /Rack 1, front: Server one U3–U4; Kept for a switch U8–U9/ })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /Rack 1, rear: Kept for a switch U8–U9$/ })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Rack 1, rear: Kept for a switch U8–U9; PDU left 0U$/ })).toBeInTheDocument();
     expect(screen.getByText(/PDU left \(rear\)/)).toBeInTheDocument();
+  });
+
+  it("stands what takes no unit along the side of its face, with what feeds it", () => {
+    const fed = { ...view, mountings: view.mountings.map((m) => (m.uid === "m3" ? { ...m, note: "feed A from UPS-1" } : m)) };
+    const { container } = renderWith(<RackElevation view={fed} />, {});
+    const strips = container.querySelectorAll("[data-zero-u]");
+    expect(strips).toHaveLength(1);                                   // on the rear only
+    expect(strips[0].closest("[data-rack-face]")?.getAttribute("data-rack-face")).toBe("rear");
+    expect(strips[0].textContent).toContain("feed A from UPS-1");
     expect(screen.getByText("4 of 10 U used")).toBeInTheDocument();
   });
 

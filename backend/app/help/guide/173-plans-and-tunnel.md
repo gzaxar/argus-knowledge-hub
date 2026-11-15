@@ -23,7 +23,8 @@ not drawn on its own. Click the square to open the rack's elevation. A ticket on
 counted on the rack.
 
 Rooms, zones and cables come from their outlines and routes on the map, so they appear only on a plan that is
-placed on the map. Rooms of another floor of the same building are left out.
+placed on the map. On a plan drawn by ARGUS a cable or pipe from another building starts at the wall it comes
+through, named there, and a dot marks where it arrives. Rooms of another floor of the same building are left out.
 
 From a record looked for — `?focus=` in the address, as the tunnel and Ask ARGUS use it — the plan opens around
 it. A unit in a rack is shown as its rack, with a link that opens the rack with that unit selected.

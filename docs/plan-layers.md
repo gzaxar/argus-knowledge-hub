@@ -28,7 +28,8 @@ The uploaded drawing is the **base**: walls, rooms, doors. ARGUS never writes on
   other workspaces that are not reachable from the plan's.
 - On a drawing ARGUS made (a demo's, or "Draw a plan"), `building` gives the building's walls `[x, y, w, h]` in px.
   The web clips routes to them, so a cable from another building is drawn from the wall it comes through, not
-  across the title block or the ground around. On an uploaded drawing, routes are clipped to the picture.
+  across the title block or the ground around. On an uploaded drawing, routes are clipped to the picture. A route
+  coming through a wall is named there (`routeEnds` in `PlanLayersPage.tsx`) and a dot marks the end inside.
 - The web offers only the layers that have something on this plan: an IT building has no beamline chip.
 - Everything is filtered for the viewer as the plan itself is (`routers/indoor._viewer`); tickets need ticket read
   permission in their workspace; activities follow the activity rules (`services/activities.sees`).
@@ -66,3 +67,12 @@ between everything the plan shows. Relations that say where or what a record is 
 On the page, relations are arcs coloured by type, higher the farther apart their ends; they can be limited to some
 types and, by default, to those of the record selected. A click selects (a room only when nothing else is under
 the pointer); the panel says each relation in words and opens the rack, or the unit in its rack.
+
+## The demos' cables and pipes
+
+The demo routes were drawn on the map as a few straight strokes. Inside a building those crossed rooms diagonally
+and stopped anywhere, so `scripts/rack_demos.py` redraws the part inside each building with
+`scripts/demo_routes_inside.py`: from where the route comes through the wall, a square run along the free space
+between rooms (a corridor, the gap between two rows of rooms) to well inside the room its end is in. Outside the
+building the route is kept as it was; a route through a corner goes in through the side wall. Running it again
+changes nothing (`tests/test_demo_routes_inside.py`).

@@ -23,7 +23,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Callable, Optional
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.asset import Asset, Relation
@@ -32,7 +32,7 @@ from app.models.issue import Issue
 from app.models.rack import RackMounting
 from app.services import indoor, spatial
 from app.services.racks import RACK_TYPES
-from app.services.visibility import reachable_in
+from app.services.visibility import reachable_in, site_clause
 
 LAYERS = [
     ("places", "Rooms and accesses", True),
@@ -126,7 +126,10 @@ def _shapes(db: Session, plan: FloorPlan, may: Callable[[Asset], bool]) -> tuple
     own = {plan.place_uid} | {c.uid for c in indoor.containers(db, plan.place_uid)}
     box = [(0.0, 0.0), (w, 0.0), (w, h), (0.0, h)]
     outlines, routes = [], []
-    for asset, f in spatial.within(db, Asset.deleted_at.is_(None), bbox, limit=500):
+    # Only what the plan's workspace reaches is looked for: the same spot may hold other workspaces' copies (an
+    # imported demo twice), and they must not use up the limit before this workspace's own are found.
+    reach = or_(Asset.workspace_id == plan.workspace_id, Asset.is_global.is_(True), site_clause(plan.workspace_id))
+    for asset, f in spatial.within(db, and_(Asset.deleted_at.is_(None), reach), bbox, limit=500):
         if f.role not in ("outline", "route") or asset.uid in own or not may(asset):
             continue
         if not reachable_in(asset, plan.workspace_id):

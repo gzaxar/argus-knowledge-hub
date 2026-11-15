@@ -30,9 +30,9 @@
 <rect x="162" y="22" width="116" height="156" fill="none" stroke="#a7764d" stroke-width="0.6" stroke-opacity="0.7"/>
 <line x1="166" y1="20" x2="176" y2="20" stroke="#f3dcc8" stroke-width="3"/>
 <path d="M166,20 L166,30 A10,10 0 0 1 176,20" fill="none" stroke="#475569" stroke-width="0.6"/>
-<rect x="43" y="23" width="74" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
-<text x="80" y="34.5" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">SUBSTATION</text>
-<text x="80" y="48" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">U0.01 · 192 m²</text>
+<rect x="43" y="73.8" width="74" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
+<text x="80" y="85.3" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">SUBSTATION</text>
+<text x="80" y="98.8" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">U0.01 · 192 m²</text>
 <rect x="214.12" y="106.86" width="45.84" height="24.2" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
 <text x="237.04" y="116.56" font-family="Helvetica, Arial, sans-serif" font-size="8" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">COOLING</text>
 <text x="237.04" y="126.16" font-family="Helvetica, Arial, sans-serif" font-size="8" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">PLANT</text>

@@ -23,7 +23,11 @@ export interface PlanPin { id: string; x: number; y: number; label: string; colo
 
 /** A shape over the drawing, in plan pixels: an outline (a room, a zone) or a route (a cable, a pipe). */
 export interface PlanShape { id: string; points: [number, number][]; closed: boolean; label: string; colour: string;
-  dashed?: boolean; onClick?: () => void }
+  dashed?: boolean; onClick?: () => void;
+  /** A name always shown at a point of the shape (a route: along its longest stretch), centred on it or beside it. */
+  tag?: { x: number; y: number; text: string; direction: "center" | "left" | "right" | "top" | "bottom" };
+  /** Where a route arrives: a dot. */
+  end?: [number, number] }
 
 function squareIcon(colour: string, big: boolean) {
   const s = big ? 18 : 14;
@@ -122,6 +126,19 @@ export function PlanView({ planUid, width, height, pins = [], lines = [], shapes
               ? <Polygon key={sh.id} positions={pos} pathOptions={opts} eventHandlers={events}><Tooltip sticky>{sh.label}</Tooltip></Polygon>
               : <Polyline key={sh.id} positions={pos} pathOptions={opts} eventHandlers={events}><Tooltip sticky>{sh.label}</Tooltip></Polyline>;
           })}
+          {shapes.filter((sh) => sh.end).map((sh) => (
+            <CircleMarker key={`${sh.id}-end`} center={toLL(height, sh.end![0], sh.end![1])} radius={4}
+                          eventHandlers={sh.onClick ? { click: sh.onClick } : undefined}
+                          pathOptions={{ color: "#fff", weight: 1.5, fillColor: sh.colour, fillOpacity: 1 }} />
+          ))}
+          {shapes.filter((sh) => sh.tag).map((sh) => (
+            <CircleMarker key={`${sh.id}-tag`} center={toLL(height, sh.tag!.x, sh.tag!.y)} radius={0} interactive={false}
+                          pathOptions={{ opacity: 0, fillOpacity: 0 }}>
+              <Tooltip permanent direction={sh.tag!.direction} offset={[0, 0]}
+                       className="!rounded !border-0 !bg-white/85 !px-1 !py-0 !text-[10px] !shadow-none"
+                       ><span style={{ color: sh.colour }}>{sh.tag!.text}</span></Tooltip>
+            </CircleMarker>
+          ))}
           {lines.map((l) => (
             <Polyline key={l.id} positions={[toLL(height, l.from.x, l.from.y), toLL(height, l.to.x, l.to.y)]}
                       pathOptions={{ color: "#475569", weight: 2, dashArray: "6 6" }}>
