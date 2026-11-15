@@ -37,13 +37,13 @@
 <rect x="262" y="22" width="66" height="56" fill="none" stroke="#6683a3" stroke-width="0.6" stroke-opacity="0.7"/>
 <line x1="266" y1="80" x2="276" y2="80" stroke="#dfeaf5" stroke-width="3"/>
 <path d="M266,80 L266,70 A10,10 0 0 0 276,80" fill="none" stroke="#475569" stroke-width="0.6"/>
-<rect x="102.6" y="45.2" width="54.8" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
-<text x="130" y="56.7" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">OFFICES</text>
-<text x="130" y="70.2" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D0.01 · 308 m²</text>
-<rect x="270.8" y="102.6" width="48.4" height="29" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
-<text x="295" y="114.1" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">SERVER</text>
-<text x="295" y="126.1" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">ROOM</text>
-<text x="295" y="139.6" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D0.02 · 49 m²</text>
+<rect x="102.6" y="23" width="54.8" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
+<text x="130" y="34.5" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">OFFICES</text>
+<text x="130" y="48" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D0.01 · 308 m²</text>
+<rect x="277.52" y="96.34" width="34.96" height="20.6" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
+<text x="295" y="104.69" font-family="Helvetica, Arial, sans-serif" font-size="6.5" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">SERVER</text>
+<text x="295" y="112.49" font-family="Helvetica, Arial, sans-serif" font-size="6.5" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">ROOM</text>
+<text x="295" y="124.94" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D0.02 · 49 m²</text>
 <rect x="262" y="30.8" width="66" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
 <text x="295" y="42.3" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">RECEPTION</text>
 <text x="295" y="55.8" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D0.03 · 42 m²</text>

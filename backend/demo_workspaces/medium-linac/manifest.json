@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-11-15T00:03:07.322803+00:00",
+  "created_at": "2026-11-15T11:31:57.013316+00:00",
   "created_by": "ARGUS demo authors",
   "demo": {
     "description": "A medium-sized electron linac (fictional Valmora): buildings, floor plans and racks, the beam model from MAD-X with design and test beam optics, RF, vacuum, magnets and their supplies, magnet cooling water, electrical distribution, civil HVAC and offices with phones and network outlets, controls on EPIK8s with backups to an external data centre, radiation protection, purchasing with inventory numbers, tickets, runbooks and contracts.",
@@ -181,7 +181,7 @@
     "beam_asset_bindings": {
       "file": "records/beam_asset_bindings.jsonl",
       "rows": 31,
-      "sha256": "ae35e3c8748b2c4f58cd707982ab9397719fb3f6acc5d9f4c3f0a0fead25c386"
+      "sha256": "690464b3120f0f19b663239d3423473a33ca189e4e6d4e5a0274530b65fe7940"
     },
     "beam_model_documents": {
       "file": "records/beam_model_documents.jsonl",
@@ -191,7 +191,7 @@
     "beam_model_values": {
       "file": "records/beam_model_values.jsonl",
       "rows": 60,
-      "sha256": "01db10c93ba43c1e1d29ce45a792da8fecd1a640860cf88e6f7b7f029ff4392a"
+      "sha256": "4407dfabb31cd42d5bac6857305515bc302074c67e2d2efcca6cdbbb1a1d6e8f"
     },
     "document_folders": {
       "file": "records/document_folders.jsonl",
@@ -211,7 +211,7 @@
     "document_relations": {
       "file": "records/document_relations.jsonl",
       "rows": 127,
-      "sha256": "e7d804f7fc70bce6990e46535eb60d9ee70460e522543dd31b5a9571ddbd3750"
+      "sha256": "3e8c14d36bfcae8156afcd85f8c9294d23855b1d19d525ed41ba4969e10efc30"
     },
     "document_revisions": {
       "file": "records/document_revisions.jsonl",
@@ -231,7 +231,7 @@
     "documents": {
       "file": "records/documents.jsonl",
       "rows": 22,
-      "sha256": "7d440da62d1568396b277addbab9e94c89c0740df9827de3bc9099bf01c70c9d"
+      "sha256": "e91b5ca9826fa806cee114f2def5654812cf3ef8daad32394a74512b0488fea6"
     },
     "equipment_class_requests": {
       "file": "records/equipment_class_requests.jsonl",
@@ -241,7 +241,7 @@
     "floor_plans": {
       "file": "records/floor_plans.jsonl",
       "rows": 4,
-      "sha256": "65d95bac68ce25a4752527f74fd48f6d46d8a16a6b136a0c17212a6ac0c660b1"
+      "sha256": "80da41240529e99780fd3bcc56f39e79beff0a0bd9b5e74bf37d65cf26d9ab10"
     },
     "global_values": {
       "file": "records/global_values.jsonl",
@@ -316,7 +316,7 @@
     "relations": {
       "file": "records/relations.jsonl",
       "rows": 1133,
-      "sha256": "49ac0326b0ff55776eb913db69196d14f6b30245abeb79593ce4c21a65376650"
+      "sha256": "b54e3936d01c8cc1febfdfd15809095e3ad2b78a8297aca72461d563982b6117"
     },
     "review_escalations": {
       "file": "records/review_escalations.jsonl",
@@ -366,7 +366,7 @@
     "ticket_workflows": {
       "file": "records/ticket_workflows.jsonl",
       "rows": 8,
-      "sha256": "b4d10b2d00070d1bb7a46dee97cd259388800399794018cf84cc2bd8238836af"
+      "sha256": "ad74d5cb1f8fbfb999cb863d250d5dcc34ab8def4178d86a2af9a7d578d4f43c"
     },
     "tickets": {
       "file": "records/tickets.jsonl",
@@ -376,12 +376,12 @@
     "types": {
       "file": "records/types.jsonl",
       "rows": 299,
-      "sha256": "9bf412e4df860bd2ef8e9e51a6a10e78646e3d2faae9695c230c6eddfb011b73"
+      "sha256": "ddbfb0e1b239f94fb1611e4a426ad1c67ecf9f1ba2e2e1b5093a7ff20374c4c4"
     },
     "workspace": {
       "file": "records/workspace.jsonl",
       "rows": 1,
-      "sha256": "e1f56a0fe01d5a5747683e74305a5354fa956499e7b957f38177df0a5f7af074"
+      "sha256": "c88caef2e89ce9bbf46ce45d6229024a79c4dae0b4c41d953e408b3b0f70dbd4"
     },
     "workspace_packages": {
       "file": "records/workspace_packages.jsonl",
@@ -459,6 +459,11 @@
       "path": "files/1f/1f7ac05376f788c16ac9d2569e232e8bebc2603a5d53a90f0d411cdaf9a166bc",
       "sha256": "1f7ac05376f788c16ac9d2569e232e8bebc2603a5d53a90f0d411cdaf9a166bc",
       "size": 426
+    },
+    {
+      "path": "files/20/20c24d86926789b6e73d276fe059116254b958a1fef3cc32d1d8dd9e4ea207a4",
+      "sha256": "20c24d86926789b6e73d276fe059116254b958a1fef3cc32d1d8dd9e4ea207a4",
+      "size": 7078
     },
     {
       "path": "files/21/21b9f6da062ad80cffadb32055b1938ecf52bb80b042476bd06748b0bb4f17d7",
@@ -551,11 +556,6 @@
       "size": 511
     },
     {
-      "path": "files/48/483d823e71153c4a1b6cc7851e963333b0a92c65c351aeb7eb44aeddb0bb5d72",
-      "sha256": "483d823e71153c4a1b6cc7851e963333b0a92c65c351aeb7eb44aeddb0bb5d72",
-      "size": 6913
-    },
-    {
       "path": "files/4c/4c87684f3af8824efa448c9268ab6b338fbeccdf11225828c40e66f6f4c09cb9",
       "sha256": "4c87684f3af8824efa448c9268ab6b338fbeccdf11225828c40e66f6f4c09cb9",
       "size": 868
@@ -574,11 +574,6 @@
       "path": "files/4d/4dabc6cd2e625790912e4e77d39488fdb9a13a7bd18f87e0b50c45f4f5d10dd5",
       "sha256": "4dabc6cd2e625790912e4e77d39488fdb9a13a7bd18f87e0b50c45f4f5d10dd5",
       "size": 501
-    },
-    {
-      "path": "files/4f/4fbbf73b9d8fe9cd74d6407e7fe39bbb2257acc0948d0a59e230288f6cf54acc",
-      "sha256": "4fbbf73b9d8fe9cd74d6407e7fe39bbb2257acc0948d0a59e230288f6cf54acc",
-      "size": 16365
     },
     {
       "path": "files/4f/4ff072caca4c74684cc845b135b07c796c4e39fc7d926653971cbcaac5fb4820",
@@ -641,6 +636,11 @@
       "size": 730
     },
     {
+      "path": "files/6a/6ae6cd0ffb89826b24e0b5e252b1b2a8d7de520422e8e2c2c81a5d8f1dd23ae5",
+      "sha256": "6ae6cd0ffb89826b24e0b5e252b1b2a8d7de520422e8e2c2c81a5d8f1dd23ae5",
+      "size": 16894
+    },
+    {
       "path": "files/6f/6fb3f32e6aa6424fce1fb6aba3a26acd38aa668f240e3952e12616675bdebe58",
       "sha256": "6fb3f32e6aa6424fce1fb6aba3a26acd38aa668f240e3952e12616675bdebe58",
       "size": 542
@@ -696,6 +696,11 @@
       "size": 609
     },
     {
+      "path": "files/88/8834f0ca4f6b393c443f7ab3322c5a8f722de406c230762eb4d08b3630759b51",
+      "sha256": "8834f0ca4f6b393c443f7ab3322c5a8f722de406c230762eb4d08b3630759b51",
+      "size": 7998
+    },
+    {
       "path": "files/88/888a8a97af879e6780d575ee43b659a7f41a41f619bda33c01fee23ade31650e",
       "sha256": "888a8a97af879e6780d575ee43b659a7f41a41f619bda33c01fee23ade31650e",
       "size": 548
@@ -729,11 +734,6 @@
       "path": "files/95/95afa21025a2c5dbb7efda5ff74250ab1606b0fb11e0a6979d1a2c8a277c22fb",
       "sha256": "95afa21025a2c5dbb7efda5ff74250ab1606b0fb11e0a6979d1a2c8a277c22fb",
       "size": 544
-    },
-    {
-      "path": "files/97/970013a6f3ff61be9111f3ecd4c8e333b07e86e3948b884a0752d478e3d977c8",
-      "sha256": "970013a6f3ff61be9111f3ecd4c8e333b07e86e3948b884a0752d478e3d977c8",
-      "size": 6515
     },
     {
       "path": "files/97/979530bcf6db69ff4421a8ba8b916f8d2dab7ccc79b81e53d89cfac4827b373c",
@@ -886,11 +886,6 @@
       "size": 474
     },
     {
-      "path": "files/dd/ddb12c0a58969898f150925b1c9a56ce47b3d9347cb02199b7663314aac1d8a4",
-      "sha256": "ddb12c0a58969898f150925b1c9a56ce47b3d9347cb02199b7663314aac1d8a4",
-      "size": 7993
-    },
-    {
       "path": "files/dd/ddc51fa2d63376f08c88af678fff81b155f0d78ea5c846c6b0266d8a80254c08",
       "sha256": "ddc51fa2d63376f08c88af678fff81b155f0d78ea5c846c6b0266d8a80254c08",
       "size": 598
@@ -939,6 +934,11 @@
       "path": "files/ef/efcc92bdc806353bf305a4c66361c43e44760b7e52a9196049c78990c995a987",
       "sha256": "efcc92bdc806353bf305a4c66361c43e44760b7e52a9196049c78990c995a987",
       "size": 473
+    },
+    {
+      "path": "files/f1/f17e8e0fdb6682cdcd4c34be0e66f73943d806645bf50196456e0af17419a60d",
+      "sha256": "f17e8e0fdb6682cdcd4c34be0e66f73943d806645bf50196456e0af17419a60d",
+      "size": 6694
     },
     {
       "path": "files/f2/f21015b15412656c655c24a1eb240e2e8e0b6fac71ecf9dff3d76c594c13ecc2",
@@ -1052,7 +1052,7 @@
     },
     {
       "path": "records/beam_asset_bindings.jsonl",
-      "sha256": "ae35e3c8748b2c4f58cd707982ab9397719fb3f6acc5d9f4c3f0a0fead25c386",
+      "sha256": "690464b3120f0f19b663239d3423473a33ca189e4e6d4e5a0274530b65fe7940",
       "size": 23863
     },
     {
@@ -1062,7 +1062,7 @@
     },
     {
       "path": "records/beam_model_values.jsonl",
-      "sha256": "01db10c93ba43c1e1d29ce45a792da8fecd1a640860cf88e6f7b7f029ff4392a",
+      "sha256": "4407dfabb31cd42d5bac6857305515bc302074c67e2d2efcca6cdbbb1a1d6e8f",
       "size": 25026
     },
     {
@@ -1082,7 +1082,7 @@
     },
     {
       "path": "records/document_relations.jsonl",
-      "sha256": "e7d804f7fc70bce6990e46535eb60d9ee70460e522543dd31b5a9571ddbd3750",
+      "sha256": "3e8c14d36bfcae8156afcd85f8c9294d23855b1d19d525ed41ba4969e10efc30",
       "size": 27180
     },
     {
@@ -1102,7 +1102,7 @@
     },
     {
       "path": "records/documents.jsonl",
-      "sha256": "7d440da62d1568396b277addbab9e94c89c0740df9827de3bc9099bf01c70c9d",
+      "sha256": "e91b5ca9826fa806cee114f2def5654812cf3ef8daad32394a74512b0488fea6",
       "size": 13075
     },
     {
@@ -1112,7 +1112,7 @@
     },
     {
       "path": "records/floor_plans.jsonl",
-      "sha256": "65d95bac68ce25a4752527f74fd48f6d46d8a16a6b136a0c17212a6ac0c660b1",
+      "sha256": "80da41240529e99780fd3bcc56f39e79beff0a0bd9b5e74bf37d65cf26d9ab10",
       "size": 4644
     },
     {
@@ -1187,8 +1187,8 @@
     },
     {
       "path": "records/relations.jsonl",
-      "sha256": "49ac0326b0ff55776eb913db69196d14f6b30245abeb79593ce4c21a65376650",
-      "size": 275200
+      "sha256": "b54e3936d01c8cc1febfdfd15809095e3ad2b78a8297aca72461d563982b6117",
+      "size": 275178
     },
     {
       "path": "records/review_escalations.jsonl",
@@ -1237,7 +1237,7 @@
     },
     {
       "path": "records/ticket_workflows.jsonl",
-      "sha256": "b4d10b2d00070d1bb7a46dee97cd259388800399794018cf84cc2bd8238836af",
+      "sha256": "ad74d5cb1f8fbfb999cb863d250d5dcc34ab8def4178d86a2af9a7d578d4f43c",
       "size": 9899
     },
     {
@@ -1247,12 +1247,12 @@
     },
     {
       "path": "records/types.jsonl",
-      "sha256": "9bf412e4df860bd2ef8e9e51a6a10e78646e3d2faae9695c230c6eddfb011b73",
+      "sha256": "ddbfb0e1b239f94fb1611e4a426ad1c67ecf9f1ba2e2e1b5093a7ff20374c4c4",
       "size": 375276
     },
     {
       "path": "records/workspace.jsonl",
-      "sha256": "e1f56a0fe01d5a5747683e74305a5354fa956499e7b957f38177df0a5f7af074",
+      "sha256": "c88caef2e89ce9bbf46ce45d6229024a79c4dae0b4c41d953e408b3b0f70dbd4",
       "size": 730
     },
     {
@@ -1339,7 +1339,7 @@
   ],
   "source": {
     "argus_version": "dev",
-    "instance": "b9c8cded-0075-4727-aa5f-19cf75741dae",
+    "instance": "8620993a-da24-480c-b9d8-40d26663a6a5",
     "schema_revision": "d3e5f7a9b2c4"
   },
   "workspace": {

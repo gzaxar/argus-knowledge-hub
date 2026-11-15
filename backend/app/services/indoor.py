@@ -238,7 +238,9 @@ def redraw_plan(db: Session, plan: FloorPlan, layout: dict, *, actor: Optional[s
         raise IndoorError(f"{len(outside)} placed on the plan would be outside it ({', '.join(outside[:3])}…): "
                           "keep the building at least that large")
     # A new file: a drawing can be shared with an attachment (a demo's), which keeps its own.
-    plan.storage_path = _store(f"{plan.uid}-{uuid.uuid4().hex[:8]}.svg", plan_drawing.draw(model).encode())
+    from app.services.plan_layers import drawn_over               # it reads this module
+    plan.storage_path = _store(f"{plan.uid}-{uuid.uuid4().hex[:8]}.svg",
+                               plan_drawing.draw(model, drawn_over(db, plan)).encode())
     plan.width_px, plan.height_px, plan.updated_at = model["width"], model["height"], now()
     if model["title"] and plan.source_kind == "drawn":
         plan.name = model["title"][:200]

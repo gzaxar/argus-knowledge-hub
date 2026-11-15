@@ -6,6 +6,13 @@ at 1 m = 10 px — double outer wall, a column grid every 5 m with axis bubbles,
 for, its name in a label that fits inside it, its number and area, a door, hatched shielding around a bunker or
 tunnel, and a title block with north and a 10 m scale bar.
 
+A room's label goes where nothing ARGUS draws over the plan covers it (`plan_layers.drawn_over`: every point — a
+rack for what it holds — and every route, in the plan's pixels). It is high in the room and centred when that spot
+is free. Otherwise it goes to the free spot nearest to there; if no spot is free, it wraps a word to a line or gets
+smaller. A point on the name counts far more than one at its edge or on the number and area. In a room too full for
+any free spot (a 7 m × 8 m room with ten racks and devices), the label is as little covered as can be. The points
+are not kept in the drawing's model: a plan drawn again places its labels for what is on it then.
+
 ## The layout
 
 ```json

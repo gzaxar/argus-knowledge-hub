@@ -137,7 +137,46 @@ def _crosses(points: list, x: float, y: float, w: float, h: float) -> bool:
     return False
 
 
-def draw(m: dict) -> str:
+MARKER = 9.0                                               # a point drawn over the plan, and its ticket badge, in px
+
+
+def _covered(box: tuple, avoid: dict, lines: list, below: float = 0) -> float:
+    """How much of what is drawn over the plan a label in `box` (and its number and area, `below` it) would sit
+    under: points on the name, points at its edge or on the number, lines through it."""
+    x, y, w, h = box
+
+    def near(px, py, pad, extra=0.0):
+        return x - pad <= px <= x + w + pad and y - pad <= py <= y + h + extra + pad
+    pts = avoid.get("points", ())
+    on = sum(1 for px, py in pts if near(px, py, 4))                 # a point on the name hides a word
+    by = sum(1 for px, py in pts if near(px, py, MARKER, below)) - on  # at its edge, or on the number: a detail
+    h += below
+    crossed = sum(1 for p in avoid.get("lines", ()) if _crosses(p, x - 3, y - 3, w + 6, h + 6))
+    beam = sum(1 for ln in lines if _crosses(ln["points"], x, y - 3, w, h + 6))
+    return 10 * on + by + 15 * crossed + 40 * beam
+
+
+def _label_spot(room: tuple, pw: float, ph: float, below: float, avoid: dict, lines: list) -> tuple[float, float]:
+    """Where a room's label goes: high in the room and centred, unless what is drawn over the plan or the beam
+    would cover it there; then the free spot nearest to that, among a few across the room."""
+    x, y, w, h = room
+    full = ph + below                                         # the label and the number and area under it
+    home = (x + (w - pw) / 2, y + max(5.0, min(h * 0.18, h - full - 2)))
+    rows = [home[1]] + [y + 3 + (h - full - 6) * k / 10 for k in range(11)]
+    cols = [home[0]] + [x + 3 + (w - pw - 6) * k / 8 for k in range(9)]
+    spots = [(cx, cy) for cy in rows for cx in cols if x + 2 <= cx and cx + pw <= x + w - 2
+             and y + 2 <= cy and cy + full <= y + h - 1]
+    if not spots:
+        return home
+    # The least covered spot; of those, the nearest to where a label is usually read.
+    return min(spots, key=lambda s: (_covered((s[0], s[1], pw, ph), avoid, lines, below),
+                                     (s[0] - home[0]) ** 2 + (s[1] - home[1]) ** 2))
+
+
+def draw(m: dict, avoid: dict | None = None) -> str:
+    """The drawing of model `m`. `avoid` holds what ARGUS draws over the plan — `points` and `lines` in the
+    drawing's pixels — so the room labels are put where nothing covers them; it is not kept in the model."""
+    avoid = avoid or {}
     W, H = m["width"], m["height"]
     bx, by, bw, bh = m["building"]
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W:g} {H:g}" width="{W:g}" height="{H:g}">',
@@ -216,26 +255,47 @@ def draw(m: dict) -> str:
     # Room labels, last, over everything of the drawing.
     for r in m["rooms"]:
         x, y, w, h = r["box"]
-        fs, lines = _fit(r["name"], w, h)
-        lh = fs * 1.2
-        widest = max(len(s) for s in lines) * fs * 0.64
-        pw, ph = min(widest + 10, w - 4), len(lines) * lh + 5
-        px, py = x + (w - pw) / 2, y + max(5.0, min(h * 0.18, h - ph - 16))
-        if any(_crosses(ln["points"], x, py - 3, w, ph + 14) for ln in m["lines"]):
-            py = y + h - ph - 14                                   # the beam runs through the top: the label goes below
-        out.append(f'<rect x="{px:g}" y="{py:g}" width="{pw:g}" height="{ph:g}" rx="3" fill="#ffffff" fill-opacity="0.94" '
-                   'stroke="#94a3b8" stroke-width="0.6"/>')
-        for k, s in enumerate(lines):
-            out.append(f'<text x="{x + w / 2:g}" y="{py + 2.5 + lh * (k + 1) - lh * 0.25:g}" font-family="{FONT}" '
-                       f'font-size="{fs:g}" font-weight="bold" letter-spacing="0.2" text-anchor="middle" '
-                       f'fill="#0f172a">{_esc(s)}</text>')
         area = w * h / PX_PER_M ** 2
         sub = f"{r['number']} · {area:.0f} m²" if r["number"] else f"{area:.0f} m²"
         sfs = 6 if w >= 48 else 5
         if len(sub) * sfs * 0.55 > w - 6:
             sub = r["number"]
+        below = sfs + 4 if sub else 0
+        # The label as it fits best; in a room full of points, a word a line or a smaller size may find a free spot.
+        fs, lines = _fit(r["name"], w, h)
+        words = r["name"].upper().split()
+        variants = [(fs, lines)] + ([(fs, words)] if len(words) > 1 and len(words) <= 3 else []) + \
+                   [(max(5.5, fs * 0.8), lines), (max(5.5, fs * 0.8), words if len(words) <= 3 else lines),
+                    (max(5.5, fs * 0.65), lines)]
+        best = None
+        for vfs, vlines in variants:
+            vlh = vfs * 1.2
+            vpw = min(max(len(t) for t in vlines) * vfs * 0.64 + 10, w - 4)
+            vph = len(vlines) * vlh + 5
+            if vph + below > h - 4:
+                continue
+            spot = _label_spot((x, y, w, h), vpw, vph, below, avoid, m["lines"])
+            score = _covered((spot[0], spot[1], vpw, vph), avoid, m["lines"], below)
+            if best is None or score < best[0]:
+                best = (score, vfs, vlines, vpw, vph, spot)
+            if score == 0:
+                break
+        if best is None:
+            lh = fs * 1.2
+            pw, ph = min(max(len(t) for t in lines) * fs * 0.64 + 10, w - 4), len(lines) * lh + 5
+            px, py = _label_spot((x, y, w, h), pw, ph, below, avoid, m["lines"])
+        else:
+            _, fs, lines, pw, ph, (px, py) = best
+            lh = fs * 1.2
+        mid = px + pw / 2
+        out.append(f'<rect x="{px:g}" y="{py:g}" width="{pw:g}" height="{ph:g}" rx="3" fill="#ffffff" fill-opacity="0.94" '
+                   'stroke="#94a3b8" stroke-width="0.6"/>')
+        for k, s in enumerate(lines):
+            out.append(f'<text x="{mid:g}" y="{py + 2.5 + lh * (k + 1) - lh * 0.25:g}" font-family="{FONT}" '
+                       f'font-size="{fs:g}" font-weight="bold" letter-spacing="0.2" text-anchor="middle" '
+                       f'fill="#0f172a">{_esc(s)}</text>')
         if py + ph + 3 + sfs < y + h - 2 and sub:
-            out.append(f'<text x="{x + w / 2:g}" y="{py + ph + 2 + sfs:g}" font-family="{FONT}" font-size="{sfs:g}" '
+            out.append(f'<text x="{mid:g}" y="{py + ph + 2 + sfs:g}" font-family="{FONT}" font-size="{sfs:g}" '
                        f'text-anchor="middle" fill="#475569">{_esc(sub)}</text>')
     # The title block under the building: title and the synthetic note on the left; north and a scale bar on the right.
     top = by + bh + 4
@@ -271,8 +331,8 @@ def draw(m: dict) -> str:
     return "\n".join(out) + "\n"
 
 
-def redraw(svg: str) -> str:
-    return draw(read(svg))
+def redraw(svg: str, avoid: dict | None = None) -> str:
+    return draw(read(svg), avoid)
 
 
 # --------------------------------------------------------------------------- a layout in metres

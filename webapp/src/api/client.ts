@@ -3501,6 +3501,8 @@ export interface PlanLayersView extends FloorPlanView {
   items: PlanLayerItem[];
   outlines: PlanShape[];
   routes: PlanShape[];
+  /** The building's walls [x, y, w, h] in px, on a drawing made by ARGUS (a demo's or "Draw a plan"); else null. */
+  building?: [number, number, number, number] | null;
   tickets: { uid: string; key: string | null; title: string; state: string; priority: string | null; asset_uid: string; shown_at: string }[];
   activities: { id: string; title: string; status: string; planned_start: string | null; asset_uid: string; shown_at: string }[];
   /** Units held in the racks shown, not points of their own. */

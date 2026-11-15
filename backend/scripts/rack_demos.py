@@ -14,7 +14,8 @@ Run inside the API container with DATABASE_URL pointing at an EMPTY database (it
 3. Each floor plan's drawing keeps only the building: rooms, room numbers, the beam axis, north and the title. The
    unit markers and labels drawn into it before (a rectangle and a label in #1e293b) go: ARGUS draws the records
    over the drawing, by layer (docs/plan-layers.md). The building is then drawn as a room schedule
-   (scripts/demo_plan_drawing.py): same geometry, labels that fit their rooms, column grid, doors, shielding.
+   (scripts/demo_plan_drawing.py): same geometry, labels that fit their rooms where no point or route covers
+   them, column grid, doors, shielding.
 4. The tour gains the plan by layers, a rack and (for a beam model) the tunnel; the bundle is exported with it.
 
 Records, relations, tickets, documents and attachments are not touched: the export has the same identifiers plus the
@@ -39,7 +40,7 @@ from app.db import SessionLocal  # noqa: E402
 from app.models.asset import Asset  # noqa: E402
 from app.models.indoor import FloorPlan  # noqa: E402
 from app.models.workspace import Workspace  # noqa: E402
-from app.services import rack_layout  # noqa: E402
+from app.services import plan_layers, rack_layout  # noqa: E402
 
 bundle = core.read(SRC)
 WS, NAME = bundle.manifest["workspace"]["id"], bundle.manifest["workspace"]["name"]
@@ -135,7 +136,7 @@ for plan in plans:
     clean = MARK.sub("", svg)
     if clean != svg:
         print(f"{plan.name}: {len(MARK.findall(svg))} unit markers taken out of the drawing")
-    drawn = redraw(clean)
+    drawn = redraw(clean, plan_layers.drawn_over(db, plan))       # room labels clear of the points and routes
     if drawn != svg:
         path.write_text(drawn)
         print(f"{plan.name}: redrawn")

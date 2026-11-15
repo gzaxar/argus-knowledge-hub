@@ -33,12 +33,13 @@
 <rect x="242" y="22" width="86" height="136" fill="none" stroke="#6683a3" stroke-width="0.6" stroke-opacity="0.7"/>
 <line x1="246" y1="20" x2="256" y2="20" stroke="#dfeaf5" stroke-width="3"/>
 <path d="M246,20 L246,30 A10,10 0 0 1 256,20" fill="none" stroke="#475569" stroke-width="0.6"/>
-<rect x="54.2" y="45.2" width="131.6" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
-<text x="120" y="56.7" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">ENGINEERING OFFICES</text>
-<text x="120" y="70.2" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D1.01 · 280 m²</text>
-<rect x="242" y="45.2" width="86" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
-<text x="285" y="56.7" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">MEETING ROOM</text>
-<text x="285" y="70.2" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D1.02 · 126 m²</text>
+<rect x="136.6" y="89.5" width="80.4" height="29" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
+<text x="176.8" y="101" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">ENGINEERING</text>
+<text x="176.8" y="113" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">OFFICES</text>
+<text x="176.8" y="126.5" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D1.01 · 280 m²</text>
+<rect x="242" y="23" width="86" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
+<text x="285" y="34.5" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">MEETING ROOM</text>
+<text x="285" y="48" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D1.02 · 126 m²</text>
 <text x="8" y="194.073" font-family="Helvetica, Arial, sans-serif" font-size="9.07336" font-weight="bold" fill="#0f172a">Administration Building — first floor</text>
 <text x="8" y="203.105" font-family="Helvetica, Arial, sans-serif" font-size="5.62548" fill="#b91c1c">Synthetic demo plan · not a real building</text>
 <rect x="242" y="199.4" width="50" height="3" fill="#1f2937" stroke="#1f2937" stroke-width="0.6"/><rect x="292" y="199.4" width="50" height="3" fill="#ffffff" stroke="#1f2937" stroke-width="0.6"/><text x="242" y="209.4" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#334155">0</text><text x="292" y="209.4" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#334155">5</text><text x="342" y="209.4" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#334155">10 m</text>

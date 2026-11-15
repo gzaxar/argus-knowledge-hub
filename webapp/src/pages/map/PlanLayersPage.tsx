@@ -25,6 +25,35 @@ export function initialLayers(v: Pick<PlanLayersView, "layers">, saved = remembe
   return new Set(v.layers.filter((l) => saved[l.id] ?? l.on).map((l) => l.id));
 }
 
+type Pt = [number, number];
+
+/** The pieces of a line inside a box (Liang–Barsky, segment by segment): a cable coming from another building is
+ *  drawn from the wall it comes through, not across the drawing's title or the ground around it. */
+export function clipLine(points: Pt[], [bx, by, bw, bh]: [number, number, number, number]): Pt[][] {
+  const pieces: Pt[][] = [];
+  let cur: Pt[] = [];
+  const close = () => { if (cur.length > 1) pieces.push(cur); cur = []; };
+  for (let k = 0; k + 1 < points.length; k++) {
+    const [x0, y0] = points[k], [x1, y1] = points[k + 1];
+    const dx = x1 - x0, dy = y1 - y0;
+    let t0 = 0, t1 = 1, inside = true;
+    for (const [p, q] of [[-dx, x0 - bx], [dx, bx + bw - x0], [-dy, y0 - by], [dy, by + bh - y0]]) {
+      if (p === 0) { if (q < 0) inside = false; continue; }
+      const t = q / p;
+      if (p < 0) t0 = Math.max(t0, t); else t1 = Math.min(t1, t);
+    }
+    if (!inside || t0 > t1) { close(); continue; }
+    const r = (n: number) => Math.round(n * 10) / 10;
+    const a: Pt = [r(x0 + t0 * dx), r(y0 + t0 * dy)], b: Pt = [r(x0 + t1 * dx), r(y0 + t1 * dy)];
+    const last = cur[cur.length - 1];
+    if (!last || t0 > 0 || last[0] !== a[0] || last[1] !== a[1]) { close(); cur = [a]; }
+    cur.push(b);
+    if (t1 < 1) close();
+  }
+  close();
+  return pieces;
+}
+
 /** The pins and shapes to draw for the layers that are on. A unit held in a rack shows as its rack. */
 export function drawn(v: PlanLayersView, on: Set<PlanLayerId>, focus: Set<string>,
                       open: (i: PlanLayerItem) => void, pickShape: (uid: string) => void) {
@@ -40,10 +69,13 @@ export function drawn(v: PlanLayersView, on: Set<PlanLayerId>, focus: Set<string
       ],
       onClick: () => open(i),
     }));
+  const box: [number, number, number, number] = v.building ?? [0, 0, v.width_px ?? 0, v.height_px ?? 0];
   const shapes: PlanShape[] = [...v.outlines, ...v.routes]
     .filter((s) => on.has(s.layer))
-    .map((s) => ({ id: s.uid, points: s.points, closed: s.layer !== "paths", label: `${s.name} · ${s.type}`,
-                   colour: LAYER_COLOUR[s.layer], dashed: s.layer === "zones", onClick: () => pickShape(s.uid) }));
+    .flatMap((s) => (s.layer === "paths" && box[2] > 0 ? clipLine(s.points, box) : [s.points])
+      .map((points, k) => ({ id: k ? `${s.uid}#${k}` : s.uid, points, closed: s.layer !== "paths",
+                             label: `${s.name} · ${s.type}`, colour: LAYER_COLOUR[s.layer], dashed: s.layer === "zones",
+                             onClick: () => pickShape(s.uid) })));
   return { pins, shapes, wanted };
 }
 
@@ -96,7 +128,8 @@ export function PlanLayersPage() {
 
       <fieldset className="flex flex-wrap gap-2" aria-label="Layers">
         <legend className="sr-only">Layers</legend>
-        {v.layers.map((l) => (
+        {/* A layer with nothing in it on this plan is not offered: an IT building has no beamline. */}
+        {v.layers.filter((l) => l.count > 0).map((l) => (
           <label key={l.id} className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
             layers.has(l.id) ? "border-slate-400 bg-white text-slate-900" : "border-slate-200 bg-slate-50 text-slate-500"}`}>
             <input type="checkbox" className="sr-only" checked={layers.has(l.id)} onChange={() => toggle(l.id)} />
