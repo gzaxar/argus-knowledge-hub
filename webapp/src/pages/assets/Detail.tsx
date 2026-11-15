@@ -69,7 +69,7 @@ export function AssetDetail() {
   const [commentAuthor, setCommentAuthor] = useState("web-user");
   const [showEmpty, setShowEmpty] = useState(false);
   const [relationTarget, setRelationTarget] = useState("");
-  const [relationType, setRelationType] = useState("related_to");
+  const [relationType, setRelationType] = useState("");
   const [relationTargetText, setRelationTargetText] = useState("");
   const targetLabel = (x: { name: string; key?: string | null }) => (x.key ? `${x.name} (${x.key})` : x.name);
   const [showGraph, setShowGraph] = useState(false);
@@ -427,7 +427,7 @@ export function AssetDetail() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (relationTarget) addRelationMutation.mutate();
+              if (relationTarget && relationType.trim()) addRelationMutation.mutate();
             }}
             className="mt-3 flex gap-2"
           >
