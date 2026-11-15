@@ -4,6 +4,8 @@ view on the map (services/indoor.py). Records are read and changed under the sam
 - `GET/POST /v1/assets/{uid}/levels`, `PATCH/DELETE /v1/levels/{uid}` — a place's floors.
 - `GET/POST /v1/assets/{uid}/plans`, `GET/PATCH/DELETE /v1/plans/{uid}`, `GET /v1/plans/{uid}/image`, `GET /v1/plans/{uid}/layers`, `GET /v1/plans/{uid}/scene`,
   `PUT/DELETE /v1/plans/{uid}/placement` — floor plans; placing one on the map by control points.
+- `POST /v1/assets/{uid}/plans/drawn`, `GET/PUT /v1/plans/{uid}/layout`, `POST /v1/plans/drawing-preview` — a plan
+  drawn here from a layout in metres, when there is no drawing (docs/plan-drawing.md).
 - `GET/PUT/DELETE /v1/assets/{uid}/indoors` — where a record is inside; `GET /v1/map/plans?bbox=` — the plans
   placed on the map in view, for a floor switcher.
 - `GET/PUT /v1/assets/{uid}/site-sharing` — a site's place shared with its facilities or withheld (docs/sites.md).
@@ -16,7 +18,7 @@ are, or in its own workspace if they may read it.
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -177,6 +179,73 @@ async def add_plan(uid: str, file: UploadFile = File(...), name: str = Form(""),
         _bad(e)
     db.commit()
     return indoor.plan_out(db, plan)
+
+
+class DrawnPlanIn(BaseModel):
+    layout: dict
+    name: Optional[str] = Field(default=None, max_length=200)
+    level_uid: Optional[str] = None
+    place_rooms: bool = True
+
+
+class LayoutIn(BaseModel):
+    layout: dict
+    place_rooms: bool = True
+
+
+@router.post("/plans/drawing-preview")
+def drawing_preview(body: LayoutIn, workspace_id: str = Depends(require_permission("read"))):
+    """What a layout would look like, as an SVG; nothing is saved."""
+    from app.services import plan_drawing
+    try:
+        svg = plan_drawing.draw(plan_drawing.from_layout(body.layout))
+    except plan_drawing.PlanDrawingError as e:
+        _bad(e)
+    return Response(svg, media_type="image/svg+xml",
+                    headers={"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'"})
+
+
+@router.post("/assets/{uid}/plans/drawn", status_code=201)
+def draw_plan(uid: str, body: DrawnPlanIn, workspace_id: str = Depends(require_permission("modify")),
+              grants=Depends(get_grants), identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """A plan of the place drawn from a layout in metres: the building's size and its rooms. Rooms that stand for
+    room records place those records at their centre (unless `place_rooms` is false)."""
+    place = _place(db, uid, workspace_id, grants, modify=True)
+    level = _level(db, body.level_uid, workspace_id, modify=True) if body.level_uid else None
+    if level is not None and level.place_uid != place.uid:
+        raise HTTPException(status_code=422, detail={"error": "that floor is another place's", "code": "indoors"})
+    try:
+        plan = indoor.draw_plan(db, place, body.layout, name=body.name, level=level, actor=actor_of(identity))
+        placed = indoor.place_rooms(db, plan, actor=actor_of(identity)) if body.place_rooms else 0
+    except indoor.IndoorError as e:
+        db.rollback()
+        _bad(e)
+    db.commit()
+    return {**indoor.plan_out(db, plan), "rooms_placed": placed}
+
+
+@router.get("/plans/{uid}/layout")
+def plan_layout(uid: str, workspace_id: str = Depends(require_permission("read")), grants=Depends(get_grants),
+                db: Session = Depends(get_db)):
+    """The layout a plan was drawn from, to change it; `editable` false for an uploaded drawing."""
+    plan = _plan(db, uid, workspace_id, grants)
+    layout = indoor.plan_layout(plan)
+    return {"editable": layout is not None, "layout": layout}
+
+
+@router.put("/plans/{uid}/layout")
+def change_layout(uid: str, body: LayoutIn, workspace_id: str = Depends(require_permission("modify")),
+                  grants=Depends(get_grants), identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """The plan drawn again from a changed layout; what is placed on it keeps its point."""
+    plan = _plan(db, uid, workspace_id, grants, modify=True)
+    try:
+        indoor.redraw_plan(db, plan, body.layout, actor=actor_of(identity))
+        placed = indoor.place_rooms(db, plan, actor=actor_of(identity)) if body.place_rooms else 0
+    except indoor.IndoorError as e:
+        db.rollback()
+        _bad(e)
+    db.commit()
+    return {**indoor.plan_out(db, plan), "rooms_placed": placed}
 
 
 @router.get("/plans/{uid}")

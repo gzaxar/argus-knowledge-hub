@@ -185,6 +185,87 @@ def add_plan(db: Session, place: Asset, filename: str, content: bytes, *, name: 
     return plan
 
 
+
+# --------------------------------------------------------------------------- a plan drawn here (docs/plan-drawing.md)
+
+def draw_plan(db: Session, place: Asset, layout: dict, *, name: Optional[str], level: Optional[PlaceLevel],
+              actor: Optional[str]) -> FloorPlan:
+    """A plan drawn from a layout in metres, when there is no drawing to upload."""
+    from app.services import plan_drawing
+    try:
+        model = plan_drawing.from_layout(layout)
+    except plan_drawing.PlanDrawingError as e:
+        raise IndoorError(str(e)) from None
+    svg = plan_drawing.draw(model).encode()
+    plan = add_plan(db, place, "drawn-plan.svg", svg, name=name or model["title"], level=level, actor=actor)
+    plan.source_kind, plan.source_filename = "drawn", None
+    db.flush()
+    return plan
+
+
+def _drawing(plan: FloorPlan) -> Optional[dict]:
+    from app.services import plan_drawing
+    if plan.mime_type != "image/svg+xml":
+        return None
+    try:
+        with open(plan.storage_path, encoding="utf-8") as f:
+            return plan_drawing.drawn_model(f.read())
+    except (OSError, ValueError):
+        return None
+
+
+def plan_layout(plan: FloorPlan) -> Optional[dict]:
+    """The layout in metres of a plan drawn here (or a demo's), to change it; None for an uploaded drawing."""
+    from app.services import plan_drawing
+    model = _drawing(plan)
+    return plan_drawing.layout_of(model) if model else None
+
+
+def redraw_plan(db: Session, plan: FloorPlan, layout: dict, *, actor: Optional[str]) -> FloorPlan:
+    """The plan drawn again from a changed layout. The building keeps its corner, so what is placed on the plan
+    keeps its point; a building made smaller than what is on it is refused."""
+    from app.services import plan_drawing
+    before = _drawing(plan)
+    if before is None:
+        raise IndoorError("only a plan drawn in ARGUS can be drawn again: this one is an uploaded drawing")
+    try:
+        model = plan_drawing.from_layout(layout, before)
+    except plan_drawing.PlanDrawingError as e:
+        raise IndoorError(str(e)) from None
+    outside = [a.name for a, p in on_plan(db, plan.uid)
+               if p.plan_x is not None and not (0 <= p.plan_x <= model["width"] and 0 <= p.plan_y <= model["height"])]
+    if outside:
+        raise IndoorError(f"{len(outside)} placed on the plan would be outside it ({', '.join(outside[:3])}…): "
+                          "keep the building at least that large")
+    # A new file: a drawing can be shared with an attachment (a demo's), which keeps its own.
+    plan.storage_path = _store(f"{plan.uid}-{uuid.uuid4().hex[:8]}.svg", plan_drawing.draw(model).encode())
+    plan.width_px, plan.height_px, plan.updated_at = model["width"], model["height"], now()
+    if model["title"] and plan.source_kind == "drawn":
+        plan.name = model["title"][:200]
+    db.flush()
+    return plan
+
+
+def place_rooms(db: Session, plan: FloorPlan, *, actor: Optional[str]) -> int:
+    """The room records a drawn plan's rooms stand for, placed at their room's centre (once: a room already
+    there is left as it is). How many were placed."""
+    model = _drawing(plan)
+    placed = 0
+    for r in (model or {}).get("rooms", []):
+        uid = r.get("record")
+        rec = db.get(Asset, uid) if uid else None
+        if rec is None or rec.deleted_at is not None or rec.workspace_id != plan.workspace_id:
+            continue
+        x, y, w, h = r["box"]
+        cx, cy = round(x + w / 2, 1), round(y + h / 2, 1)
+        now_at = current(db, rec.uid)
+        if now_at and now_at.plan_uid == plan.uid and now_at.plan_x == cx and now_at.plan_y == cy:
+            continue
+        place(db, rec, place_uid=plan.place_uid, level_uid=plan.level_uid, plan_uid=plan.uid, x=cx, y=cy,
+              actor=actor, source="drawn plan", note=f"its room on the plan {plan.name}")
+        placed += 1
+    return placed
+
 # --------------------------------------------------------------------------- placing a plan on the map
 
 def _solve3(m: list[list[float]], v: list[float]) -> list[float]:

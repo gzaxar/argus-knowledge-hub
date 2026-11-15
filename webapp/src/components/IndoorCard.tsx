@@ -12,6 +12,7 @@ import { PlanView, usePlanImage, type PlanPin, type PlanShape } from "./PlanView
 import { GroupedRecords } from "./GroupedRecords";
 import { LAYER_COLOUR, drawn, initialLayers } from "../pages/map/PlanLayersPage";
 import { FullPage, useFullPage } from "./FullPage";
+import { PlanDrawer } from "./PlanDrawer";
 
 /** A plan or map's height: modest on the page, the screen's in a full-page window. */
 function useTall(inline: string): string {
@@ -306,6 +307,9 @@ function FloorsAndPlans({ placeUid, levels, plans, contents, editable, onChanged
   const [upload, setUpload] = useState<{ file: File | null; name: string; level: string }>({ file: null, name: "", level: "" });
   const [open, setOpen] = useState<string | null>(null);
   const [placing, setPlacing] = useState<string | null>(null);
+  // "Draw a plan": "new", or the plan whose drawing is being changed.
+  const [drawing, setDrawing] = useState<string | null>(null);
+  const roomsHere = contents.filter((c) => /room|hall|area|office|lab|gallery|bunker|corridor/i.test(c.type));
   const num = (v: string) => (v.trim() === "" ? null : Number(v));
   const addLevel = useMutation({
     mutationFn: () => indoorApi.addLevel(placeUid, { name: form.name, ordinal: Number(form.ordinal) || 0,
@@ -362,6 +366,9 @@ function FloorsAndPlans({ placeUid, levels, plans, contents, editable, onChanged
                 {open === pl.uid ? "hide" : "show"}</button>
               {editable && <button type="button" onClick={() => setPlacing(placing === pl.uid ? null : pl.uid)} className="ml-2 text-indigo-700 underline">
                 {pl.corners ? "re-place on the map" : "place on the map"}</button>}
+              {editable && pl.mime_type === "image/svg+xml" && (
+                <button type="button" onClick={() => setDrawing(pl.uid)} className="ml-2 text-indigo-700 underline">edit drawing</button>
+              )}
               {editable && <button type="button" onClick={async () => await ask(`Remove the plan ${pl.name}?`) && removePlan.mutate(pl.uid)}
                                    className="ml-2 text-red-600 underline">remove</button>}
               {open === pl.uid && <OpenPlan uid={pl.uid} />}
@@ -386,12 +393,20 @@ function FloorsAndPlans({ placeUid, levels, plans, contents, editable, onChanged
             </select>
             <button type="submit" disabled={!upload.file || addPlan.isPending} className="rounded border border-slate-300 px-2 py-1 disabled:opacity-40">
               {addPlan.isPending ? "Uploading…" : "Add a plan"}</button>
-            <span className="w-full text-slate-500">An image, an SVG, a PDF (its first page) or a DXF/DWG drawing.</span>
+            <span className="w-full text-slate-500">An image, an SVG, a PDF (its first page) or a DXF/DWG drawing — or, with
+              none to hand, <button type="button" onClick={() => setDrawing("new")} className="text-indigo-700 underline">draw a plan</button>
+              {" "}from the building's size and its rooms.</span>
             {addPlan.isError && <span className="text-red-600">{problem(addPlan.error)}</span>}
           </form>
         )}
       </div>
 
+      {drawing && (
+        <FullPage open title={drawing === "new" ? "Draw a plan" : "Change the drawing"} onClose={() => setDrawing(null)}>
+          <PlanDrawer placeUid={placeUid} levels={levels} planUid={drawing === "new" ? undefined : drawing}
+                      roomsHere={roomsHere} onDone={() => { setDrawing(null); onChanged(); }} />
+        </FullPage>
+      )}
       {contents.length > 0 && (
         <div>
           <p className="text-xs font-semibold uppercase text-slate-500">Placed here ({contents.length})</p>

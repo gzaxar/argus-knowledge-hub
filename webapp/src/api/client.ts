@@ -2464,6 +2464,10 @@ export interface PlaceLevel {
   uid: string; place_uid: string; name: string; ordinal: number; elevation_m: number | null; height_m: number | null;
 }
 export interface ControlPoint { x: number; y: number; longitude: number; latitude: number }
+/** A plan drawn here: the building's size and its rooms, in metres from its top-left corner. */
+export interface PlanLayoutRoom { name: string; number?: string; record?: string | null; x: number; y: number; w: number; d: number }
+export interface PlanLayout { title: string; width_m: number; depth_m: number; rooms: PlanLayoutRoom[]; north?: boolean }
+
 export interface FloorPlanView {
   uid: string; name: string; place: { uid: string; name: string | null }; level: PlaceLevel | null;
   width_px: number; height_px: number; mime_type: string; source_kind: string; source_filename: string | null;
@@ -2524,6 +2528,22 @@ export const indoorApi = {
   changePlan: (uid: string, input: { name?: string; level_uid?: string | null }) =>
     request<FloorPlanView>(`/v1/plans/${uid}`, { method: "PATCH", body: json(input) }),
   removePlan: (uid: string) => request<void>(`/v1/plans/${uid}`, { method: "DELETE" }),
+  /** A plan drawn from a layout in metres, when there is no drawing (docs/plan-drawing.md). */
+  drawPlan: (placeUid: string, body: { layout: PlanLayout; name?: string | null; level_uid?: string | null; place_rooms?: boolean }) =>
+    request<FloorPlanView & { rooms_placed: number }>(`/v1/assets/${placeUid}/plans/drawn`, { method: "POST", body: json(body) }),
+  planLayout: (uid: string) => request<{ editable: boolean; layout: PlanLayout | null }>(`/v1/plans/${uid}/layout`),
+  setPlanLayout: (uid: string, body: { layout: PlanLayout; place_rooms?: boolean }) =>
+    request<FloorPlanView & { rooms_placed: number }>(`/v1/plans/${uid}/layout`, { method: "PUT", body: json(body) }),
+  /** What a layout would look like (an SVG, as a URL the page can show); nothing is saved. */
+  drawingPreview: async (layout: PlanLayout): Promise<string> => {
+    const session = await loadSession();
+    if (!session) throw new Error("Not signed in");
+    const resp = await fetch(`${session.baseUrl}/v1/plans/drawing-preview`, {
+      method: "POST", headers: { ...authHeaders(session), "Content-Type": "application/json" }, body: json({ layout }),
+    });
+    if (!resp.ok) throw new ApiError(resp.status, await resp.text());
+    return URL.createObjectURL(await resp.blob());
+  },
   /** The plan's picture, fetched signed in, as a URL the page can show. */
   planImageUrl: async (uid: string): Promise<string> => {
     const session = await loadSession();

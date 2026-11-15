@@ -5060,6 +5060,47 @@
         "title": "DraftTicketOut",
         "type": "object"
       },
+      "DrawnPlanIn": {
+        "properties": {
+          "layout": {
+            "title": "Layout",
+            "type": "object"
+          },
+          "level_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Uid"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "place_rooms": {
+            "default": true,
+            "title": "Place Rooms",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "layout"
+        ],
+        "title": "DrawnPlanIn",
+        "type": "object"
+      },
       "DryRunIn": {
         "properties": {
           "decisions": {
@@ -9248,6 +9289,24 @@
           "last_check_error"
         ],
         "title": "LLMConfigOut",
+        "type": "object"
+      },
+      "LayoutIn": {
+        "properties": {
+          "layout": {
+            "title": "Layout",
+            "type": "object"
+          },
+          "place_rooms": {
+            "default": true,
+            "title": "Place Rooms",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "layout"
+        ],
+        "title": "LayoutIn",
         "type": "object"
       },
       "LedgerOnlyIn": {
@@ -27855,6 +27914,94 @@
           }
         ],
         "summary": "Add Plan",
+        "tags": [
+          "indoors"
+        ]
+      }
+    },
+    "/v1/assets/{uid}/plans/drawn": {
+      "post": {
+        "description": "A plan of the place drawn from a layout in metres: the building's size and its rooms. Rooms that stand for\nroom records place those records at their centre (unless `place_rooms` is false).",
+        "operationId": "draw_plan_v1_assets__uid__plans_drawn_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DrawnPlanIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Draw Plan",
         "tags": [
           "indoors"
         ]
@@ -61222,6 +61369,85 @@
         ]
       }
     },
+    "/v1/plans/drawing-preview": {
+      "post": {
+        "description": "What a layout would look like, as an SVG; nothing is saved.",
+        "operationId": "drawing_preview_v1_plans_drawing_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LayoutIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Drawing Preview",
+        "tags": [
+          "indoors"
+        ]
+      }
+    },
     "/v1/plans/{uid}": {
       "delete": {
         "description": "The plan goes; what was placed on it keeps its place (and the position its point gave it).",
@@ -61606,6 +61832,170 @@
           }
         ],
         "summary": "Plan Layers",
+        "tags": [
+          "indoors"
+        ]
+      }
+    },
+    "/v1/plans/{uid}/layout": {
+      "get": {
+        "description": "The layout a plan was drawn from, to change it; `editable` false for an uploaded drawing.",
+        "operationId": "plan_layout_v1_plans__uid__layout_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Plan Layout",
+        "tags": [
+          "indoors"
+        ]
+      },
+      "put": {
+        "description": "The plan drawn again from a changed layout; what is placed on it keeps its point.",
+        "operationId": "change_layout_v1_plans__uid__layout_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LayoutIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Change Layout",
         "tags": [
           "indoors"
         ]
