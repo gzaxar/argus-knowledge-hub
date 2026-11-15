@@ -1,17 +1,19 @@
 import os
 import uuid
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth import require_permission
+from app.auth import get_identity, require_permission
 from app.db import get_db
 from app.models.icon import Icon
 from app.models.schema import Schema
 from app.models.workspace import Workspace
 from app.schemas.schema import SchemaCreate, SchemaOut, SchemaUpdate
+from app.services import dangerous
 from app.services.relations import rebuild_relations_for_schemas
 
 router = APIRouter(prefix="/v1/schemas", tags=["schemas"])
@@ -129,7 +131,8 @@ def update_schema(
 
 @router.delete("/{uid}", status_code=204)
 def delete_schema(
-    uid: str, workspace_id: str = Depends(require_permission("delete")), db: Session = Depends(get_db)
+    uid: str, workspace_id: str = Depends(require_permission("delete")), identity=Depends(get_identity),
+    typed: Optional[str] = Depends(dangerous.confirm_header), db: Session = Depends(get_db),
 ):
     """Deleting a type cascades (at the DB level, via ON DELETE CASCADE) to its
     child types, and to every object/ticket of the type or any of its
@@ -137,6 +140,8 @@ def delete_schema(
     global. A ticket merely *linked* to a deleted object keeps existing with
     that link cleared (asset_uid ON DELETE SET NULL)."""
     schema = _get_owned_schema(uid, workspace_id, db)
+    # Every record of the type goes with it: only by a person, with the workspace's name typed.
+    dangerous.require(identity, db.get(Workspace, workspace_id), typed, "Deleting a type and its records")
     db.delete(schema)
     try:
         db.commit()

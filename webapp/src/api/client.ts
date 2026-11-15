@@ -209,6 +209,9 @@ export class ApiError extends Error {
   }
 }
 
+/** The workspace's name a person typed to confirm a dangerous action (docs/dangerous-actions.md). */
+export const confirmHeader = (name: string) => ({ "X-Confirm-Workspace": encodeURIComponent(name.trim()) });
+
 async function request<T>(
   path: string,
   init: RequestInit = {},
@@ -266,7 +269,8 @@ export const schemasApi = {
     request<AppSchema>("/v1/schemas", { method: "POST", body: json(input) }),
   update: (uid: string, input: Partial<SchemaInput>) =>
     request<AppSchema>(`/v1/schemas/${uid}`, { method: "PUT", body: json(input) }),
-  delete: (uid: string) => request<void>(`/v1/schemas/${uid}`, { method: "DELETE" }),
+  delete: (uid: string, confirmName: string) =>
+    request<void>(`/v1/schemas/${uid}`, { method: "DELETE", headers: confirmHeader(confirmName) }),
   uploadIcon: async (uid: string, file: File): Promise<AppSchema> => {
     const session = await loadSession();
     if (!session) throw new Error("Not signed in");
@@ -736,10 +740,11 @@ export const workspacesApi = {
       body: json({ pattern }),
     }),
   get: (workspaceId: string) => request<WorkspaceDetail>(`/v1/workspaces/${workspaceId}`),
-  update: (workspaceId: string, input: WorkspaceUpdateInput) =>
-    request<Workspace>(`/v1/workspaces/${workspaceId}`, { method: "PUT", body: json(input) }),
-  delete: (workspaceId: string) =>
-    request<void>(`/v1/workspaces/${workspaceId}`, { method: "DELETE" }),
+  update: (workspaceId: string, input: WorkspaceUpdateInput, confirmName?: string) =>
+    request<Workspace>(`/v1/workspaces/${workspaceId}`, {
+      method: "PUT", body: json(input), headers: confirmName ? confirmHeader(confirmName) : undefined }),
+  delete: (workspaceId: string, confirmName: string) =>
+    request<void>(`/v1/workspaces/${workspaceId}`, { method: "DELETE", headers: confirmHeader(confirmName) }),
   integrityReport: (workspaceId: string) =>
     request<IntegrityReport>(`/v1/workspaces/${workspaceId}/integrity-report`),
   relink: (workspaceId: string) =>
@@ -747,10 +752,10 @@ export const workspacesApi = {
       `/v1/workspaces/${workspaceId}/relink`,
       { method: "POST" },
     ),
-  cleanup: (workspaceId: string, options: CleanupOptions) =>
+  cleanup: (workspaceId: string, options: CleanupOptions, confirmName?: string) =>
     request<{ cleanup: CleanupResult; report: IntegrityReport }>(
       `/v1/workspaces/${workspaceId}/cleanup`,
-      { method: "POST", body: json(options) },
+      { method: "POST", body: json(options), headers: confirmName ? confirmHeader(confirmName) : undefined },
     ),
   setDefaultAccess: (workspaceId: string, input: DefaultAccess) =>
     request<WorkspaceDetail>(`/v1/workspaces/${workspaceId}/default-access`, {

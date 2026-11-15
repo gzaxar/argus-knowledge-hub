@@ -21,6 +21,7 @@ from app.models.schema import Schema
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.services.asset_types import ensure_asset_types
+from tests.confirm import typed
 
 client = TestClient(app)
 
@@ -79,7 +80,7 @@ def world():
     yield {"src": src, "dst": dst, "cat": cat, "t": t, "types": ids, "uids": {"ctrl": ctrl, "g": g, "p": p},
            "pm": pm_uid, "owner": owner}
     for ws in (dst, src, cat, other):
-        client.delete(f"/v1/workspaces/{ws}")
+        client.delete(f"/v1/workspaces/{ws}", headers=typed(ws))
     from app.models.group import Group
     db = SessionLocal()
     for g in db.query(Group).filter(Group.name.ilike(f"%{t}%")):

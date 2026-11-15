@@ -1,4 +1,4 @@
-import { ask } from "../../lib/dialogs";
+import { ask, askTyped } from "../../lib/dialogs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { ApiError, workspacesApi } from "../../api/client";
@@ -7,6 +7,10 @@ import { CleanupOptions } from "../../api/types";
 export function WorkspaceIntegrity() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const queryClient = useQueryClient();
+  // The name typed to delete orphaned objects (docs/dangerous-actions.md); an administrator may not be a member.
+  const workspace = useQuery({ queryKey: ["workspace", workspaceId], queryFn: () => workspacesApi.get(workspaceId!),
+                               enabled: !!workspaceId });
+  const nameOf = (id: string) => workspace.data?.name ?? id;
 
   const report = useQuery({
     queryKey: ["integrity-report", workspaceId],
@@ -22,7 +26,8 @@ export function WorkspaceIntegrity() {
   });
 
   const cleanupMutation = useMutation({
-    mutationFn: (options: CleanupOptions) => workspacesApi.cleanup(workspaceId!, options),
+    mutationFn: (options: CleanupOptions) =>
+      workspacesApi.cleanup(workspaceId!, options, options.delete_orphaned_objects ? nameOf(workspaceId!) : undefined),
     onSuccess: (data) => {
       queryClient.setQueryData(["integrity-report", workspaceId], data.report);
     },
@@ -199,7 +204,8 @@ export function WorkspaceIntegrity() {
               {data.counts.orphaned_objects > 0 && (
                 <button
                   onClick={async () => {
-                    if (await ask(`Permanently delete ${data.counts.orphaned_objects} orphaned object(s)? This cannot be undone.`)) {
+                    if (await askTyped(`Permanently delete ${data.counts.orphaned_objects} orphaned object(s)? This cannot be undone.`,
+                                       nameOf(workspaceId!))) {
                       cleanupMutation.mutate({ delete_orphaned_objects: true });
                     }
                   }}

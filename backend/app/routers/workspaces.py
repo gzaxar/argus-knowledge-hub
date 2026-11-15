@@ -22,7 +22,7 @@ from app.models.workspace import Workspace
 from app.services.integrity import cleanup_workspace, generate_integrity_report, relink_workspace
 from app.services.relations import rebuild_relations_for_schemas
 from app.services.ticket_types import DEFAULT_ISSUE_TYPES, ensure_ticket_types
-from app.services import asset_keys
+from app.services import asset_keys, dangerous
 from app.services.workspace_ids import rule as id_rule, save_rule, slugify, unique_id
 from app.schemas.workspace import (
     CleanupOptions,
@@ -393,6 +393,7 @@ def update_workspace(
     workspace_id: str,
     body: WorkspaceUpdate,
     identity: Identity = Depends(get_identity),
+    typed: Optional[str] = Depends(dangerous.confirm_header),
     db: Session = Depends(get_db),
 ):
     _require_admin(identity)
@@ -401,6 +402,9 @@ def update_workspace(
         raise HTTPException(status_code=404, detail="Workspace not found")
 
     turning_global = body.is_global is True and not workspace.is_global
+    if turning_global:
+        # Every type and its records seen from every workspace: not taken back by turning it off again.
+        dangerous.require(identity, workspace, typed, "Making a workspace global")
     if body.name is not None:
         workspace.name = body.name
     if body.is_global is not None:
@@ -437,11 +441,13 @@ def update_workspace(
 def delete_workspace(
     workspace_id: str,
     identity: Identity = Depends(get_identity),
+    typed: Optional[str] = Depends(dangerous.confirm_header),
     db: Session = Depends(get_db),
 ):
     """Admin-only: permanently deletes the workspace and, via ON DELETE
     CASCADE, everything scoped to it — schemas, assets, tickets, labels,
-    global values, import history, memberships and PATs."""
+    global values, import history, memberships and PATs. Only by a person
+    signed in, with the workspace's name typed (services/dangerous.py)."""
     _require_admin(identity)
     workspace = db.get(Workspace, workspace_id)
     if workspace is None:
@@ -451,6 +457,7 @@ def delete_workspace(
         refuse(db, workspace_id, "deleted")
     except CatalogueProtected as exc:
         raise HTTPException(status_code=409, detail={"error": str(exc), "code": "catalogue_workspace"})
+    dangerous.require(identity, workspace, typed, "Deleting a workspace")
     # The one sanctioned purge of append-only audit rows: the workspace's own.
     from app.ledger.audit import allow_purge
     allow_purge(db)
@@ -490,11 +497,15 @@ def cleanup_workspace_endpoint(
     workspace_id: str,
     body: CleanupOptions,
     identity: Identity = Depends(get_identity),
+    typed: Optional[str] = Depends(dangerous.confirm_header),
     db: Session = Depends(get_db),
 ):
     _require_owner_or_admin(workspace_id, identity, db)
-    if db.get(Workspace, workspace_id) is None:
+    workspace = db.get(Workspace, workspace_id)
+    if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
+    if body.delete_orphaned_objects:
+        dangerous.require(identity, workspace, typed, "Deleting the orphaned objects")
     cleanup_result = cleanup_workspace(db, workspace_id, body.model_dump())
     return {"cleanup": cleanup_result, "report": generate_integrity_report(db, workspace_id)}
 

@@ -1,7 +1,7 @@
 ---
 title: Administration and the production installation
 summary: The administration pages, the production installation (addresses, sign-in, releases, the mobile app's distribution), backups, and where operators find the details.
-keywords: [administration, statistics, storage, disk, disk space, free space, occupancy, quota, volume, usage, tokens used, active users, concurrent users, feedback, package, packages, it, electrical, hydraulic, hvac, plant, domain, template, workspace template, catalogue package, accelerator catalogue, core facility, admin, settings, workspace identifiers, users, production, deployment, release, version, argo cd, keycloak, kubernetes, backup, restore, disk, operations, google play, apk, privacy, mirror]
+keywords: [administration, dangerous action, delete workspace, confirm, type the name, statistics, storage, disk, disk space, free space, occupancy, quota, volume, usage, tokens used, active users, concurrent users, feedback, package, packages, it, electrical, hydraulic, hvac, plant, domain, template, workspace template, catalogue package, accelerator catalogue, core facility, admin, settings, workspace identifiers, users, production, deployment, release, version, argo cd, keycloak, kubernetes, backup, restore, disk, operations, google play, apk, privacy, mirror]
 order: 140
 ---
 
@@ -120,6 +120,19 @@ A release is a version tag (`v1.35.21`, for example). It:
 
 The mobile app installed from GitHub offers the newer release on its home screen; the Google Play version is updated
 by Google Play. The two are signed differently: a phone keeps one or the other.
+
+## Actions that cannot be taken back
+
+Four actions reach a whole workspace and cannot be undone:
+
+- deleting a workspace;
+- making a workspace global (its types and records are seen from every workspace);
+- deleting a type, which deletes every record of it;
+- deleting the orphaned objects on the integrity page.
+
+ARGUS asks twice before doing any of them. First it asks the question, then it wants the workspace's name typed
+exactly. They are done only by a person signed in. An API token cannot do them, even an administrator's token with
+every scope, and an MCP client or the Ask assistant cannot either.
 
 ## Cleanup, backups and recovery
 

@@ -1,4 +1,4 @@
-import { ask, notify } from "../../lib/dialogs";
+import { askTyped, notify } from "../../lib/dialogs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -90,16 +90,16 @@ export function AdminWorkspaces() {
   });
 
   const toggleGlobalMutation = useMutation({
-    mutationFn: (vars: { id: string; is_global: boolean }) =>
-      workspacesApi.update(vars.id, { is_global: vars.is_global }),
+    mutationFn: (vars: { id: string; is_global: boolean; name: string }) =>
+      workspacesApi.update(vars.id, { is_global: vars.is_global }, vars.is_global ? vars.name : undefined),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me-workspaces"] }),
     onError: () => notify("Failed to update global flag."),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => workspacesApi.delete(id),
+    mutationFn: (vars: { id: string; name: string }) => workspacesApi.delete(vars.id, vars.name),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me-workspaces"] }),
-    onError: () => notify("Delete failed."),
+    onError: (e) => notify(e instanceof ApiError && e.detail ? `Delete failed: ${e.detail}` : "Delete failed."),
   });
 
   if (workspaces.isError) {
@@ -175,11 +175,12 @@ export function AdminWorkspaces() {
                           const next = e.target.checked;
                           if (
                             !next ||
-                            await ask(
-                              `Make every schema in "${ws.name}" global? This makes every object type (and its objects) in this workspace visible and referenceable from every other workspace.`,
+                            await askTyped(
+                              `Make every schema in "${ws.name}" global? This makes every object type (and its objects) in this workspace visible and referenceable from every other workspace. Turning it off later does not take back what was shared.`,
+                              ws.name,
                             )
                           ) {
-                            toggleGlobalMutation.mutate({ id: ws.id, is_global: next });
+                            toggleGlobalMutation.mutate({ id: ws.id, is_global: next, name: ws.name });
                           }
                         }}
                       />
@@ -248,11 +249,12 @@ export function AdminWorkspaces() {
                         <button
                           onClick={async () => {
                             if (
-                              await ask(
+                              await askTyped(
                                 `Delete workspace "${ws.name}"? This permanently deletes every schema, object, ticket, label, global value and import in it. This cannot be undone.`,
+                                ws.name,
                               )
                             ) {
-                              deleteMutation.mutate(ws.id);
+                              deleteMutation.mutate({ id: ws.id, name: ws.name });
                             }
                           }}
                           className="text-red-500 hover:text-red-700"

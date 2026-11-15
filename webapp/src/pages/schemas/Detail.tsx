@@ -1,4 +1,4 @@
-import { ask, notify } from "../../lib/dialogs";
+import { ask, askTyped, notify } from "../../lib/dialogs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -103,7 +103,7 @@ export function SchemaDetail() {
   });
 
   const deleteSchemaMutation = useMutation({
-    mutationFn: () => schemasApi.delete(uid!),
+    mutationFn: () => schemasApi.delete(uid!, nameOf(currentWs ?? "")),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["schemas"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
@@ -436,7 +436,7 @@ export function SchemaDetail() {
               const warning = children.length > 0
                 ? `Delete "${schema.name}"? This also permanently deletes its ${children.length} child type(s) and every ${noun} of this type or any child type — including ones in other workspaces if it's global. This cannot be undone.`
                 : `Delete "${schema.name}"? This also permanently deletes every ${noun} of this type — including ones in other workspaces if it's global. This cannot be undone.`;
-              if (await ask(warning)) deleteSchemaMutation.mutate();
+              if (await askTyped(warning, nameOf(currentWs ?? ""))) deleteSchemaMutation.mutate();
             }}
             disabled={deleteSchemaMutation.isPending}
             className="rounded border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"

@@ -5,13 +5,15 @@
  *   notify("Saved.")                         a notice that goes away by itself (an error stays until dismissed)
  *   if (await ask("Delete it?")) …           a yes/no question
  *   const why = await askText("Why?")        a question with an answer; null when cancelled
+ *   if (await askTyped("Delete it?", name)) … a dangerous action, confirmed twice: yes, then the name typed
  *
  * <DialogHost /> is mounted once, at the root.
  */
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 type Notice = { id: number; text: string; kind: "info" | "error" };
-type Question = { id: number; text: string; input: boolean; initial: string; danger: boolean; resolve: (v: string | boolean | null) => void };
+type Question = { id: number; text: string; input: boolean; initial: string; danger: boolean; mustType?: string;
+                  resolve: (v: string | boolean | null) => void };
 
 let notices: Notice[] = [];
 let question: Question | null = null;
@@ -63,6 +65,16 @@ export function askText(text: string, initial = ""): Promise<string | null> {
                                         resolve: (v) => resolve(typeof v === "string" ? v : null) }));
 }
 
+/** A dangerous action (docs/dangerous-actions.md), asked twice: the question, then `name` typed exactly. The
+ *  server checks the name again, so it is sent with the request (`confirmHeader`). */
+export async function askTyped(text: string, name: string): Promise<boolean> {
+  if (!await ask(text)) return false;
+  const typed = await new Promise<string | null>((resolve) => put({
+    text: `To confirm, type the workspace's name:\n${name}`, input: true, initial: "", danger: true, mustType: name,
+    resolve: (v) => resolve(typeof v === "string" ? v : null) }));
+  return typed !== null && typed.trim() === name.trim();
+}
+
 export function DialogHost() {
   const state = useSyncExternalStore(subscribe, () => snapshot);
   const q = state.question;
@@ -85,15 +97,21 @@ export function DialogHost() {
             <p className="whitespace-pre-wrap break-words text-sm text-slate-800">{q.text}</p>
             {q.input && (
               <textarea ref={field} value={text} onChange={(e) => setText(e.target.value)} rows={2}
-                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); answer(text); } }}
+                        aria-label={q.mustType !== undefined ? "The workspace's name" : undefined}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter" || e.shiftKey) return;
+                          e.preventDefault();
+                          if (q.mustType === undefined || text.trim() === q.mustType.trim()) answer(text);
+                        }}
                         className="mt-3 w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
             )}
             <div className="mt-4 flex justify-end gap-2">
               <button type="button" onClick={() => answer(q.input ? null : false)}
                       className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">Cancel</button>
               <button type="button" ref={yes} onClick={() => answer(q.input ? text : true)}
-                      className={`rounded px-3 py-1.5 text-sm text-white ${q.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}>
-                {q.input ? "OK" : q.danger ? "Yes, go ahead" : "OK"}
+                      disabled={q.mustType !== undefined && text.trim() !== q.mustType.trim()}
+                      className={`rounded px-3 py-1.5 text-sm text-white disabled:opacity-40 ${q.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}>
+                {q.mustType !== undefined ? "I understand, do it" : q.input ? "OK" : q.danger ? "Yes, go ahead" : "OK"}
               </button>
             </div>
           </div>

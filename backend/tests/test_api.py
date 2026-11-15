@@ -64,9 +64,10 @@ def test_schema_crud(token):
     assert fetched.status_code == 200
     assert fetched.json()["name"] == "Magnet"
 
-    deleted = client.delete("/v1/schemas/s-1", headers=auth(token))
-    assert deleted.status_code == 204
-    assert client.get("/v1/schemas/s-1", headers=auth(token)).status_code == 404
+    # Deleting a type takes every record of it: never with a token (docs/dangerous-actions.md).
+    deleted = client.delete("/v1/schemas/s-1", headers={**auth(token), "X-Confirm-Workspace": "Test"})
+    assert deleted.status_code == 403 and deleted.json()["detail"]["code"] == "person_only"
+    assert client.get("/v1/schemas/s-1", headers=auth(token)).status_code == 200
 
 
 def test_asset_and_sync(token):

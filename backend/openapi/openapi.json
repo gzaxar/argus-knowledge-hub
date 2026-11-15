@@ -69071,6 +69071,22 @@
               ],
               "title": "X-Workspace-Id"
             }
+          },
+          {
+            "in": "header",
+            "name": "x-confirm-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Confirm-Workspace"
+            }
           }
         ],
         "responses": {
@@ -71781,7 +71797,7 @@
     },
     "/v1/workspaces/{workspace_id}": {
       "delete": {
-        "description": "Admin-only: permanently deletes the workspace and, via ON DELETE\nCASCADE, everything scoped to it — schemas, assets, tickets, labels,\nglobal values, import history, memberships and PATs.",
+        "description": "Admin-only: permanently deletes the workspace and, via ON DELETE\nCASCADE, everything scoped to it — schemas, assets, tickets, labels,\nglobal values, import history, memberships and PATs. Only by a person\nsigned in, with the workspace's name typed (services/dangerous.py).",
         "operationId": "delete_workspace_v1_workspaces__workspace_id__delete",
         "parameters": [
           {
@@ -71823,6 +71839,22 @@
                 }
               ],
               "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-confirm-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Confirm-Workspace"
             }
           }
         ],
@@ -71970,6 +72002,22 @@
                 }
               ],
               "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-confirm-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Confirm-Workspace"
             }
           }
         ],
@@ -72478,6 +72526,22 @@
                 }
               ],
               "title": "X-Workspace-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-confirm-workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Confirm-Workspace"
             }
           }
         ],

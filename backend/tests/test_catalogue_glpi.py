@@ -23,6 +23,7 @@ from app.models.workspace import Workspace
 from app.services import asset_keys
 from app.services import catalogue_mapping as cm
 from app.services.asset_types import ensure_asset_types
+from tests.confirm import typed
 
 
 @pytest.fixture()
@@ -49,7 +50,7 @@ def w():
     db.close()
     app.dependency_overrides[get_identity] = lambda: OidcIdentity(user=admin)
     for ws in (it, cat):
-        TestClient(app).delete(f"/v1/workspaces/{ws}")
+        TestClient(app).delete(f"/v1/workspaces/{ws}", headers=typed(ws))
     app.dependency_overrides.pop(get_identity, None)
 
 

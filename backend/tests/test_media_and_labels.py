@@ -18,6 +18,7 @@ from app.models.schema import Schema
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.services.jira_import import _import_object_qrcode
+from tests.confirm import typed
 
 client = TestClient(app)
 
@@ -247,7 +248,8 @@ def test_turning_workspace_global_cascades_to_its_icons(tmp_path, monkeypatch):
     admin = db.get(User, admin_id)
     app.dependency_overrides[get_identity] = lambda: OidcIdentity(user=admin)
     try:
-        resp = client.put(f"/v1/workspaces/{workspace_id}", json={"is_global": True})
+        resp = client.put(f"/v1/workspaces/{workspace_id}", json={"is_global": True},
+                          headers=typed(workspace_id))
     finally:
         app.dependency_overrides.pop(get_identity, None)
     assert resp.status_code == 200, resp.text

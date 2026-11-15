@@ -28,6 +28,7 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.services import catalogue_mapping as cm
 from app.services.asset_types import ensure_asset_types
+from tests.confirm import typed
 
 MOXA = {"id": "moxa", "name": "Moxa Inc.", "aliases": ["Moxa", "MOXA Technologies"], "website": "https://www.moxa.com"}
 NPORT = {"id": "moxa/nport-5450", "vendor": "moxa", "model_code": "NPort 5450", "name": "Moxa NPort 5450",
@@ -72,7 +73,7 @@ def w(tmp_path):
     db.commit()
     db.close()
     app.dependency_overrides[get_identity] = lambda: OidcIdentity(user=admin)
-    TestClient(app).delete(f"/v1/workspaces/{ws}")
+    TestClient(app).delete(f"/v1/workspaces/{ws}", headers=typed(ws))
     app.dependency_overrides.pop(get_identity, None)
 
 

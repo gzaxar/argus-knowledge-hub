@@ -55,7 +55,9 @@ INSTRUCTIONS = (
     "Records come with a `url`, the page of that record in ARGUS, and a `link`, the same as a ready "
     "Markdown link: when you cite a record, write its `link` as given, so the reader can open it.\n"
     + PROPOSALS_GUIDE +
-    "Nothing here changes ARGUS by itself: the lookups only read, and a proposal waits for a person."
+    "Nothing here changes ARGUS by itself: the lookups only read, and a proposal waits for a person. "
+    "Deleting a workspace, making it global, deleting a type with its records or deleting orphaned objects "
+    "cannot be done from here or with any token: a person signed in to ARGUS does it, typing the workspace's name."
 )
 
 # Offered to MCP clients only. Ask ARGUS uses the same tools inside one

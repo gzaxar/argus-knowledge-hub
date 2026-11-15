@@ -20,6 +20,7 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.services import catalogue_mapping as cm
 from app.services.asset_types import ensure_asset_types
+from tests.confirm import typed
 
 client = TestClient(app)
 
@@ -72,7 +73,7 @@ def world():
     yield {"src": src, "cat": cat, "t": t, "types": types, "uids": uids}
     # The tests run against a real database: leave no workspaces behind.
     for ws in (cat, src):
-        client.delete(f"/v1/workspaces/{ws}")
+        client.delete(f"/v1/workspaces/{ws}", headers=typed(ws))
     app.dependency_overrides.pop(get_identity, None)
 
 

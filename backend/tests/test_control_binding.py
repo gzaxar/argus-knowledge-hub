@@ -16,6 +16,7 @@ from app.models.schema import Schema
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.services.asset_types import ensure_asset_types
+from tests.confirm import typed
 
 client = TestClient(app)
 
@@ -69,7 +70,7 @@ def beamline():
     db.close()
     app.dependency_overrides[get_identity] = lambda: OidcIdentity(user=admin)
     yield {"ws": ws, "uids": uids, "h": {"X-Workspace-Id": ws}}
-    client.delete(f"/v1/workspaces/{ws}")
+    client.delete(f"/v1/workspaces/{ws}", headers=typed(ws))
     app.dependency_overrides.pop(get_identity, None)
 
 
