@@ -91,7 +91,8 @@ export function IndoorCard({ uid, editable }: { uid: string; editable: boolean }
             <FullPage open={seeing} title={`${spot.via ? `${spot.via.key || spot.via.name} — ` : ""}on the plan ${spot.plan.name}`}
                       onClose={() => setSeeing(false)}>
               <HerePlan plan={spot.plan} x={spot.x} y={spot.y} uid={uid}
-                        label={spot.via ? `here, in ${spot.via.key || spot.via.name}` : "here"} />
+                        label={spot.via ? `here, in ${spot.via.key || spot.via.name}` : "here"}
+                        inside={spot.via ? [] : v.contents.filter((c) => c.plan_uid === spot.plan.uid).map((c) => c.uid)} />
             </FullPage>
             {!seeing && (
               <button type="button" onClick={() => setSeeing(true)}
@@ -193,11 +194,27 @@ export function SiteSharing({ uid }: { uid: string }) {
   );
 }
 
-function HerePlan({ plan, x, y, uid, label = "here" }: { plan: { uid: string; width_px: number; height_px: number; north_deg?: number | null };
-                    x: number; y: number; uid: string; label?: string }) {
-  return <PlanView planUid={plan.uid} width={plan.width_px} height={plan.height_px} className={useTall("h-56")}
-                   northDeg={plan.north_deg}
-                   pins={[{ id: uid, x, y, label, colour: "#dc2626", highlight: true }]} focus={[{ x, y }]} />;
+/** The record's point on a plan; for a place, also what is placed in it on the same plan — a rack opens its
+ *  elevation, anything else its record. */
+function HerePlan({ plan, x, y, uid, label = "here", inside = [] }: {
+  plan: { uid: string; width_px: number; height_px: number; north_deg?: number | null };
+  x: number; y: number; uid: string; label?: string; inside?: string[] }) {
+  const navigate = useNavigate();
+  const tall = useTall("h-56");
+  const layers = useQuery({ queryKey: ["plan-layers", plan.uid], queryFn: () => indoorApi.layers(plan.uid),
+                            enabled: inside.length > 0 });
+  const wanted = new Set(inside);
+  const items = (layers.data?.items ?? []).filter((i) => wanted.has(i.uid));
+  const pins: PlanPin[] = [
+    ...items.map((i) => ({ id: i.uid, x: i.x, y: i.y, label: i.key ? `${i.key} · ${i.name}` : i.name,
+                           colour: LAYER_COLOUR[i.layer], square: !!i.rack,
+                           onClick: () => navigate(i.rack ? `/racks/${i.uid}` : `/assets/${i.uid}`) })),
+  ];
+  // A place drawn with what is in it: its own point would sit on top of them (and take their clicks).
+  if (items.length === 0) pins.push({ id: uid, x, y, label, colour: "#dc2626", highlight: true });
+  return <PlanView planUid={plan.uid} width={plan.width_px} height={plan.height_px} className={tall}
+                   northDeg={plan.north_deg} pins={pins}
+                   focus={items.length > 0 ? [{ x, y }, ...items.map((i) => ({ x: i.x, y: i.y }))] : [{ x, y }]} />;
 }
 
 /** Choose the place (a room, a hall) by searching, optionally a plan of it (or of a place it is in) and the
