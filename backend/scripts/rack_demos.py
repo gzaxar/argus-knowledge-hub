@@ -13,7 +13,8 @@ Run inside the API container with DATABASE_URL pointing at an EMPTY database (it
    The PDUs are written into the layout file, so an imported demo gets their places too.
 3. Each floor plan's drawing keeps only the building: rooms, room numbers, the beam axis, north and the title. The
    unit markers and labels drawn into it before (a rectangle and a label in #1e293b) go: ARGUS draws the records
-   over the drawing, by layer (docs/plan-layers.md).
+   over the drawing, by layer (docs/plan-layers.md). The building is then drawn as a room schedule
+   (scripts/demo_plan_drawing.py): same geometry, labels that fit their rooms, column grid, doors, shielding.
 4. The tour gains the plan by layers, a rack and (for a beam model) the tunnel; the bundle is exported with it.
 
 Records, relations, tickets, documents and attachments are not touched: the export has the same identifiers plus the
@@ -83,7 +84,8 @@ if extra:
         if spec["rack"] not in extra["racks"]:
             continue
         rack = db.get(Asset, spec["rack"])
-        units = [u["asset"] for u in spec["units"] if u.get("asset")]
+        # What the PDUs feed: the units, not the PDUs themselves (they are in the layout too, after a first run).
+        units = [u["asset"] for u in spec["units"] if u.get("asset") and not u["asset"].startswith(f"{spec['rack']}-pdu-")]
         short = rack.name.split(" — ")[0].replace("Rack ", "")
         for side, ups in extra["feeds"].items():
             uid = f"{spec['rack']}-pdu-{side}"
@@ -100,6 +102,10 @@ if extra:
             if not any(u.get("asset") == uid for u in spec["units"]):
                 spec["units"].append({"asset": uid, "kind": "zero_u", "face": "rear",
                                       "note": f"feed {side.upper()} from {db.get(Asset, ups).name}"})
+    # A PDU powering itself or its twin (an earlier run of this script made those): taken out.
+    db.execute(text("DELETE FROM relations WHERE workspace_id = :w AND relation_type = 'powers' "
+                    "AND from_asset_uid LIKE '%-pdu-_' AND to_asset_uid LIKE '%-pdu-_' "
+                    "AND split_part(from_asset_uid, '-pdu-', 1) = split_part(to_asset_uid, '-pdu-', 1)"), {"w": WS})
     if WS == "valmora-linac-demo":
         # The Kubernetes cluster is its nodes (`part of` it), not a box in rack S01.
         kc = db.get(Asset, "vl-kc")
@@ -117,7 +123,10 @@ db.commit()
 print(f"racks: {len(report['changed'])} changes, {report['unchanged']} already so, "
       f"{report['points_moved']} plan points moved into their racks")
 
-# ---- the drawings keep the building only
+# ---- the drawings keep the building only, drawn as a room schedule (scripts/demo_plan_drawing.py)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from demo_plan_drawing import redraw  # noqa: E402
+
 MARK = re.compile(r'<rect [^>]*stroke="#1e293b"[^>]*/>\s*<text [^>]*fill="#1e293b"[^>]*>[^<]*</text>\s*')
 plans = list(db.scalars(select(FloorPlan).where(FloorPlan.workspace_id == WS)))
 for plan in plans:
@@ -125,8 +134,11 @@ for plan in plans:
     svg = path.read_text()
     clean = MARK.sub("", svg)
     if clean != svg:
-        path.write_text(clean)
         print(f"{plan.name}: {len(MARK.findall(svg))} unit markers taken out of the drawing")
+    drawn = redraw(clean)
+    if drawn != svg:
+        path.write_text(drawn)
+        print(f"{plan.name}: redrawn")
 db.commit()
 
 # ---- the tour

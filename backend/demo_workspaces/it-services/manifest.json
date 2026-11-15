@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-11-14T16:39:11.783999+00:00",
+  "created_at": "2026-11-15T00:03:12.425965+00:00",
   "created_by": "ARGUS demo authors",
   "demo": {
     "description": "A medium-sized IT organisation: a service catalogue (network, internet, Wi-Fi, mail, DNS, hosting, storage, backup, monitoring, service desk, VPN, HPC, LLM inference), three buildings with floors, rooms and racks, a GPU cluster for HPC and LLM inference, user workstations, a port-to-port network map, a cooling control process reaching its units through a serial converter, mapped and placed equipment, dependencies, incidents, requests and changes, maintenance activities, runbooks, contracts and SLAs.",
@@ -242,12 +242,12 @@
     "assets": {
       "file": "records/assets.jsonl",
       "rows": 315,
-      "sha256": "203be6475271b9a12568f1cb78538d0cce80a49e89a881ae248807289af61f00"
+      "sha256": "1c7ab303b8cf86956a0c71c71471192b7c09bec0d6e1a6b656e1187ab2cb1750"
     },
     "attachments": {
       "file": "records/attachments.jsonl",
       "rows": 2,
-      "sha256": "f9c62b1401e1b93670ec96210681662ed5b3a0b7ef974e6dac572db12f85256e"
+      "sha256": "dcf517d3c162dd03a71bdbf6e59e0a541855ad2954996873fd069e0a990b1a13"
     },
     "beam_asset_bindings": {
       "file": "records/beam_asset_bindings.jsonl",
@@ -282,7 +282,7 @@
     "document_relations": {
       "file": "records/document_relations.jsonl",
       "rows": 120,
-      "sha256": "ed66c421482684ce77ff386f853109e0c32d333759ee17ff99e3de5cc238ea7c"
+      "sha256": "5e16f1e3b8450d2bfcd30b454ec01f7e2d105400ff361c2b785a8bc3b436c122"
     },
     "document_revisions": {
       "file": "records/document_revisions.jsonl",
@@ -302,7 +302,7 @@
     "documents": {
       "file": "records/documents.jsonl",
       "rows": 17,
-      "sha256": "5ff478b92645d289cbdd8d64953e0b66f5536c06b4fa8e93c3c0a3d13e47988d"
+      "sha256": "1f85440cef33e0cae0ec3fa67f6518c082d444da504718318a414b8607441793"
     },
     "equipment_class_requests": {
       "file": "records/equipment_class_requests.jsonl",
@@ -312,7 +312,7 @@
     "floor_plans": {
       "file": "records/floor_plans.jsonl",
       "rows": 4,
-      "sha256": "785e64e7a4c2ecd7c95c2146c5a1b73399726d04fc29b98d5f162b6a1fab10b0"
+      "sha256": "b0fb27db0f54730a14f6ea2937779dfbf55a932c31524b14b23a8bd6d68653a2"
     },
     "global_values": {
       "file": "records/global_values.jsonl",
@@ -387,7 +387,7 @@
     "relations": {
       "file": "records/relations.jsonl",
       "rows": 613,
-      "sha256": "24239a281da67596695d312f90f015506c1bb4f2f9492853937c6d381137bd3e"
+      "sha256": "c770e67133cfc43b25484f9b31b795cc85891d10a74af1b3f9547cb243a1d86d"
     },
     "review_escalations": {
       "file": "records/review_escalations.jsonl",
@@ -437,7 +437,7 @@
     "ticket_workflows": {
       "file": "records/ticket_workflows.jsonl",
       "rows": 4,
-      "sha256": "0d8b2fc86e4d429ce9c1b7f0cc94322dab57406433706fa797df9f498f29a0cc"
+      "sha256": "4414a59d30f1f722641694993c28677d3071841afeb4a1cebc5fc5c45d68946b"
     },
     "tickets": {
       "file": "records/tickets.jsonl",
@@ -447,12 +447,12 @@
     "types": {
       "file": "records/types.jsonl",
       "rows": 116,
-      "sha256": "1aca76a90e42d8a0ff09fb9283820b868b684cf7b16e63b3d972c36a84d514b3"
+      "sha256": "f9d04145b3349ca3f13eef3905ac5d3b8fbc3854037bd3292f8c76bc1ba66167"
     },
     "workspace": {
       "file": "records/workspace.jsonl",
       "rows": 1,
-      "sha256": "26c75e3053a72c5bce50592f39d9f63084ccd111cdce95823203c504d7b1b99a"
+      "sha256": "4a57228d329937cbceeefdcaf77729e3f18463d59ce905f5261e86bdcdc65c2b"
     },
     "workspace_packages": {
       "file": "records/workspace_packages.jsonl",
@@ -470,6 +470,11 @@
       "path": "files/02/02d3611919d90228d85466ed05a4fdb6080364dcef2598cea0cc4f2bc5e18699",
       "sha256": "02d3611919d90228d85466ed05a4fdb6080364dcef2598cea0cc4f2bc5e18699",
       "size": 624
+    },
+    {
+      "path": "files/07/0789030fa2f338074599a54faad704e0d70662fa55a279aa30e1a944f5d20bc2",
+      "sha256": "0789030fa2f338074599a54faad704e0d70662fa55a279aa30e1a944f5d20bc2",
+      "size": 6351
     },
     {
       "path": "files/08/08fab0a511eee773e02fb528a43343f9141b823ccc186253ad663bdad94bbe71",
@@ -490,6 +495,11 @@
       "path": "files/12/12e8c1a05fe3c14fb9f44e98145afa96c14ee0d9dddfdd69b75c53c31486cae8",
       "sha256": "12e8c1a05fe3c14fb9f44e98145afa96c14ee0d9dddfdd69b75c53c31486cae8",
       "size": 530
+    },
+    {
+      "path": "files/13/137a2bdce26082cb2060bd38e1121fbc1406c5ba1d5d6f441a62145570e210f0",
+      "sha256": "137a2bdce26082cb2060bd38e1121fbc1406c5ba1d5d6f441a62145570e210f0",
+      "size": 12603
     },
     {
       "path": "files/17/1770a651a8a42004866cd4c22a24324194b1f1c39937b3ea5fa9bd275e837a3c",
@@ -542,14 +552,14 @@
       "size": 532
     },
     {
+      "path": "files/41/41accb07917b80d221e490d172026e92cec000f93caea14f84cd7180aa8fd672",
+      "sha256": "41accb07917b80d221e490d172026e92cec000f93caea14f84cd7180aa8fd672",
+      "size": 8157
+    },
+    {
       "path": "files/47/474c95a16e5ccaffa820030f8d6362b51fbfbe542c57dd409eb153da5b0e53bf",
       "sha256": "474c95a16e5ccaffa820030f8d6362b51fbfbe542c57dd409eb153da5b0e53bf",
       "size": 511
-    },
-    {
-      "path": "files/47/474e03b0487ec967b8054eb1c23b75420f603e60f6c60c2be1617c7c0769f5ed",
-      "sha256": "474e03b0487ec967b8054eb1c23b75420f603e60f6c60c2be1617c7c0769f5ed",
-      "size": 1519
     },
     {
       "path": "files/4c/4c87684f3af8824efa448c9268ab6b338fbeccdf11225828c40e66f6f4c09cb9",
@@ -595,11 +605,6 @@
       "path": "files/64/6420d831dfe55992360e7712b409187ea0bfc353ce9a538f6b2c632099452230",
       "sha256": "6420d831dfe55992360e7712b409187ea0bfc353ce9a538f6b2c632099452230",
       "size": 441
-    },
-    {
-      "path": "files/70/70a5bac858e61aa99e9e07d32a90e7f5c32965c37eb3513cb932337f406b328b",
-      "sha256": "70a5bac858e61aa99e9e07d32a90e7f5c32965c37eb3513cb932337f406b328b",
-      "size": 1513
     },
     {
       "path": "files/72/729d3e264f4e2e9670cd86f4531141baa78eb94e975198228a8167c8a1eb0572",
@@ -657,11 +662,6 @@
       "size": 618
     },
     {
-      "path": "files/93/930e7a9d899644f72cfbe7dd3d596b34fa0339079bc43cd105bd491ac781b4f3",
-      "sha256": "930e7a9d899644f72cfbe7dd3d596b34fa0339079bc43cd105bd491ac781b4f3",
-      "size": 2293
-    },
-    {
       "path": "files/95/95afa21025a2c5dbb7efda5ff74250ab1606b0fb11e0a6979d1a2c8a277c22fb",
       "sha256": "95afa21025a2c5dbb7efda5ff74250ab1606b0fb11e0a6979d1a2c8a277c22fb",
       "size": 544
@@ -717,11 +717,6 @@
       "size": 470
     },
     {
-      "path": "files/ba/bad5eea2ec37c28929af01bbb068caffb80c26570c4d8446cf721d29556d1ed4",
-      "sha256": "bad5eea2ec37c28929af01bbb068caffb80c26570c4d8446cf721d29556d1ed4",
-      "size": 1509
-    },
-    {
       "path": "files/bc/bcec2a1228e483c91c6bdec3d18ef82b8381e6b00a60794cc90a95fb97d4b6a1",
       "sha256": "bcec2a1228e483c91c6bdec3d18ef82b8381e6b00a60794cc90a95fb97d4b6a1",
       "size": 517
@@ -730,6 +725,11 @@
       "path": "files/c0/c07711c7f515e7707b97e32d9a18fed49bb200f1fcf0d1a987422f44e8ec8479",
       "sha256": "c07711c7f515e7707b97e32d9a18fed49bb200f1fcf0d1a987422f44e8ec8479",
       "size": 649
+    },
+    {
+      "path": "files/c1/c18043b8df047aa728dd97c9bf554588c6e88caa3072ecfb738444fec35611c2",
+      "sha256": "c18043b8df047aa728dd97c9bf554588c6e88caa3072ecfb738444fec35611c2",
+      "size": 10305
     },
     {
       "path": "files/cd/cd71cf844dcdf0ba2ce6f9df82d2619dc45e2225c84fa9bb70b6fb79aba0e112",
@@ -863,12 +863,12 @@
     },
     {
       "path": "records/assets.jsonl",
-      "sha256": "203be6475271b9a12568f1cb78538d0cce80a49e89a881ae248807289af61f00",
+      "sha256": "1c7ab303b8cf86956a0c71c71471192b7c09bec0d6e1a6b656e1187ab2cb1750",
       "size": 234415
     },
     {
       "path": "records/attachments.jsonl",
-      "sha256": "f9c62b1401e1b93670ec96210681662ed5b3a0b7ef974e6dac572db12f85256e",
+      "sha256": "dcf517d3c162dd03a71bdbf6e59e0a541855ad2954996873fd069e0a990b1a13",
       "size": 1302
     },
     {
@@ -903,7 +903,7 @@
     },
     {
       "path": "records/document_relations.jsonl",
-      "sha256": "ed66c421482684ce77ff386f853109e0c32d333759ee17ff99e3de5cc238ea7c",
+      "sha256": "5e16f1e3b8450d2bfcd30b454ec01f7e2d105400ff361c2b785a8bc3b436c122",
       "size": 25524
     },
     {
@@ -923,7 +923,7 @@
     },
     {
       "path": "records/documents.jsonl",
-      "sha256": "5ff478b92645d289cbdd8d64953e0b66f5536c06b4fa8e93c3c0a3d13e47988d",
+      "sha256": "1f85440cef33e0cae0ec3fa67f6518c082d444da504718318a414b8607441793",
       "size": 9891
     },
     {
@@ -933,7 +933,7 @@
     },
     {
       "path": "records/floor_plans.jsonl",
-      "sha256": "785e64e7a4c2ecd7c95c2146c5a1b73399726d04fc29b98d5f162b6a1fab10b0",
+      "sha256": "b0fb27db0f54730a14f6ea2937779dfbf55a932c31524b14b23a8bd6d68653a2",
       "size": 4542
     },
     {
@@ -1008,7 +1008,7 @@
     },
     {
       "path": "records/relations.jsonl",
-      "sha256": "24239a281da67596695d312f90f015506c1bb4f2f9492853937c6d381137bd3e",
+      "sha256": "c770e67133cfc43b25484f9b31b795cc85891d10a74af1b3f9547cb243a1d86d",
       "size": 144691
     },
     {
@@ -1058,7 +1058,7 @@
     },
     {
       "path": "records/ticket_workflows.jsonl",
-      "sha256": "0d8b2fc86e4d429ce9c1b7f0cc94322dab57406433706fa797df9f498f29a0cc",
+      "sha256": "4414a59d30f1f722641694993c28677d3071841afeb4a1cebc5fc5c45d68946b",
       "size": 5178
     },
     {
@@ -1068,12 +1068,12 @@
     },
     {
       "path": "records/types.jsonl",
-      "sha256": "1aca76a90e42d8a0ff09fb9283820b868b684cf7b16e63b3d972c36a84d514b3",
+      "sha256": "f9d04145b3349ca3f13eef3905ac5d3b8fbc3854037bd3292f8c76bc1ba66167",
       "size": 143746
     },
     {
       "path": "records/workspace.jsonl",
-      "sha256": "26c75e3053a72c5bce50592f39d9f63084ccd111cdce95823203c504d7b1b99a",
+      "sha256": "4a57228d329937cbceeefdcaf77729e3f18463d59ce905f5261e86bdcdc65c2b",
       "size": 718
     },
     {
@@ -1146,8 +1146,8 @@
   ],
   "source": {
     "argus_version": "dev",
-    "instance": "a81a3ca6-2f2f-4de8-afe8-98fb351a47f9",
-    "schema_revision": "b1c3d5e7f9a2"
+    "instance": "748f747b-3440-458f-9cb8-940907982b03",
+    "schema_revision": "d3e5f7a9b2c4"
   },
   "workspace": {
     "id": "it-services-demo",

@@ -79,13 +79,23 @@ Both demo bundles (`backend/demo_workspaces/it-services`, `medium-linac`) come w
 Their floor plans' drawings show the building only (rooms, room numbers, beam axis, north, title): the records
 are drawn over them by layer (docs/plan-layers.md). A unit in a rack is not a point of its own: its rack is.
 
+The drawings are a room schedule, made by `backend/scripts/demo_plan_drawing.py`: the building's double outer wall,
+a column grid every 5 m with axis bubbles (numbers along the top, letters up the side), each room filled in the
+colour of what it is for (bunker, RF, laser, control, electrical, IT, plant, circulation, offices, stores), its name
+in a label sized and wrapped to fit inside it, its number and area (1 m = 10 px), a door, hatched shielding around
+a bunker or tunnel, and a title block with north and a 10 m scale bar. The geometry does not move — same size, same
+rooms, same beam axis — so every point, outline and rack placed on a plan stays where it was. The model is kept in
+the drawing's `<desc>`, so drawing it again changes nothing. The plans are synthetic: no real building is drawn.
+
 They are made by `backend/scripts/rack_demos.py` from the previous bundle and a layout file
 (`backend/scripts/demo_rack_layouts/<demo>.json`), through the application, in an empty database:
 
     PYTHONPATH=/app python scripts/rack_demos.py <bundle dir> scripts/demo_rack_layouts/<demo>.json <output dir>
 
 Identifiers, relations, tickets, documents and attachments of the previous bundle are all kept; the script adds the
-PDUs, their relations, the mountings, and the tour's steps for the plan by layer, a rack and the tunnel.
+PDUs, their relations, the mountings, and the tour's steps for the plan by layer, a rack and the tunnel, and redraws
+the plans. A PDU feeds the rack's units, never itself or its twin (an earlier run made those `powers` relations; they
+are taken out).
 
 ## Updating an imported demo
 
