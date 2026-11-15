@@ -67,10 +67,15 @@ export default function Plan3DPage() {
     scene.add(sun);
 
     const [fw, fd] = floorOf(v, v.width_px, v.height_px);
+    // The whole floor in view, from the south and above, whatever the shape of the window: the distance at which
+    // its width fits the horizontal field and its depth the vertical one, with a margin.
     const reset = () => {
-      const span = Math.max(fw, fd);
-      camera.position.set(fw * 0.5, span * 0.5, fd * 1.05);
+      const half = THREE.MathUtils.degToRad(camera.fov / 2);
+      const across = (fw / 2) / (Math.tan(half) * camera.aspect);
+      const deep = (fd / 2) / Math.tan(half);
+      const dist = 1.18 * Math.max(across, deep * 0.75);
       controls.target.set(fw / 2, 0, fd / 2);
+      camera.position.set(fw / 2, dist * 0.82, fd / 2 + dist * 0.57);   // about 55° above the floor
       controls.update();
     };
     reset();

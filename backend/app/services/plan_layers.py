@@ -211,10 +211,21 @@ def layers(db: Session, plan: FloorPlan, may: Callable[[Asset], bool], *, may_re
     for s in outlines + routes:
         count[s["layer"]] += 1
     count["tickets"], count["activities"] = len(tickets), len(activities)
+    model = indoor._drawing(plan)
     return {**indoor.plan_out(db, plan),
+            # A drawing ARGUS made knows its building's walls: routes are drawn inside them, not over the title.
+            "building": model["building"] if model else None,
             "layers": [{"id": k, "label": label, "on": on, "count": count[k]} for k, label, on in LAYERS],
             "items": items, "outlines": outlines, "routes": routes, "tickets": tickets, "activities": activities,
             "in_racks": len(owner), "held": owner}
+
+
+def drawn_over(db: Session, plan: FloorPlan) -> dict:
+    """What ARGUS draws over the plan, in its pixels — every point (a rack for what it holds) and every route —
+    for a drawing to keep its room labels clear of it (services/plan_drawing.py)."""
+    view = layers(db, plan, lambda a: True, may_read_tickets=lambda w: True)
+    return {"points": [(i["x"], i["y"]) for i in view["items"] if i["x"] is not None and i["y"] is not None],
+            "lines": [r["points"] for r in view["routes"]]}
 
 
 ACTIVITY_WINDOW = (timedelta(days=-1), timedelta(days=30))

@@ -110,3 +110,25 @@ def test_a_layout_that_cannot_be_drawn_is_refused_and_an_uploaded_drawing_is_not
     db = SessionLocal()
     assert indoor.plan_layout(db.get(indoor.FloorPlan, up.json()["uid"])) is None
     db.close()
+
+
+def test_a_room_label_goes_where_no_point_or_route_covers_it():
+    from app.services import plan_drawing
+    import re
+    model = plan_drawing.from_layout({"title": "Hall", "width_m": 20, "depth_m": 12,
+                                      "rooms": [{"name": "Rack room", "x": 0, "y": 0, "w": 20, "d": 12}]})
+
+    def label(svg):                                           # the label's box: x, y, w, h
+        m = re.search(r'<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="3"', svg)
+        return tuple(float(v) for v in m.groups())
+
+    x, y, w, h = label(plan_drawing.draw(model))
+    assert abs((x + w / 2) - (20 + 100)) < 1                  # alone: centred, high in the room
+    # Racks right where it was, and a cable through the middle: it moves to where neither is.
+    points = [(x + w / 2 + dx, y + h / 2) for dx in (-20, 0, 20)]
+    cable = [[20, 80], [220, 80]]
+    nx, ny, nw, nh = label(plan_drawing.draw(model, {"points": points, "lines": [cable]}))
+    assert not any(nx - 9 <= px <= nx + nw + 9 and ny - 9 <= py <= ny + nh + 9 for px, py in points)
+    assert not plan_drawing._crosses(cable, nx, ny, nw, nh)
+    # The avoided points are not kept in the drawing's model.
+    assert plan_drawing.read(plan_drawing.draw(model, {"points": points})) == model

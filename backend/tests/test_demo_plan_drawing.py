@@ -55,7 +55,8 @@ def test_the_demo_plans_are_drawn_so_and_their_names_fit(demo):
         digest = plan["storage_path"]["$file"]
         svg = (base / "files" / digest[:2] / digest).read_text()
         assert drawing.MARK in svg, f"{plan['name']} is not drawn by scripts/demo_plan_drawing.py"
-        assert drawing.redraw(svg) == svg
+        # Drawn again it is the same building; only its labels may sit elsewhere, clear of what is placed now.
+        assert drawing.read(drawing.redraw(svg)) == drawing.read(svg)
         assert f'viewBox="0 0 {plan["width_px"]:g} {plan["height_px"]:g}"' in svg
         model = drawing.read(svg)
         for room in model["rooms"]:
@@ -63,7 +64,28 @@ def test_the_demo_plans_are_drawn_so_and_their_names_fit(demo):
             fs, lines = drawing._fit(room["name"], w, h)
             assert max(len(s) for s in lines) * fs * 0.64 <= w - 6, (plan["name"], room["name"])
             pill = re.search(rf'<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="3"[^>]*/>\s*'
-                             rf'<text x="{x + w / 2:g}"[^>]*>{re.escape(html.escape(lines[0]))}</text>', svg)
+                             rf'<text x="[\d.]+"[^>]*>(?:{re.escape(html.escape(lines[0]))}|'
+                             rf'{re.escape(html.escape(room["name"].upper().split()[0]))})</text>', svg)
             assert pill, (plan["name"], room["name"])
             px, py, pw, ph = (float(v) for v in pill.groups())
             assert x <= px and px + pw <= x + w and y <= py and py + ph <= y + h, (plan["name"], room["name"])
+            under = [p for p in points(base, plan["uid"]) if px - 4 <= p[0] <= px + pw + 4 and py - 4 <= p[1] <= py + ph + 4]
+            assert len(under) <= covered.get((demo, room["name"]), 0), (plan["name"], room["name"], under)
+
+
+# A label is put where no point of the plan covers it; in a room too full for that, as few as can be.
+covered: dict = {("medium-linac", "Klystron Gallery (RF)"): 1,        # 19 points in 32 m × 6 m
+                 ("medium-linac", "RF and Vacuum Service Area"): 2}   # 10 points in 7 m × 8 m
+
+
+def points(base: Path, plan_uid: str) -> list:
+    """The points ARGUS draws over a plan of a bundle: what is placed on it, a unit in a rack shown as its rack."""
+    def rows(name):
+        return [json.loads(x) for x in (base / "records" / f"{name}.jsonl").read_text().splitlines() if x.strip()]
+    live = [m for m in rows("rack_mountings") if m["state"] == "confirmed" and not m["valid_until"]]
+    racks = {m["rack_uid"] for m in live} | {a["uid"] for a in rows("assets") if a["type"] == "Rack"}
+    mounted = {m["asset_uid"] for m in live if m["asset_uid"]}
+    return [(p["plan_x"], p["plan_y"]) for p in rows("indoor_placements")
+            if p["plan_uid"] == plan_uid and p["state"] == "confirmed" and not p["valid_until"]
+            and p["plan_x"] is not None and p["asset_uid"] not in mounted
+            and (p["asset_uid"] in racks or p.get("place_uid") not in racks)]

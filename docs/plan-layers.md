@@ -26,6 +26,10 @@ The uploaded drawing is the **base**: walls, rooms, doors. ARGUS never writes on
   transform, so they appear only on a plan placed on the map. Left out: the plan's own place and the places it is
   in, outlines covering the whole plan, outlines of another floor (`indoor_placements.level_uid`), and records of
   other workspaces that are not reachable from the plan's.
+- On a drawing ARGUS made (a demo's, or "Draw a plan"), `building` gives the building's walls `[x, y, w, h]` in px.
+  The web clips routes to them, so a cable from another building is drawn from the wall it comes through, not
+  across the title block or the ground around. On an uploaded drawing, routes are clipped to the picture.
+- The web offers only the layers that have something on this plan: an IT building has no beamline chip.
 - Everything is filtered for the viewer as the plan itself is (`routers/indoor._viewer`); tickets need ticket read
   permission in their workspace; activities follow the activity rules (`services/activities.sees`).
 
@@ -51,7 +55,8 @@ installed there now — confirmed installations of the ledger and confirmed beam
 A simplified 3D view of a floor plan (three.js, loaded only when the page is opened): the drawing on the floor,
 rooms as glass walls 2.8 m high, zones tinted on the floor, cables and pipes as lines, racks as 2 m cabinets with
 their units at their units (U1 at 0.1 m, 44.45 mm a unit; front units towards the front, 0U strips at the rear),
-beamline components at 1.2 m, fixed plant as 1.6 m blocks, other devices as small cubes.
+beamline components at 1.2 m, fixed plant as 1.6 m blocks, other devices as small cubes. It opens, and **Reset
+view** returns, with the whole floor in view from the south, about 55° above it, whatever the shape of the window.
 
 `scene` is `layers` plus `metres_per_px` (from the plan's placement on the map; 0.1 m when it is not placed,
 `scale_known: false`), `units` (each unit held in a rack on the plan, with its rack, units and face) and `relations`

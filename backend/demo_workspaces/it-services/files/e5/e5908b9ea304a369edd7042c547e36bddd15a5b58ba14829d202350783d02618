@@ -46,11 +46,11 @@
 <rect x="116.6" y="57.8" width="86.8" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
 <text x="160" y="69.3" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">READING HALL</text>
 <text x="160" y="82.8" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">L0.10 · 588 m²</text>
-<rect x="322.6" y="172.6" width="54.8" height="41" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
-<text x="350" y="184.1" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">NETWORK</text>
-<text x="350" y="196.1" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">CLOSET</text>
-<text x="350" y="208.1" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">IDF-2</text>
-<text x="350" y="221.6" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">L0.21 · 42 m²</text>
+<rect x="330.44" y="165.56" width="39.12" height="28.4" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
+<text x="350" y="173.91" font-family="Helvetica, Arial, sans-serif" font-size="6.5" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">NETWORK</text>
+<text x="350" y="181.71" font-family="Helvetica, Arial, sans-serif" font-size="6.5" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">CLOSET</text>
+<text x="350" y="189.51" font-family="Helvetica, Arial, sans-serif" font-size="6.5" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">IDF-2</text>
+<text x="350" y="201.96" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">L0.21 · 42 m²</text>
 <text x="8" y="270" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" fill="#0f172a">Library — ground floor</text>
 <text x="8" y="283.625" font-family="Helvetica, Arial, sans-serif" font-size="9.3" fill="#b91c1c">Synthetic demo plan · not a real building</text>
 <rect x="292" y="269.4" width="50" height="3" fill="#1f2937" stroke="#1f2937" stroke-width="0.6"/><rect x="342" y="269.4" width="50" height="3" fill="#ffffff" stroke="#1f2937" stroke-width="0.6"/><text x="292" y="279.4" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#334155">0</text><text x="342" y="279.4" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#334155">5</text><text x="392" y="279.4" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#334155">10 m</text>

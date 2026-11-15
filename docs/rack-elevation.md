@@ -82,7 +82,7 @@ are drawn over them by layer (docs/plan-layers.md). A unit in a rack is not a po
 The drawings are a room schedule, made by `backend/scripts/demo_plan_drawing.py`: the building's double outer wall,
 a column grid every 5 m with axis bubbles (numbers along the top, letters up the side), each room filled in the
 colour of what it is for (bunker, RF, laser, control, electrical, IT, plant, circulation, offices, stores), its name
-in a label sized and wrapped to fit inside it, its number and area (1 m = 10 px), a door, hatched shielding around
+in a label sized and wrapped to fit inside it, put where no point or route drawn over the plan covers it, its number and area (1 m = 10 px), a door, hatched shielding around
 a bunker or tunnel, and a title block with north and a 10 m scale bar. The geometry does not move — same size, same
 rooms, same beam axis — so every point, outline and rack placed on a plan stays where it was. The model is kept in
 the drawing's `<desc>`, so drawing it again changes nothing. The plans are synthetic: no real building is drawn.
