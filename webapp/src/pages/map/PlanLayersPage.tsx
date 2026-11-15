@@ -75,8 +75,42 @@ export function drawn(v: PlanLayersView, on: Set<PlanLayerId>, focus: Set<string
     .flatMap((s) => (s.layer === "paths" && box[2] > 0 ? clipLine(s.points, box) : [s.points])
       .map((points, k) => ({ id: k ? `${s.uid}#${k}` : s.uid, points, closed: s.layer !== "paths",
                              label: `${s.name} · ${s.type}`, colour: LAYER_COLOUR[s.layer], dashed: s.layer === "zones",
+                             ...(s.layer === "paths" && box[2] > 0 ? routeEnds(points, s.name, box) : {}),
                              onClick: () => pickShape(s.uid) })));
   return { pins, shapes, wanted };
+}
+
+/** Which wall of the box a point lies on, as the side a label goes to stay inside: a route coming through the right
+ *  wall is named to the left of where it enters. */
+function wallOf([x, y]: Pt, [bx, by, bw, bh]: [number, number, number, number]): "left" | "right" | "top" | "bottom" | null {
+  const near = (a: number, b: number) => Math.abs(a - b) < 0.6;
+  if (near(x, bx + bw)) return "left";
+  if (near(x, bx)) return "right";
+  if (near(y, by)) return "bottom";
+  if (near(y, by + bh)) return "top";
+  return null;
+}
+
+/** A route that comes in from outside is named, and a dot marks where it arrives: without them a line crossing the
+ *  plan says neither what it is nor where it goes. The name goes along its longest stretch inside — on a plan drawn
+ *  by ARGUS that runs in the free space between rooms, so the name covers no room — over it when the stretch is
+ *  level, beside it when it is upright. */
+export function routeEnds(points: Pt[], name: string, box: [number, number, number, number]): Pick<PlanShape, "tag" | "end"> {
+  const first = points[0], last = points[points.length - 1];
+  const inWall = wallOf(first, box), outWall = wallOf(last, box);
+  const out: Pick<PlanShape, "tag" | "end"> = {};
+  if (inWall || outWall) {
+    let best = 0, at: Pt = first, level = true;
+    for (let k = 0; k + 1 < points.length; k++) {
+      const [x0, y0] = points[k], [x1, y1] = points[k + 1];
+      const len = Math.hypot(x1 - x0, y1 - y0);
+      if (len > best) { best = len; at = [(x0 + x1) / 2, (y0 + y1) / 2]; level = Math.abs(x1 - x0) >= Math.abs(y1 - y0); }
+    }
+    out.tag = { x: at[0], y: at[1], text: name, direction: level ? "center" : "right" };
+  }
+  const arrives = inWall ? (outWall ? null : last) : outWall ? first : null;
+  if (arrives) out.end = arrives;
+  return out;
 }
 
 /** A floor plan with what is on it, by layer: the drawing as it was uploaded, and over it the records — rooms,

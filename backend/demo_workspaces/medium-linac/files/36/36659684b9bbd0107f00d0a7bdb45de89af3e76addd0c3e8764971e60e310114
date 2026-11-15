@@ -40,13 +40,13 @@
 <rect x="102.6" y="23" width="54.8" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
 <text x="130" y="34.5" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">OFFICES</text>
 <text x="130" y="48" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D0.01 · 308 m²</text>
-<rect x="277.52" y="96.34" width="34.96" height="20.6" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
-<text x="295" y="104.69" font-family="Helvetica, Arial, sans-serif" font-size="6.5" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">SERVER</text>
-<text x="295" y="112.49" font-family="Helvetica, Arial, sans-serif" font-size="6.5" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">ROOM</text>
-<text x="295" y="124.94" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D0.02 · 49 m²</text>
-<rect x="262" y="30.8" width="66" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
-<text x="295" y="42.3" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">RECEPTION</text>
-<text x="295" y="55.8" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D0.03 · 42 m²</text>
+<rect x="277.52" y="102.6" width="34.96" height="20.6" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
+<text x="295" y="110.95" font-family="Helvetica, Arial, sans-serif" font-size="6.5" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">SERVER</text>
+<text x="295" y="118.75" font-family="Helvetica, Arial, sans-serif" font-size="6.5" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">ROOM</text>
+<text x="295" y="131.2" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D0.02 · 49 m²</text>
+<rect x="262" y="39.2" width="66" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
+<text x="295" y="50.7" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">RECEPTION</text>
+<text x="295" y="64.2" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D0.03 · 42 m²</text>
 <text x="8" y="193.835" font-family="Helvetica, Arial, sans-serif" font-size="8.83459" font-weight="bold" fill="#0f172a">Administration Building — ground floor</text>
 <text x="8" y="202.71" font-family="Helvetica, Arial, sans-serif" font-size="5.5" fill="#b91c1c">Synthetic demo plan · not a real building</text>
 <rect x="242" y="199.4" width="50" height="3" fill="#1f2937" stroke="#1f2937" stroke-width="0.6"/><rect x="292" y="199.4" width="50" height="3" fill="#ffffff" stroke="#1f2937" stroke-width="0.6"/><text x="242" y="209.4" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#334155">0</text><text x="292" y="209.4" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#334155">5</text><text x="342" y="209.4" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#334155">10 m</text>

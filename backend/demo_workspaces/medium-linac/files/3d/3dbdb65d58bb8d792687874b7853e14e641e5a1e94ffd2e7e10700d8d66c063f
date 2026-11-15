@@ -37,9 +37,10 @@
 <text x="176.8" y="101" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">ENGINEERING</text>
 <text x="176.8" y="113" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">OFFICES</text>
 <text x="176.8" y="126.5" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D1.01 · 280 m²</text>
-<rect x="242" y="23" width="86" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
-<text x="285" y="34.5" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">MEETING ROOM</text>
-<text x="285" y="48" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D1.02 · 126 m²</text>
+<rect x="253.95" y="118" width="54.8" height="29" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
+<text x="281.35" y="129.5" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">MEETING</text>
+<text x="281.35" y="141.5" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">ROOM</text>
+<text x="281.35" y="155" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">D1.02 · 126 m²</text>
 <text x="8" y="194.073" font-family="Helvetica, Arial, sans-serif" font-size="9.07336" font-weight="bold" fill="#0f172a">Administration Building — first floor</text>
 <text x="8" y="203.105" font-family="Helvetica, Arial, sans-serif" font-size="5.62548" fill="#b91c1c">Synthetic demo plan · not a real building</text>
 <rect x="242" y="199.4" width="50" height="3" fill="#1f2937" stroke="#1f2937" stroke-width="0.6"/><rect x="292" y="199.4" width="50" height="3" fill="#ffffff" stroke="#1f2937" stroke-width="0.6"/><text x="242" y="209.4" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#334155">0</text><text x="292" y="209.4" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#334155">5</text><text x="342" y="209.4" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#334155">10 m</text>

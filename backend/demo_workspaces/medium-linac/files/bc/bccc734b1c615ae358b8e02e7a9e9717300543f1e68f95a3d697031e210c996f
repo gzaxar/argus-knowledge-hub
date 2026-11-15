@@ -108,10 +108,10 @@
 <rect x="536.6" y="43.1" width="86.8" height="17" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
 <text x="580" y="54.6" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">CONTROL ROOM</text>
 <text x="580" y="68.1" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">A0.10 · 160 m²</text>
-<rect x="509.4" y="150.96" width="61.2" height="24.2" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
-<text x="540" y="160.66" font-family="Helvetica, Arial, sans-serif" font-size="8" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">ELECTRICAL</text>
-<text x="540" y="170.26" font-family="Helvetica, Arial, sans-serif" font-size="8" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">ROOM</text>
-<text x="540" y="183.16" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">A0.11 · 64 m²</text>
+<rect x="503" y="146.5" width="74" height="29" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
+<text x="540" y="158" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">ELECTRICAL</text>
+<text x="540" y="170" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">ROOM</text>
+<text x="540" y="183.5" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">A0.11 · 64 m²</text>
 <rect x="593" y="166.52" width="52.24" height="24.8" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
 <text x="619.12" y="173.97" font-family="Helvetica, Arial, sans-serif" font-size="5.5" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">RF AND</text>
 <text x="619.12" y="180.57" font-family="Helvetica, Arial, sans-serif" font-size="5.5" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">VACUUM</text>

@@ -6,6 +6,8 @@ import { useSyncExternalStore } from "react";
 import type { RackElevationView, RackMountingView, RackProblem } from "../api/client";
 
 const ROW = 22;
+/** The width of a 0U strip along the side of a face. */
+const SIDE = 26;
 
 /** Where a block being dragged would land: shared by both faces, since a block can cross from one to the other. */
 /** A drag ends with a click on the block: that click is not a selection. */
@@ -75,8 +77,12 @@ export function RackFace({ view, face, selected, onSelect, onDrop, problems = []
     window.addEventListener("pointerup", up);
   };
   const here = view.mountings.filter((m) => m.top_u != null && (m.face === face || m.face === "both"));
+  // What takes no unit (a PDU, a cable manager) stands along the side of its face, the whole height, as it is mounted.
+  const sides = view.mountings.filter((m) => m.kind === "zero_u" && !m.shelf_uid && (m.face === face || m.face === "both"))
+    .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));                      // PDU A left of PDU B
   const wrong = new Set(problems.flatMap((p) => [p.mounting, p.with]).filter(Boolean) as string[]);
   const carried = (shelf: RackMountingView) => view.mountings.filter((m) => m.shelf_uid === shelf.uid);
+  const said = [...here.map((m) => `${nameOf(m)} ${spanOf(m)}`), ...sides.map((m) => `${nameOf(m)} 0U`)];
   return (
     <div className="min-w-0 flex-1">
       <div className="mb-1 flex items-baseline justify-between text-xs">
@@ -84,7 +90,7 @@ export function RackFace({ view, face, selected, onSelect, onDrop, problems = []
         <span className="text-slate-400">{view.used_units[face]} of {units} U used</span>
       </div>
       <div data-rack-face={face} className="relative rounded border-2 border-slate-700 bg-white" style={{ height: units * ROW + 4 }}
-           role="img" aria-label={`${view.rack.name}, ${face}: ${here.map((m) => `${nameOf(m)} ${spanOf(m)}`).join("; ") || "empty"}`}>
+           role="img" aria-label={`${view.rack.name}, ${face}: ${said.join("; ") || "empty"}`}>
         {Array.from({ length: units }, (_, i) => units - i).map((u) => (
           <div key={u}
                className={`flex items-center border-b border-slate-100 text-[10px] text-slate-400 ${
@@ -101,12 +107,13 @@ export function RackFace({ view, face, selected, onSelect, onDrop, problems = []
                     onPointerDown={(e) => startDrag(m, e)}
                     onClick={() => { if (!suppressClick) onSelect?.(m); }}
                     title={`${nameOf(m)} · ${spanOf(m)} · ${m.face}${m.asset?.key ? ` · ${m.asset.key}` : ""}`}
-                    className={`absolute left-8 right-1 overflow-hidden rounded border px-1.5 text-left text-[11px] leading-tight
+                    className={`absolute left-8 overflow-hidden rounded border px-1.5 text-left text-[11px] leading-tight
                       ${TONE[m.kind] ?? TONE.device} ${m.face === "both" ? "border-l-4" : ""}
                       ${wrong.has(m.uid) ? "!border-red-500 !bg-red-100 !text-red-900" : ""}
                       ${pending ? "ring-2 ring-emerald-400" : ""} ${selected === m.uid ? "outline outline-2 outline-slate-900" : ""}
                       ${onDrop ? "cursor-grab touch-none select-none" : "cursor-pointer"}`}
-                    style={{ top: (units - (m.top_u as number)) * ROW + 1, height: m.height_u * ROW - 2 }}>
+                    style={{ top: (units - (m.top_u as number)) * ROW + 1, height: m.height_u * ROW - 2,
+                             right: 4 + sides.length * SIDE }}>
               <span className="block truncate font-medium">{nameOf(m)}</span>
               {m.height_u > 1 && (
                 <span className="block truncate text-[10px] opacity-70">
@@ -117,6 +124,18 @@ export function RackFace({ view, face, selected, onSelect, onDrop, problems = []
             </button>
           );
         })}
+        {sides.map((m, i) => (
+          <button key={m.uid} type="button" data-zero-u={m.uid}
+                  onClick={() => onSelect?.(m)}
+                  title={`${nameOf(m)} · 0U · ${m.face}${m.note ? ` · ${m.note}` : ""}${m.asset?.key ? ` · ${m.asset.key}` : ""}`}
+                  className={`absolute bottom-1 top-1 overflow-hidden rounded border border-violet-400 bg-violet-100 py-1 text-[10px] leading-tight text-violet-950
+                    ${staged?.has(m.uid) || m.since == null ? "ring-2 ring-emerald-400" : ""}
+                    ${selected === m.uid ? "outline outline-2 outline-slate-900" : ""} cursor-pointer`}
+                  style={{ right: 2 + (sides.length - 1 - i) * SIDE, width: SIDE - 3, writingMode: "vertical-rl" }}>
+            <span className="font-medium">{nameOf(m)}</span>
+            {m.note && <span className="opacity-70"> · {m.note}</span>}
+          </button>
+        ))}
       </div>
     </div>
   );

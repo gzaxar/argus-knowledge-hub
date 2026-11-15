@@ -110,3 +110,44 @@ def test_the_scene_has_the_scale_the_units_at_their_height_and_the_relations_bet
         [("Server Q", rack, 10, 2, "front")]
     # The server's place in its rack is shown by placing it; that the UPS powers it is a line.
     assert s["relations"] == [{"from": ups, "to": server, "type": "powers"}]
+
+
+def test_other_workspaces_copies_at_the_same_spot_do_not_hide_the_plans_own(world, monkeypatch):
+    """The map is looked up within a limit: copies of the same records in other workspaces (a demo imported twice)
+    are not looked for, so they cannot use it up before the plan's own are found."""
+    from app.models.workspace import Workspace
+    from app.services import plan_layers
+    w, h = world, world["headers"]
+    hall = _unit(w, "Hall M", "Building")
+    plan = client.post(f"/v1/assets/{hall}/plans", headers=h, data={"name": "Hall M plan"},
+                       files={"file": ("hall.png", png(), "image/png")}).json()
+    assert client.put(f"/v1/plans/{plan['uid']}/placement", headers=h,
+                      json={"points": [cp(0, 0), cp(1000, 0), cp(0, 500)]}).status_code == 200
+    db = SessionLocal()
+    other = Workspace(id=f"copy-{uuid.uuid4().hex[:6]}", name="A copy")
+    db.add(other)
+    db.flush()
+    line = {"type": "LineString", "coordinates": [list(at(0, 300)), list(at(1000, 300))]}
+    own = _unit(w, "Cable own", "Power Cable")
+    copies = []
+    for k in range(3):
+        schema = engine.ensure_type(db, other.id, "Power Cable")
+        schema.metadata_json = {**(schema.metadata_json or {}), "locatable": True}
+        a = Asset(uid=str(uuid.uuid4()), workspace_id=other.id, schema_uid=schema.uid, key=f"C-{k}", name=f"Copy {k}",
+                  type="Power Cable", attributes={}, record_status="Active")
+        db.add(a)
+        db.flush()
+        copies.append(a)
+    for a in copies + [db.get(Asset, own)]:
+        spatial.set_location(db, a, spatial.shape(db, line, "route"), actor="t", source="manual", role="route")
+    other_id = other.id
+    db.commit()
+    db.close()
+    within = spatial.within
+    monkeypatch.setattr(plan_layers.spatial, "within", lambda db, f, bbox, limit=2000: within(db, f, bbox, limit=1))
+    v = client.get(f"/v1/plans/{plan['uid']}/layers", headers=h).json()
+    assert [r["name"] for r in v["routes"]] == ["Cable own"]
+    db = SessionLocal()
+    db.delete(db.get(Workspace, other_id))
+    db.commit()
+    db.close()

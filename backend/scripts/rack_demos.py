@@ -16,6 +16,8 @@ Run inside the API container with DATABASE_URL pointing at an EMPTY database (it
    over the drawing, by layer (docs/plan-layers.md). The building is then drawn as a room schedule
    (scripts/demo_plan_drawing.py): same geometry, labels that fit their rooms where no point or route covers
    them, column grid, doors, shielding.
+3b. Before that, inside each building a route (a cable, a pipe) runs along the gaps between rooms to the room it
+   serves (scripts/demo_routes_inside.py): the part outside is kept.
 4. The tour gains the plan by layers, a rack and (for a beam model) the tunnel; the bundle is exported with it.
 
 Records, relations, tickets, documents and attachments are not touched: the export has the same identifiers plus the
@@ -127,6 +129,59 @@ print(f"racks: {len(report['changed'])} changes, {report['unchanged']} already s
 # ---- the drawings keep the building only, drawn as a room schedule (scripts/demo_plan_drawing.py)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from demo_plan_drawing import redraw  # noqa: E402
+
+# ---- inside a building, a cable or pipe runs along the gaps between rooms to the room it serves
+# (scripts/demo_routes_inside.py): only the part inside the building is redrawn, the map keeps the rest.
+from demo_routes_inside import inside as in_box, reroute  # noqa: E402
+
+from app.models.spatial import SpatialFeature  # noqa: E402
+from app.services import indoor, spatial  # noqa: E402
+
+from app.models.indoor import PlaceLevel  # noqa: E402
+
+drawn_plans = []
+for plan in db.scalars(select(FloorPlan).where(FloorPlan.workspace_id == WS).order_by(FloorPlan.name)):
+    model = indoor._drawing(plan) if plan.transform else None
+    if model and model.get("building") and model.get("rooms"):
+        level = db.get(PlaceLevel, plan.level_uid) if plan.level_uid else None
+        drawn_plans.append((plan, tuple(model["building"]), [tuple(r["box"]) for r in model["rooms"]],
+                            abs(level.ordinal) if level else 0))
+# A cable comes into a building at the ground floor: of a building's floors, the ground one is tried first.
+drawn_plans.sort(key=lambda d: (d[0].place_uid, d[3], d[0].name))
+
+
+def to_geo(t: dict, x: float, y: float) -> list[float]:
+    return [round(t["c"] + t["a"] * x + t["b"] * y, 8), round(t["f"] + t["d"] * x + t["e"] * y, 8)]
+
+
+rerouted = 0
+routes = db.scalars(select(SpatialFeature).where(SpatialFeature.workspace_id == WS, SpatialFeature.role == "route",
+                                                 SpatialFeature.state == "confirmed",
+                                                 SpatialFeature.valid_until.is_(None)))
+for feature in list(routes):
+    coords = [list(c[:2]) for c in spatial.geojson(feature.geometry)["coordinates"]]
+    before = [list(c) for c in coords]
+    for place in dict.fromkeys(d[0].place_uid for d in drawn_plans):
+        floors = []
+        for plan, building, rooms, _ in (d for d in drawn_plans if d[0].place_uid == place):
+            pts = [indoor.to_plan(plan.transform, lon, lat) for lon, lat in coords]
+            ends = [q for q in (pts[0], pts[-1]) if in_box(q, building)]
+            if len(ends) == 1:
+                floors.append((plan, building, rooms, pts, any(in_box(ends[0], r) for r in rooms)))
+        if not floors:
+            continue
+        # The floor whose rooms hold the route's end, the lowest first; else the lowest.
+        plan, building, rooms, pts, _ = next((f for f in floors if f[4]), floors[0])
+        new = reroute(pts, building, rooms)
+        if new:
+            coords = [to_geo(plan.transform, x, y) for x, y in new]
+    if coords != before:
+        asset = db.get(Asset, feature.subject_uid)
+        spatial.set_location(db, asset, {"type": "LineString", "coordinates": coords}, actor=ACTOR, role="route",
+                             note="inside the buildings, along the gaps between rooms to the room it serves")
+        rerouted += 1
+db.commit()
+print(f"routes: {rerouted} run inside their buildings along the gaps between rooms")
 
 MARK = re.compile(r'<rect [^>]*stroke="#1e293b"[^>]*/>\s*<text [^>]*fill="#1e293b"[^>]*>[^<]*</text>\s*')
 plans = list(db.scalars(select(FloorPlan).where(FloorPlan.workspace_id == WS)))

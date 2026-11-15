@@ -12,7 +12,8 @@ Open the rack and choose **Edit the rack**.
 
 Units are numbered from the bottom (U1). A block is a unit, as high as the units it takes; a block with a thick
 left edge goes through the rack (front and rear). Amber is a shelf, dashed grey a space kept for something.
-What takes no unit — a vertical PDU — is listed under the drawing as **0U**. Click a block to see what it is and
+What takes no unit — a vertical PDU — stands as a violet strip along the side of its face, the whole height, with
+what feeds it ("feed A from UPS-SRV"); it is also listed under the drawing as **0U**. Click a block to see what it is and
 open its record, with its ports, cables, tickets, documents and photos.
 
 ## Changing it
