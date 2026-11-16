@@ -383,7 +383,7 @@ function ActivityPanel({ id, names, onClose, onChanged }: {
                     <option value="this">This occurrence</option><option value="future">This and future occurrences</option><option value="series">The entire series</option>
                   </select>
                 )}
-                <div className="flex gap-2">
+                <div className="sticky bottom-0 -mx-5 flex gap-2 border-t border-slate-200 bg-white px-5 py-2" data-form-actions="">
                   <button type="button" onClick={() => save.mutate()}
                           disabled={save.isPending || workspaces.length === 0 || (x.recurring && workspacesChanged && scope === "this")}
                           className="rounded bg-slate-900 px-3 py-1 text-white disabled:opacity-40">Save</button>

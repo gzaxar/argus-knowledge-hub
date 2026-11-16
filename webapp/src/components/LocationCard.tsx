@@ -7,7 +7,7 @@ import { GroupedRecords } from "./GroupedRecords";
 import { Link } from "react-router-dom";
 import { ApiError, MAP_TILES, placesApi, type PlaceNeighbour, type PlacedFeature } from "../api/client";
 import { FitTo, GeoShape, drawnGeometry, fmtArea, fmtLength, parseGeometry, pointsOf, type LatLng } from "../lib/geo";
-import { FullPage, useFullPage } from "./FullPage";
+import { FullPage, FullPageActions, useFullPage } from "./FullPage";
 
 const DRAFT_TITLE = { position: "Set its position", route: "Draw its route", outline: "Draw its outline" } as const;
 
@@ -192,7 +192,7 @@ export function LocationCard({ uid, editable }: { uid: string; editable: boolean
               </div>
             )}
             {draft?.kind === "position" && (
-              <form className="space-y-1" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+              <form id="location-position" className="space-y-1" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
                 <p className="text-xs text-slate-500">Click the map, or type WGS 84 coordinates.</p>
                 <div className="flex gap-1">
                   <input placeholder="latitude" value={draft.lat} onChange={(e) => setDraft({ ...draft, lat: e.target.value })}
@@ -202,14 +202,14 @@ export function LocationCard({ uid, editable }: { uid: string; editable: boolean
                   <input placeholder="± m" value={draft.acc} onChange={(e) => setDraft({ ...draft, acc: e.target.value })}
                          className="w-16 rounded border border-slate-300 px-2 py-1 text-xs" />
                 </div>
-                <div className="flex gap-2">
-                  <button type="submit" disabled={save.isPending} className="rounded bg-slate-900 px-3 py-1 text-xs text-white">Save</button>
+                <FullPageActions>
+                  <button type="submit" form="location-position" disabled={save.isPending} className="rounded bg-slate-900 px-3 py-1 text-xs text-white">Save</button>
                   <button type="button" onClick={() => setDraft(null)} className="text-xs text-slate-500 underline">cancel</button>
-                </div>
+                </FullPageActions>
               </form>
             )}
             {shapeDraft && (
-              <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+              <form id="location-shape" className="space-y-2" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
                 <p className="text-xs text-slate-500">
                   {shapeDraft.kind === "route"
                     ? "Click the map along the route, point by point."
@@ -240,11 +240,11 @@ export function LocationCard({ uid, editable }: { uid: string; editable: boolean
                             className="mt-1 w-full rounded border border-slate-300 px-2 py-1 font-mono" />
                   <span className="text-slate-500">WGS 84 longitude, latitude. It is used instead of what is drawn.</span>
                 </details>
-                <div className="flex gap-2">
-                  <button type="submit" disabled={save.isPending || (!shapeDraft.pasted.trim() && shapeDraft.points.length < minimum)}
+                <FullPageActions>
+                  <button type="submit" form="location-shape" disabled={save.isPending || (!shapeDraft.pasted.trim() && shapeDraft.points.length < minimum)}
                           className="rounded bg-slate-900 px-3 py-1 text-xs text-white disabled:opacity-40">Save</button>
                   <button type="button" onClick={() => setDraft(null)} className="text-xs text-slate-500 underline">cancel</button>
-                </div>
+                </FullPageActions>
               </form>
             )}
             {save.isError && <p className="text-xs text-red-600">{save.error instanceof Error && !(save.error instanceof ApiError) ? save.error.message : problem(save.error)}</p>}

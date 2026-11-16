@@ -305,6 +305,7 @@ export function IssueForm() {
           </div>
         )}
 
+        <div className="sticky bottom-0 z-10 -mx-2 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur" data-form-actions="">
         <button
           type="submit"
           disabled={saveMutation.isPending}
@@ -312,6 +313,7 @@ export function IssueForm() {
         >
           {saveMutation.isPending ? "Saving…" : isEdit ? "Save changes" : "Create ticket"}
         </button>
+        </div>
         {saveMutation.isError && (
           <p className="text-sm text-red-600">{(saveMutation.error as Error).message}</p>
         )}

@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { placesApi, type AssetLocationView } from "../api/client";
-import { FullPage, useFullPage } from "../components/FullPage";
+import { FullPage, FullPageActions, useFullPage } from "../components/FullPage";
 import { LocationCard } from "../components/LocationCard";
 import { renderWith } from "../test/render";
 
@@ -31,6 +31,23 @@ describe("a map operation in a full-page window (issue #13)", () => {
     expect(close).toHaveBeenCalled();
   });
 
+  it("puts an editor's Save in its top bar, beside Close, where it is seen however tall the map is", async () => {
+    const save = vi.fn();
+    const body = (
+      <div style={{ height: 5000 }}>
+        <FullPageActions><button type="button" onClick={save}>Save</button></FullPageActions>
+      </div>
+    );
+    const { rerender } = renderWith(<FullPage open={false} title="Move it" onClose={() => {}}>{body}</FullPage>);
+    expect(screen.getByRole("button", { name: "Save" }).closest("[data-full-page-actions]")).toBeNull();   // inline
+    rerender(<FullPage open title="Move it" onClose={() => {}}>{body}</FullPage>);
+    const button = await screen.findByRole("button", { name: "Save" });
+    expect(button.closest("[data-full-page-actions]")).not.toBeNull();                                   // in the top bar
+    expect(screen.getAllByRole("button", { name: "Save" })).toHaveLength(1);
+    fireEvent.click(button);
+    expect(save).toHaveBeenCalled();
+  });
+
   it("opens setting a unit's position full page, and the page's map has a Full page button", async () => {
     vi.spyOn(placesApi, "location").mockResolvedValue({ uid: "u1", locatable: true, map_layer: null, hidden: false,
       location: null, route: null, outline: null, history: [], observations: [] } as AssetLocationView);
@@ -39,6 +56,7 @@ describe("a map operation in a full-page window (issue #13)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Set its position" }));
     const dialog = await screen.findByRole("dialog", { name: "Set its position" });
     expect(dialog).toHaveTextContent("Click the map, or type WGS 84 coordinates.");
+    expect(screen.getByRole("button", { name: "Save" }).closest("[data-full-page-actions]")).not.toBeNull();
     expect(screen.queryByRole("button", { name: "Full page" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /Close/ }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());

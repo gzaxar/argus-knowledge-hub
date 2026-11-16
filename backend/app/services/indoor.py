@@ -592,6 +592,45 @@ def _container_of(db: Session, asset: Asset) -> Optional[str]:
                                                          Relation.relation_type == "located in").limit(1))
 
 
+def plan_offer(db: Session, asset_uid: str, may=None) -> Optional[dict]:
+    """The floor plans a record could be put on, when it is said to be in a place (placed inside it, its location
+    attribute, or a `located in` relation) that has plans — its own or those of the places it is in, as a room is
+    drawn on its building's plan — but has no point on a plan yet. None otherwise, and for a unit in a rack, which
+    is shown where its rack is."""
+    from app.models.rack import RackMounting
+    from app.services.racks import RACK_TYPES
+    asset = db.get(Asset, asset_uid)
+    if asset is None:
+        return None
+    if db.scalar(select(RackMounting.uid).where(RackMounting.asset_uid == asset_uid, RackMounting.state == "confirmed",
+                                                RackMounting.valid_until.is_(None)).limit(1)):
+        return None
+    now_ = current(db, asset_uid)
+    if now_ is not None and now_.plan_uid:
+        return None
+    place_uid = _container_of(db, asset)
+    place = db.get(Asset, place_uid) if place_uid else None
+    if place is None or place.deleted_at is not None or place.type in RACK_TYPES or (may and not may(place)):
+        return None
+    owners = [place] + [c for c in containers(db, place.uid) if not may or may(c)]
+    where = current(db, place.uid)
+    # The floor it is already said to be on, else the one its place is on.
+    floor = (now_.level_uid if now_ is not None and now_.level_uid else None) or (where.level_uid if where else None)
+    found = []
+    for k, owner in enumerate(owners):
+        for plan in db.scalars(select(FloorPlan).where(FloorPlan.place_uid == owner.uid).order_by(FloorPlan.name)):
+            level = db.get(PlaceLevel, plan.level_uid) if plan.level_uid else None
+            first = (not (where is not None and where.plan_uid == plan.uid),       # the plan its place is drawn on
+                     not (floor and plan.level_uid == floor),                      # its floor
+                     k, abs(level.ordinal) if level else 0, plan.name)            # nearest place, lowest floor
+            found.append((first, {"uid": plan.uid, "name": plan.name, "level": level.name if level else None,
+                                  "place": {"uid": owner.uid, "name": owner.name}}))
+    if not found:
+        return None
+    plans = [x for _, x in sorted(found, key=lambda f: f[0])]
+    return {"place": {"uid": place.uid, "key": place.key, "name": place.name, "type": place.type}, "plans": plans}
+
+
 def spot(db: Session, asset_uid: str, may=None, depth: int = 8) -> Optional[dict]:
     """Where to show a record on a floor plan: its own point, or else the point of the nearest place it is in
     that has one (the rack a converter is mounted in, the room the rack is in). `via` names that place, so a

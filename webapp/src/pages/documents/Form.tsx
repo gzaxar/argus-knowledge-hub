@@ -419,6 +419,7 @@ export function DocumentForm() {
           </p>
         )}
 
+        <div className="sticky bottom-0 z-10 -mx-2 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur" data-form-actions="">
         <button
           type="submit"
           disabled={createMutation.isPending}
@@ -430,6 +431,7 @@ export function DocumentForm() {
               ? "Save document"
               : "Create document"}
         </button>
+        </div>
         </fieldset>
       </form>
       <aside className="xl:sticky xl:top-4 xl:self-start">

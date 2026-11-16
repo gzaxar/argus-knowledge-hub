@@ -151,3 +151,54 @@ def test_other_workspaces_copies_at_the_same_spot_do_not_hide_the_plans_own(worl
     db.delete(db.get(Workspace, other_id))
     db.commit()
     db.close()
+
+
+def test_a_record_said_to_be_in_a_place_with_a_plan_is_offered_that_plan_until_it_is_on_it(world):
+    """Created with "Located in" a room drawn on its building's plan: the record's indoors view offers that plan
+    (the web asks whether to put it there); once it has a point on it, or when it is a unit in a rack, no offer."""
+    w, h = world, world["headers"]
+    hall = _unit(w, "Hall O", "Building")
+    plan = client.post(f"/v1/assets/{hall}/plans", headers=h, data={"name": "Hall O plan"},
+                       files={"file": ("hall.png", png(), "image/png")}).json()
+    room, pump, unit, rack = (_unit(w, "Room O1", "Room"), _unit(w, "Pump O", "Water Pump"),
+                              _unit(w, "Switch O", "Switch"), _unit(w, "Rack O", "Rack"))
+    assert client.put(f"/v1/assets/{room}/indoors", headers=h,
+                      json={"place_uid": hall, "plan_uid": plan["uid"], "x": 200, "y": 100}).status_code == 200
+    db = SessionLocal()
+    for uid, where in ((pump, f"Room O1-{w['ws']}"), (unit, f"Rack O-{w['ws']}")):
+        a = db.get(Asset, uid)
+        a.attributes = {**(a.attributes or {}), "argus_location": where}
+    db.commit()
+    db.close()
+
+    offer = client.get(f"/v1/assets/{pump}/indoors", headers=h).json()["plan_offer"]
+    assert offer["place"]["uid"] == room                                       # the room it is said to be in
+    assert [p["uid"] for p in offer["plans"]] == [plan["uid"]]                 # drawn on its building's plan
+    assert offer["plans"][0]["place"]["uid"] == hall
+    assert client.get(f"/v1/assets/{unit}/indoors", headers=h).json()["plan_offer"] is None    # in a rack
+    assert client.get(f"/v1/assets/{hall}/indoors", headers=h).json()["plan_offer"] is None    # in nothing
+
+    assert client.put(f"/v1/assets/{pump}/indoors", headers=h,
+                      json={"place_uid": room, "plan_uid": plan["uid"], "x": 210, "y": 110}).status_code == 200
+    assert client.get(f"/v1/assets/{pump}/indoors", headers=h).json()["plan_offer"] is None    # on it now
+
+    # A building with two floors, each with its plan: the floor the record is said to be on comes first, else the
+    # lowest — not the first by name ("first floor" before "ground floor").
+    two = _unit(w, "Hall T", "Building")
+    ground = client.post(f"/v1/assets/{two}/levels", headers=h, json={"name": "Ground floor", "ordinal": 0}).json()
+    first = client.post(f"/v1/assets/{two}/levels", headers=h, json={"name": "First floor", "ordinal": 1}).json()
+    plans = {}
+    for lvl, name in ((first, "Hall T — first floor"), (ground, "Hall T — ground floor")):
+        plans[name] = client.post(f"/v1/assets/{two}/plans", headers=h, data={"name": name, "level_uid": lvl["uid"]},
+                                  files={"file": ("t.png", png(), "image/png")}).json()["uid"]
+    desk, office = _unit(w, "Desk T", "Workstation"), _unit(w, "Office T", "Room")
+    db = SessionLocal()
+    db.get(Asset, desk).attributes = {"argus_location": f"Hall T-{w['ws']}"}
+    db.commit()
+    db.close()
+    offer = client.get(f"/v1/assets/{desk}/indoors", headers=h).json()["plan_offer"]
+    assert offer["plans"][0]["uid"] == plans["Hall T — ground floor"]
+    assert client.put(f"/v1/assets/{office}/indoors", headers=h,
+                      json={"place_uid": two, "level_uid": first["uid"]}).status_code == 200
+    offer = client.get(f"/v1/assets/{office}/indoors", headers=h).json()["plan_offer"]
+    assert offer["plans"][0]["uid"] == plans["Hall T — first floor"]          # the floor it is on
