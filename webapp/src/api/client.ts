@@ -2619,7 +2619,8 @@ export const placesApi = {
   nearby: (latitude: number, longitude: number, radius: number, filters: MapFilters) =>
     request<{ type: "FeatureCollection"; features: MapFeature[] }>(
       `/v1/map/nearby?latitude=${latitude}&longitude=${longitude}&radius_m=${radius}&${mapQuery(filters)}`),
-  layers: () => request<{ id: string; name: string; description?: string; package: string }[]>("/v1/map/layers"),
+  /** The map layers of the workspace's packages, each with how many of its located records are on it. */
+  layers: () => request<{ id: string; name: string; description?: string; package: string; count?: number }[]>("/v1/map/layers"),
   /** [west, south, east, north] around the workspace's located records, or null. */
   /** Where the records of these workspaces (the current one if none) are: the box to open the map on. */
   extent: (workspaces?: string[]) => request<{ bbox: [number, number, number, number] | null }>(

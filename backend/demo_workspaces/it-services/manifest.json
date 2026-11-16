@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-11-16T16:54:46.774400+00:00",
+  "created_at": "2026-11-16T18:41:31.178357+00:00",
   "created_by": "ARGUS demo authors",
   "demo": {
     "description": "A medium-sized IT organisation: a service catalogue (network, internet, Wi-Fi, mail, DNS, hosting, storage, backup, monitoring, service desk, VPN, HPC, LLM inference), three buildings with floors, rooms and racks, a GPU cluster for HPC and LLM inference, user workstations, a port-to-port network map, a cooling control process reaching its units through a serial converter, mapped and placed equipment, dependencies, incidents, requests and changes, maintenance activities, runbooks, contracts and SLAs.",
@@ -242,7 +242,7 @@
     "assets": {
       "file": "records/assets.jsonl",
       "rows": 315,
-      "sha256": "4f831b470773b6350da59a1574d52bff7c7f2164f2eefef2c710e3fa89f82b32"
+      "sha256": "8298cffd843dc795fd5cec96b05a79caf0b84ee72ae7d72b61d801adf5f29484"
     },
     "attachments": {
       "file": "records/attachments.jsonl",
@@ -282,7 +282,7 @@
     "document_relations": {
       "file": "records/document_relations.jsonl",
       "rows": 120,
-      "sha256": "4c894bfc5eefab651eb8b26b61747756fe8e10349541231e4ebfa8f93b145731"
+      "sha256": "f8d97c90fad0597229f71df1be7beef02f854376ceeac887d6a18dc5ca95e235"
     },
     "document_revisions": {
       "file": "records/document_revisions.jsonl",
@@ -302,7 +302,7 @@
     "documents": {
       "file": "records/documents.jsonl",
       "rows": 17,
-      "sha256": "b4707eb0998249e6f588deb9b04e109226bcff04559819e16774d01831da6df8"
+      "sha256": "d87e5c8e1656db0df3e9ae1494298b0140f702a7f9f420e247ec3b784f070dfa"
     },
     "equipment_class_requests": {
       "file": "records/equipment_class_requests.jsonl",
@@ -387,7 +387,7 @@
     "relations": {
       "file": "records/relations.jsonl",
       "rows": 613,
-      "sha256": "54b692690195679139156024478738de61528642e9839b7782200324af4cf577"
+      "sha256": "90cb20a71fe263639813b9ecd5e1c5cba48f217badbec6eecbb409e694081f71"
     },
     "review_escalations": {
       "file": "records/review_escalations.jsonl",
@@ -437,7 +437,7 @@
     "ticket_workflows": {
       "file": "records/ticket_workflows.jsonl",
       "rows": 4,
-      "sha256": "18a81f694a000d62e235595b8ed12763c7840be243cff068c65b9b0914589a82"
+      "sha256": "00723b50e6ad9fdd993b05e42484c1a0b4d1584aafccd89ca29b92cc5b61a4d9"
     },
     "tickets": {
       "file": "records/tickets.jsonl",
@@ -447,12 +447,12 @@
     "types": {
       "file": "records/types.jsonl",
       "rows": 116,
-      "sha256": "8c424799f041082fdbe8dce5be4da1d1368df6cde47d25683112dd3ff9ffad02"
+      "sha256": "69a050c93e30aee67e117024e5a196d79e8df8f6bb4d9642ec561415123bae8a"
     },
     "workspace": {
       "file": "records/workspace.jsonl",
       "rows": 1,
-      "sha256": "c453fed94fc1b2ee83fe326e86805cec5e8e639cb10a8ea78361e14ff5d6a99f"
+      "sha256": "2f34e4164ba8ff37b16a8bf6fbe5c61d11ac3f3ff3a734d83e0c8bde875f6f9a"
     },
     "workspace_packages": {
       "file": "records/workspace_packages.jsonl",
@@ -863,7 +863,7 @@
     },
     {
       "path": "records/assets.jsonl",
-      "sha256": "4f831b470773b6350da59a1574d52bff7c7f2164f2eefef2c710e3fa89f82b32",
+      "sha256": "8298cffd843dc795fd5cec96b05a79caf0b84ee72ae7d72b61d801adf5f29484",
       "size": 234415
     },
     {
@@ -903,7 +903,7 @@
     },
     {
       "path": "records/document_relations.jsonl",
-      "sha256": "4c894bfc5eefab651eb8b26b61747756fe8e10349541231e4ebfa8f93b145731",
+      "sha256": "f8d97c90fad0597229f71df1be7beef02f854376ceeac887d6a18dc5ca95e235",
       "size": 25524
     },
     {
@@ -923,7 +923,7 @@
     },
     {
       "path": "records/documents.jsonl",
-      "sha256": "b4707eb0998249e6f588deb9b04e109226bcff04559819e16774d01831da6df8",
+      "sha256": "d87e5c8e1656db0df3e9ae1494298b0140f702a7f9f420e247ec3b784f070dfa",
       "size": 9891
     },
     {
@@ -1008,7 +1008,7 @@
     },
     {
       "path": "records/relations.jsonl",
-      "sha256": "54b692690195679139156024478738de61528642e9839b7782200324af4cf577",
+      "sha256": "90cb20a71fe263639813b9ecd5e1c5cba48f217badbec6eecbb409e694081f71",
       "size": 144691
     },
     {
@@ -1058,7 +1058,7 @@
     },
     {
       "path": "records/ticket_workflows.jsonl",
-      "sha256": "18a81f694a000d62e235595b8ed12763c7840be243cff068c65b9b0914589a82",
+      "sha256": "00723b50e6ad9fdd993b05e42484c1a0b4d1584aafccd89ca29b92cc5b61a4d9",
       "size": 5178
     },
     {
@@ -1068,12 +1068,12 @@
     },
     {
       "path": "records/types.jsonl",
-      "sha256": "8c424799f041082fdbe8dce5be4da1d1368df6cde47d25683112dd3ff9ffad02",
+      "sha256": "69a050c93e30aee67e117024e5a196d79e8df8f6bb4d9642ec561415123bae8a",
       "size": 143746
     },
     {
       "path": "records/workspace.jsonl",
-      "sha256": "c453fed94fc1b2ee83fe326e86805cec5e8e639cb10a8ea78361e14ff5d6a99f",
+      "sha256": "2f34e4164ba8ff37b16a8bf6fbe5c61d11ac3f3ff3a734d83e0c8bde875f6f9a",
       "size": 718
     },
     {
@@ -1146,7 +1146,7 @@
   ],
   "source": {
     "argus_version": "dev",
-    "instance": "472d3ef0-4305-4755-82c1-eea942588029",
+    "instance": "7e213229-8ef4-46d3-87a3-652c5c1bc751",
     "schema_revision": "e4f6a8b0c2d5"
   },
   "workspace": {

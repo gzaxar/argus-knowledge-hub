@@ -57693,7 +57693,7 @@
     },
     "/v1/map/layers": {
       "get": {
-        "description": "The map layers the workspace's packages define.",
+        "description": "The map layers the workspace's packages define, each with how many of the workspace's records with a\nlocation are on it (`count`): a package can define layers a workspace has nothing on (an accelerator's\ncryogenics), and the map offers only those with something to show.",
         "operationId": "map_layers_v1_map_layers_get",
         "parameters": [
           {

@@ -98,10 +98,9 @@
 <rect x="261.24" y="80.64" width="117.52" height="14.6" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
 <text x="320" y="90.34" font-family="Helvetica, Arial, sans-serif" font-size="8" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">KLYSTRON GALLERY (RF)</text>
 <text x="320" y="103.24" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">A0.02 · 192 m²</text>
-<rect x="43" y="70.8" width="35.6" height="24.2" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
-<text x="60.8" y="80.5" font-family="Helvetica, Arial, sans-serif" font-size="8" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">LASER</text>
-<text x="60.8" y="90.1" font-family="Helvetica, Arial, sans-serif" font-size="8" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">ROOM</text>
-<text x="60.8" y="103" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">A0.03 · 60 m²</text>
+<rect x="53.6" y="63" width="51.6" height="12.8" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
+<text x="79.4" y="71.35" font-family="Helvetica, Arial, sans-serif" font-size="6.5" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">LASER ROOM</text>
+<text x="79.4" y="83.8" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">A0.03 · 60 m²</text>
 <rect x="256.8" y="23" width="91.92" height="14.6" rx="3" fill="#ffffff" fill-opacity="0.94" stroke="#94a3b8" stroke-width="0.6"/>
 <text x="302.76" y="32.7" font-family="Helvetica, Arial, sans-serif" font-size="8" font-weight="bold" letter-spacing="0.2" text-anchor="middle" fill="#0f172a">SERVICE CORRIDOR</text>
 <text x="302.76" y="45.6" font-family="Helvetica, Arial, sans-serif" font-size="6" text-anchor="middle" fill="#475569">A0.04 · 132 m²</text>

@@ -615,11 +615,11 @@ class LocationRepository {
     return features(west: box[0], south: box[1], east: box[2], north: box[3]);
   }
 
-  /// The map's layers: id and name, from the workspace's packages.
+  /// The map's layers: id and name, from the workspace's packages — those the workspace has something on.
   Future<List<({String id, String name})>> layers() async => [
         for (final l in _list(await _api.json((c) => c.invokeAPI('/v1/map/layers', 'GET', [], null, {}, {}, null)))
             .map(_map))
-          (id: l['id'].toString(), name: (l['name'] ?? l['id']).toString()),
+          if (l['count'] != 0) (id: l['id'].toString(), name: (l['name'] ?? l['id']).toString()),
       ];
 
   /// Set the record's position (someone who may edit it): at once, the one it had kept in its history. [fromHere]
