@@ -75,24 +75,50 @@ export function listProfiles(): Profile[] {
   return readProfiles();
 }
 
+/* Each browser tab keeps its own profile and workspace (sessionStorage); what was chosen last (localStorage) is
+ * only where a new tab starts. Before, a tab that switched workspace switched every other open tab too: their
+ * next request went to the new workspace while they still showed the old one, and a record open there answered
+ * "not found". */
+const TAB_PROFILE_KEY = "argus.tab.profile";
+const tabWorkspaceKey = (profileId: string) => `argus.tab.workspace.${profileId}`;
+
+function tabGet(key: string): string | null {
+  try { return sessionStorage.getItem(key); } catch { return null; }
+}
+
+function tabSet(key: string, value: string | null): void {
+  try {
+    if (value == null) sessionStorage.removeItem(key); else sessionStorage.setItem(key, value);
+  } catch { /* a tab that cannot keep it follows the shared choice */ }
+}
+
 export function getActiveProfileId(): string | null {
   migrateLegacy();
+  const mine = tabGet(TAB_PROFILE_KEY);
+  if (mine && readProfiles().some((p) => p.id === mine)) return mine;
   return localStorage.getItem(ACTIVE_KEY);
 }
 
 export function setActiveProfileId(id: string): void {
   localStorage.setItem(ACTIVE_KEY, id);
+  tabSet(TAB_PROFILE_KEY, id);
 }
 
 export function getActiveProfile(): Profile | null {
   const id = getActiveProfileId();
   const profiles = readProfiles();
-  return profiles.find((p) => p.id === id) ?? profiles[0] ?? null;
+  const profile = profiles.find((p) => p.id === id) ?? profiles[0] ?? null;
+  if (!profile) return null;
+  // This tab's workspace, when it chose one; otherwise the one chosen last anywhere.
+  const mine = tabGet(tabWorkspaceKey(profile.id));
+  return mine ? { ...profile, activeWorkspaceId: mine } : profile;
 }
 
 export function updateProfile(id: string, patch: Partial<Profile>): void {
   const profiles = readProfiles().map((p) => (p.id === id ? { ...p, ...patch } : p));
   writeProfiles(profiles);
+  // Choosing a workspace is this tab's choice, and the default for tabs opened later.
+  if ("activeWorkspaceId" in patch) tabSet(tabWorkspaceKey(id), patch.activeWorkspaceId ?? null);
 }
 
 /** Used throughout api/client.ts — resolves the active profile into what a

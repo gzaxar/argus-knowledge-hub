@@ -1254,7 +1254,7 @@ export const intakeApi = {
 /** Universal links shared with the field client (asset-model-revision §24.7). */
 export const linksApi = {
   resolve: (path: string) =>
-    request<{ kind: string; uid: string; web_path: string; name?: string; key?: string }>(
+    request<{ kind: string; uid: string; web_path: string; name?: string; key?: string; workspace_id?: string }>(
       `/v1/links/resolve?path=${encodeURIComponent(path)}`),
 };
 
