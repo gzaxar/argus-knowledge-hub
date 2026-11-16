@@ -37,4 +37,11 @@ class User(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Whether the identity provider vouches for the address (its `email_verified` claim) at the last sign-in; None
+    # when it did not say. A group by e-mail domain only counts a verified address (services/domain_groups.py).
+    email_verified: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    # Removed from ARGUS by an administrator (services/user_removal.py): no sign-in, no token, no access. The row
+    # stays, so what they did keeps their name.
+    removed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    removed_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

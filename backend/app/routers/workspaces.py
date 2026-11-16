@@ -2,7 +2,7 @@ from typing import Optional
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -697,6 +697,47 @@ def _require_admin(identity: Identity) -> None:
 def list_users(identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
     _require_admin(identity)
     return db.scalars(select(User).order_by(User.email)).all()
+
+
+@router.get("/admin/users/{user_id}/removal")
+def user_removal_preview(user_id: str, identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
+    """What removing this person from ARGUS would change, what stays, and whether it may be done
+    (docs/dangerous-actions.md). Nothing changes."""
+    from app.services import user_removal
+    _require_admin(identity)
+    target = db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {**user_removal.preview(db, target), "blocked": user_removal.check(db, target, identity.user)}
+
+
+@router.delete("/admin/users/{user_id}")
+def remove_user(user_id: str, identity: Identity = Depends(get_identity), db: Session = Depends(get_db),
+                x_confirm_user: Optional[str] = Header(default=None)):
+    """Remove a person from ARGUS (services/user_removal.py): only an administrator signed in, never with a token,
+    and only with the person's e-mail address typed to confirm, percent-encoded, in X-Confirm-User."""
+    from urllib.parse import unquote
+    from app.services import dangerous, user_removal
+    if not dangerous.by_a_person(identity):
+        raise HTTPException(status_code=403, detail={
+            "error": "Removing a person cannot be done with an API token or from MCP: an administrator signed in "
+                     "to ARGUS does it, typing the person's e-mail address to confirm.", "code": "person_only"})
+    _require_admin(identity)
+    target = db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    typed = unquote(x_confirm_user) if x_confirm_user is not None else ""
+    if typed.strip().lower() != (target.email or "").strip().lower():
+        raise HTTPException(status_code=428, detail={
+            "error": f"Removing a person needs their e-mail address, “{target.email}”, typed to confirm "
+                     "(the X-Confirm-User header).", "code": "confirm_user_email", "email": target.email})
+    try:
+        out = user_removal.remove(db, target, identity.user)
+    except user_removal.RemovalError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    db.commit()
+    return out
 
 
 @router.put("/admin/users/{user_id}", response_model=UserOut)

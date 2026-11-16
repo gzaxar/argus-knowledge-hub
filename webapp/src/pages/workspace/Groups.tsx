@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError, directoryApi, rolesApi, workspacesApi } from "../../api/client";
-import type { DirectoryGroup } from "../../api/types";
+import type { DirectoryGroup, GroupDomainsResult } from "../../api/types";
 
 /** The groups people are put in, to give them roles together: those made here, and the directory's (read only). */
 export function WorkspaceGroups() {
@@ -74,7 +74,7 @@ export function WorkspaceGroups() {
         {local.map((g) => (
           <GroupRow key={g.uid} group={g} open={open === g.uid} onToggle={() => setOpen(open === g.uid ? null : g.uid)}
                     onChanged={refresh} editable canAppoint={!!workspaceId && (!!me.data?.is_admin || !!access.data?.workspace.includes("manage_members"))}
-                    currentUserId={me.data?.user_id} />
+                    currentUserId={me.data?.user_id} instanceAdmin={!!me.data?.is_admin} />
         ))}
         {local.length === 0 && <li className="px-4 py-3 text-sm text-slate-400">None yet.</li>}
       </ul>
@@ -91,9 +91,9 @@ export function WorkspaceGroups() {
   );
 }
 
-function GroupRow({ group: g, open, onToggle, onChanged, editable, canAppoint, currentUserId }: {
+function GroupRow({ group: g, open, onToggle, onChanged, editable, canAppoint, currentUserId, instanceAdmin = false }: {
   group: DirectoryGroup; open: boolean; onToggle: () => void; onChanged: () => void; editable: boolean;
-  canAppoint: boolean; currentUserId?: string | null;
+  canAppoint: boolean; currentUserId?: string | null; instanceAdmin?: boolean;
 }) {
   return (
     <li className="px-4 py-2">
@@ -101,6 +101,8 @@ function GroupRow({ group: g, open, onToggle, onChanged, editable, canAppoint, c
         <span>
           <span className={`font-medium ${g.active ? "text-slate-900" : "text-slate-400 line-through"}`}>{g.name}</span>
           {g.description && <span className="ml-2 text-sm text-slate-500">{g.description}</span>}
+          {g.email_domains?.length ? <span className="ml-2 rounded bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-800">
+            by address: {g.email_domains.join(", ")}</span> : null}
         </span>
         <span className="shrink-0 text-xs text-slate-500">
           {g.member_count} member{g.member_count === 1 ? "" : "s"}
@@ -112,14 +114,14 @@ function GroupRow({ group: g, open, onToggle, onChanged, editable, canAppoint, c
         </span>
       </button>
       {open && <GroupDetail group={g} onChanged={onChanged} editable={editable}
-                            canAppoint={canAppoint} currentUserId={currentUserId} />}
+                            canAppoint={canAppoint} currentUserId={currentUserId} instanceAdmin={instanceAdmin} />}
     </li>
   );
 }
 
-function GroupDetail({ group: g, onChanged, editable, canAppoint, currentUserId }: {
+function GroupDetail({ group: g, onChanged, editable, canAppoint, currentUserId, instanceAdmin = false }: {
   group: DirectoryGroup; onChanged: () => void; editable: boolean;
-  canAppoint: boolean; currentUserId?: string | null;
+  canAppoint: boolean; currentUserId?: string | null; instanceAdmin?: boolean;
 }) {
   const qc = useQueryClient();
   const members = useQuery({ queryKey: ["group-members", g.uid], queryFn: () => directoryApi.groupMembers(g.uid) });
@@ -147,6 +149,7 @@ function GroupDetail({ group: g, onChanged, editable, canAppoint, currentUserId 
   const error = [add, remove, update, appoint, revoke].find((m) => m.isError)?.error as ApiError | undefined;
   return (
     <div className="mt-2 space-y-3 rounded bg-slate-50 p-3 text-sm">
+      {instanceAdmin && g.source === "local" && <EmailDomains group={g} onDone={done} />}
       {editable && <section className="rounded border border-slate-200 bg-white p-3">
         <h3 className="font-medium text-slate-900">Group administrators</h3>
         <p className="mt-1 text-xs text-slate-500">They manage this group&apos;s members. Membership changes affect every workspace listed above.</p>
@@ -169,8 +172,10 @@ function GroupDetail({ group: g, onChanged, editable, canAppoint, currentUserId 
         {(members.data ?? []).map((m) => (
           <li key={m.user_id} className="flex items-center justify-between gap-2">
             <span>{m.name ? `${m.name} · ` : ""}<span className="text-slate-600">{m.email}</span>
-              {!m.active && <span className="ml-2 text-xs text-slate-400">inactive</span>}</span>
-            {canEditMembers && (
+              {!m.active && <span className="ml-2 text-xs text-slate-400">inactive</span>}
+              {m.source === "domain" && <span className="ml-2 text-xs text-indigo-700"
+                                               title="In this group because of their e-mail address">by address</span>}</span>
+            {canEditMembers && m.source !== "domain" && (
               <button type="button" className="text-xs text-red-500 hover:text-red-700"
                       onClick={async () => { if (await ask(`Take ${m.email} out of ${g.name}?`)) remove.mutate(m.user_id); }}>
                 Remove
@@ -255,5 +260,52 @@ function MoveGroup({ group: g, onDone }: { group: DirectoryGroup; onDone: () => 
       )}
       {move.isError && <p className="mt-1 text-red-600">{(move.error as ApiError)?.detail ?? "Could not move it."}</p>}
     </div>
+  );
+}
+
+/** A group by e-mail domain (services/domain_groups.py): everyone signed in with a verified address in these domains
+ *  is in it. Set by the installation's administrators, after a preview of who would be in it. */
+function EmailDomains({ group: g, onDone }: { group: DirectoryGroup; onDone: () => void }) {
+  const [text, setText] = useState((g.email_domains ?? []).join(", "));
+  const [preview, setPreview] = useState<GroupDomainsResult | null>(null);
+  const domains = text.split(/[\s,;]+/).map((d) => d.trim()).filter(Boolean);
+  const check = useMutation({ mutationFn: () => directoryApi.setGroupDomains(g.uid, domains, false), onSuccess: setPreview });
+  const apply = useMutation({
+    mutationFn: () => directoryApi.setGroupDomains(g.uid, domains, true),
+    onSuccess: () => { setPreview(null); onDone(); },
+  });
+  const error = (check.error ?? apply.error) as ApiError | null;
+  return (
+    <section className="rounded border border-indigo-200 bg-white p-3" aria-label="E-mail domains">
+      <h3 className="font-medium text-slate-900">E-mail domains</h3>
+      <p className="mt-1 text-xs text-slate-500">
+        Everyone who signs in with a <b>verified</b> address in these domains is in this group, and has what the group
+        has. <code>infn.it</code> is that domain, <code>*.infn.it</code> its subdomains (lnf.infn.it, pi.infn.it…).
+        An address the identity provider did not verify is not counted. Empty: an ordinary group.
+      </p>
+      <form className="mt-2 flex flex-wrap items-center gap-2"
+            onSubmit={(e) => { e.preventDefault(); check.mutate(); }}>
+        <input value={text} onChange={(e) => { setText(e.target.value); setPreview(null); }} aria-label="E-mail domains"
+               placeholder="infn.it, *.infn.it" className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1" />
+        <button type="submit" disabled={check.isPending} className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50">
+          Preview</button>
+      </form>
+      {preview && (
+        <div className="mt-2 rounded bg-indigo-50 p-2 text-xs text-indigo-950" role="status">
+          {preview.domains.length === 0
+            ? <p>Without domains it is an ordinary group again: those in it by address leave it.</p>
+            : <p><b>{preview.would_be_in_it}</b> {preview.would_be_in_it === 1 ? "person" : "people"} would be in it
+                {preview.examples.length ? ` (${preview.examples.join(", ")}${preview.would_be_in_it > preview.examples.length ? ", …" : ""})` : ""},
+                and everyone from these domains who signs in later.</p>}
+          {preview.unverified > 0 && <p className="mt-1 text-amber-800">{preview.unverified} signed in with an address there that
+            was not verified: they are not counted.</p>}
+          <p className="mt-1">{preview.workspaces.length ? `It has roles in: ${preview.workspaces.join(", ")}.` : "It has no role yet: give it one on Access."}</p>
+          <button type="button" disabled={apply.isPending} onClick={() => apply.mutate()}
+                  className="mt-2 rounded bg-indigo-700 px-3 py-1 font-medium text-white hover:bg-indigo-800">
+            {preview.domains.length ? "Apply these domains" : "Make it an ordinary group"}</button>
+        </div>
+      )}
+      {error && <p className="mt-1 text-red-600">{error.detail ?? "Could not do that."}</p>}
+    </section>
   );
 }

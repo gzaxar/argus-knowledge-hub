@@ -692,6 +692,42 @@ export interface AdminUser {
   is_admin: boolean;
   created_at: string;
   last_login_at: string | null;
+  active?: boolean;
+  /** Whether the identity provider said the address is verified at the last sign-in (null: it did not say). */
+  email_verified?: boolean | null;
+  /** Removed from ARGUS by an administrator: no sign-in, no token, no access. */
+  removed_at?: string | null;
+}
+
+/** What removing a person from ARGUS would change (GET /v1/admin/users/{id}/removal). */
+export interface UserRemovalPreview {
+  user: { id: string; email: string; name: string | null; is_admin: boolean; removed_at: string | null };
+  roles: string[];
+  memberships: string[];
+  site_administrator_of: string[];
+  group_administrator_of: string[];
+  groups_left: string[];
+  directory_groups: string[];
+  personal_tokens: number;
+  open_tickets_count: number;
+  open_tickets_unassigned: { uid: string; workspace_id: string; title: string; state: string }[];
+  activities_count: number;
+  activities_released: { uid: string; workspace_id: string; title: string | null; status: string }[];
+  stays: { documents_owned: number; robot_tokens_made: number; history: string };
+  blocked: string | null;
+}
+
+/** Setting a group's e-mail domains (PUT /v1/groups/{uid}/domains): the preview, or what was done. */
+export interface GroupDomainsResult {
+  domains: string[];
+  would_be_in_it: number;
+  examples: string[];
+  unverified: number;
+  workspaces: string[];
+  preview: boolean;
+  added?: number;
+  removed?: number;
+  members?: number;
 }
 
 export interface DefaultAccess {
@@ -1045,6 +1081,8 @@ export interface DirectoryGroup {
   home_site_id?: string | null;
   /** Roles it has site-wide. */
   site_grants?: SiteGroupGrant[];
+  /** A group by e-mail domain: everyone signed in with a verified address in these domains is in it. */
+  email_domains?: string[] | null;
 }
 
 export interface DirectoryGroupMember {

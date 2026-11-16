@@ -64,7 +64,9 @@ You do not have to wait for someone's first sign-in to give them access.
 3. Leave **send an invitation e-mail** ticked to tell them, with a link to ARGUS and an optional line of your own.
 
 To give them the role **together**, choose **Given to** a group (one made here, or *a new group…*): they join
-it, and the group gets the role here, so whoever joins it later has it too.
+it, and the group gets the role here, so whoever joins it later has it too. **The role goes to the whole group**:
+everyone already in it gets it here as well, not only the people you invite. To give it only to them, choose
+*the people themselves*.
 
 Each person not known yet is added, and gets the role at once. In **Granted roles** they show as *not signed in
 yet* until their first sign-in, which claims the account and the access, whatever the case of the letters.
@@ -80,6 +82,20 @@ deactivated group keeps its members, and its roles stop applying. Give a group a
 
 A group can hold roles in several workspaces, so its members are changed by an administrator, or by someone who
 manages every workspace where it holds one. A directory's group is changed in the directory.
+
+### Groups by e-mail domain
+
+An administrator of the installation can make a group **by e-mail domain**: open it, and under **E-mail domains**
+write, say, `infn.it, *.infn.it`, **Preview** (how many people would be in it, and how many signed in with an
+address there that was not verified), then **Apply these domains**. From then on everyone who signs in with a
+**verified** address in those domains is in the group, *by address*, and has what the group has: give it, say,
+**Viewer** on a site or a workspace on **Access**. Someone who signs in with Gmail, or with an address their identity
+provider did not verify, is not in it.
+
+`infn.it` is that domain only; `*.infn.it` is its subdomains (`lnf.infn.it`, `pi.infn.it`…), so write both for
+both. Members by address cannot be taken out by hand (change the domains, or remove the person from ARGUS); people
+can still be added by hand as well. Emptying the domains makes it an ordinary group again, and those who were in it by
+address leave it.
 
 ## Site-wide group access
 

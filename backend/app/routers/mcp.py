@@ -57,7 +57,8 @@ INSTRUCTIONS = (
     + PROPOSALS_GUIDE +
     "Nothing here changes ARGUS by itself: the lookups only read, and a proposal waits for a person. "
     "Deleting a workspace, making it global, deleting a type with its records or deleting orphaned objects "
-    "cannot be done from here or with any token: a person signed in to ARGUS does it, typing the workspace's name."
+    "cannot be done from here or with any token: a person signed in to ARGUS does it, typing the workspace's name. "
+    "Removing a person from ARGUS, or setting a group's e-mail domains, is an administrator's, signed in, too."
 )
 
 # Offered to MCP clients only. Ask ARGUS uses the same tools inside one

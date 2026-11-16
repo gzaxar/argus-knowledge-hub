@@ -114,7 +114,7 @@ def identity_for_token(db: Session, token: ApiToken) -> Optional["Identity"]:
     scope = _scope_of(token)
     if token.kind == "personal":
         owner = db.get(User, token.user_id) if token.user_id else None
-        if owner is None or not owner.active:
+        if owner is None or not owner.active or owner.removed_at is not None:
             return None
         return OidcIdentity(user=_as_token_user(owner, scope), claims=None, token=scope)
     if not token.workspace_id:
@@ -156,6 +156,13 @@ def bootstrap_admins() -> set[str]:
     return {e.strip().lower() for e in os.environ.get("ARGUS_BOOTSTRAP_ADMINS", "").split(",") if e.strip()}
 
 
+def _verified(claims: dict) -> Optional[bool]:
+    """The identity provider's `email_verified` claim; None when it does not send one."""
+    if "email_verified" not in claims:
+        return None
+    return claims.get("email_verified") in (True, "true", "True", 1)
+
+
 def _resolve_oidc_user(db: Session, claims: dict) -> User:
     """Find the person behind a verified token, in the order that avoids
     creating a second row for someone who already exists:
@@ -181,7 +188,8 @@ def _resolve_oidc_user(db: Session, claims: dict) -> User:
 
     if user is None:
         user = User(id=str(uuid.uuid4()), oidc_sub=sub, email=email, name=claims.get("name"),
-                    is_admin=bool(email) and email.lower() in bootstrap_admins())
+                    is_admin=bool(email) and email.lower() in bootstrap_admins(),
+                    email_verified=_verified(claims))
         try:
             # /me and /me/workspaces can be the first requests in parallel.
             # A savepoint contains a competing insert without aborting the
@@ -196,9 +204,17 @@ def _resolve_oidc_user(db: Session, claims: dict) -> User:
         else:
             return user
 
+    if user.removed_at is not None:
+        # Removed by an administrator (services/user_removal.py): signing in again does not bring the account back.
+        raise HTTPException(status_code=403, detail={
+            "error": "This account was removed from ARGUS. Ask an administrator if you need access again.",
+            "code": "account_removed"})
     user.oidc_sub = sub
     if email:
         user.email = email
+    # Whether the identity provider vouches for the address: a group by e-mail domain counts only a verified one.
+    if "email_verified" in claims:
+        user.email_verified = _verified(claims)
     # A bootstrap administrator whose account existed before they were named one (a directory sync, a
     # seeding script, a sign-in before the setting) is made one, but only while the installation has no
     # administrator: after that, administrators are granted in the web app, and revoking one sticks.
@@ -258,6 +274,8 @@ def get_identity(
         else:
             user = _resolve_oidc_user(db, claims)
             user.last_login_at = datetime.now(timezone.utc)
+            from app.services import domain_groups
+            domain_groups.sync_user(db, user)
             db.commit()
             identity = OidcIdentity(user=user, claims=claims)
             _note_usage(identity)
@@ -352,6 +370,8 @@ def _lenient_grants(authorization: Optional[str], workspace_id: Optional[str]):
             except jwt.PyJWTError:
                 return NONE
             user = db.scalar(select(User).where(User.oidc_sub == claims["sub"])) or db.get(User, claims["sub"])
+            if user is not None and user.removed_at is not None:
+                return NONE
             if user is not None and workspace_id:
                 return grants_of(db, OidcIdentity(user=user), workspace_id)
             if user is not None and user.is_admin:

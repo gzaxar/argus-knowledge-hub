@@ -6749,6 +6749,25 @@
         "title": "GroupCreate",
         "type": "object"
       },
+      "GroupDomainsIn": {
+        "properties": {
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "domains": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Domains",
+            "type": "array"
+          }
+        },
+        "title": "GroupDomainsIn",
+        "type": "object"
+      },
       "GroupHomeIn": {
         "properties": {
           "confirm": {
@@ -6888,6 +6907,20 @@
               }
             ],
             "title": "Email"
+          },
+          "email_domains": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Domains"
           },
           "home_site_id": {
             "anyOf": [
@@ -14627,6 +14660,11 @@
       },
       "UserOut": {
         "properties": {
+          "active": {
+            "default": true,
+            "title": "Active",
+            "type": "boolean"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -14635,6 +14673,17 @@
           "email": {
             "title": "Email",
             "type": "string"
+          },
+          "email_verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Verified"
           },
           "id": {
             "title": "Id",
@@ -14666,6 +14715,18 @@
               }
             ],
             "title": "Name"
+          },
+          "removed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Removed At"
           }
         },
         "required": [
@@ -22447,6 +22508,98 @@
       }
     },
     "/v1/admin/users/{user_id}": {
+      "delete": {
+        "description": "Remove a person from ARGUS (services/user_removal.py): only an administrator signed in, never with a token,\nand only with the person's e-mail address typed to confirm, percent-encoded, in X-Confirm-User.",
+        "operationId": "remove_user_v1_admin_users__user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-confirm-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Confirm-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove User",
+        "tags": [
+          "workspaces"
+        ]
+      },
       "put": {
         "operationId": "set_user_admin_v1_admin_users__user_id__put",
         "parameters": [
@@ -22530,6 +22683,84 @@
           }
         ],
         "summary": "Set User Admin",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/v1/admin/users/{user_id}/removal": {
+      "get": {
+        "description": "What removing this person from ARGUS would change, what stays, and whether it may be done\n(docs/dangerous-actions.md). Nothing changes.",
+        "operationId": "user_removal_preview_v1_admin_users__user_id__removal_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "User Removal Preview",
         "tags": [
           "workspaces"
         ]
@@ -46186,6 +46417,94 @@
           }
         ],
         "summary": "Remove Group Administrator",
+        "tags": [
+          "directory"
+        ]
+      }
+    },
+    "/v1/groups/{uid}/domains": {
+      "put": {
+        "description": "Make a local group a group by e-mail domain (services/domain_groups.py): everyone signed in with a verified\naddress in these domains is in it, and has what the group has. Only the installation's administrators, signed\nin: a domain can let in many people at once. Without `confirm`, the preview: how many are in it then, and how\nmany sign in with an address there that their identity provider did not verify (they are not counted).",
+        "operationId": "set_group_domains_v1_groups__uid__domains_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupDomainsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Group Domains",
         "tags": [
           "directory"
         ]
