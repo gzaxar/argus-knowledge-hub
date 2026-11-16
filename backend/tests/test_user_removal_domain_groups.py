@@ -36,9 +36,9 @@ def idp(monkeypatch):
         return dict(claims[raw])
     monkeypatch.setattr(auth, "verify_oidc_token", verify)
 
-    def person(email, verified=True):
+    def person(email, verified=True, iss="https://idp.test/other"):
         key = secrets.token_hex(8)
-        claims[key] = {"sub": f"sub-{key}", "email": email, "name": email.split("@")[0],
+        claims[key] = {"sub": f"sub-{key}", "iss": iss, "email": email, "name": email.split("@")[0],
                        **({"email_verified": verified} if verified is not None else {})}
         return {"Authorization": f"Bearer {key}"}
     return person
@@ -251,3 +251,26 @@ def test_a_removed_person_is_not_put_back_in_a_group_by_domain(world, idp, monke
         db.close()
     finally:
         done()
+
+
+def test_a_provider_that_gives_out_a_domains_addresses_vouches_for_them(world, idp, monkeypatch):
+    """INFN AAI says email_verified false, but it gives out the INFN addresses: an address there that it signs in
+    counts as verified. The same address from another provider that does not verify it does not; nor does an
+    address of another domain from INFN AAI."""
+    import app.auth_oidc as auth_oidc
+    aai = "https://idp.test/realms/aai"
+    monkeypatch.setattr(auth_oidc, "PROVIDERS", {
+        aai: {"jwks_uri": "x", "audience": ("argus",), "email_domains": auth_oidc.email_domains_of("infn.it,*.infn.it")},
+        "https://idp.test/other": {"jwks_uri": "y", "audience": ("argus",), "email_domains": ()}})
+    t = world["t"]
+    cases = {f"aai-{t}@lnf.infn.it": (aai, False, True), f"aai2-{t}@infn.it": (aai, None, True),
+             f"other-{t}@infn.it": ("https://idp.test/other", False, False),
+             f"elsewhere-{t}@cern.ch": (aai, False, False), f"gmail-{t}@gmail.com": ("https://idp.test/other", True, True)}
+    for email, (iss, claim, _) in cases.items():
+        assert client.get("/v1/me", headers=idp(email, verified=claim, iss=iss)).status_code == 200
+    db = SessionLocal()
+    got = {u.email: u.email_verified for u in db.scalars(__import__("sqlalchemy").select(User).where(
+        User.email.in_(list(cases))))}
+    db.close()
+    assert got == {e: v for e, (_, _, v) in cases.items()}
+    assert auth_oidc.email_domains_of("infn.it, *.it, not a domain") == ("infn.it",)      # invalid ones never trusted

@@ -12,6 +12,13 @@ and `*.infn.it`. Whoever signs in with a verified address there is in the group;
 - Only a **verified** address counts: `User.email_verified`, from the identity provider's `email_verified` claim at
   each sign-in (None when it sends none, and then the address does not count). An unverified address could be
   anybody's.
+- **A provider that gives out a domain's addresses vouches for them.** INFN AAI's tokens say `email_verified: false`,
+  but INFN AAI is where the INFN addresses come from. The chart's `api.oidc.emailDomains` (`OIDC_EMAIL_DOMAINS`, or
+  `email_domains` in an `OIDC_EXTRA_PROVIDERS` entry) names the domains a provider is the authority for; an address
+  there that this provider signs in counts as verified (`auth_oidc.vouches_for`). Production sets
+  `["infn.it", "*.infn.it"]` for INFN AAI. The same address from another provider still needs that provider's
+  `email_verified`; another domain's address from INFN AAI too. Invalid domains in the setting are ignored, never
+  trusted. The flag is written at each sign-in, so it changes at a person's next one.
 - A removed or inactive person never counts.
 
 ## Membership

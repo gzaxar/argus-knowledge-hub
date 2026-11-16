@@ -157,7 +157,11 @@ def bootstrap_admins() -> set[str]:
 
 
 def _verified(claims: dict) -> Optional[bool]:
-    """The identity provider's `email_verified` claim; None when it does not send one."""
+    """Whether the address may be trusted: the identity provider says it is verified (`email_verified`), or the
+    provider is the authority for its domain (INFN AAI for infn.it, auth_oidc.vouches_for). None when neither says."""
+    from app.auth_oidc import vouches_for
+    if claims.get("iss") and claims.get("email") and vouches_for(claims["iss"], claims["email"]):
+        return True
     if "email_verified" not in claims:
         return None
     return claims.get("email_verified") in (True, "true", "True", 1)
@@ -213,8 +217,9 @@ def _resolve_oidc_user(db: Session, claims: dict) -> User:
     if email:
         user.email = email
     # Whether the identity provider vouches for the address: a group by e-mail domain counts only a verified one.
-    if "email_verified" in claims:
-        user.email_verified = _verified(claims)
+    verified = _verified(claims)
+    if verified is not None:
+        user.email_verified = verified
     # A bootstrap administrator whose account existed before they were named one (a directory sync, a
     # seeding script, a sign-in before the setting) is made one, but only while the installation has no
     # administrator: after that, administrators are granted in the web app, and revoking one sticks.

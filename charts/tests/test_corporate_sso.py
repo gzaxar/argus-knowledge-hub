@@ -60,6 +60,14 @@ class DirectOidcTests(unittest.TestCase):
         issuers = {p["issuer"]: p["audience"] for p in json.loads(json.loads(raw))}
         self.assertEqual(issuers["https://securetoken.google.com/seraphic-camera-479521-s5"], "seraphic-camera-479521-s5")
         self.assertEqual(issuers["https://keycloak.90.147.174.30.myip.cloud.infn.it/realms/argus"], "argus-webapp")
+        # INFN AAI gives out the INFN addresses: one it signs in counts as verified (docs/domain-groups.md).
+        self.assertIn('name: OIDC_EMAIL_DOMAINS, value: "infn.it,*.infn.it"', result.stdout)
+
+    def test_no_provider_is_trusted_for_any_domain_unless_said(self):
+        result = render("--set", f"api.oidc.issuer={BASE}", "--set", f"api.oidc.jwksUri={BASE}/certs",
+                        "--set", "api.oidc.audience=argus")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("OIDC_EMAIL_DOMAINS", result.stdout)
 
 
 if __name__ == "__main__":

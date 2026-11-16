@@ -45,6 +45,9 @@ api:
     issuer: ""
     jwksUri: ""
     audience: ""
+    # The e-mail domains this provider gives out the addresses of ("infn.it", "*.infn.it"): an address there that it
+    # signs in counts as verified for groups by e-mail domain, whatever its email_verified claim says.
+    emailDomains: []
     # Optional confidential-client token mediation (secret from existingSecret).
     tokenEndpoint: ""
     redirectUris: []
