@@ -18,6 +18,11 @@ The chart adds the bundled Keycloak to the trusted issuers by itself when `api.o
 provider that issued it. People are matched by e-mail, so an
 account keeps its roles whichever provider it signs in with, as long as the e-mail is the same.
 
+INFN AAI is also named the authority for the INFN addresses (`api.oidc.emailDomains: ["infn.it", "*.infn.it"]`,
+`OIDC_EMAIL_DOMAINS`): its tokens say `email_verified: false`, yet an INFN address it signs in is one it gave out,
+so it counts as verified for groups by e-mail domain (docs/domain-groups.md). Google's tokens carry their own
+`email_verified`.
+
 ARGUS signs in directly to the INFN test realm using public client **`argus-knowledge-hub`** and
 Authorization Code with PKCE S256. The browser exchanges and refreshes tokens directly with INFN;
 there is no client secret and no token mediation through the ARGUS API. The API verifies ID tokens

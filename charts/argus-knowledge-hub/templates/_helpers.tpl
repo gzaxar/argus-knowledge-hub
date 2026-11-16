@@ -32,6 +32,10 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 - {name: OIDC_ISSUER, value: {{ required "api.oidc.issuer is required" $oidc.issuer | quote }}}
 - {name: OIDC_JWKS_URI, value: {{ required "api.oidc.jwksUri is required" $oidc.jwksUri | quote }}}
 - {name: OIDC_AUDIENCE, value: {{ required "api.oidc.audience is required" $oidc.audience | quote }}}
+{{- with $oidc.emailDomains }}
+# The domains it gives out the addresses of: an address there that it signs in counts as verified.
+- {name: OIDC_EMAIL_DOMAINS, value: {{ join "," . | quote }}}
+{{- end }}
 {{- else if .Values.keycloak.enabled }}
 # The issuer is the public address the browser signs in at; the keys are fetched inside the cluster.
 - {name: OIDC_ISSUER, value: {{ $kcIssuer | quote }}}

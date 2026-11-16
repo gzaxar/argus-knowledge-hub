@@ -41,6 +41,9 @@ api:
     # The web's own client first; then LibreChat's, whose INFN AAI tokens call /mcp as the signed-in person
     # (epik8s-platform argus-hub, argus-mcp-server KNOWLEDGE_HUB_AS_CALLER).
     audience: argus-knowledge-hub,argus-librechat
+    # INFN AAI gives out the INFN addresses: one it signs in counts as verified (its tokens say email_verified false),
+    # so groups by e-mail domain can let INFN people in (docs/domain-groups.md).
+    emailDomains: ["infn.it", "*.infn.it"]
   # Google sign-in (Firebase), as before Keycloak, so existing accounts keep working.
   extraProviders:
     - issuer: https://securetoken.google.com/seraphic-camera-479521-s5

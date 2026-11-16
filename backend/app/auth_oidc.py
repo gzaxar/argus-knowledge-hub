@@ -38,6 +38,10 @@ from jwt import PyJWKClient
 OIDC_ISSUER = os.environ.get("OIDC_ISSUER")
 OIDC_JWKS_URI = os.environ.get("OIDC_JWKS_URI")
 OIDC_AUDIENCE = os.environ.get("OIDC_AUDIENCE")
+# The e-mail domains the main provider is the authority for (OIDC_EMAIL_DOMAINS, "infn.it,*.infn.it"): it gives out
+# those addresses, so an address there that it signs in counts as verified even when its token says otherwise.
+# An extra provider says the same with "email_domains" in its OIDC_EXTRA_PROVIDERS entry.
+OIDC_EMAIL_DOMAINS = os.environ.get("OIDC_EMAIL_DOMAINS")
 
 
 def load_providers() -> dict:
@@ -45,7 +49,8 @@ def load_providers() -> dict:
     A half-configured one (an issuer with no JWKS URL) is left out rather than
     trusted with whatever is missing."""
     found = {}
-    candidates = [{"issuer": OIDC_ISSUER, "jwks_uri": OIDC_JWKS_URI, "audience": OIDC_AUDIENCE}]
+    candidates = [{"issuer": OIDC_ISSUER, "jwks_uri": OIDC_JWKS_URI, "audience": OIDC_AUDIENCE,
+                   "email_domains": OIDC_EMAIL_DOMAINS}]
     raw_extra = os.environ.get("OIDC_EXTRA_PROVIDERS")
     if raw_extra:
         try:
@@ -56,8 +61,32 @@ def load_providers() -> dict:
     for p in candidates:
         audiences = audiences_of(p.get("audience"))
         if p.get("issuer") and p.get("jwks_uri") and audiences:
-            found[p["issuer"]] = {"jwks_uri": p["jwks_uri"], "audience": audiences}
+            found[p["issuer"]] = {"jwks_uri": p["jwks_uri"], "audience": audiences,
+                                  "email_domains": email_domains_of(p.get("email_domains"))}
     return found
+
+
+def email_domains_of(value) -> tuple:
+    """The domains a provider is the authority for: "a,b", ["a", "b"]; invalid ones are dropped, never trusted."""
+    from app.services.domain_groups import DomainError, normalise
+    if isinstance(value, str):
+        value = value.split(",")
+    if not isinstance(value, (list, tuple)):
+        return ()
+    out = []
+    for v in value:
+        try:
+            out += normalise([str(v)])
+        except DomainError:
+            continue
+    return tuple(out)
+
+
+def vouches_for(issuer: str, email: str) -> bool:
+    """Whether the provider that signed this token is the authority for this address's domain."""
+    from app.services.domain_groups import matches
+    provider = PROVIDERS.get(issuer) or {}
+    return bool(provider.get("email_domains")) and matches(email, provider["email_domains"])
 
 
 def audiences_of(value) -> tuple:
