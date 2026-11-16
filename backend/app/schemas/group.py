@@ -20,6 +20,8 @@ class GroupOut(BaseModel):
     # Owned by this site (null: the installation), and the sites where it holds a role site-wide (issue #26).
     home_site_id: Optional[str] = None
     site_grants: list[dict] = []
+    # A group by e-mail domain: everyone signed in with a verified address in these domains is in it.
+    email_domains: Optional[list[str]] = None
 
 
 class GroupCreate(BaseModel):
@@ -76,3 +78,10 @@ class DirectoryStatusOut(BaseModel):
     active_groups: int
     users: int
     last_synced_at: Optional[datetime] = None
+
+
+class GroupDomainsIn(BaseModel):
+    # "infn.it" that domain, "*.infn.it" its subdomains; empty: an ordinary group again.
+    domains: list[str] = []
+    # false: only the preview — who would be in it — nothing changes.
+    confirm: bool = False

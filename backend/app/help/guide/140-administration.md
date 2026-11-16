@@ -130,6 +130,12 @@ Four actions reach a whole workspace and cannot be undone:
 - deleting a type, which deletes every record of it;
 - deleting the orphaned objects on the integrity page.
 
+Removing a person from ARGUS (**Users → Remove from ARGUS**) is confirmed the same way, with their e-mail address
+typed: they can no longer sign in from any identity provider, their personal tokens stop working, and their own
+roles, memberships, administration rights and places in local groups go; open tickets assigned to them and planned
+activities they own are left for someone else. Their name stays on everything they did. You cannot remove yourself
+or the last administrator. A removed person can be invited again later.
+
 ARGUS asks twice before doing any of them. First it asks the question, then it wants the workspace's name typed
 exactly. They are done only by a person signed in. An API token cannot do them, even an administrator's token with
 every scope, and an MCP client or the Ask assistant cannot either.

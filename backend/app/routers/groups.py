@@ -9,7 +9,7 @@ from app.db import get_db
 from app.models.group import Group, GroupMember, GroupAdministrator
 from app.models.user import User
 from app.schemas.group import (GroupHomeIn, DirectoryStatusOut, GroupCreate, GroupMemberOut, GroupMembersIn, GroupOut,
-                               GroupUpdate, GroupAdministratorOut, GroupAdministratorIn)
+                               GroupUpdate, GroupAdministratorOut, GroupAdministratorIn, GroupDomainsIn)
 from app.services import access_log, local_groups, site_group_grants
 from app.services.directory import provider_name
 from app.services.directory_sync import sync_directory
@@ -70,6 +70,7 @@ def list_groups(
             source=g.source, active=g.active, member_count=counts.get(g.uid, 0),
             workspaces=local_groups.workspaces_of(db, g.uid),
             home_site_id=g.home_site_id, site_grants=site_group_grants.of_group(db, g.uid),
+            email_domains=g.email_domains,
         )
         for g in groups
     ]
@@ -87,7 +88,8 @@ def _out(db: Session, g: Group) -> GroupOut:
     from app.services import site_group_grants
     return GroupOut(uid=g.uid, dn=g.dn, name=g.name, description=g.description, email=g.email, source=g.source,
                     active=g.active, member_count=count, workspaces=local_groups.workspaces_of(db, g.uid),
-                    home_site_id=g.home_site_id, site_grants=site_group_grants.of_group(db, g.uid))
+                    home_site_id=g.home_site_id, site_grants=site_group_grants.of_group(db, g.uid),
+                    email_domains=g.email_domains)
 
 
 @router.post("/groups", response_model=GroupOut, status_code=201)
@@ -190,6 +192,45 @@ def update_group(uid: str, body: GroupUpdate, workspace_id: str = Depends(requir
     return _out(db, group)
 
 
+@router.put("/groups/{uid}/domains")
+def set_group_domains(uid: str, body: GroupDomainsIn, identity: Identity = Depends(get_identity),
+                      db: Session = Depends(get_db)):
+    """Make a local group a group by e-mail domain (services/domain_groups.py): everyone signed in with a verified
+    address in these domains is in it, and has what the group has. Only the installation's administrators, signed
+    in: a domain can let in many people at once. Without `confirm`, the preview: how many are in it then, and how
+    many sign in with an address there that their identity provider did not verify (they are not counted)."""
+    from app.services import domain_groups
+    group = _group(db, uid)
+    user = getattr(identity, "user", None)
+    if not isinstance(identity, OidcIdentity) or identity.token is not None or not (user and user.is_admin):
+        raise HTTPException(status_code=403, detail="Only the installation's administrators, signed in, set a group's "
+                                                    "e-mail domains")
+    if group.source != "local":
+        raise HTTPException(status_code=409, detail=f"{group.name} comes from the directory: its members are set there")
+    try:
+        domains = domain_groups.normalise(body.domains)
+    except domain_groups.DomainError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    from app.models.user import User as U
+    verified = [u for u in db.scalars(select(U).where(U.email_verified.is_(True), U.removed_at.is_(None),
+                                                      U.active.is_(True)))
+                if domains and domain_groups.matches(u.email, domains)]
+    preview = {"domains": domains, "would_be_in_it": len(verified),
+               "examples": sorted(u.email for u in verified)[:10],
+               "unverified": domain_groups.unverified(db, domains) if domains else 0,
+               "workspaces": local_groups.workspaces_of(db, uid),
+               "site_grants": site_group_grants.of_group(db, uid)}
+    if not body.confirm:
+        return {**preview, "preview": True}
+    before = group.email_domains
+    group.email_domains = domains or None
+    out = domain_groups.sync_group(db, group)
+    access_log.record(db, "group.domains_set", user.id, group_uid=uid, before=before, after=group.email_domains,
+                      added=out["added"], removed=out["removed"])
+    db.commit()
+    return {**preview, **out, "preview": False}
+
+
 @router.put("/groups/{uid}/home")
 def move_group(uid: str, body: GroupHomeIn, workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
                identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
@@ -256,6 +297,11 @@ def remove_group_member(uid: str, user_id: str, workspace_id: Optional[str] = He
                         identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
     group = _group(db, uid)
     local_groups.require_manage_members(db, identity, group, workspace_id)
+    from app.services import domain_groups
+    if db.scalar(select(GroupMember.id).where(GroupMember.group_uid == uid, GroupMember.user_id == user_id,
+                                              GroupMember.source == domain_groups.SOURCE)):
+        raise HTTPException(status_code=409, detail="In this group because of their e-mail address: change the "
+                                                    "group's domains, or remove the person from ARGUS")
     if not local_groups.remove_member(db, group, user_id):
         raise HTTPException(status_code=404, detail="Not a member of this group")
     access_log.record(db, "group.member_removed", access_log.actor_of(identity), group_uid=uid,

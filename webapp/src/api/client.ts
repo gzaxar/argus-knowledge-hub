@@ -10,6 +10,8 @@ import type {
 } from "./portabilityTypes";
 import type {
   AppSchema,
+  GroupDomainsResult,
+  UserRemovalPreview,
   Asset,
   AssetComment,
   AssetHistory,
@@ -772,6 +774,12 @@ export const workspacesApi = {
   removeMember: (workspaceId: string, userId: string) =>
     request<void>(`/v1/workspaces/${workspaceId}/members/${userId}`, { method: "DELETE" }),
   listUsers: () => request<AdminUser[]>("/v1/admin/users"),
+  /** What removing a person from ARGUS would change; nothing changes. */
+  userRemoval: (userId: string) => request<UserRemovalPreview>(`/v1/admin/users/${userId}/removal`),
+  /** Remove a person from ARGUS: their e-mail address, typed to confirm, goes with it for the server to check. */
+  removeUser: (userId: string, typedEmail: string) =>
+    request<UserRemovalPreview>(`/v1/admin/users/${userId}`, {
+      method: "DELETE", headers: { "X-Confirm-User": encodeURIComponent(typedEmail.trim()) } }),
   setUserAdmin: (userId: string, isAdmin: boolean) =>
     request<AdminUser>(`/v1/admin/users/${userId}`, {
       method: "PUT",
@@ -995,6 +1003,9 @@ export const directoryApi = {
     request<InvitationResult>(`/v1/groups/${uid}/members`, { method: "POST", body: json(input) }),
   moveGroup: (uid: string, homeSiteId: string | null, confirm: boolean) =>
     request<GroupMovePreview>(`/v1/groups/${uid}/home`, { method: "PUT", body: json({ home_site_id: homeSiteId, confirm }) }),
+  /** A group by e-mail domain: `confirm` false gives the preview only. An empty list makes it ordinary again. */
+  setGroupDomains: (uid: string, domains: string[], confirm: boolean) =>
+    request<GroupDomainsResult>(`/v1/groups/${uid}/domains`, { method: "PUT", body: json({ domains, confirm }) }),
   removeGroupMember: (uid: string, userId: string) =>
     request<void>(`/v1/groups/${uid}/members/${encodeURIComponent(userId)}`, { method: "DELETE" }),
   status: () => request<DirectoryStatus>("/v1/directory/status"),

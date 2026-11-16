@@ -13,7 +13,14 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 type Notice = { id: number; text: string; kind: "info" | "error" };
 type Question = { id: number; text: string; input: boolean; initial: string; danger: boolean; mustType?: string;
+                  /** What is to be typed, said on the field ("The workspace's name"). */
+                  mustTypeLabel?: string;
+                  /** Whether what was typed is it (exactly, by default; an e-mail address ignores case). */
+                  same?: (typed: string, expected: string) => boolean;
                   resolve: (v: string | boolean | null) => void };
+
+const matchesTyped = (q: Question, typed: string) =>
+  (q.same ?? ((a: string, b: string) => a.trim() === b.trim()))(typed, q.mustType ?? "");
 
 let notices: Notice[] = [];
 let question: Question | null = null;
@@ -67,12 +74,14 @@ export function askText(text: string, initial = ""): Promise<string | null> {
 
 /** A dangerous action (docs/dangerous-actions.md), asked twice: the question, then `name` typed exactly. The
  *  server checks the name again, so it is sent with the request (`confirmHeader`). */
-export async function askTyped(text: string, name: string): Promise<boolean> {
+export async function askTyped(text: string, name: string, what = "the workspace's name",
+                               same: (a: string, b: string) => boolean = (a, b) => a.trim() === b.trim()): Promise<boolean> {
   if (!await ask(text)) return false;
   const typed = await new Promise<string | null>((resolve) => put({
-    text: `To confirm, type the workspace's name:\n${name}`, input: true, initial: "", danger: true, mustType: name,
+    text: `To confirm, type ${what}:\n${name}`, input: true, initial: "", danger: true, mustType: name,
+    mustTypeLabel: what.charAt(0).toUpperCase() + what.slice(1), same,
     resolve: (v) => resolve(typeof v === "string" ? v : null) }));
-  return typed !== null && typed.trim() === name.trim();
+  return typed !== null && same(typed, name);
 }
 
 export function DialogHost() {
@@ -97,11 +106,11 @@ export function DialogHost() {
             <p className="whitespace-pre-wrap break-words text-sm text-slate-800">{q.text}</p>
             {q.input && (
               <textarea ref={field} value={text} onChange={(e) => setText(e.target.value)} rows={2}
-                        aria-label={q.mustType !== undefined ? "The workspace's name" : undefined}
+                        aria-label={q.mustType !== undefined ? q.mustTypeLabel ?? "The workspace's name" : undefined}
                         onKeyDown={(e) => {
                           if (e.key !== "Enter" || e.shiftKey) return;
                           e.preventDefault();
-                          if (q.mustType === undefined || text.trim() === q.mustType.trim()) answer(text);
+                          if (q.mustType === undefined || matchesTyped(q, text)) answer(text);
                         }}
                         className="mt-3 w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
             )}
@@ -109,7 +118,7 @@ export function DialogHost() {
               <button type="button" onClick={() => answer(q.input ? null : false)}
                       className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">Cancel</button>
               <button type="button" ref={yes} onClick={() => answer(q.input ? text : true)}
-                      disabled={q.mustType !== undefined && text.trim() !== q.mustType.trim()}
+                      disabled={q.mustType !== undefined && !matchesTyped(q, text)}
                       className={`rounded px-3 py-1.5 text-sm text-white disabled:opacity-40 ${q.danger ? "bg-red-600 hover:bg-red-700" : "bg-slate-900 hover:bg-slate-800"}`}>
                 {q.mustType !== undefined ? "I understand, do it" : q.input ? "OK" : q.danger ? "Yes, go ahead" : "OK"}
               </button>

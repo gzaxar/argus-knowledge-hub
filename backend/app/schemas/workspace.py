@@ -130,6 +130,11 @@ class UserOut(BaseModel):
     is_admin: bool
     created_at: datetime
     last_login_at: Optional[datetime]
+    active: bool = True
+    # Whether the identity provider said the address is verified at the last sign-in (None: it did not say).
+    email_verified: Optional[bool] = None
+    # Removed from ARGUS by an administrator: no sign-in, no token, no access.
+    removed_at: Optional[datetime] = None
 
 
 class UserAdminUpdate(BaseModel):

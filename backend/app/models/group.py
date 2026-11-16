@@ -1,6 +1,7 @@
 from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -38,6 +39,9 @@ class Group(Base, TimestampMixin):
     # grants only at that site and its current facilities. Null: owned by the installation.
     home_site_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("workspaces.id", ondelete="SET NULL"),
                                                         nullable=True, index=True)
+    # A group by e-mail domain (services/domain_groups.py): everyone signed in with a verified address in one of
+    # these domains is in it ("infn.it" that domain, "*.infn.it" its subdomains). Null: an ordinary group.
+    email_domains: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
 
 
 class GroupMember(Base):
