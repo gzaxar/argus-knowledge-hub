@@ -10,6 +10,7 @@ import {
   assetsApi,
   attachmentsApi,
   graphApi,
+  linksApi,
   membersApi,
   relationsApi,
   schemasApi,
@@ -31,6 +32,7 @@ import { LocationCard } from "../../components/LocationCard";
 import { IndoorCard } from "../../components/IndoorCard";
 import { RackCard } from "../../components/RackCard";
 import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
+import { openInWorkspace } from "../../api/session";
 import { ExportMenu } from "../../components/ExportMenu";
 import { FollowButton } from "../../components/FollowButton";
 import { useShowKeys } from "../../api/displayPrefs";
@@ -195,7 +197,7 @@ export function AssetDetail() {
   });
 
   if (asset.isLoading) return <p className="text-sm text-slate-500">Loading…</p>;
-  if (!asset.data) return <p className="text-sm text-red-600">Asset not found.</p>;
+  if (!asset.data) return <NotHere uid={uid!} />;
 
   const a = asset.data;
   const allAttrDefs = effectiveAttributes(schema.data, allSchemas.data);
@@ -703,4 +705,24 @@ export function AssetDetail() {
       </div>
     </div>
   );
+}
+
+
+/** A record not found in this workspace: if it is in another one the person may read (a link from elsewhere, or a
+ *  tab whose workspace was changed), say which and open it there. */
+function NotHere({ uid }: { uid: string }) {
+  const here = useCurrentWorkspaceId();
+  const where = useQuery({ queryKey: ["asset-where", uid], queryFn: () => linksApi.resolve(`/asset/${uid}`), retry: false });
+  const ws = where.data?.workspace_id;
+  if (where.isLoading) return <p className="text-sm text-slate-500">Looking for it…</p>;
+  if (ws && ws !== here) {
+    return (
+      <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="status">
+        <p><b>{where.data?.name ?? uid}</b> is in the workspace <b>{ws}</b>, not in this one.</p>
+        <button type="button" onClick={() => openInWorkspace(ws, `/assets/${uid}`, here)}
+                className="mt-2 rounded bg-amber-700 px-3 py-1 text-white hover:bg-amber-800">Open it there</button>
+      </div>
+    );
+  }
+  return <p className="text-sm text-red-600">Asset not found.</p>;
 }
