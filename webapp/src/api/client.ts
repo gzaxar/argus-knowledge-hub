@@ -2511,7 +2511,13 @@ export interface IndoorView {
   spot?: PlanSpot | null;
   in: { uid: string; key: string; name: string; type: string }[];
   contents: { uid: string; key: string; name: string; type: string; level_uid: string | null; plan_uid: string | null }[];
+  /** Said to be in a place that has floor plans, but on none of them yet: where it could go. */
+  plan_offer?: PlanOffer | null;
   history: IndoorPlacementView[];
+}
+export interface PlanOffer {
+  place: { uid: string; key: string; name: string; type: string };
+  plans: { uid: string; name: string; level: string | null; place: { uid: string; name: string } }[];
 }
 
 export const indoorApi = {

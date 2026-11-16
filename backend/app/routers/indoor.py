@@ -402,6 +402,8 @@ def get_indoors(uid: str, workspace_id: str = Depends(require_permission("read")
             "in": [{"uid": c.uid, "key": c.key, "name": c.name, "type": c.type}
                    for c in indoor.containers(db, uid) if may(c)],
             "contents": contents,
+            # Said to be in a place that has floor plans, but on none of them yet: the web offers to place it.
+            "plan_offer": indoor.plan_offer(db, uid, may),
             "history": [indoor.placement_out(db, p) for p in indoor.history(db, uid)]}
 
 

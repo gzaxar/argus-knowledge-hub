@@ -52,3 +52,12 @@ of the model, the rooms the path crosses as bands above it, and a dot under each
 Click an element to see the hardware installed there: its serial, its room, its rack, its point on a floor
 plan (a link opens the plan around it), what powers it and in which rack that supply is, and its open tickets.
 Nothing is guessed: an element with nothing installed says so.
+
+## Putting a record on the plan of the place it is in
+
+A record said to be in a place — its **Located in**, or a `located in` relation — whose place has a floor plan
+(its own, or the building's plan the room is drawn on) but which has no point on any plan yet, shows in **Indoors**:
+*It is in … which has a floor plan, but it is on none of them yet*, with **Put it on the plan**. That opens the
+placement already in that place and on that plan: click where it is and **Save** (top right). Right after a new
+record is saved, the same is asked once. A unit in a rack is not offered it: it is shown where its rack is.
+

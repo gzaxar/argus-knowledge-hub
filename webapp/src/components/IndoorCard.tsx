@@ -1,17 +1,17 @@
 import { ask } from "../lib/dialogs";
 import "leaflet/dist/leaflet.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMapEvents } from "react-leaflet";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ApiError, MAP_TILES, indoorApi, placesApi, type ControlPoint, type FloorPlanView, type IndoorView, type PlaceLevel, type PlanLayersView, sitesApi, type PlacementEnding } from "../api/client";
+import { ApiError, MAP_TILES, indoorApi, placesApi, type ControlPoint, type FloorPlanView, type IndoorView, type PlaceLevel, type PlanLayersView, sitesApi, type PlacementEnding, type PlanOffer } from "../api/client";
 import type { Asset } from "../api/types";
 import { AffineImage } from "../lib/affineOverlay";
 import { FitTo, pointsOf, type LatLng } from "../lib/geo";
 import { PlanView, usePlanImage, type PlanPin, type PlanShape } from "./PlanView";
 import { GroupedRecords } from "./GroupedRecords";
 import { LAYER_COLOUR, drawn, initialLayers } from "../pages/map/PlanLayersPage";
-import { FullPage, useFullPage } from "./FullPage";
+import { FullPage, FullPageActions, useFullPage } from "./FullPage";
 import { PlanDrawer } from "./PlanDrawer";
 
 /** A plan or map's height: modest on the page, the screen's in a full-page window. */
@@ -39,9 +39,23 @@ export function IndoorCard({ uid, editable }: { uid: string; editable: boolean }
   const view = useQuery({ queryKey: ["asset-indoors", uid], queryFn: () => indoorApi.indoors(uid), retry: false });
   const floors = useQuery({ queryKey: ["asset-levels", uid], queryFn: () => indoorApi.levels(uid), retry: false });
   const [editing, setEditing] = useState(false);
+  // Put on the plan of the place it is said to be in (the offer below, or the question asked once it is created).
+  const [offered, setOffered] = useState<PlanOffer | null>(null);
   // ?plan=1 (from "Show on the floor plan" in an Ask answer) opens the plan straight away.
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [seeing, setSeeing] = useState(params.get("plan") === "1");
+  const offer = editable ? view.data?.plan_offer ?? null : null;
+  // Just created (?onplan=ask) in a place that has a floor plan: ask once whether to put it on it now.
+  useEffect(() => {
+    if (params.get("onplan") !== "ask" || !view.data) return;
+    const next = new URLSearchParams(params);
+    next.delete("onplan");
+    setParams(next, { replace: true });
+    if (!offer) return;
+    const where = offer.plans.length === 1 ? `the floor plan ${offer.plans[0].name}` : `one of its ${offer.plans.length} floor plans`;
+    void ask(`${offer.place.name} has ${offer.plans.length === 1 ? "a floor plan" : "floor plans"}. Put it on ${where} now?`)
+      .then((yes) => { if (yes) { setOffered(offer); setEditing(true); } });
+  }, [params, view.data]); // eslint-disable-line react-hooks/exhaustive-deps
   const refresh = () => {
     for (const k of ["asset-indoors", "asset-levels", "asset-location", "asset-location-context", "asset-history"]) {
       queryClient.invalidateQueries({ queryKey: [k] });
@@ -103,6 +117,14 @@ export function IndoorCard({ uid, editable }: { uid: string; editable: boolean }
             )}
           </div>
         )}
+        {offer && !editing && (
+          <div className="mt-2 rounded border border-indigo-200 bg-indigo-50 p-2 text-xs text-indigo-950" data-plan-offer="">
+            It is in <b>{offer.place.name}</b>, which has {offer.plans.length === 1 ? "a floor plan" : `${offer.plans.length} floor plans`},
+            but it is on none of them yet.{" "}
+            <button type="button" onClick={() => { setOffered(offer); setEditing(true); }}
+                    className="ml-1 rounded bg-indigo-700 px-2 py-0.5 font-medium text-white hover:bg-indigo-800">Put it on the plan</button>
+          </div>
+        )}
         {editable && !editing && (
           <div className="mt-2 flex gap-2">
             <button type="button" onClick={() => setEditing(true)} className="rounded border border-slate-300 px-3 py-1 text-xs hover:bg-slate-50">
@@ -114,7 +136,9 @@ export function IndoorCard({ uid, editable }: { uid: string; editable: boolean }
         )}
         {editing && (
           <FullPage open title={p ? "Move it" : "Place it inside"} onClose={() => setEditing(false)}>
-            <PlacementEditor uid={uid} current={v} onDone={() => { setEditing(false); refresh(); }} onCancel={() => setEditing(false)} />
+            <PlacementEditor uid={uid} current={v} start={offered}
+                             onDone={() => { setEditing(false); setOffered(null); refresh(); }}
+                             onCancel={() => { setEditing(false); setOffered(null); }} />
           </FullPage>
         )}
       </div>
@@ -220,12 +244,16 @@ function HerePlan({ plan, x, y, uid, label = "here", inside = [] }: {
 
 /** Choose the place (a room, a hall) by searching, optionally a plan of it (or of a place it is in) and the
  *  point on it. */
-function PlacementEditor({ uid, current, onDone, onCancel }: {
-  uid: string; current: IndoorView; onDone: () => void; onCancel: () => void;
+function PlacementEditor({ uid, current, start = null, onDone, onCancel }: {
+  uid: string; current: IndoorView;
+  /** Start in the place it is said to be in, on that place's first floor plan (the plan offer). */
+  start?: PlanOffer | null;
+  onDone: () => void; onCancel: () => void;
 }) {
   const [q, setQ] = useState("");
-  const [place, setPlace] = useState<{ uid: string; name: string } | null>(current.placement?.place ?? null);
-  const [planUid, setPlanUid] = useState<string | null>(current.placement?.plan?.uid ?? null);
+  const [place, setPlace] = useState<{ uid: string; name: string } | null>(
+    current.placement?.place ?? (start ? { uid: start.place.uid, name: start.place.name } : null));
+  const [planUid, setPlanUid] = useState<string | null>(current.placement?.plan?.uid ?? start?.plans[0]?.uid ?? null);
   const [point, setPoint] = useState<{ x: number; y: number } | null>(
     current.placement?.x != null ? { x: current.placement.x, y: current.placement.y ?? 0 } : null);
   const found = useQuery({ queryKey: ["place-search", q], queryFn: () => indoorApi.searchRecords(q), enabled: q.trim().length >= 2 });
@@ -289,11 +317,11 @@ function PlacementEditor({ uid, current, onDone, onCancel }: {
         </div>
       )}
       {save.isError && <p className="text-xs text-red-600">{problem(save.error)}</p>}
-      <div className="flex gap-2">
+      <FullPageActions>
         <button type="button" disabled={!place || save.isPending || (!!planUid && !point)} onClick={() => save.mutate()}
                 className="rounded bg-slate-900 px-3 py-1 text-xs text-white disabled:opacity-40">Save</button>
         <button type="button" onClick={onCancel} className="text-xs text-slate-500 underline">cancel</button>
-      </div>
+      </FullPageActions>
     </div>
   );
 }
@@ -519,12 +547,12 @@ function PlanPlacer({ plan, onDone }: { plan: FloorPlanView; onDone: () => void 
         <p className="text-slate-600">Placed: {result.metres_per_px?.toFixed(4)} m a pixel, turned {result.rotation_deg}°, fit within ±{(result.residual_m ?? 0).toFixed(2)} m.</p>
       )}
       {save.isError && <p className="text-red-600">{problem(save.error)}</p>}
-      <div className="flex gap-2">
+      <FullPageActions>
         <button type="button" disabled={points.length < 2 || save.isPending} onClick={() => save.mutate()}
                 className="rounded bg-slate-900 px-3 py-1 text-white disabled:opacity-40">{result ? "Place it again" : "Place it"}</button>
         {result && <button type="button" onClick={onDone} className="rounded border border-slate-300 px-3 py-1">Done</button>}
         {plan.corners && <button type="button" onClick={async () => await ask("Take the plan off the map?") && unplace.mutate()} className="text-red-600 underline">take it off the map</button>}
-      </div>
+      </FullPageActions>
     </div>
   );
 }

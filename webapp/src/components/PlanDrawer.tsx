@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { FullPageActions } from "./FullPage";
 import { ApiError, indoorApi, type PlanLayout, type PlanLayoutRoom, type PlaceLevel } from "../api/client";
 
 /** "Draw a plan" (docs/plan-drawing.md): when a place has no drawing to upload, its plan is drawn from the building's
@@ -239,12 +240,12 @@ export function PlanDrawer({ placeUid, placeName = "", levels, planUid, roomsHer
           <input type="checkbox" checked={placeRooms} onChange={(e) => setPlaceRooms(e.target.checked)} />
           Place the room records at their room's centre
         </label>
-        <div className="flex items-center gap-2">
+        <FullPageActions className="flex items-center gap-2">
+          {save.isError && <span className="text-xs text-red-600">{problem(save.error)}</span>}
           <button type="button" disabled={save.isPending || !!preview.error || !layout.title.trim()} onClick={() => save.mutate()}
                   className="rounded bg-slate-900 px-3 py-1 text-xs text-white disabled:opacity-40">
             {save.isPending ? "Saving…" : planUid ? "Save the plan" : "Create the plan"}</button>
-          {save.isError && <span className="text-xs text-red-600">{problem(save.error)}</span>}
-        </div>
+        </FullPageActions>
         <p className="text-xs text-slate-500">A schematic plan at 1 m = 10 px, not a survey. Records are then placed on it like on
           any other plan; redrawing it keeps their points.</p>
       </div>
