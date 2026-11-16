@@ -131,6 +131,110 @@ print(f"racks: {len(report['changed'])} changes, {report['unchanged']} already s
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from demo_plan_drawing import redraw  # noqa: E402
 
+# ---- the linac's layers that had nothing on them (cryogenics, gas handling, lasers and optics, building services):
+# a few records of each, placed where they would be, through the application's services. Added once.
+if WS == "valmora-linac-demo":
+    from app.models.indoor import FloorPlan as _Plan
+    from app.services import indoor as _indoor, spatial as _spatial
+
+    def _record(uid, type_name, key, name, attrs, location=None):
+        a = db.get(Asset, uid)
+        if a is None:
+            schema = ledger_engine.ensure_type(db, WS, type_name)
+            assert _spatial.placement(db, schema.uid)[0], f"{type_name} is not a package type with a map layer here"
+            a = Asset(uid=uid, workspace_id=WS, schema_uid=schema.uid, type=type_name, key=key, name=name,
+                      record_status="Active",
+                      attributes={**attrs, **({"argus_location": location} if location else {}),
+                                  "argus_keywords": ["synthetic-demo"]})
+            db.add(a)
+            db.flush()
+        return a
+
+    def _on_plan(a, plan_uid, place_uid, x, y):
+        now = _indoor.current(db, a.uid)
+        if now is None or not now.plan_uid:
+            plan = db.get(_Plan, plan_uid)
+            _indoor.place(db, a, place_uid=place_uid, level_uid=plan.level_uid, plan_uid=plan.uid, x=x, y=y,
+                          actor=ACTOR, note="synthetic demo")
+
+    def _geo(plan_uid, x, y):
+        t = db.get(_Plan, plan_uid).transform
+        return t["c"] + t["a"] * x + t["b"] * y, t["f"] + t["d"] * x + t["e"] * y
+
+    def _outdoors(a, plan_uid, x, y):
+        if _spatial.current(db, a.uid) is None:
+            lon, lat = _geo(plan_uid, x, y)
+            _spatial.set_location(db, a, _spatial.point(round(lat, 8), round(lon, 8)), actor=ACTOR, accuracy_m=1)
+
+    ACC, UTL, ADM = ("9725cd2b-a190-4a3c-a088-14c6482c1642", "380c8015-6c57-43c7-a200-04979618fb2d",
+                     "c7d11122-0287-4b0b-bb19-c965474708de")
+    # Cryogenics: liquid nitrogen for the cold traps and the detectors, from a tank outside the utilities building.
+    tank = _record("vl-ln2-tank", "Dewar", "VL-LN2-TANK", "Liquid nitrogen storage tank LN2-T1",
+                   {"cryogen": "ln2", "capacity_l": 6000, "mobile": False,
+                    "description": "Outdoor LN2 tank (synthetic): fills the mobile dewars and the transfer line."})
+    _outdoors(tank, UTL, 260, 225)
+    line = _record("vl-ln2-line", "Cryogenic Transfer Line", "VL-LN2-LINE", "LN2 transfer line to the service area",
+                   {"cryogen": "ln2", "length_m": 70,
+                    "description": "Vacuum-insulated line from the LN2 tank to the RF and vacuum service area (synthetic)."})
+    if _spatial.current(db, line.uid, "route") is None:
+        a_lon, a_lat = _geo(UTL, 260, 225)
+        b_lon, b_lat = _geo(ACC, 900, 230)
+        c_lon, c_lat = _geo(ACC, 625, 205)
+        _spatial.set_location(db, line, {"type": "LineString", "coordinates": [
+            [round(a_lon, 8), round(a_lat, 8)], [round(b_lon, 8), round(b_lat, 8)], [round(c_lon, 8), round(c_lat, 8)]]},
+            actor=ACTOR, role="route")
+    dewar = _record("vl-ln2-dewar", "Dewar", "VL-LN2-D50", "Mobile LN2 dewar D-50",
+                    {"cryogen": "ln2", "capacity_l": 50, "mobile": True,
+                     "description": "Refills the cold traps of the ion pumps (synthetic)."}, "vl-room-service")
+    _on_plan(dewar, ACC, "vl-room-service", 640, 210)
+    # Gas handling: SF6 keeps the waveguides from arcing; its cylinders stand in the gas store outside.
+    bottles = _record("vl-sf6-bundle", "Gas Cylinder", "VL-SF6-B1", "SF6 cylinder bundle",
+                      {"gas": "sf6", "water_volume_l": 50, "fill_pressure_bar": 22, "purity": "3.0",
+                       "description": "In the outdoor gas store (synthetic)."})
+    _outdoors(bottles, UTL, 230, 225)
+    cabinet = _record("vl-sf6-manifold", "Gas Manifold", "VL-SF6-MAN", "SF6 gas cabinet for the waveguides",
+                      {"gas": "sf6", "max_pressure_bar": 3, "n_inlets": 2,
+                       "description": "Keeps the waveguides of K-1 and K-2 at 2 bar of SF6 (synthetic)."}, "vl-room-gallery")
+    _on_plan(cabinet, ACC, "vl-room-gallery", 455, 75)
+    relief = _record("vl-sf6-relief", "Pressure Relief Device", "VL-SF6-PRV", "SF6 relief valve on the waveguide line",
+                     {"gas": "sf6", "relief_kind": "valve", "set_pressure_bar": 3.5,
+                      "description": "Protects the waveguides from over-pressure (synthetic)."}, "vl-room-gallery")
+    _on_plan(relief, ACC, "vl-room-gallery", 440, 105)
+    relate(cabinet.uid, "gas from", bottles.uid)
+    relate(relief.uid, "relieves", cabinet.uid)
+    # Lasers and optics: the photocathode drive laser on its table, in a laser controlled area.
+    table = _record("vl-optical-table", "Optical Table", "VL-OT-1", "Optical table OT-1",
+                    {"table_size_mm": "3000 x 1500", "isolation": "active",
+                     "description": "Carries the drive laser and its harmonic generation (synthetic)."}, "vl-room-laser")
+    _on_plan(table, ACC, "vl-room-laser", 100, 95)
+    laser = _record("vl-drive-laser", "Laser Oscillator", "VL-LASER-DL", "Photocathode drive laser",
+                    {"laser_class": "4", "wavelength_nm": 266, "pulse_energy_mj": 0.2, "pulse_duration_fs": 300,
+                     "repetition_rate_hz": 10,
+                     "description": "Ti:Sa, third harmonic on the gun's cathode (synthetic)."}, "vl-room-laser")
+    _on_plan(laser, ACC, "vl-room-laser", 70, 80)
+    relate(laser.uid, "on table", table.uid)
+    relate(laser.uid, "illuminates", "vl-unit-gun01")
+    area = _record("vl-laser-area", "Laser Controlled Area", "VL-LCA-1", "Laser controlled area — Laser Room",
+                   {"max_laser_class": "4", "entry_interlocked": True, "n_doors": 1,
+                    "description": "Class 4 operation only with the door interlock closed (synthetic)."}, "vl-room-laser")
+    room_outline = _spatial.current(db, "vl-room-laser", "outline")
+    if room_outline is not None and _spatial.current(db, area.uid, "outline") is None:
+        _spatial.set_location(db, area, _spatial.geojson(room_outline.geometry), actor=ACTOR, role="outline",
+                              base_m=0, top_m=3)
+    # Building services: the crane that lifts klystrons, the goods lift of the administration building.
+    crane = _record("vl-crane-gallery", "Overhead Crane", "VL-CRANE-1", "Overhead crane in the klystron gallery",
+                    {"statutory_inspection_due": "2027-03-31",
+                     "description": "5 t, lifts klystrons and modulator tanks (synthetic)."}, "vl-room-gallery")
+    _on_plan(crane, ACC, "vl-room-gallery", 330, 70)
+    lift = _record("vl-goods-lift", "Elevator", "VL-LIFT-ADM", "Goods lift, administration building",
+                   {"rated_load_kg": 1000, "n_stops": 2, "statutory_inspection_due": "2027-01-15",
+                    "description": "Ground and first floor (synthetic)."}, "vl-bld-adm")
+    _on_plan(lift, ADM, "vl-bld-adm", 30, 30)
+    db.commit()
+    ledger_engine.derive_located_in(db, [WS])
+    db.commit()
+    print("layer examples: cryogenics, gas handling, lasers and optics, building services")
+
 # ---- inside a building, a cable or pipe runs along the gaps between rooms to the room it serves
 # (scripts/demo_routes_inside.py): only the part inside the building is redrawn, the map keeps the rest.
 from demo_routes_inside import inside as in_box, reroute  # noqa: E402

@@ -6,14 +6,14 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.auth import OidcIdentity, get_grants, get_identity, grants_of, require_permission
 from app.db import get_db
 from app.models.asset import Asset
 from app.models.schema import Schema
-from app.models.spatial import LocationObservation
+from app.models.spatial import LocationObservation, SpatialFeature
 from app.models.workspace import Workspace
 from app.routers.ledger import actor_of
 from app.services import spatial
@@ -396,15 +396,26 @@ def map_nearby(latitude: float, longitude: float, radius_m: float = Query(500, g
 
 @router.get("/map/layers")
 def map_layers(workspace_id: str = Depends(require_permission("read")), db: Session = Depends(get_db)):
-    """The map layers the workspace's packages define."""
+    """The map layers the workspace's packages define, each with how many of the workspace's records with a
+    location are on it (`count`): a package can define layers a workspace has nothing on (an accelerator's
+    cryogenics), and the map offers only those with something to show."""
+    from collections import Counter
     from app.packages.install import installed
     from app.packages.loader import available
     shipped = available()
+    per_type = dict(db.execute(
+        select(Asset.schema_uid, func.count(func.distinct(Asset.uid)))
+        .join(SpatialFeature, (SpatialFeature.subject_uid == Asset.uid) & (SpatialFeature.subject_kind == "asset"))
+        .where(Asset.workspace_id == workspace_id, Asset.deleted_at.is_(None), SpatialFeature.state == "confirmed")
+        .group_by(Asset.schema_uid)).all())
+    counts: Counter = Counter()
+    for schema_uid, n in per_type.items():
+        counts[spatial.placement(db, schema_uid)[1]] += n
     out = []
     for pid in installed(db, workspace_id):
         p = shipped.get(pid)
         for layer in (p.section("map_layers") or []) if p else []:
-            out.append({**layer, "package": pid})
+            out.append({**layer, "package": pid, "count": counts.get(layer.get("id"), 0)})
     return out
 
 

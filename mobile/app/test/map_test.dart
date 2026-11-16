@@ -109,7 +109,9 @@ void main() {
     app.server.routes['GET /v1/map/features'] = _json(all);
     app.server.routes['GET /v1/map/extent'] = _json({'bbox': [12.672, 41.8212, 12.673, 41.8222]});
     app.server.routes['GET /v1/map/layers'] = _json([
-      {'id': 'equipment', 'name': 'Equipment', 'package': 'core'}, {'id': 'places', 'name': 'Places', 'package': 'core'}]);
+      {'id': 'equipment', 'name': 'Equipment', 'package': 'core', 'count': 1},
+      {'id': 'places', 'name': 'Places', 'package': 'core', 'count': 1},
+      {'id': 'cryogenics', 'name': 'Cryogenics', 'package': 'vacuum-cryo', 'count': 0}]);
     await app.go('/map');
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
@@ -124,6 +126,7 @@ void main() {
     expect(find.byIcon(Icons.radio_button_unchecked), findsOneWidget, reason: 'the pump, outlined in orange');
 
     await app.tap('map-layers');
+    expect(find.byKey(const Key('map-layer-cryogenics')), findsNothing, reason: 'nothing on it here');
     await app.tap('map-layer-equipment');
     await tester.pumpAndSettle();
     Navigator.of(tester.element(find.byKey(const Key('map-layer-equipment')))).pop();

@@ -198,6 +198,9 @@ def test_the_map_and_nearby_search_show_only_what_the_person_may_see(world):
     # core-objects' layers, and those of the packages the accelerator stands on since 1.35.26
     assert {layer["id"] for layer in layers} == {"equipment", "places", "safety", "safety-zones", "cryogenics",
                                                  "gas-handling", "optics", "survey"}
+    # Each says how many of the workspace's located records are on it: the map offers only those with some.
+    count = {layer["id"]: layer["count"] for layer in layers}
+    assert count["equipment"] >= 1 and count["cryogenics"] == 0 and count["optics"] == 0
 
 
 # --------------------------------------------------------------------------- importing locations

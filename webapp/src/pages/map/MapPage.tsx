@@ -154,6 +154,9 @@ export function MapPage() {
     if (hit) { setWentTo(wanted); setFramed(extentKey); focusOn(hit); }
   }, [wanted, wentTo, map, everything.data]); // eslint-disable-line react-hooks/exhaustive-deps
   const found = useMemo(() => findOnMap(everything.data?.features ?? [], find), [everything.data, find]);
+  // A layer this workspace has nothing on is not offered, unless another workspace shown has something on it here.
+  const inView = useMemo(() => new Set((features.data?.features ?? []).map((f) => f.properties.map_layer ?? "")),
+                         [features.data]);
   // The building (or hall, or room) gone to: its floor plans, to open or lay on the map.
   const focusedInside = useMemo(() => (plans.data ?? []).filter((p) => p.place.uid === focus)
     .sort((a, b) => (a.level?.ordinal ?? 0) - (b.level?.ordinal ?? 0)), [plans.data, focus]);
@@ -197,7 +200,7 @@ export function MapPage() {
         </div>
         <div className="space-y-1">
           <p className="text-xs font-semibold uppercase text-slate-500">Layers</p>
-          {(layers.data ?? []).map((l) => (
+          {(layers.data ?? []).filter((l) => l.count !== 0 || inView.has(l.id)).map((l) => (
             <button key={l.id} type="button" aria-pressed={!hidden.has(l.id)} onClick={() => toggleLayer(l.id)}
                     title={hidden.has(l.id) ? "Show this layer" : "Hide this layer"}
                     className={`flex w-full items-center gap-2 rounded px-1 text-left hover:bg-slate-50 ${hidden.has(l.id) ? "text-slate-400 line-through" : ""}`}>
