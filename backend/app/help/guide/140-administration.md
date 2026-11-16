@@ -49,7 +49,25 @@ is in:
   space on the disk under it, whichever runs out first; the database's disk is on another node and is not seen),
   the growth per day and, at that rate, roughly when it is full; the attachments' growth since their first
   upload, the daily measurements (taken hourly, the trend builds up from the first day), the attachments by
-  workspace and the largest database tables. **Measure now** measures again.
+  workspace and the largest database tables. **Measure now** measures again. Growth that is negative is shown
+  as *shrinking*.
+
+### Freeing room in the portability archives
+
+The portability archives card has **Free up space…**: what the area holds, part by part, and the cleanups that
+can be done, each with what it frees and why it is safe. Tick the ones you want and **Free the space**.
+
+- **The export repository copy** (`work/…`) is the local copy of the Git repository the scheduled exports are
+  pushed to (for example `infn-epics/argus-knowledge` on baltig): it is most of the space. **Compact** packs the
+  objects each export wrote loose; nothing is lost. **Drop** removes the copy when the remote repository has all of
+  it (it is not offered otherwise): the next export clones it again. Since 1.35.120 each export compacts it by
+  itself.
+- **Uploaded workspace bundles** older than a week: not needed once the import is done.
+- **Exported workspace bundles** older than a month: export the workspace again for a fresh one.
+- **Left-overs** of exports and imports older than a week (staging, quarantine, verification).
+
+The records of exports and imports, the evidence they cite (in the repository) and the attachments are not
+touched. Only an administrator signed in can do it, never with a token.
 - **Nerds**: for whoever looks after ARGUS — the most used routes, the slowest, those that failed (server
   errors), and the most used by client.
 

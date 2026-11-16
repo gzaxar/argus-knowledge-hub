@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-11-15T16:07:21.389756+00:00",
+  "created_at": "2026-11-16T16:54:41.104607+00:00",
   "created_by": "ARGUS demo authors",
   "demo": {
     "description": "A medium-sized electron linac (fictional Valmora): buildings, floor plans and racks, the beam model from MAD-X with design and test beam optics, RF, vacuum, magnets and their supplies, magnet cooling water, electrical distribution, civil HVAC and offices with phones and network outlets, controls on EPIK8s with backups to an external data centre, radiation protection, purchasing with inventory numbers, tickets, runbooks and contracts.",
@@ -155,8 +155,8 @@
     },
     "asset_history": {
       "file": "records/asset_history.jsonl",
-      "rows": 669,
-      "sha256": "2c399a7cd262d81b507cb221b88eabcf193a7731b0d70695d8a2846608e120a0"
+      "rows": 675,
+      "sha256": "1c5db8bda3a75a980ee09420dab586f4437da91ccb6cc7fe935f5ee825e934fb"
     },
     "asset_labels": {
       "file": "records/asset_labels.jsonl",
@@ -171,7 +171,7 @@
     "assets": {
       "file": "records/assets.jsonl",
       "rows": 402,
-      "sha256": "c440c61966242308c63e347ffc06279221c14a4e4ef6fe5ecc5e97fdca745f3c"
+      "sha256": "c242d264bfb28de389ffe89d8576a0b0b178bc351ff19d7f0433fd0144610f5d"
     },
     "attachments": {
       "file": "records/attachments.jsonl",
@@ -181,7 +181,7 @@
     "beam_asset_bindings": {
       "file": "records/beam_asset_bindings.jsonl",
       "rows": 31,
-      "sha256": "6224b0c9cd47711f5a42e7a6e43701e9034a4edb987baf9a927a4180cc29a9a8"
+      "sha256": "9adf8715e0b9de005bb750709b169813275261e28f4d9a274a7bf886111c457f"
     },
     "beam_model_documents": {
       "file": "records/beam_model_documents.jsonl",
@@ -191,7 +191,7 @@
     "beam_model_values": {
       "file": "records/beam_model_values.jsonl",
       "rows": 60,
-      "sha256": "05d815cfa5e51e1bd036205cf9ccae639ebf297b187a2679fe1f84bb429e3108"
+      "sha256": "7f25160bfc6cadeecf24a705ab373adcde080b86e41e464fdaab26b235abf1f9"
     },
     "document_folders": {
       "file": "records/document_folders.jsonl",
@@ -211,7 +211,7 @@
     "document_relations": {
       "file": "records/document_relations.jsonl",
       "rows": 127,
-      "sha256": "e81fec2c4aa145f9340dfe22bbefe92955ca1ddd2a8bf38a0d04f77d54f8f0db"
+      "sha256": "58b10e0e219109e60e56bd7f2e5fa6c4e42ec0ed43b374e3ea1dada120f7db08"
     },
     "document_revisions": {
       "file": "records/document_revisions.jsonl",
@@ -231,7 +231,7 @@
     "documents": {
       "file": "records/documents.jsonl",
       "rows": 22,
-      "sha256": "7ad794f6c58a648c884dfd78f8a768ad064013928d17ba35ffd0a60adb7083e0"
+      "sha256": "d0a99c665fa83c556fbd64c5e7746f5937ddf3786e57a611fe0a9e00dd278046"
     },
     "equipment_class_requests": {
       "file": "records/equipment_class_requests.jsonl",
@@ -241,7 +241,7 @@
     "floor_plans": {
       "file": "records/floor_plans.jsonl",
       "rows": 4,
-      "sha256": "5facef834f7223677b37389ebb843aa7d061375d62a4904c97960d121fe5614b"
+      "sha256": "e74d4674d2e53cc46ec5d5a2987bfc855755e28c0ee9e9c5a1df155e68ad380e"
     },
     "global_values": {
       "file": "records/global_values.jsonl",
@@ -270,8 +270,8 @@
     },
     "indoor_placements": {
       "file": "records/indoor_placements.jsonl",
-      "rows": 220,
-      "sha256": "352db03102a0ae9b1c7cf6594aef491f7472d73186adf34b3df5d4d146e29681"
+      "rows": 223,
+      "sha256": "640b4a9e5bfdb12684d690ca73f9b181ab96487a03449a36172bb1ce04157265"
     },
     "llm_configs": {
       "file": "records/llm_configs.jsonl",
@@ -316,7 +316,7 @@
     "relations": {
       "file": "records/relations.jsonl",
       "rows": 1133,
-      "sha256": "dfa69f3fa61559edba0c7a99f7432987a5ab35d4557b50a4cd25b6443cdd0e8f"
+      "sha256": "c65cbe8976ad5b615140649bc1f00f6adb2c63d3d416c7107ee285a428bde8a4"
     },
     "review_escalations": {
       "file": "records/review_escalations.jsonl",
@@ -335,8 +335,8 @@
     },
     "spatial_features": {
       "file": "records/spatial_features.jsonl",
-      "rows": 222,
-      "sha256": "e6ad113c04f3a8acca13f5ea61b7fcb7d9d2eb42da8494bc1498c8315dfe219a"
+      "rows": 225,
+      "sha256": "734b903315c5eebc79e8ab5ca551982e9d4bb8bf1974d71d74b00b23b2b11117"
     },
     "ticket_comments": {
       "file": "records/ticket_comments.jsonl",
@@ -366,7 +366,7 @@
     "ticket_workflows": {
       "file": "records/ticket_workflows.jsonl",
       "rows": 8,
-      "sha256": "99bb85d282b9980ad2d40b184bc038f666d6571727c5f4751547f6db06f8b037"
+      "sha256": "1e794c81c9c6b2d7ad8d61c6356bfd0aa9182e758161715e49ec303175885df9"
     },
     "tickets": {
       "file": "records/tickets.jsonl",
@@ -376,12 +376,12 @@
     "types": {
       "file": "records/types.jsonl",
       "rows": 299,
-      "sha256": "aefd679de0cf832b84709aa14398033846d8b375bac44251585a923d3e11fd98"
+      "sha256": "e664de6c8704b453f16d2f5fb6db922d915ea79005d28af92532a7f8d3e6855b"
     },
     "workspace": {
       "file": "records/workspace.jsonl",
       "rows": 1,
-      "sha256": "c86d15330138aed1f22641b0580b1ea3ef6aed10a9bf2f54f6ef6af1007d3bbf"
+      "sha256": "83627d2821fef2ac10f9508019621a04c29969ce7d81bdf23b574aedfeb13856"
     },
     "workspace_packages": {
       "file": "records/workspace_packages.jsonl",
@@ -1027,8 +1027,8 @@
     },
     {
       "path": "records/asset_history.jsonl",
-      "sha256": "2c399a7cd262d81b507cb221b88eabcf193a7731b0d70695d8a2846608e120a0",
-      "size": 170459
+      "sha256": "1c5db8bda3a75a980ee09420dab586f4437da91ccb6cc7fe935f5ee825e934fb",
+      "size": 172171
     },
     {
       "path": "records/asset_labels.jsonl",
@@ -1042,7 +1042,7 @@
     },
     {
       "path": "records/assets.jsonl",
-      "sha256": "c440c61966242308c63e347ffc06279221c14a4e4ef6fe5ecc5e97fdca745f3c",
+      "sha256": "c242d264bfb28de389ffe89d8576a0b0b178bc351ff19d7f0433fd0144610f5d",
       "size": 319049
     },
     {
@@ -1052,7 +1052,7 @@
     },
     {
       "path": "records/beam_asset_bindings.jsonl",
-      "sha256": "6224b0c9cd47711f5a42e7a6e43701e9034a4edb987baf9a927a4180cc29a9a8",
+      "sha256": "9adf8715e0b9de005bb750709b169813275261e28f4d9a274a7bf886111c457f",
       "size": 23863
     },
     {
@@ -1062,7 +1062,7 @@
     },
     {
       "path": "records/beam_model_values.jsonl",
-      "sha256": "05d815cfa5e51e1bd036205cf9ccae639ebf297b187a2679fe1f84bb429e3108",
+      "sha256": "7f25160bfc6cadeecf24a705ab373adcde080b86e41e464fdaab26b235abf1f9",
       "size": 25026
     },
     {
@@ -1082,7 +1082,7 @@
     },
     {
       "path": "records/document_relations.jsonl",
-      "sha256": "e81fec2c4aa145f9340dfe22bbefe92955ca1ddd2a8bf38a0d04f77d54f8f0db",
+      "sha256": "58b10e0e219109e60e56bd7f2e5fa6c4e42ec0ed43b374e3ea1dada120f7db08",
       "size": 27180
     },
     {
@@ -1102,7 +1102,7 @@
     },
     {
       "path": "records/documents.jsonl",
-      "sha256": "7ad794f6c58a648c884dfd78f8a768ad064013928d17ba35ffd0a60adb7083e0",
+      "sha256": "d0a99c665fa83c556fbd64c5e7746f5937ddf3786e57a611fe0a9e00dd278046",
       "size": 13075
     },
     {
@@ -1112,7 +1112,7 @@
     },
     {
       "path": "records/floor_plans.jsonl",
-      "sha256": "5facef834f7223677b37389ebb843aa7d061375d62a4904c97960d121fe5614b",
+      "sha256": "e74d4674d2e53cc46ec5d5a2987bfc855755e28c0ee9e9c5a1df155e68ad380e",
       "size": 4644
     },
     {
@@ -1142,8 +1142,8 @@
     },
     {
       "path": "records/indoor_placements.jsonl",
-      "sha256": "352db03102a0ae9b1c7cf6594aef491f7472d73186adf34b3df5d4d146e29681",
-      "size": 109008
+      "sha256": "640b4a9e5bfdb12684d690ca73f9b181ab96487a03449a36172bb1ce04157265",
+      "size": 110699
     },
     {
       "path": "records/llm_configs.jsonl",
@@ -1187,7 +1187,7 @@
     },
     {
       "path": "records/relations.jsonl",
-      "sha256": "dfa69f3fa61559edba0c7a99f7432987a5ab35d4557b50a4cd25b6443cdd0e8f",
+      "sha256": "c65cbe8976ad5b615140649bc1f00f6adb2c63d3d416c7107ee285a428bde8a4",
       "size": 275178
     },
     {
@@ -1207,8 +1207,8 @@
     },
     {
       "path": "records/spatial_features.jsonl",
-      "sha256": "e6ad113c04f3a8acca13f5ea61b7fcb7d9d2eb42da8494bc1498c8315dfe219a",
-      "size": 182031
+      "sha256": "734b903315c5eebc79e8ab5ca551982e9d4bb8bf1974d71d74b00b23b2b11117",
+      "size": 184499
     },
     {
       "path": "records/ticket_comments.jsonl",
@@ -1237,7 +1237,7 @@
     },
     {
       "path": "records/ticket_workflows.jsonl",
-      "sha256": "99bb85d282b9980ad2d40b184bc038f666d6571727c5f4751547f6db06f8b037",
+      "sha256": "1e794c81c9c6b2d7ad8d61c6356bfd0aa9182e758161715e49ec303175885df9",
       "size": 9899
     },
     {
@@ -1247,12 +1247,12 @@
     },
     {
       "path": "records/types.jsonl",
-      "sha256": "aefd679de0cf832b84709aa14398033846d8b375bac44251585a923d3e11fd98",
+      "sha256": "e664de6c8704b453f16d2f5fb6db922d915ea79005d28af92532a7f8d3e6855b",
       "size": 375276
     },
     {
       "path": "records/workspace.jsonl",
-      "sha256": "c86d15330138aed1f22641b0580b1ea3ef6aed10a9bf2f54f6ef6af1007d3bbf",
+      "sha256": "83627d2821fef2ac10f9508019621a04c29969ce7d81bdf23b574aedfeb13856",
       "size": 730
     },
     {
@@ -1339,8 +1339,8 @@
   ],
   "source": {
     "argus_version": "dev",
-    "instance": "503b270f-77de-4ccb-9dbf-4f4209a56dd0",
-    "schema_revision": "d3e5f7a9b2c4"
+    "instance": "520f4889-0ec3-40ae-ab6b-6b4fcf1c9a84",
+    "schema_revision": "e4f6a8b0c2d5"
   },
   "workspace": {
     "id": "valmora-linac-demo",

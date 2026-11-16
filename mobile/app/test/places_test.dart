@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 
 import 'fake_server.dart';
 import 'harness.dart';
@@ -87,6 +88,14 @@ void main() {
     expect(find.text('12 m'), findsOneWidget);
     expect(app.server.requests.any((r) => r.url.path == '/v1/map/nearby' && num.tryParse(r.url.queryParameters['radius_m'] ?? '') == 200),
         isTrue);
+    // Each one can be seen on the map: it opens there, on that record.
+    app.server.routes['GET /v1/map/features'] = http.Response('{"type":"FeatureCollection","features":[]}', 200,
+        headers: {'content-type': 'application/json'});
+    app.server.routes['GET /v1/map/extent'] = http.Response('{"bbox":null}', 200, headers: {'content-type': 'application/json'});
+    await app.tap('nearby-map-$ionPumpUid');
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('map')), findsOneWidget);
   });
 
   testWidgets('an observation waiting for review can be accepted', (tester) async {

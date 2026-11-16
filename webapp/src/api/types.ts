@@ -2174,6 +2174,14 @@ export interface StorageArea {
   planned_bytes: number | null; disk_free_bytes: number | null; disk_total_bytes: number | null;
   available_bytes: number | null; growth_per_day_bytes: number | null; days_left: number | null;
 }
+/** What the portability area holds and what each cleanup would free (GET /v1/admin/statistics/storage/cleanup). */
+export interface StorageCleanupPreview {
+  root: string;
+  holds: { part: string; bytes: number; what: string }[];
+  repositories: { path: string; bytes: number; loose_bytes: number; in_sync: boolean; reason: string | null }[];
+  actions: { id: string; label: string; frees_up_to: number; available: boolean; note: string; count?: number }[];
+}
+export interface StorageCleanupResult { actions: { id: string; done: boolean; freed: number; reason?: string }[]; freed: number }
 export interface StorageReport {
   measured_at: string | null;
   areas: StorageArea[];

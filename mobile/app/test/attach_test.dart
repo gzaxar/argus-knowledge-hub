@@ -56,6 +56,17 @@ void main() {
     expect(_sent(r).attachedTo, 'document/$draftUid/revision/$draftUid-r1');
   });
 
+  testWidgets("a photo already on the phone can be attached too", (tester) async {
+    final r = await start(tester);
+    await r.go('/document/$draftUid');
+    await tester.dragUntilVisible(
+        find.byKey(const Key('doc-attach')), find.byType(Scrollable).first, const Offset(0, -300));
+    await r.tap('doc-attach');
+    await r.tap('attach-gallery');
+    expect(r.photos.lastFromGallery, isTrue);
+    expect(_sent(r).attachedTo, 'document/$draftUid/revision/$draftUid-r1');
+  });
+
   testWidgets('a published document without a draft offers no attaching', (tester) async {
     final r = await start(tester);
     await r.go('/document/$documentUid');

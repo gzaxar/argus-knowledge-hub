@@ -10,6 +10,8 @@ import type {
 } from "./portabilityTypes";
 import type {
   AppSchema,
+  StorageCleanupPreview,
+  StorageCleanupResult,
   GroupDomainsResult,
   UserRemovalPreview,
   Asset,
@@ -2619,7 +2621,9 @@ export const placesApi = {
       `/v1/map/nearby?latitude=${latitude}&longitude=${longitude}&radius_m=${radius}&${mapQuery(filters)}`),
   layers: () => request<{ id: string; name: string; description?: string; package: string }[]>("/v1/map/layers"),
   /** [west, south, east, north] around the workspace's located records, or null. */
-  extent: () => request<{ bbox: [number, number, number, number] | null }>("/v1/map/extent"),
+  /** Where the records of these workspaces (the current one if none) are: the box to open the map on. */
+  extent: (workspaces?: string[]) => request<{ bbox: [number, number, number, number] | null }>(
+    `/v1/map/extent${workspaces?.length ? `?workspaces=${encodeURIComponent(workspaces.join(","))}` : ""}`),
   /** A CSV or (Geo)JSON file of locations: dry_run says what would happen, row by row. */
   importLocations: (file: File, dryRun: boolean) => {
     const form = new FormData();
@@ -2728,6 +2732,10 @@ export const spreadsheetImportApi = {
 export const statisticsApi = {
   get: (days: number, refreshStorage = false) =>
     request<Statistics>(`/v1/admin/statistics?days=${days}${refreshStorage ? "&refresh_storage=true" : ""}`),
+  /** What the portability area holds and what each cleanup would free; nothing changes. */
+  cleanupPreview: () => request<StorageCleanupPreview>("/v1/admin/statistics/storage/cleanup"),
+  cleanup: (actions: string[]) =>
+    request<StorageCleanupResult>("/v1/admin/statistics/storage/cleanup", { method: "POST", body: json({ actions }) }),
 };
 
 /** Templates for documents reworked from raw text, and the rework itself. */

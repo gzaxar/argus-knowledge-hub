@@ -1,8 +1,9 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ApiError, statisticsApi } from "../../api/client";
-import type { Statistics, StorageArea, StorageReport } from "../../api/types";
+import type { Statistics, StorageArea, StorageCleanupPreview, StorageReport } from "../../api/types";
+import { ask } from "../../lib/dialogs";
 
 const CLIENT_COLORS: Record<string, string> = {
   web: "bg-indigo-500",
@@ -13,13 +14,17 @@ const CLIENT_COLORS: Record<string, string> = {
 const CLIENT_LABELS: Record<string, string> = { web: "Web", app: "Android app", mcp: "MCP (assistants)", api: "API & scripts" };
 
 const n = (v: number) => v.toLocaleString();
-const bytes = (v: number | null | undefined) => {
+const bytes = (v: number | null | undefined): string => {
   if (v == null) return "—";
+  if (v < 0) return `−${bytes(-v)}`;
   const units = ["B", "KB", "MB", "GB", "TB"];
   let x = v, i = 0;
   while (x >= 1024 && i < units.length - 1) { x /= 1024; i++; }
   return `${x >= 100 || i === 0 ? Math.round(x) : x.toFixed(1)} ${units[i]}`;
 };
+/** Growth a day in words: shrinking is said so, not as a negative number of bytes. */
+export const growth = (v: number | null | undefined) =>
+  v == null ? "—" : Math.abs(v) < 1024 ? "steady" : v < 0 ? `shrinking, ${bytes(-v)}/day` : `${bytes(v)}/day`;
 const AREA_LABELS: Record<string, string> = { attachments: "Attachment files", database: "Database", portability: "Portability archives" };
 const tokens = (v: number) => (v >= 1e6 ? `${(v / 1e6).toFixed(1)} M` : v >= 1e3 ? `${(v / 1e3).toFixed(1)} k` : String(v));
 
@@ -264,7 +269,7 @@ function StorageGauge({ a }: { a: StorageArea }) {
         <dt className="text-slate-500">Available</dt>
         <dd className={`text-right tabular-nums ${diskBound ? "text-rose-700" : ""}`}>{bytes(a.available_bytes)}</dd>
         <dt className="text-slate-500">Growth</dt>
-        <dd className="text-right tabular-nums">{a.growth_per_day_bytes != null ? `${bytes(a.growth_per_day_bytes)}/day` : "—"}</dd>
+        <dd className="text-right tabular-nums">{growth(a.growth_per_day_bytes)}</dd>
         <dt className="text-slate-500">Full in</dt>
         <dd className={`text-right tabular-nums ${a.days_left != null && a.days_left < 30 ? "font-semibold text-rose-700" : ""}`}>
           {a.days_left == null ? "—" : a.days_left > 3650 ? "over 10 years" : `about ${n(a.days_left)} days`}
@@ -272,6 +277,7 @@ function StorageGauge({ a }: { a: StorageArea }) {
       </dl>
       {diskBound && <p className="mt-1 text-[11px] text-rose-700">The disk under it has less free space than its planned room.</p>}
       {a.area === "database" && <p className="mt-1 text-[11px] text-slate-400">On another node: only its planned room is known.</p>}
+      {a.area === "portability" && <FreeRoom />}
     </div>
   );
 }
@@ -535,6 +541,69 @@ export function StatisticsPage() {
           </div>
             </>
           )}
+        </>
+      )}
+    </div>
+  );
+}
+
+const said = (e: unknown, fallback: string) => {
+  const d = e instanceof ApiError ? e.detail as unknown : null;
+  return typeof d === "string" ? d : d && typeof d === "object" && "error" in d ? String((d as { error: unknown }).error) : fallback;
+};
+
+/** Freeing room in the portability area (services/storage_cleanup.py): what is there, what may go, chosen and done
+ *  by an administrator. Each cleanup says what it frees and why it is safe; one that is not is not offered. */
+function FreeRoom() {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const preview = useQuery({ queryKey: ["storage-cleanup"], queryFn: statisticsApi.cleanupPreview, enabled: open });
+  const run = useMutation({
+    mutationFn: (ids: string[]) => statisticsApi.cleanup(ids),
+    onSuccess: () => { setChosen(new Set()); void qc.invalidateQueries({ queryKey: ["storage-cleanup"] });
+                       void qc.invalidateQueries({ queryKey: ["statistics"] }); },
+  });
+  const p: StorageCleanupPreview | undefined = preview.data;
+  const toggle = (id: string) => setChosen((c) => { const n2 = new Set(c); if (n2.has(id)) n2.delete(id); else n2.add(id); return n2; });
+  const total = (p?.actions ?? []).filter((a) => chosen.has(a.id)).reduce((t, a) => t + a.frees_up_to, 0);
+  if (!open) {
+    return <button type="button" onClick={() => setOpen(true)}
+                   className="mt-2 rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">Free up space…</button>;
+  }
+  return (
+    <div className="mt-3 space-y-2 border-t border-slate-200 pt-2 text-xs" aria-label="Free up space">
+      {preview.isLoading && <p className="text-slate-500">Looking at what is there…</p>}
+      {preview.isError && <p className="text-rose-700">{said(preview.error, "Could not look.")}</p>}
+      {p && (
+        <>
+          <ul className="space-y-0.5 text-slate-600">
+            {p.holds.filter((h) => h.bytes > 0).map((h) => (
+              <li key={h.part} className="flex justify-between gap-2"><span><b>{h.part}</b> · {h.what}</span>
+                <span className="tabular-nums">{bytes(h.bytes)}</span></li>
+            ))}
+          </ul>
+          <ul className="space-y-1">
+            {p.actions.map((a) => (
+              <li key={a.id}>
+                <label className={`flex items-start gap-2 ${a.available ? "" : "text-slate-400"}`}>
+                  <input type="checkbox" disabled={!a.available} checked={chosen.has(a.id)} onChange={() => toggle(a.id)} className="mt-0.5" />
+                  <span className="flex-1">{a.label}{a.count != null && a.count > 0 ? ` (${a.count})` : ""}
+                    <span className="block text-[11px] text-slate-500">{a.note}</span></span>
+                  <span className="tabular-nums">{a.frees_up_to ? `up to ${bytes(a.frees_up_to)}` : "—"}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <div className="flex items-center justify-between gap-2">
+            <button type="button" onClick={() => setOpen(false)} className="text-slate-500 underline">close</button>
+            <button type="button" disabled={chosen.size === 0 || run.isPending}
+                    onClick={async () => { if (await ask(`Remove these files from the portability area? Up to ${bytes(total)} is freed.`)) run.mutate([...chosen]); }}
+                    className="rounded bg-slate-900 px-2 py-1 font-medium text-white disabled:opacity-40">
+              {run.isPending ? "Freeing…" : "Free the space"}</button>
+          </div>
+          {run.data && <p role="status" className="text-emerald-700">Freed {bytes(run.data.freed)}.</p>}
+          {run.isError && <p className="text-rose-700">{said(run.error, "Could not do it.")}</p>}
         </>
       )}
     </div>

@@ -601,6 +601,27 @@ class LocationRepository {
     return out;
   }
 
+  /// Where the workspace's located records are, [west, south, east, north]; null when nothing has a location.
+  Future<List<double>?> extent() async {
+    final r = _map(await _api.json((c) => c.invokeAPI('/v1/map/extent', 'GET', [], null, {}, {}, null)));
+    final box = r['bbox'];
+    return box is List && box.length == 4 ? [for (final v in box) (v as num).toDouble()] : null;
+  }
+
+  /// Everything located in the workspace (its whole extent), to find a record on the map and go to it.
+  Future<List<MapFeatureItem>> everything() async {
+    final box = await extent();
+    if (box == null) return const [];
+    return features(west: box[0], south: box[1], east: box[2], north: box[3]);
+  }
+
+  /// The map's layers: id and name, from the workspace's packages.
+  Future<List<({String id, String name})>> layers() async => [
+        for (final l in _list(await _api.json((c) => c.invokeAPI('/v1/map/layers', 'GET', [], null, {}, {}, null)))
+            .map(_map))
+          (id: l['id'].toString(), name: (l['name'] ?? l['id']).toString()),
+      ];
+
   /// Set the record's position (someone who may edit it): at once, the one it had kept in its history. [fromHere]
   /// says it is where the phone stands, with its GPS accuracy, rather than a point chosen on the map.
   Future<void> setPosition(String uid, double lat, double lon, {double? accuracy, required bool fromHere}) =>

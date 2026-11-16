@@ -68,6 +68,7 @@ Future<PendingCommand?> attachTo(BuildContext context, WidgetRef ref, AttachTarg
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         for (final (k, icon, label) in const [
           ('photo', Icons.photo_camera_outlined, 'Photo'),
+          ('gallery', Icons.photo_library_outlined, 'Photo from the phone'),
           ('video', Icons.videocam_outlined, 'Video'),
           ('audio', Icons.mic_none, 'Recorded note'),
           ('place', Icons.my_location, 'Where I am'),
@@ -89,6 +90,7 @@ Future<PendingCommand?> attachTo(BuildContext context, WidgetRef ref, AttachTarg
           )
         : switch (kind) {
             'photo' => await ref.read(photoSourceProvider).take(),
+            'gallery' => await ref.read(photoSourceProvider).take(fromGallery: true),
             'video' => await media.video(),
             _ => await media.place(),
           };

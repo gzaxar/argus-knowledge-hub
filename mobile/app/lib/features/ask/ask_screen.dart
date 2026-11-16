@@ -14,6 +14,7 @@ import '../shell/app_shell.dart';
 import 'voice.dart';
 import 'voice_orb.dart';
 import 'voice_turns.dart';
+import '../../widgets/pick_photo.dart';
 
 /// Ask: a question answered from the workspace's records, typed or spoken, as a conversation
 /// (the web's Ask page). The lookups behind each answer are shown, so the person sees which
@@ -415,7 +416,7 @@ class _AskScreenState extends ConsumerState<AskScreen> with WidgetsBindingObserv
           _say('Reading text from a photo needs the app on a phone.');
           return;
         }
-        final photo = await ref.read(photoSourceProvider).take();
+        final photo = await pickPhoto(context, ref, title: 'Photo of the page');
         if (photo == null || !mounted) return;
         await _startDocument('Reading the text…', 'photo', photo, () => reader.read(photo));
       case 'ask-photo' || 'ask-image':

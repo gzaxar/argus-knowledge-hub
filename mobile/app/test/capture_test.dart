@@ -140,4 +140,23 @@ void main() {
     expect(app.server.requests.any((r) => r.url.path == '/v1/notifications/everywhere/12/read'), isTrue);
     expect(find.byKey(const Key('ticket-title')), findsOneWidget);
   });
+
+  testWidgets('a photo input asks where the photo comes from: the camera, or the photos already on the phone',
+      (tester) async {
+    final app = await start(tester, askPhotoSource: true);
+    await app.go('/asset/$positionUid');
+    await app.tap('asset-report');
+    await tester.scrollUntilVisible(find.byKey(const Key('report-photo')), 200, scrollable: find.byType(Scrollable).first);
+    await app.tap('report-photo');
+    expect(find.text('Photo of the fault'), findsOneWidget);
+    await app.tap('photo-gallery');
+    expect((app.photos.taken, app.photos.lastFromGallery), (1, true));
+    await app.tap('report-photo');
+    await app.tap('photo-camera');
+    expect((app.photos.taken, app.photos.lastFromGallery), (2, false));
+    await app.tap('report-photo');
+    await tester.tapAt(const Offset(10, 10));                      // dismissed: nothing taken
+    await tester.pumpAndSettle();
+    expect(app.photos.taken, 2);
+  });
 }

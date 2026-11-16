@@ -139,8 +139,10 @@ def _shape(db, ws: str) -> dict:
                          db.scalars(select(PlaceLevel).where(PlaceLevel.workspace_id == ws))),
         "plans": sorted((p.name, json.dumps(p.control_points, sort_keys=True)) for p in plans),
         "plan_files": files(p.storage_path for p in plans),
-        "placements": sorted((assets[p.asset_uid].name, assets[p.place_uid].name if p.place_uid else None,
-                              p.plan_x, p.plan_y) for p in placements),
+        # A record may have an earlier placement (in a room, no point) beside the one on a plan: both are kept.
+        "placements": sorted(((assets[p.asset_uid].name, assets[p.place_uid].name if p.place_uid else None,
+                               p.plan_x, p.plan_y) for p in placements),
+                             key=lambda r: tuple("" if v is None else repr(v) for v in r)),
         "beam_values": sorted((v.s, v.x, v.y) for v in db.scalars(select(BeamModelValue).where(BeamModelValue.workspace_id == ws))),
         "bindings": sorted((b.component_id, assets[b.asset_uid].name, b.status) for b in
                            db.scalars(select(BeamAssetBinding).where(BeamAssetBinding.workspace_id == ws))),

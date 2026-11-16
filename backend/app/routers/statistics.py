@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import Date, cast, func, select, text
 from sqlalchemy.orm import Session
 
@@ -331,3 +332,45 @@ def statistics(days: int = Query(30, ge=1, le=366), refresh_storage: bool = Fals
                      "by_model": by_model, "recent_negative": recent,
                      "workspace": ask_feedback.workspace_id(), "assignee": ask_feedback.assignee_email(db)},
     }
+
+
+# --------------------------------------------------------------------------- freeing room
+
+class CleanupIn(BaseModel):
+    # Ids of the cleanups to do, as the preview gives them ("compact:work/<id>", "bundle_imports"…).
+    actions: list[str] = []
+
+
+@router.get("/storage/cleanup")
+def storage_cleanup_preview(identity=Depends(get_identity)):
+    """What the portability area holds, part by part, and what each cleanup would free (services/storage_cleanup.py).
+    Nothing changes. Administrators signed in."""
+    from app.services import storage_cleanup
+    _person_admin(identity)
+    return storage_cleanup.preview()
+
+
+@router.post("/storage/cleanup")
+def storage_cleanup_run(body: CleanupIn, identity=Depends(get_identity), db: Session = Depends(get_db)):
+    """Do the cleanups asked for that are available now, and measure the storage again."""
+    from app.services import storage, storage_cleanup
+    import logging
+    _person_admin(identity)
+    out = storage_cleanup.run(body.actions)
+    logging.getLogger("argus.storage").info("storage cleanup by %s: %s", identity.user.id, out)
+    try:
+        storage.snapshot(db)
+        db.commit()
+    except Exception:  # noqa: BLE001 — the cleanup is done; a measurement that fails waits for the next hour
+        db.rollback()
+    return out
+
+
+def _person_admin(identity) -> None:
+    """An administrator signed in: freeing room removes files, never with a token."""
+    from app.services import dangerous
+    _admin(identity)
+    if not dangerous.by_a_person(identity):
+        raise HTTPException(status_code=403, detail={"error": "Freeing room removes files: an administrator signed in "
+                                                             "to ARGUS does it, never with an API token.",
+                                                    "code": "person_only"})

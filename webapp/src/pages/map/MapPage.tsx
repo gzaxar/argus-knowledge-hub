@@ -1,6 +1,6 @@
 import "leaflet/dist/leaflet.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { LatLngBounds, Map as LeafletMap } from "leaflet";
+import { geoJSON, type LatLngBounds, type Map as LeafletMap } from "leaflet";
 import { useEffect, useMemo, useState } from "react";
 import { Circle, CircleMarker, MapContainer, Popup, TileLayer, useMapEvents } from "react-leaflet";
 import { GeoShape } from "../../lib/geo";
@@ -17,6 +17,27 @@ import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
 const LAYER_COLOURS: Record<string, string> = { equipment: "#2563eb", places: "#059669" };
 const STATUSES = ["Active", "Provisional", "Retired"];
 const ORDER = { outline: 0, route: 1, position: 2 } as const;
+const HIDDEN_LAYERS = "argus.map-hidden-layers";
+
+/** The site a workspace belongs to: itself when it is a site, its site when it is a facility at one. */
+export const siteOf = (w?: { id: string; role?: string | null; site_id?: string | null } | null) =>
+  !w ? null : w.role === "site" ? w.id : w.site_id ?? null;
+
+/** Located records whose name, key or type has every word typed, the best first: a name that starts with them. */
+export function findOnMap(features: MapFeature[], text: string, limit = 30): MapFeature[] {
+  const words = text.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const seen = new Set<string>();
+  const hits = features.filter((f) => {
+    if (seen.has(f.properties.uid)) return false;
+    const t = `${f.properties.name} ${f.properties.key} ${f.properties.type}`.toLowerCase();
+    if (!words.every((w) => t.includes(w))) return false;
+    seen.add(f.properties.uid);
+    return true;
+  });
+  const starts = (f: MapFeature) => (f.properties.name.toLowerCase().startsWith(words[0]) ? 0 : 1);
+  return hits.sort((a, b) => starts(a) - starts(b) || a.properties.name.localeCompare(b.properties.name)).slice(0, limit);
+}
 const RADII = [50, 200, 1000, 5000];
 // LNF, Frascati: where the map opens when the workspace has nothing located yet.
 const START: [number, number] = [41.8217, 12.6726];
@@ -59,15 +80,19 @@ export function MapPage() {
     enabled: centre !== null,
   });
   const reviews = useQuery({ queryKey: ["location-reviews", here], queryFn: () => placesApi.reviews() });
-  // Open on where this workspace's records are, once: after that the view is the person's.
-  const extent = useQuery({ queryKey: ["map-extent", here], queryFn: () => placesApi.extent() });
-  const [framed, setFramed] = useState(false);
+  // Open on where the shown workspaces' records are: this workspace's at first, and again whenever the workspaces
+  // shown change (ticking another one goes to it); otherwise the view is the person's.
+  const shownWorkspaces = filters.workspaces ?? (here ? [here] : []);
+  const extentKey = shownWorkspaces.join(",");
+  const extent = useQuery({ queryKey: ["map-extent", extentKey],
+                            queryFn: () => placesApi.extent(filters.workspaces) });
+  const [framed, setFramed] = useState<string | null>(null);
   useEffect(() => {
     const box = extent.data?.bbox;
-    if (!map || framed || !extent.isFetched) return;
-    setFramed(true);
+    if (!map || framed === extentKey || !extent.isFetched || extent.isFetching) return;
+    setFramed(extentKey);
     if (box) map.fitBounds([[box[1], box[0]], [box[3], box[2]]], { padding: [24, 24], maxZoom: 18 });
-  }, [map, framed, extent.isFetched, extent.data]);
+  }, [map, framed, extentKey, extent.isFetched, extent.isFetching, extent.data]);
   // Indoors: the plans placed on the map in view, by floor (every building's floor of the same order together).
   const plans = useQuery({ queryKey: ["map-plans", bbox], queryFn: () => indoorApi.mapPlans(bbox!), enabled: bbox !== null,
                            placeholderData: (prev) => prev });
@@ -90,14 +115,66 @@ export function MapPage() {
     },
   });
 
+  // The workspaces whose records may be shown with these: those of the same site (the site and its facilities).
+  const current = (workspaces.data ?? []).find((w) => w.id === here);
+  const site = siteOf(current);
+  const siteWorkspaces = (workspaces.data ?? []).filter((w) => w.id === here || (site != null && siteOf(w) === site));
+  // Layers turned off on this map (remembered here).
+  const [hidden, setHidden] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_LAYERS) ?? "[]") as string[]); } catch { return new Set(); }
+  });
+  const toggleLayer = (id: string) => setHidden((cur) => {
+    const next = new Set(cur);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    try { localStorage.setItem(HIDDEN_LAYERS, JSON.stringify([...next])); } catch { /* not remembered */ }
+    return next;
+  });
+  // Everything located in the workspaces shown (their whole extent), to find a record and go to it.
+  const everything = useQuery({
+    queryKey: ["map-everything", extentKey, filters.types, filters.status],
+    queryFn: () => placesApi.features(extent.data!.bbox!, filters),
+    enabled: !!extent.data?.bbox,
+  });
+  const [find, setFind] = useState("");
+  const [focus, setFocus] = useState<string | null>(null);
+  const focusOn = (f: MapFeature) => {
+    if (!map) return;
+    const box = geoJSON(f.geometry as never).getBounds();
+    if (f.geometry.type === "Point") map.setView(box.getCenter(), Math.max(map.getZoom(), 19));
+    else map.fitBounds(box, { padding: [40, 40], maxZoom: 19 });
+    setFocus(f.properties.uid);
+  };
+  // `?focus=<uid>` (a record's "On the site map"): go to it once it is found.
+  const wanted = params.get("focus");
+  const [wentTo, setWentTo] = useState<string | null>(null);
+  useEffect(() => {
+    if (!wanted || wentTo === wanted || !map || !everything.data) return;
+    const hit = everything.data.features.filter((f) => f.properties.uid === wanted)
+      .sort((a, b) => ORDER[b.properties.role] - ORDER[a.properties.role])[0];
+    if (hit) { setWentTo(wanted); setFramed(extentKey); focusOn(hit); }
+  }, [wanted, wentTo, map, everything.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const found = useMemo(() => findOnMap(everything.data?.features ?? [], find), [everything.data, find]);
+  // The building (or hall, or room) gone to: its floor plans, to open or lay on the map.
+  const focusedInside = useMemo(() => (plans.data ?? []).filter((p) => p.place.uid === focus)
+    .sort((a, b) => (a.level?.ordinal ?? 0) - (b.level?.ordinal ?? 0)), [plans.data, focus]);
+  const focusedName = everything.data?.features.find((f) => f.properties.uid === focus)?.properties.name ?? "";
+
   const objectTypes = useMemo(() => (schemas.data ?? []).filter((s) => s.applies_to === "objects")
     .sort((a, b) => a.name.localeCompare(b.name)), [schemas.data]);
+  // Two types of the same name (this workspace's and a shared one) are told apart by where they come from.
+  const typeLabel = useMemo(() => {
+    const count = new Map<string, number>();
+    for (const s of objectTypes) count.set(s.name, (count.get(s.name) ?? 0) + 1);
+    return (s: (typeof objectTypes)[number]) =>
+      (count.get(s.name) ?? 0) > 1 ? `${s.name} (${s.workspace_id === here ? "this workspace" : s.workspace_id ?? "shared"})` : s.name;
+  }, [objectTypes, here]);
   const label = (f: MapFeature) => f.properties.name + (showKeys ? ` · ${f.properties.key}` : "");
   const open = (f: MapFeature, e?: React.MouseEvent) => {
     if (openInWorkspace(f.properties.workspace_id, `/assets/${f.properties.uid}`, here)) e?.preventDefault();
   };
   const toggle = (key: keyof MapFilters, value: string) => setFilters((cur) => {
-    const list = cur[key] ?? [];
+    // The workspaces start from the current one, shown by default: ticking another adds it, it does not replace it.
+    const list = cur[key] ?? (key === "workspaces" && here ? [here] : []);
     const next = list.includes(value) ? list.filter((x) => x !== value) : [...list, value];
     return { ...cur, [key]: next.length ? next : undefined };
   });
@@ -121,25 +198,67 @@ export function MapPage() {
         <div className="space-y-1">
           <p className="text-xs font-semibold uppercase text-slate-500">Layers</p>
           {(layers.data ?? []).map((l) => (
-            <p key={l.id} className="flex items-center gap-2">
-              <span className="inline-block h-3 w-3 rounded-full" style={{ background: LAYER_COLOURS[l.id] ?? "#64748b" }} />
+            <button key={l.id} type="button" aria-pressed={!hidden.has(l.id)} onClick={() => toggleLayer(l.id)}
+                    title={hidden.has(l.id) ? "Show this layer" : "Hide this layer"}
+                    className={`flex w-full items-center gap-2 rounded px-1 text-left hover:bg-slate-50 ${hidden.has(l.id) ? "text-slate-400 line-through" : ""}`}>
+              <span className="inline-block h-3 w-3 rounded-full" style={{ background: hidden.has(l.id) ? "#cbd5e1" : LAYER_COLOURS[l.id] ?? "#64748b" }} />
               {l.name}
-            </p>
+            </button>
           ))}
+          {(layers.data?.length ?? 0) > 0 && <p className="text-[11px] text-slate-400">Click a layer to hide or show it.</p>}
           {layers.data?.length === 0 && <p className="text-xs text-slate-500">This workspace's packages define none.</p>}
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase text-slate-500">Type</p>
+          <p className="text-xs font-semibold uppercase text-slate-500">Find on the map</p>
+          <input type="search" value={find} onChange={(e) => setFind(e.target.value)} aria-label="Find on the map"
+                 placeholder="A building, a room, a rack, a key…" className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-xs" />
+          {find.trim() && (
+            <ul className="mt-1 max-h-56 space-y-0.5 overflow-y-auto">
+              {found.length === 0 && <li className="text-xs text-slate-500">{everything.isLoading ? "Looking…" : "Nothing located matches."}</li>}
+              {found.map((f) => (
+                <li key={f.properties.uid}>
+                  <button type="button" onClick={() => focusOn(f)}
+                          className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-xs hover:bg-slate-100">
+                    <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ background: LAYER_COLOURS[f.properties.map_layer ?? ""] ?? "#64748b" }} />
+                    <span className="truncate">{label(f)}</span>
+                    <span className="ml-auto shrink-0 text-slate-400">{f.properties.type}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {focusedInside.length > 0 && (
+          <div className="rounded border border-emerald-200 bg-emerald-50 p-2 text-xs" aria-label="Inside">
+            <p className="font-semibold text-emerald-900">Inside {focusedName}</p>
+            <ul className="mt-1 space-y-0.5">
+              {focusedInside.map((p) => (
+                <li key={p.uid} className="flex items-center gap-2">
+                  <Link to={`/plans/${p.uid}`} className="text-indigo-700 hover:underline">{p.level?.name ?? p.name}</Link>
+                  {p.corners && <button type="button" onClick={() => setFloor(floorOf(p))}
+                                        className="text-slate-600 underline">on the map</button>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <details>
+          <summary className="cursor-pointer text-xs font-semibold uppercase text-slate-500">Filter by type
+            {filters.types?.length ? ` (${filters.types.length})` : ""}</summary>
           <select multiple value={filters.types ?? []} size={5}
                   onChange={(e) => setFilters({ ...filters, types: Array.from(e.target.selectedOptions).map((o) => o.value) })}
                   className="mt-1 w-full rounded border border-slate-300 text-xs">
-            {objectTypes.map((s) => <option key={s.uid} value={s.uid}>{s.name}</option>)}
+            {objectTypes.map((s) => <option key={s.uid} value={s.uid}>{typeLabel(s)}</option>)}
           </select>
           <p className="text-[11px] text-slate-400">A type includes the types under it. None selected: all.</p>
-        </div>
+        </details>
         <div>
           <p className="text-xs font-semibold uppercase text-slate-500">Workspaces</p>
-          {(workspaces.data ?? []).map((w) => (
+          <p className="text-[11px] text-slate-400">
+            {site ? "This workspace is shown; tick the others of its site to show theirs too (the map moves to take them in)."
+                  : "This workspace belongs to no site: only its own records are shown."}</p>
+          {siteWorkspaces.map((w) => (
             <label key={w.id} className="flex items-center gap-2 text-xs">
               <input type="checkbox" checked={filters.workspaces ? filters.workspaces.includes(w.id) : w.id === here}
                      onChange={() => toggle("workspaces", w.id)} />
@@ -227,11 +346,15 @@ export function MapPage() {
           {centre && <Circle center={centre} radius={radius} pathOptions={{ color: "#f59e0b", fillOpacity: 0.05 }} />}
           {floor && (plans.data ?? []).filter((p) => floorOf(p) === floor && p.corners).map((p) => <PlanOverlay key={p.uid} plan={p} />)}
           {/* Areas under lines under points, so every point stays clickable. */}
-          {[...(features.data?.features ?? [])].sort((a, b) => ORDER[a.properties.role] - ORDER[b.properties.role]).map((f) => {
+          {[...(features.data?.features ?? [])].filter((f) => !hidden.has(f.properties.map_layer ?? ""))
+            .sort((a, b) => ORDER[a.properties.role] - ORDER[b.properties.role]).map((f) => {
             const colour = LAYER_COLOURS[f.properties.map_layer ?? ""] ?? "#64748b";
+            const lit = focus === f.properties.uid;
             const style = f.properties.role === "position"
-              ? { color: "#fff", weight: 2, fillOpacity: 0.9, fillColor: colour }
-              : { color: colour };
+              ? { color: lit ? "#f59e0b" : "#fff", weight: lit ? 4 : 2, fillOpacity: 0.9, fillColor: colour }
+              : { color: lit ? "#f59e0b" : colour, weight: lit ? 4 : 3 };
+            // A building or a room with floor plans: what is inside, plan by plan.
+            const inside = (plans.data ?? []).filter((p) => p.place.uid === f.properties.uid);
             return (
               <GeoShape key={f.id} geometry={f.geometry} style={style}>
                 <Popup>
@@ -241,6 +364,20 @@ export function MapPage() {
                     {f.properties.base_m != null && f.properties.top_m != null && ` · ${f.properties.base_m}–${f.properties.top_m} m`}
                     {f.properties.accuracy_m != null && ` · ±${Math.round(f.properties.accuracy_m)} m`}</p>
                   <Link to={`/assets/${f.properties.uid}`} onClick={(e) => open(f, e)}>Open</Link>
+                  {inside.length > 0 && (
+                    <div className="mt-2 border-t border-slate-200 pt-1 text-xs" data-inside="">
+                      <p className="font-medium text-slate-700">Inside: {inside.length === 1 ? "a floor plan" : `${inside.length} floor plans`}</p>
+                      <ul>
+                        {[...inside].sort((a, b) => (a.level?.ordinal ?? 0) - (b.level?.ordinal ?? 0)).map((p) => (
+                          <li key={p.uid}>
+                            <Link to={`/plans/${p.uid}`}>{p.level?.name ?? p.name}</Link>
+                            {p.corners && <button type="button" className="ml-2 text-slate-500 underline"
+                                                  onClick={() => setFloor(floorOf(p))}>on the map</button>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </Popup>
               </GeoShape>
             );

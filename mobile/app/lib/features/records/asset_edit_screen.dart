@@ -8,6 +8,7 @@ import '../../domain/models.dart';
 import '../../widgets/attribute_form.dart';
 import '../../widgets/common.dart';
 import '../capture/proposal_tile.dart';
+import '../../widgets/pick_photo.dart';
 
 /// Editing a record's attributes, respecting what its type actually allows (see AttributeFields). A text
 /// field can also be read from a photo: not full nameplate OCR, the same AI reading the registration photo
@@ -34,7 +35,7 @@ class _AssetEditScreenState extends ConsumerState<AssetEditScreen> {
 
   /// A photo's reading of one field, once the person takes it; null leaves the field as it was.
   Future<String?> _scan(AttributeDef def, AssetDetail a) async {
-    final photo = await ref.read(photoSourceProvider).take();
+    final photo = await pickPhoto(context, ref, title: 'Photo of the nameplate or the unit');
     if (photo == null || !mounted) return null;
     final draft = {
       'uid': a.uid,
