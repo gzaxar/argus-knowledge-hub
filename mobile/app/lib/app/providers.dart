@@ -104,6 +104,28 @@ class ShowKeysController extends Notifier<bool> {
 
 final showKeysProvider = NotifierProvider<ShowKeysController, bool>(ShowKeysController.new);
 
+/// The map layers turned off on the phone's map (remembered on the phone).
+class HiddenLayersController extends Notifier<Set<String>> {
+  static const _key = 'argus.pref.map-hidden-layers';
+
+  @override
+  Set<String> build() {
+    ref.read(localStoreProvider).read(_key).then((v) {
+      if (v != null && v.isNotEmpty) state = v.split(',').toSet();
+    }).catchError((_) {});
+    return const {};
+  }
+
+  Future<void> toggle(String layer) async {
+    final next = {...state};
+    if (!next.remove(layer)) next.add(layer);
+    state = next;
+    await ref.read(localStoreProvider).write(_key, next.join(','));
+  }
+}
+
+final hiddenLayersProvider = NotifierProvider<HiddenLayersController, Set<String>>(HiddenLayersController.new);
+
 /// Whether ARGUS answered the last request, and the device's offset from the server's clock.
 class Reachability {
   const Reachability({this.reachable = true, this.serverOffset = Duration.zero, this.since});

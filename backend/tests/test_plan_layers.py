@@ -162,6 +162,11 @@ def test_a_record_said_to_be_in_a_place_with_a_plan_is_offered_that_plan_until_i
                        files={"file": ("hall.png", png(), "image/png")}).json()
     room, pump, unit, rack = (_unit(w, "Room O1", "Room"), _unit(w, "Pump O", "Water Pump"),
                               _unit(w, "Switch O", "Switch"), _unit(w, "Rack O", "Rack"))
+    db = SessionLocal()
+    room_type = engine.ensure_type(db, w["ws"], "Room")
+    room_type.metadata_json = {**(room_type.metadata_json or {}), "map_layer": "places"}       # a place, as packages say
+    db.commit()
+    db.close()
     assert client.put(f"/v1/assets/{room}/indoors", headers=h,
                       json={"place_uid": hall, "plan_uid": plan["uid"], "x": 200, "y": 100}).status_code == 200
     db = SessionLocal()
@@ -177,6 +182,28 @@ def test_a_record_said_to_be_in_a_place_with_a_plan_is_offered_that_plan_until_i
     assert offer["plans"][0]["place"]["uid"] == hall
     assert client.get(f"/v1/assets/{unit}/indoors", headers=h).json()["plan_offer"] is None    # in a rack
     assert client.get(f"/v1/assets/{hall}/indoors", headers=h).json()["plan_offer"] is None    # in nothing
+
+    # A room with an outline of its own is drawn on the plan by it: no point offered.
+    bunker = _unit(w, "Bunker O", "Room")
+    db = SessionLocal()
+    b = db.get(Asset, bunker)
+    b.attributes = {"argus_location": f"Hall O-{w['ws']}"}
+    ring = [list(at(10, 10)), list(at(90, 10)), list(at(90, 60)), list(at(10, 60)), list(at(10, 10))]
+    spatial.set_location(db, b, spatial.shape(db, {"type": "Polygon", "coordinates": [ring]}, "outline"),
+                         actor="t", source="manual", role="outline")
+    db.commit()
+    db.close()
+    assert client.get(f"/v1/assets/{bunker}/indoors", headers=h).json()["plan_offer"] is None
+
+    # A virtual machine on a host that has its point: shown there, nothing offered.
+    host, vm = _unit(w, "Host O", "Server"), _unit(w, "VM O", "Server")
+    assert client.put(f"/v1/assets/{host}/indoors", headers=h,
+                      json={"place_uid": room, "plan_uid": plan["uid"], "x": 220, "y": 120}).status_code == 200
+    db = SessionLocal()
+    db.get(Asset, vm).attributes = {"argus_location": f"Host O-{w['ws']}"}
+    db.commit()
+    db.close()
+    assert client.get(f"/v1/assets/{vm}/indoors", headers=h).json()["plan_offer"] is None
 
     assert client.put(f"/v1/assets/{pump}/indoors", headers=h,
                       json={"place_uid": room, "plan_uid": plan["uid"], "x": 210, "y": 110}).status_code == 200

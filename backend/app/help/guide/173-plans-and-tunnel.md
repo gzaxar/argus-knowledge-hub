@@ -59,5 +59,7 @@ A record said to be in a place — its **Located in**, or a `located in` relatio
 (its own, or the building's plan the room is drawn on) but which has no point on any plan yet, shows in **Indoors**:
 *It is in … which has a floor plan, but it is on none of them yet*, with **Put it on the plan**. That opens the
 placement already in that place and on that plan: click where it is and **Save** (top right). Right after a new
-record is saved, the same is asked once. A unit in a rack is not offered it: it is shown where its rack is.
+record is saved, the same is asked once. It is not offered to what is already shown on a plan another way: a unit
+in a rack, or anything in a piece of equipment that has its point (a virtual machine on its host), is shown there;
+a room or zone with an outline of its own, or one the plan itself draws, is drawn by it.
 

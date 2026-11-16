@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:argus_field/widgets/place_map.dart';
 import 'package:argus_field/app/app.dart';
 import 'package:argus_field/app/providers.dart';
+import 'package:argus_field/widgets/pick_photo.dart';
 import 'package:argus_field/app/router.dart';
 import 'package:argus_field/core/config.dart';
 import 'package:argus_field/domain/capture.dart';
@@ -84,6 +85,7 @@ Future<Running> start(WidgetTester tester,
     {Map<String, String> stored = signedIn,
     List<Override> overrides = const [],
     AppConfig config = testConfig,
+    bool askPhotoSource = false,
     void Function(FakeArgus server)? prepare}) async {
   FlutterSecureStorage.setMockInitialValues(Map.of(stored));
   await tester.binding.setSurfaceSize(const Size(420, 1400));
@@ -100,6 +102,8 @@ Future<Running> start(WidgetTester tester,
       cacheStoreProvider.overrideWithValue(MemoryLocalStore()),
       blobStoreProvider.overrideWithValue(MemoryBlobStore()),
       photoSourceProvider.overrideWithValue(photos),
+      // Most tests are not about where a photo comes from: they get the camera without the question.
+      askPhotoSourceProvider.overrideWithValue(askPhotoSource),
       textReaderProvider.overrideWithValue(texts),
       mediaSourceProvider.overrideWithValue(media),
       phoneNotifierProvider.overrideWithValue(FakePhoneNotifier()),

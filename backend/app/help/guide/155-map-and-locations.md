@@ -132,12 +132,24 @@ records with copies of the floors and plans, placed where the originals were.
 ## The map
 
 **Assets → Map** shows the records with a location, coloured by layer: points, routes as lines and outlines as
-areas (under the points, so every point can be clicked). It opens on where the workspace's located records are. Narrow it to **types** (a type includes
-the types under it), **workspaces** you can read, and **status**. A marker opens its record (in its own
-workspace). **Near a point**: choose a distance and *of the map's centre* to list what is within it, nearest
-first — a route or an outline by its nearest part (inside an outline is 0 m). **Indoors** chooses a floor: the
-floor plans placed on the map in view are laid on it (the same floor of every building together). The map shows exactly what a list would show you: nothing restricted, nothing from a workspace you
-cannot open.
+areas (under the points, so every point can be clicked). It opens on where the workspace's located records are.
+
+- **Layers**: click one to hide it or show it again (remembered in this browser).
+- **Find on the map**: type a name, a key or a type (a building, a room, a rack…): the located records that match
+  are listed, and a click takes the map to one, outlined in orange. A record's **Location** card has **On the site
+  map**, which opens the map on it (`/map?focus=…`).
+- **Inside**: when the map goes to a building (or a hall, or a room) with floor plans, they are listed: open one, or
+  **on the map** to lay that floor on the map. Clicking a building's outline says the same in its pop-up.
+- **Filter by type** (a type includes the types under it) and **status**.
+- **Workspaces**: this workspace's records are shown; the other workspaces of the same site (the laboratory and its
+  facilities) can be ticked to show theirs too, and the map moves to take them in. A workspace at no site shows
+  only its own.
+
+A marker opens its record (in its own workspace). **Near a point**: choose a distance and *of the map's centre* to
+list what is within it, nearest first — a route or an outline by its nearest part (inside an outline is 0 m).
+**Indoors** chooses a floor: the floor plans placed on the map in view are laid on it (the same floor of every
+building together). The map shows exactly what a list would show you: nothing restricted, nothing from a workspace
+you cannot open.
 
 ## Reporting a position from the phone
 

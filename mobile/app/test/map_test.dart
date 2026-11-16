@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 
 import 'fake_server.dart';
 import 'harness.dart';
+import 'package:argus_field/domain/models.dart';
+import 'package:argus_field/features/places/map_screen.dart';
 
 http.Response _json(Object body) => http.Response(jsonEncode(body), 200, headers: {'content-type': 'application/json'});
 
@@ -74,5 +76,70 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('map')), findsOneWidget);
     expect(find.text('0 in view'), findsOneWidget);
+  });
+
+  testWidgets('a tapped building lists its floor plans, and one opens', (tester) async {
+    final app = await start(tester);
+    app.server.routes['GET /v1/map/features'] = _json({'type': 'FeatureCollection', 'features': [
+      _feature('bld-b', 'Building B', 'position', {'type': 'Point', 'coordinates': [12.6726, 41.8217]}),
+    ]});
+    app.server.routes['GET /v1/assets/bld-b/levels'] = _json({'levels': [], 'plans': [
+      {'uid': 'p0', 'name': 'B ground floor', 'width_px': 100, 'height_px': 50, 'place': {'uid': 'bld-b', 'name': 'Building B'},
+        'level': {'uid': 'l0', 'name': 'Ground floor', 'ordinal': 0}},
+      {'uid': 'p1', 'name': 'B first floor', 'width_px': 100, 'height_px': 50, 'place': {'uid': 'bld-b', 'name': 'Building B'},
+        'level': {'uid': 'l1', 'name': 'First floor', 'ordinal': 1}},
+    ]});
+    await app.go('/map');
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(of: find.byType(MarkerLayer).first, matching: find.byType(GestureDetector)).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Inside: 2 floor plans'), findsOneWidget);
+    expect(find.byKey(const Key('map-inside-p0')), findsOneWidget);
+    expect(find.text('First floor'), findsOneWidget);
+  });
+
+  testWidgets('search finds a located record and goes to it; a layer turned off is not drawn', (tester) async {
+    final app = await start(tester);
+    final all = {'type': 'FeatureCollection', 'features': [
+      _feature('hall-1', 'Hall BTF', 'outline', _hall),
+      _feature(ionPumpUid, 'Ion pump 7', 'position', {'type': 'Point', 'coordinates': [12.6726, 41.8217]},
+          layer: 'equipment'),
+    ]};
+    app.server.routes['GET /v1/map/features'] = _json(all);
+    app.server.routes['GET /v1/map/extent'] = _json({'bbox': [12.672, 41.8212, 12.673, 41.8222]});
+    app.server.routes['GET /v1/map/layers'] = _json([
+      {'id': 'equipment', 'name': 'Equipment', 'package': 'core'}, {'id': 'places', 'name': 'Places', 'package': 'core'}]);
+    await app.go('/map');
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+    expect(find.text('2 in view'), findsOneWidget);
+
+    await app.tap('map-find');
+    await tester.enterText(find.byKey(const Key('map-find-text')), 'pump');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('map-found-hall-1')), findsNothing);
+    await app.tap('map-found-$ionPumpUid');
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.radio_button_unchecked), findsOneWidget, reason: 'the pump, outlined in orange');
+
+    await app.tap('map-layers');
+    await app.tap('map-layer-equipment');
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.byKey(const Key('map-layer-equipment')))).pop();
+    await tester.pumpAndSettle();
+    expect(find.text('1 in view'), findsOneWidget, reason: 'the equipment layer is off');
+  });
+
+  test('a search matches every word typed, once a record, names that start with it first', () {
+    MapFeatureItem item(String uid, String name, String key, String type) => MapFeatureItem(
+        target: LinkTarget(kind: RecordKind.asset, uid: uid, title: name, key: key, subtitle: type),
+        shape: const PlaceShape(role: 'position'));
+    final all = [item('s', 'Shielded accelerator hall', 'VL-HALL', 'Building'),
+                 item('b', 'Accelerator Building', 'VL-BLD-ACC', 'Building'),
+                 item('b', 'Accelerator Building', 'VL-BLD-ACC', 'Building'), item('r', 'Rack A12-1', 'VL-RK-A12-1', 'Rack')];
+    expect(findOnMap(all, 'accel').map((f) => f.target.uid), ['b', 's']);
+    expect(findOnMap(all, 'vl-rk').map((f) => f.target.uid), ['r']);
+    expect(findOnMap(all, ' '), isEmpty);
   });
 }

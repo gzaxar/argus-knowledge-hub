@@ -311,6 +311,10 @@ def publish(checkpoint: Path, manifest: dict, *, remote: str, work: Path, signer
             check=False, env=credentials)
     if r.returncode != 0:
         raise GitError(f"push refused: {r.stderr.strip()[:300]}", code="push_refused")
+    # What this export wrote loose is packed now, so the local copy does not grow by a full copy every night
+    # (services/storage_cleanup.py); a failure here never fails the export.
+    from app.services.storage_cleanup import compact_after_publish
+    compact_after_publish(work)
     root = git(["rev-list", "--max-parents=0", "HEAD"], cwd=work).stdout.split()[0]
     tag_object = git(["rev-parse", f"refs/tags/{tag}"], cwd=work).stdout.strip()
     return Published(ident["repository_id"], root, commit, parent, tag, tag_object, previous_tag, staged,

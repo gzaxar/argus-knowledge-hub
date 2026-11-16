@@ -7,6 +7,7 @@ import '../../app/providers.dart';
 import '../../core/link_parser.dart';
 import '../../core/problem.dart';
 import 'text_reader.dart';
+import '../../widgets/pick_photo.dart';
 
 /// Scan a label (flutter-app-design §5.2): a QR code, a DataMatrix or a barcode of any kind, or — with
 /// "Read text" — what is printed on a nameplate (a serial, an inventory number), read on the device. What
@@ -69,7 +70,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       try {
         await _controller.stop(); // one camera at a time
       } catch (_) {}
-      final photo = await ref.read(photoSourceProvider).take();
+      if (!mounted) return;
+      final photo = await pickPhoto(context, ref, title: 'Photo of the label');
       if (photo == null || !mounted) return;
       final candidates = labelCandidates(await reader.read(photo));
       if (!mounted) return;

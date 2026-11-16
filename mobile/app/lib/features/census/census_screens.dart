@@ -9,6 +9,7 @@ import '../../domain/census.dart';
 import '../../domain/models.dart' show LinkTarget;
 import '../../widgets/common.dart';
 import 'rack_drawing.dart';
+import '../../widgets/pick_photo.dart';
 
 /// The guided survey of a rack from the phone (docs/rack-census.md):
 /// photograph the rack, confirm which rack it is and where; photograph each unit (and its label); take, correct or
@@ -211,7 +212,7 @@ class _CensusScreenState extends ConsumerState<CensusScreen> {
   }
 
   Future<void> _rackPhoto(String role) async {
-    final photo = await ref.read(photoSourceProvider).take();
+    final photo = await pickPhoto(context, ref, title: 'Photo of the rack');
     if (photo == null) return;
     final out = await _do(() => ref.read(censusRepositoryProvider).photo(widget.uid, role, photo));
     if (out?.note != null && mounted) {
@@ -220,7 +221,7 @@ class _CensusScreenState extends ConsumerState<CensusScreen> {
   }
 
   Future<void> _unitPhoto() async {
-    final photo = await ref.read(photoSourceProvider).take();
+    final photo = await pickPhoto(context, ref, title: 'Photo of the rack');
     if (photo == null) return;
     final out = await _do(() => ref.read(censusRepositoryProvider).photo(widget.uid, 'device', photo));
     if (out?.item != null && mounted) context.push('/census/${widget.uid}/unit/${out!.item}');
@@ -480,7 +481,7 @@ class _CensusUnitScreenState extends ConsumerState<CensusUnitScreen> {
   }
 
   Future<void> _photo(String role) async {
-    final photo = await ref.read(photoSourceProvider).take();
+    final photo = await pickPhoto(context, ref, title: 'Photo of the rack');
     if (photo == null) return;
     setState(() => _busy = true);
     try {

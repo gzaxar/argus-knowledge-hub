@@ -16,6 +16,7 @@ Run inside the API container with DATABASE_URL pointing at an EMPTY database (it
    over the drawing, by layer (docs/plan-layers.md). The building is then drawn as a room schedule
    (scripts/demo_plan_drawing.py): same geometry, labels that fit their rooms where no point or route covers
    them, column grid, doors, shielding.
+3a. The linac's scintillator screens get a point each, just under the screen unit they are part of.
 3b. Before that, inside each building a route (a cable, a pipe) runs along the gaps between rooms to the room it
    serves (scripts/demo_routes_inside.py): the part outside is kept.
 4. The tour gains the plan by layers, a rack and (for a beam model) the tunnel; the bundle is exported with it.
@@ -182,6 +183,21 @@ for feature in list(routes):
         rerouted += 1
 db.commit()
 print(f"routes: {rerouted} run inside their buildings along the gaps between rooms")
+
+# ---- what a beamline unit holds is shown with it: the linac's scintillator screens, a point each just under the
+# screen unit they are part of on the bunker's plan (an asset with no point there is otherwise offered one).
+if WS == "valmora-linac-demo":
+    for screen_key, unit_key in (("VL-SCN-1", "VL-U-SCR01"), ("VL-SCN-2", "VL-U-SCR02"), ("VL-SCN-3", "VL-U-SCR03")):
+        screen = db.scalar(select(Asset).where(Asset.workspace_id == WS, Asset.key == screen_key))
+        unit = db.scalar(select(Asset).where(Asset.workspace_id == WS, Asset.key == unit_key))
+        where = indoor.current(db, unit.uid) if unit is not None else None
+        mine = indoor.current(db, screen.uid) if screen is not None else None
+        if screen is None or where is None or not where.plan_uid or (mine is not None and mine.plan_uid):
+            continue
+        indoor.place(db, screen, place_uid=where.place_uid, level_uid=where.level_uid, plan_uid=where.plan_uid,
+                     x=where.plan_x, y=where.plan_y + 7, actor=ACTOR, note=f"with {unit_key}, the unit it is part of")
+        print(f"{screen_key}: on the plan with {unit_key}")
+    db.commit()
 
 MARK = re.compile(r'<rect [^>]*stroke="#1e293b"[^>]*/>\s*<text [^>]*fill="#1e293b"[^>]*>[^<]*</text>\s*')
 plans = list(db.scalars(select(FloorPlan).where(FloorPlan.workspace_id == WS)))

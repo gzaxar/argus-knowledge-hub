@@ -144,7 +144,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/map', builder: (_, s) {
         final lat = double.tryParse(s.uri.queryParameters['lat'] ?? '');
         final lon = double.tryParse(s.uri.queryParameters['lon'] ?? '');
-        return MapScreen(center: lat == null || lon == null ? null : LatLng(lat, lon), zoom: lat == null ? null : 18);
+        return MapScreen(center: lat == null || lon == null ? null : LatLng(lat, lon), zoom: lat == null ? null : 18,
+            focus: s.uri.queryParameters['focus']);
       }),
       GoRoute(path: '/asset/:uid/position', builder: (_, s) {
         final lat = double.tryParse(s.uri.queryParameters['lat'] ?? '');

@@ -97,6 +97,23 @@ A unit is never created from a scan alone: you check the values and register.
 - **Export** (**⇪** at the top of each of them): **Open as PDF** (in the phone's PDF viewer), **Print**, **Send
   PDF** or **Send Markdown** to mail, Drive, Files or any other app. The same files as Export on the web.
 
+## Photos: from the camera or the phone
+
+Wherever the app takes a photo — a nameplate when registering or editing a unit, a fault when reporting, a label
+when scanning, a rack in a census, the new unit when replacing one, a page for a document — it asks first: **Take a
+photo** or **Choose from photos**, so a picture already on the phone can be used. Attaching a file offers **Photo**
+(the camera) and **Photo from the phone**. Ask ARGUS has both as before.
+
+## The map and Near me
+
+**Map** shows the located records in view: points, routes and outlines. Tap one to see what it is and open it; a
+building, a hall or a room with floor plans also lists them under **Inside**, floor by floor — tap one to go in.
+The **search** button finds a located record (by name, key or type) and takes the map to it, outlined in orange.
+The **layers** button turns layers off and on (remembered on the phone). The round button centres the map on you.
+
+**Near me** lists what has a location around the phone (50 m, 200 m or 1 km), nearest first; the **map** button
+beside each one opens the map on it.
+
 ## Floor plans and the compass
 
 A floor plan opened on the phone (from a record's **Indoors**, or a place's plans) zooms and moves with two

@@ -94,7 +94,15 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen> {
             leading: const Icon(Icons.place_outlined),
             title: Text(h.target.title ?? h.target.uid),
             subtitle: Text(keyed(showKeys, h.target.key, [h.target.subtitle])),
-            trailing: Text(_distance(h.distance)),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(_distance(h.distance)),
+              IconButton(
+                key: Key('nearby-map-${h.target.uid}'),
+                tooltip: 'On the map',
+                icon: const Icon(Icons.map_outlined),
+                onPressed: () => context.push('/map?focus=${Uri.encodeQueryComponent(h.target.uid)}'),
+              ),
+            ]),
             onTap: () => context.push(h.target.route),
           ),
       ]),

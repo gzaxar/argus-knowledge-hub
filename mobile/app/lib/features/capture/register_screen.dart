@@ -9,6 +9,7 @@ import '../../domain/capture.dart';
 import '../../domain/models.dart' show RecordKind;
 import '../../widgets/common.dart';
 import 'proposal_tile.dart';
+import '../../widgets/pick_photo.dart';
 
 /// The identifiers a nameplate carries, always offered even before the assistant answers.
 const baseFields = ['manufacturer', 'model', 'serial', 'inventory_number'];
@@ -140,7 +141,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       };
 
   Future<void> _capture() async {
-    final photo = await ref.read(photoSourceProvider).take();
+    final photo = await pickPhoto(context, ref, title: 'Photo of the nameplate or the unit');
     if (photo == null) return;
     setState(() {
       _photo = photo;

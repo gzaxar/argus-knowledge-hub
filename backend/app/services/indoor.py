@@ -595,8 +595,9 @@ def _container_of(db: Session, asset: Asset) -> Optional[str]:
 def plan_offer(db: Session, asset_uid: str, may=None) -> Optional[dict]:
     """The floor plans a record could be put on, when it is said to be in a place (placed inside it, its location
     attribute, or a `located in` relation) that has plans — its own or those of the places it is in, as a room is
-    drawn on its building's plan — but has no point on a plan yet. None otherwise, and for a unit in a rack, which
-    is shown where its rack is."""
+    drawn on its building's plan — but has no point on a plan yet. None otherwise: for a unit in a rack, or anything
+    already shown where what it is in stands (a virtual machine on its host); for a room drawn by its outline, or
+    by the plan itself."""
     from app.models.rack import RackMounting
     from app.services.racks import RACK_TYPES
     asset = db.get(Asset, asset_uid)
@@ -607,6 +608,25 @@ def plan_offer(db: Session, asset_uid: str, may=None) -> Optional[dict]:
         return None
     now_ = current(db, asset_uid)
     if now_ is not None and now_.plan_uid:
+        return None
+    from app.services import spatial
+
+    def is_place(rec: Asset) -> bool:
+        """A room, a hall, a building: on the map's places layer, or drawn by an outline, or with floors or plans."""
+        return (spatial.placement(db, rec.schema_uid)[1] == "places"
+                or spatial.current(db, rec.uid, "outline") is not None
+                or db.scalar(select(PlaceLevel.uid).where(PlaceLevel.place_uid == rec.uid).limit(1)) is not None
+                or db.scalar(select(FloorPlan.uid).where(FloorPlan.place_uid == rec.uid).limit(1)) is not None)
+
+    # Already shown on a plan where the equipment it is in stands (a virtual machine on its host, a card in a crate):
+    # that equipment's point is the one that matters. In a room, it still deserves a point of its own.
+    shown = spot(db, asset_uid, may)
+    if shown is not None and shown.get("via"):
+        via = db.get(Asset, shown["via"]["uid"])
+        if via is not None and (via.type in RACK_TYPES or not is_place(via)):
+            return None
+    # A room or a zone with an outline of its own is drawn on the plan by that outline: it needs no point.
+    if spatial.current(db, asset_uid, "outline") is not None:
         return None
     place_uid = _container_of(db, asset)
     place = db.get(Asset, place_uid) if place_uid else None
@@ -627,6 +647,13 @@ def plan_offer(db: Session, asset_uid: str, may=None) -> Optional[dict]:
                                   "place": {"uid": owner.uid, "name": owner.name}}))
     if not found:
         return None
+    # A room the plan itself draws (by its name, on a plan ARGUS drew) is already on it.
+    name = (asset.name or "").strip().lower()
+    for _, x in found:
+        plan = db.get(FloorPlan, x["uid"])
+        model = _drawing(plan) if plan is not None else None
+        if model and name and any((r.get("name") or "").strip().lower() == name for r in model.get("rooms", [])):
+            return None
     plans = [x for _, x in sorted(found, key=lambda f: f[0])]
     return {"place": {"uid": place.uid, "key": place.key, "name": place.name, "type": place.type}, "plans": plans}
 

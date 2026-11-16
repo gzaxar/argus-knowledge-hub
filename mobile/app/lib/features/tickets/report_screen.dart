@@ -11,6 +11,7 @@ import '../../domain/models.dart';
 import '../../widgets/common.dart';
 import '../capture/proposal_tile.dart';
 import '../../widgets/photo_text.dart';
+import '../../widgets/pick_photo.dart';
 
 /// Reporting a problem where it happens (flutter-app-design §9).
 ///
@@ -120,7 +121,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
   }
 
   Future<void> _addPhoto() async {
-    final photo = await ref.read(photoSourceProvider).take();
+    final photo = await pickPhoto(context, ref, title: 'Photo of the fault');
     if (photo != null) setState(() => _photos.add(photo));
   }
 

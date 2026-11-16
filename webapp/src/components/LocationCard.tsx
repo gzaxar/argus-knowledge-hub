@@ -102,7 +102,11 @@ export function LocationCard({ uid, editable }: { uid: string; editable: boolean
     <section className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="flex items-baseline justify-between">
         <h2 className="text-sm font-semibold text-slate-900">Location</h2>
-        {l.map_layer && <span className="text-xs text-slate-500">map layer: {l.map_layer}</span>}
+        <span className="flex items-baseline gap-3 text-xs text-slate-500">
+          {(l.location || l.route || l.outline) && !l.hidden && (
+            <Link to={`/map?focus=${encodeURIComponent(uid)}`} className="text-indigo-700 hover:underline">On the site map</Link>)}
+          {l.map_layer && <span>map layer: {l.map_layer}</span>}
+        </span>
       </div>
       {l.hidden ? (
         <p className="mt-2 text-sm text-slate-500">Its location is restricted.</p>

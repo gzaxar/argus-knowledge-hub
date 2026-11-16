@@ -11,6 +11,7 @@ import '../../data/replacement_repositories.dart';
 import '../../domain/capture.dart';
 import '../../domain/models.dart';
 import '../../widgets/common.dart';
+import '../../widgets/pick_photo.dart';
 
 const removalReasons = ['Failure', 'Maintenance', 'Upgrade', 'Unknown'];
 
@@ -352,7 +353,7 @@ class _ReplaceScreenState extends ConsumerState<ReplaceScreen> {
             TextButton.icon(
               key: const Key('replace-photo'),
               onPressed: () async {
-                final p = await ref.read(photoSourceProvider).take();
+                final p = await pickPhoto(context, ref, title: 'Photo of the new unit');
                 if (p != null) setState(() => _photos.add(p));
               },
               icon: const Icon(Icons.add_a_photo_outlined),
