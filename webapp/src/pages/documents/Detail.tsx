@@ -434,10 +434,6 @@ export function DocumentDetail() {
       <SupersededBanner doc={doc} />
       <DocumentControlCard doc={doc} />
       <DocumentContextPanel documentUid={doc.uid} />
-      <section className="mt-4 rounded-lg border border-slate-200 bg-white">
-        <h2 className="border-b border-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-900">Related by meaning</h2>
-        <div className="px-4 py-3"><SemanticRelated kind="document" uid={doc.uid} /></div>
-      </section>
 
       {/* Revision selector */}
       <div className="mt-6 flex flex-wrap gap-2">
@@ -885,6 +881,12 @@ export function DocumentDetail() {
       )}
 
       {!viewed && <p className="mt-4 text-sm text-slate-400">No revisions.</p>}
+
+      {/* After the document: what is near it in meaning is read once the document has been. */}
+      <section className="mt-6 rounded-lg border border-slate-200 bg-white">
+        <h2 className="border-b border-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-900">Related by meaning</h2>
+        <div className="px-4 py-3"><SemanticRelated kind="document" uid={doc.uid} /></div>
+      </section>
 
       {viewingDrawing && (
         <DrawingViewer

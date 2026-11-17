@@ -594,6 +594,89 @@ def notices(t: dt.Template, extraction: dict) -> dict:
             if t.document_type in c["reference_types"] else None}
 
 
+# ---------------------------------------------------------------- the pictures of the source (a log's plots)
+
+FIGURE_LINE = re.compile(r"^!\[([^\]]*)\]\(/v1/intake/source-images/([0-9a-f]{32})\)\s*$")
+# An entry of a running log, wherever it is on its line: "10h35: misura emittanza", "9.35 - laser riacceso".
+ENTRY = re.compile(r"(?:^|\s)(\d{1,2}(?:[h.:]\d{2}|h))\s*[:\-–—]\s*(\S.*)$")
+FIGURE_LABELS = {
+    "it": {"section": "Figure", "figure": "Figura", "page": "pagina",
+           "read": "Letto nell'immagine dal modello di visione, da verificare"},
+    "en": {"section": "Figures", "figure": "Figure", "page": "page",
+           "read": "Read in the picture by the vision model, to check"},
+}
+
+
+def figures_in(source: str) -> list[dict]:
+    """The pictures the source shows (a file's, kept by routers/intake.py), in order: id, the line (1-based), the
+    page they were on and the entry they belong to — the log's last timed entry above them, else the text just
+    above."""
+    lines = (source or "").replace("\r\n", "\n").split("\n")
+    out = []
+    for i, line in enumerate(lines):
+        m = FIGURE_LINE.match(line.strip())
+        if not m:
+            continue
+        page = re.search(r"page (\d+)", m.group(1))
+        out.append({"id": m.group(2), "line": i + 1, "page": int(page.group(1)) if page else None,
+                    "caption": _caption(lines, i)})
+    return out
+
+
+def _clean(line: str) -> str:
+    return re.sub(r"^#{1,6}\s*|^\s*[-*]\s+|\*\*|__", "", line).strip()
+
+
+def _caption(lines: list[str], at: int) -> str:
+    """The entry a picture belongs to: the last timed entry above it in its day, with the short line just above
+    the picture when that names it ("calibrazione", "spot a deflettore spento"); without a timed entry, the
+    text just above it."""
+    near = None
+    for j in range(at - 1, max(-1, at - 60), -1):
+        line = lines[j].strip()
+        if not line or FIGURE_LINE.match(line):
+            continue
+        text = _clean(line)
+        hits = list(ENTRY.finditer(text))
+        if hits:
+            entry = f"{hits[-1].group(1)}: {hits[-1].group(2)}"
+            return (f"{entry} — {near}" if near else entry)[:200]
+        if parse_date(text) and len(text) <= 40:
+            break                                   # the day's heading: no entry above it in this day
+        if near is None:
+            # A short line naming the picture; a heading or a line in capitals is a note to the shift, not it.
+            near = text if (len(text) <= 80 and not line.startswith("#") and text != text.upper()) else ""
+    return (near or "")[:200]
+
+
+def for_model(source: str) -> str:
+    """The source as the model reads it: each picture a short mark on its own line, so the lines keep their
+    numbers and the model is not given links."""
+    n = 0
+
+    def mark(m: re.Match) -> str:
+        nonlocal n
+        n += 1
+        return f"[figure {n}]"
+    return re.sub(r"(?m)^!\[[^\]]*\]\(/v1/intake/source-images/[0-9a-f]{32}\)[ \t]*$", mark, source)
+
+
+def figures_section(t: dt.Template, figures: list[dict], readings: dict) -> str:
+    """The draft's pictures, each under the entry it belongs to, with what the vision model read in it."""
+    if not figures:
+        return ""
+    words = FIGURE_LABELS.get(t.language, FIGURE_LABELS["en"])
+    out = [f"## {words['section']}", ""]
+    for n, f in enumerate(figures, start=1):
+        where = f" ({words['page']} {f['page']})" if f.get("page") else ""
+        label = f"{words['figure']} {n}" + (f" — {f['caption']}" if f.get("caption") else "")
+        out += [f"**{label}**{where}", "", f"![{label.replace(']', ')')}](/v1/intake/source-images/{f['id']})", ""]
+        read = (readings or {}).get(f["id"])
+        if read:
+            out += [f"> *{words['read']}:*"] + [f"> {x}" if x.strip() else ">" for x in read.strip().split("\n")] + [""]
+    return "\n".join(out).rstrip() + "\n"
+
+
 def compose(t: dt.Template, extraction: dict, dates: dict, title: str) -> str:
     note = notices(t, extraction)
     body = dt.render(t, extraction, {"title": title, "document_date": dates.get("document_date"),
@@ -608,10 +691,13 @@ def compose(t: dt.Template, extraction: dict, dates: dict, title: str) -> str:
 
 
 def preview(endpoint: Endpoint, t: dt.Template, source: str, meta: SourceMeta, *, document_types: list[str],
-            title: Optional[str] = None, now: Optional[datetime] = None, extracted: Optional[dict] = None) -> dict:
+            title: Optional[str] = None, now: Optional[datetime] = None, extracted: Optional[dict] = None,
+            readings: Optional[dict] = None) -> dict:
     """The draft and everything to check, saved nowhere. `extracted` replaces the model (tests, a re-render of
-    an edited extraction)."""
-    source = (source or "").replace("\r\n", "\n")
+    an edited extraction). The source's pictures go in a Figures section, with `readings` (id → what the vision
+    model read in it), if any."""
+    figures = figures_in(source)
+    source = for_model((source or "").replace("\r\n", "\n"))
     if not source.strip():
         raise ReshapeError("There is no text to rework.")
     if len(source) > MAX_SOURCE_CHARS:
@@ -624,6 +710,8 @@ def preview(endpoint: Endpoint, t: dt.Template, source: str, meta: SourceMeta, *
     dates = settle_dates(t, extraction, source, meta, now)
     final_title = (title or "").strip() or extraction["title"] or (meta.subject or "").strip() or t.title
     markdown = compose(t, extraction, dates, final_title)
+    if figures:
+        markdown = markdown.rstrip() + "\n\n" + figures_section(t, figures, readings or {})
     hostile = addressed_to_assistant(source)
     issues = findings["issues"] + dates.pop("issues") + [
         {"kind": "addressed_to_assistant", "lines": [h["line"]],
@@ -632,4 +720,5 @@ def preview(endpoint: Endpoint, t: dt.Template, source: str, meta: SourceMeta, *
     return {"title": final_title, "markdown": markdown, "extraction": extraction, "dates": dates,
             "missing": findings["missing"], "ambiguities": findings["ambiguities"], "issues": issues,
             "suggested_type": findings["suggested_type"], "uncited_lines": findings["uncited_lines"],
-            "notices": notices(t, extraction), "source_lines": len(numbered(source))}
+            "notices": notices(t, extraction), "source_lines": len(numbered(source)),
+            "figures": [{**f, "reading": (readings or {}).get(f["id"])} for f in figures]}

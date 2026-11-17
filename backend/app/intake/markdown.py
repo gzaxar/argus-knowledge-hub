@@ -19,6 +19,8 @@ from xml.etree import ElementTree as ET
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 BULLET = re.compile(r"^\s*[•▪◦·●○■□➢►\-\*–—]\s+(.*)$")
 NUMBERED = re.compile(r"^\s*(\d{1,3})[.)]\s+(.*)$")
+# A running log's entry: a time first (10h35:, 9.35:, 17:30 -), the line it is on never the end of the one before.
+ENTRY_TIME = re.compile(r"^(?:ore\s+)?\d{1,2}(?:[h.:]\d{2}|h)\s*(?:[:\-–—]|\s)")
 SECTION = re.compile(r"^(\d{1,2}(?:\.\d{1,2}){0,3})\.?\s+(\S.{0,90})$")
 
 
@@ -83,7 +85,8 @@ def text_to_markdown(text: str, wrapped: bool = False) -> str:
                 if current.endswith("-") and re.match(r"[a-zà-ÿ]", stripped):
                     current = current[:-1] + stripped                   # a word cut at the end of the line
                     continue
-                if not re.search(r"[.!?:;]$", current) and re.match(r"[a-zà-ÿ0-9(]", stripped):
+                if not re.search(r"[.!?:;]$", current) and re.match(r"[a-zà-ÿ0-9(]", stripped) \
+                        and not ENTRY_TIME.match(stripped):                # "10h35: …" starts a log's entry
                     current += " " + stripped
                     continue
             if current and blocks and blocks[-1].startswith(("- ", "1. ")) and wrapped \

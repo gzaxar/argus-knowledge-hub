@@ -244,11 +244,30 @@ def read_source(db: Session, identity, workspace_id: str, content: bytes, file: 
         record("proposed", text)
         return {"text": text[:reshape.MAX_SOURCE_CHARS], "format": "image", "truncated": len(text) > reshape.MAX_SOURCE_CHARS,
                 "filename": file.filename}
+    figures: list = []
     try:
-        out = files.extract_document(content, file.filename or "", file.content_type)
+        out = files.extract_document(content, file.filename or "", file.content_type, figures=figures)
     except files.UnreadableFile as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    return {**out, "filename": file.filename}
+    if figures:
+        # A PDF's pictures, kept for the drafts (services/source_images.py), each a Markdown image where it was.
+        from app.services import source_images
+        ids = [source_images.keep(workspace_id, f["png"]) for f in figures]
+        out["text"] = files.FIGURE_LINE.sub(
+            lambda m: f"![Figure {int(m.group(1)) + 1}, page {figures[int(m.group(1))]['page']}]"
+                      f"(/v1/intake/source-images/{ids[int(m.group(1))]})", out["text"])
+    return {**out, "filename": file.filename, "figures": len(figures)}
+
+
+@router.get("/source-images/{pid}")
+def source_image(pid: str, workspace_id: str = Depends(require_permission("create", resource="documents"))):
+    """A picture of a file being reworked, for its preview (services/source_images.py)."""
+    from fastapi.responses import FileResponse
+    from app.services import source_images
+    path = source_images.path_of(workspace_id, pid)
+    if path is None:
+        raise HTTPException(status_code=404, detail="This picture is no longer kept: read the file again")
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "private, max-age=3600"})
 
 
 # Kept for the old photo button: a photograph is one kind of file.

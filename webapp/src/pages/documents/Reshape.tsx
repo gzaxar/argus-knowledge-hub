@@ -51,6 +51,8 @@ export function DocumentReshape() {
   const [original, setOriginal] = useState<File | null>(seed?.file ?? null);
   const [attachOriginal, setAttachOriginal] = useState(true);
   const [fileProblem, setFileProblem] = useState<string | null>(null);
+  // The pictures read out of the file (a PDF's plots): they follow their entry into each day's draft.
+  const [figures, setFigures] = useState(0);
   const [originalDate, setOriginalDate] = useState(seed?.originalDate ?? "");
   const [subject, setSubject] = useState(seed?.subject ?? "");
   const [sender, setSender] = useState("");
@@ -102,6 +104,7 @@ export function DocumentReshape() {
 
   const loadFile = async (file: File) => {
     setFileProblem(null);
+    setFigures(0);
     setResult(null);
     setWhole(null);
     setDay(null);
@@ -109,7 +112,12 @@ export function DocumentReshape() {
     try {
       // Text files as they are; a PDF, Word or Excel file or an e-mail read by the server (nothing kept there).
       const plain = /\.(txt|md|markdown|csv|log)$/i.test(file.name);
-      setText(plain ? await file.text() : (await intakeApi.extract(file, confidentiality, intoDocument)).text);
+      if (plain) setText(await file.text());
+      else {
+        const read = await intakeApi.extract(file, confidentiality, intoDocument);
+        setText(read.text);
+        setFigures(read.figures ?? 0);
+      }
     } catch (e) {
       setFileProblem(problemText(e));
       return;
@@ -167,6 +175,12 @@ export function DocumentReshape() {
           <p className="text-[11px] text-slate-400">{text.length.toLocaleString()} of 60,000 characters
             {filename ? ` · from ${filename}` : ""}. Instructions written in the text are treated as text.</p>
           {fileProblem && <p className="text-xs text-rose-700">{fileProblem}</p>}
+          {figures > 0 && (
+            <p className="text-xs text-slate-600" data-testid="source-figures">
+              {figures} picture{figures === 1 ? "" : "s"} in the file: each goes in the draft&apos;s Figures, under
+              the entry it follows, with what the vision model reads in it to check. They are saved with the draft.
+            </p>
+          )}
           <p className="text-[11px] text-slate-500">Images are read by this workspace&apos;s vision model. Check its transcription before previewing.</p>
           {original && (
             <label className="mt-1 flex items-center gap-2 text-xs text-slate-700">

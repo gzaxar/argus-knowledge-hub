@@ -7,11 +7,14 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { useState } from "react";
 import { AuthenticatedImage } from "./AuthenticatedImage";
+import { intakeApi } from "../api/client";
 import { ImageLightbox } from "./ImageLightbox";
 
 /** An attachment URL written by the importer or the editor. The file is
  * behind the API's Bearer auth, so a plain <img src> can't fetch it. */
 const ATTACHMENT_URL = /^\/v1\/attachments\/([A-Za-z0-9-]+)$/;
+/** A picture of a file being reworked, shown in its draft until the draft is saved (it then becomes a file). */
+const SOURCE_IMAGE_URL = /^\/v1\/intake\/source-images\/([0-9a-f]{32})$/;
 
 // Imported content (a Jira custom field, a Confluence macro that slipped through) is sometimes raw HTML
 // rather than Markdown, e.g. `<div class="created-with-ak-editor">…</div>`. rehype-raw parses that HTML
@@ -163,6 +166,13 @@ export function MarkdownView({
             const match = typeof src === "string" ? src.match(ATTACHMENT_URL) : null;
             if (match) {
               return <InlineImage uid={match[1]} alt={alt ?? ""} />;
+            }
+            const source = typeof src === "string" ? src.match(SOURCE_IMAGE_URL) : null;
+            if (source) {
+              return (
+                <AuthenticatedImage uid={source[1]} alt={alt ?? ""} fetchBlobUrl={intakeApi.sourceImageBlobUrl}
+                                    className="my-3 max-h-[32rem] max-w-full rounded border border-slate-200" />
+              );
             }
             return (
               <img

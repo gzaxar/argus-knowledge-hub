@@ -103,6 +103,102 @@ def _pdf(content: bytes, limit: int = MAX_CHARS) -> tuple[str, list[dict]]:
     return "".join(parts)[:limit], refs
 
 
+# A figure's place in a PDF's text while it is read: a line of its own, kept as it is by the Markdown conversion.
+FIGURE_TOKEN = "§§figure:{}§§"
+FIGURE_LINE = re.compile(r"^§§figure:(\d+)§§$", re.M)
+MAX_FIGURES = 300
+MIN_FIGURE_PX = 48                    # smaller is a bullet, a rule or an icon, not a figure
+MAX_FIGURE_BYTES = 8 * 1024 * 1024
+
+
+def _norm_line(s: str) -> str:
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def _place_after(lines: list[str], anchor: Optional[str], start: int) -> int:
+    """Where a figure goes in a page's lines: after the line that ends with the text just above it (from `start`,
+    so the figures stay in order), or at `start` when there is none."""
+    if not anchor:
+        return start
+    a = _norm_line(anchor)
+    for i in range(start, len(lines)):
+        line = _norm_line(lines[i])
+        if line and (line.endswith(a) or a.endswith(line) or a in line):
+            return i + 1
+    return start
+
+
+def pdf_figures(content: bytes, pages: int = DOCUMENT_PAGES) -> dict[int, list[tuple[Optional[str], bytes]]]:
+    """The pictures of a PDF, page by page (1-based), top to bottom: for each, the last line of text above it on
+    its page (None: it opens the page, so it follows the previous page's text) and the picture as PNG. A logbook's
+    plots and photographs are under the entry they belong to; this keeps them there."""
+    try:
+        import pypdfium2 as pdfium
+        import pypdfium2.raw as pdfium_raw
+        pdf = pdfium.PdfDocument(content)
+    except Exception:
+        return {}
+    out: dict[int, list[tuple[Optional[str], bytes]]] = {}
+    count = 0
+    for n in range(min(len(pdf), pages)):
+        page = pdf[n]
+        width, height = page.get_size()
+        text = page.get_textpage()
+        found = []
+        for obj in page.get_objects(filter=[pdfium_raw.FPDF_PAGEOBJ_IMAGE], max_depth=3):
+            try:
+                left, bottom, right, top = obj.get_pos()
+                w, h = obj.get_size()
+                if min(w, h) < MIN_FIGURE_PX:
+                    continue
+                buf = io.BytesIO()
+                obj.get_bitmap(render=False).to_pil().convert("RGB").save(buf, format="PNG", optimize=True)
+            except Exception:                     # a picture that cannot be decoded is left out, not the page
+                continue
+            if buf.tell() > MAX_FIGURE_BYTES:
+                continue
+            above = text.get_text_bounded(left=0, bottom=top, right=width, top=height).strip().splitlines()
+            found.append((-top, left, above[-1].strip() if above else None, buf.getvalue()))
+        for _, _, anchor, png in sorted(found, key=lambda f: (f[0], f[1])):
+            if count >= MAX_FIGURES:
+                return out
+            out.setdefault(n + 1, []).append((anchor, png))
+            count += 1
+    return out
+
+
+def _pdf_document(content: bytes, figures: list) -> str:
+    """A PDF's text for a document, with a FIGURE_TOKEN line where each picture is; the pictures are appended
+    to `figures` (PNG bytes, the token's number is the index), with their page."""
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(content))
+    except Exception as exc:
+        raise UnreadableFile(f"The PDF could not be opened: {exc}")
+    pictures = pdf_figures(content)
+    parts, total = [], 0
+    for n, page in enumerate(reader.pages[:DOCUMENT_PAGES], start=1):
+        text = _page_text(page)
+        lines = text.split("\n") if text else []
+        cursor = 0
+        for anchor, png in pictures.get(n, []):
+            at = _place_after(lines, anchor, cursor)
+            token = FIGURE_TOKEN.format(len(figures))
+            figures.append({"page": n, "png": png})
+            lines[at:at] = ["", token, ""]
+            cursor = at + 3
+        if not any(x.strip() for x in lines):
+            continue
+        chunk = f"[page {n}]\n" + "\n".join(lines) + "\n"
+        parts.append(chunk)
+        total += len(chunk)
+        if total >= DOCUMENT_CHARS + 1:
+            break
+    if not parts:
+        raise UnreadableFile("The PDF has no text layer (a scan?). Photograph the nameplate or type what it says.")
+    return "".join(parts)[:DOCUMENT_CHARS + 1]
+
+
 def _docx(content: bytes, limit: int = MAX_CHARS) -> tuple[str, list[dict]]:
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as z:
@@ -162,9 +258,10 @@ def _email(content: bytes, limit: int = MAX_CHARS) -> tuple[str, list[dict]]:
     return text, [{"kind": "file", "format": "email", "chars": len(text)}]
 
 
-def extract_document(content: bytes, filename: str, mime: Optional[str]) -> dict:
+def extract_document(content: bytes, filename: str, mime: Optional[str], figures: Optional[list] = None) -> dict:
     """A file as a document's body, in Markdown (intake/markdown.py): its structure kept, as long as a document may
-    be. {text, format, truncated}."""
+    be. {text, format, truncated}. With `figures` (a list), a PDF's pictures are appended to it ({page, png}) and
+    the text has a FIGURE_TOKEN line where each was."""
     from app.intake import markdown as md
     name = (filename or "").lower()
     kind = kind_of(filename, mime)
@@ -182,7 +279,7 @@ def extract_document(content: bytes, filename: str, mime: Optional[str]) -> dict
         elif kind == "email":
             text = md.email_markdown(content)
         elif kind == "pdf":
-            raw, _ = _pdf(content, DOCUMENT_CHARS + 1)
+            raw = _pdf_document(content, figures) if figures is not None else _pdf(content, DOCUMENT_CHARS + 1)[0]
             text = "\n\n".join(md.text_to_markdown(page, wrapped=True)
                                 for page in re.split(r"(?m)^\[page \d+\]\n", raw) if page.strip())
         elif kind == "text":

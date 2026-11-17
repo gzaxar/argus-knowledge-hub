@@ -2280,6 +2280,9 @@ export interface ReshapeResult {
   suggested_type: string | null; uncited_lines: number[]; notices: { operational: string | null; reference: string | null };
   source_lines: number; template: TemplateChoice; model: string;
   links: { kind: "asset" | "document" | "ticket"; uid: string; label: string; matched_on: string }[];
+  /** The source's pictures (a PDF's plots), in the draft's Figures section: the entry each belongs to, and what
+   *  the vision model read in it (null: not read). */
+  figures?: { id: string; line: number; page: number | null; caption: string; reading: string | null }[];
 }
 export interface ReshapeSaved {
   document_uid: string; code: string; revision_uid: string; revision_number: number; state: string;
