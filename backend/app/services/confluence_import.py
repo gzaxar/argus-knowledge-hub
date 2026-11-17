@@ -33,6 +33,7 @@ from app.services.confluence_file_macros import FILE_VIEWER_MACROS, render_file_
 from app.services.confluence_presentation import prepare_presentation
 from app.services.confluence_contents import collect_headings, render_contents, toc_placeholder
 from app.services.confluence_visuals import panel_placeholder, render_emoticons, render_panel_wrappers
+from app.services.confluence_tables import protect_complex_tables, restore_complex_tables, table_contents_slots, source_note_panel
 from app.services.confluence_page_fields import normalize_document_status, render_user_mentions, resolve_user_names, status_html
 from app.services.confluence_auth import configure_confluence_session, confluence_json, reject_confluence_login
 from app.services.import_merge import effective_strategy
@@ -125,6 +126,8 @@ def _convert_macro(match: re.Match, files: Optional[dict] = None, toc_slots: Opt
         language = _macro_param(block, "language") or ""
         css = f' class="language-{language}"' if language else ""
         return f"<pre><code{css}>{body}</code></pre>"
+    if name == "note" and visual_slots is not None:
+        return source_note_panel(body, block, visual_slots)
     if name in _PANEL_MACROS:
         if visual_slots is not None:
             return panel_placeholder(name, body, block, visual_slots)
@@ -254,6 +257,10 @@ def storage_to_markdown(storage: str, files: Optional[dict] = None, *, title: Op
     visual_slots = {}
     html = _confluence_macros_to_html(storage, files, toc_slots, user_names, visual_slots)
     headings = collect_headings(html) if toc_slots else []
+    # Markdown tables cannot carry nested grids, merged cells or cell colours.
+    # Preserve only those complex tables, after existing macro/file conversion.
+    inline_contents = table_contents_slots(html, toc_slots, headings, title)
+    html, table_slots = protect_complex_tables(html, visual_slots, inline_contents)
     text = markdownify(
         html,
         heading_style="ATX",       # "## Heading", matching everything else here
@@ -275,6 +282,7 @@ def storage_to_markdown(storage: str, files: Optional[dict] = None, *, title: Op
     text = render_contents(text, toc_slots, headings, title)
     text = normalize_document_status(text)
     text = render_panel_wrappers(text, visual_slots)
+    text = restore_complex_tables(text, table_slots)
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
