@@ -171,9 +171,9 @@ controlled operating instruction.
 
 ## What the native Confluence import preserves
 
-The Confluence configuration on the workspace's **Imports** page reads the source page directly. This is
-separate from **Import from Confluence — ELI-NP** on the **New document** form, which reads a Markdown export
-and selected supporting files. The following behaviour applies to the native import:
+Use **Workspace → Administration → Imports → New → Confluence** to import Confluence pages and their
+attachments. The saved configuration reads the source pages directly and can be run again when they change.
+The following behaviour applies to this import:
 
 - **Contents and section links**: a supported table-of-contents macro becomes links to headings in the
   imported body. Follow a few links after import, including nested sections where present. **Page hierarchy
