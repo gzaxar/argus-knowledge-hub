@@ -17,8 +17,15 @@ permissions:
   packages: read
 
 jobs:
+  # The suite split in four parts of about the same time (backend/tests/shard.py, from backend/tests/durations.json),
+  # run in parallel: each on its own runner, with its own database, so no test sees another part's records.
   backend-tests:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    name: backend-tests (${{ matrix.shard }} of 4)
     permissions:
       contents: read
       packages: read
@@ -38,7 +45,8 @@ jobs:
           load: true
           tags: argus-postgres:ci
           cache-from: type=gha,scope=postgres
-          cache-to: type=gha,mode=max,scope=postgres
+          # One part writes the build cache; the four read it.
+          cache-to: ${{ matrix.shard == 1 && 'type=gha,mode=max,scope=postgres' || '' }}
       - name: Start the database
         run: |
           docker run -d --name postgres -p 5432:5432 \
@@ -52,9 +60,12 @@ jobs:
           load: true
           tags: argus-backend:ci
           cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
-      - name: Run the backend tests
+          # One part writes the build cache; the four read it.
+          cache-to: ${{ matrix.shard == 1 && 'type=gha,mode=max,scope=backend' || '' }}
+      - name: Run the backend tests (part ${{ matrix.shard }} of 4)
         run: |
+          FILES=$(python3 backend/tests/shard.py ${{ matrix.shard }} 4 | tr '\n' ' ')
+          echo "$FILES" | tr ' ' '\n'
           docker run --rm --network host \
             -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app \
             -e TOKEN_PEPPER=ci-only \
@@ -65,7 +76,7 @@ jobs:
             -v "$PWD/backend/requirements-dev.txt:/app/requirements-dev.txt:ro" \
             argus-backend:ci sh -c "pip install -q -r requirements-dev.txt && \
               export IMPORT_SECRETS_KEY=\$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())') && \
-              python -m pytest -q -p no:cacheprovider tests \
+              python -m pytest -q -p no:cacheprovider $FILES \
               --deselect tests/test_readiness_ops.py::test_a_backup_restores_into_a_scratch_database_and_checks_itself"
 
   web-build:

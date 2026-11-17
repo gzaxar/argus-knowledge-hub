@@ -73,8 +73,13 @@ def w(tmp_path):
     db.commit()
     db.close()
     app.dependency_overrides[get_identity] = lambda: OidcIdentity(user=admin)
-    TestClient(app).delete(f"/v1/workspaces/{ws}", headers=typed(ws))
+    # A test may have made this workspace the catalogue (a patched catalogue_workspace, still in place here), which
+    # cannot be deleted: left behind, its shared vendors would be found by the tests that follow.
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(inst, "catalogue_workspace", lambda db: None)
+        gone = TestClient(app).delete(f"/v1/workspaces/{ws}", headers=typed(ws))
     app.dependency_overrides.pop(get_identity, None)
+    assert gone.status_code == 204, gone.text
 
 
 def release(w, version="1.0.0", models=None, vendors=None, it_version=None, moved=None, **more):
@@ -392,8 +397,8 @@ def test_export_then_install_with_the_manifest_adopts_merges_and_keeps_every_ref
     widget2 = existing(w, w["model"], "WIDGET-9", vendor="ACME", vendor_ref=acme2.uid, device_class="switch")
     orphan = existing(w, w["model"], "Mystery box", device_class="io")
     from app.models.schema import Schema
-    unit_type = w["db"].scalar(select(Schema).where(Schema.workspace_id == w["ws"], Schema.applies_to == "objects",
-                                                    Schema.name.notin_(("Product Model", "Vendor"))).limit(1))
+    # The units' type decides the models' collection: a serial converter's is it-network, which is shipped.
+    unit_type = w["db"].scalar(select(Schema).where(Schema.workspace_id == w["ws"], Schema.name == "Serial Converter"))
     for model, n in ((widget, 2), (widget2, 1), (nport, 1)):
         for _ in range(n):
             w["db"].add(Asset(uid=str(uuid.uuid4()), workspace_id=w["ws"], schema_uid=unit_type.uid,
@@ -442,6 +447,30 @@ def test_export_then_install_with_the_manifest_adopts_merges_and_keeps_every_ref
     assert w["db"].get(Asset, acme2.uid).record_status == "Merged"
     # A unit of the duplicate still names it, and the duplicate redirects to the survivor.
     assert w["db"].get(Asset, widget2.uid).merged_into_uid == widget.uid
+
+
+def test_a_new_collection_requires_the_vendors_that_are_shipped(w, monkeypatch, tmp_path):
+    """Models whose units go to a collection not shipped yet make a new one: it requires the vendors as shipped
+    (here 1.0.0, so >=1.0,<2), and the candidates validate with the shipped collections."""
+    from app.catalogue.export import export
+    from app.models.schema import Schema
+    shipped = w["root"] / "shipped"
+    write(shipped, "vendors", "1.0.0", vendors=[MOXA])
+    write(shipped, "it-network", "1.0.0", models=[NPORT])
+    monkeypatch.setenv("ARGUS_CATALOGUE_DIR", str(shipped))
+    acme = existing(w, w["vendor"], "Acme GmbH")
+    cam = existing(w, w["model"], "Eye 200", vendor="Acme", vendor_ref=acme.uid, device_class="camera",
+                   model_code="EYE-200")
+    camera = w["db"].scalar(select(Schema).where(Schema.workspace_id == w["ws"], Schema.name == "Camera"))
+    w["db"].add(Asset(uid=str(uuid.uuid4()), workspace_id=w["ws"], schema_uid=camera.uid, key=f"U-{uuid.uuid4().hex[:8]}",
+                      name="unit", type=camera.name, attributes={"product_model": cam.uid}))
+    w["db"].commit()
+
+    out = tmp_path / "export"
+    result = export(w["db"], w["ws"], out)
+    assert result["problems"] == 0, (out / "report.md").read_text()
+    new = yaml.safe_load((out / "collections" / "accelerator-diagnostics" / "collection.yaml").read_text())
+    assert new["requires"]["collections"] == {"vendors": ">=1.0,<2"}
 
 
 def test_an_install_that_would_lose_references_keeps_nothing(w):
