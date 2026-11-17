@@ -1,5 +1,6 @@
 import { headingAnchors } from "../lib/markdownHeadingAnchors";
 import { confluencePanelStyle } from "../lib/confluencePanelPresentation";
+import { confluenceRichStyle, fitConfluenceRichTables, richCellSpan, richTableClass } from "../lib/confluenceRichTables";
 import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -12,6 +13,8 @@ import { ImageLightbox } from "./ImageLightbox";
 
 /** An attachment URL written by the importer or the editor. The file is
  * behind the API's Bearer auth, so a plain <img src> can't fetch it. */
+const richCellWrapping = { overflowWrap: "normal", wordBreak: "normal", hyphens: "none" } as const;
+
 const ATTACHMENT_URL = /^\/v1\/attachments\/([A-Za-z0-9-]+)$/;
 /** A picture of a file being reworked, shown in its draft until the draft is saved (it then becomes a file). */
 const SOURCE_IMAGE_URL = /^\/v1\/intake\/source-images\/([0-9a-f]{32})$/;
@@ -22,7 +25,15 @@ const SOURCE_IMAGE_URL = /^\/v1\/intake\/source-images\/([0-9a-f]{32})$/;
 // inline event handlers, iframes), on top of what Markdown itself produces.
 const sanitizeSchema = {
   ...defaultSchema,
-  attributes: { ...defaultSchema.attributes, "*": [...(defaultSchema.attributes?.["*"] ?? []), "className"] },
+  tagNames: [...(defaultSchema.tagNames ?? []), "colgroup", "col", "mark", "tfoot", "u", "s"],
+  attributes: {
+    ...defaultSchema.attributes,
+    "*": [...(defaultSchema.attributes?.["*"] ?? []), "className"],
+    td: [...(defaultSchema.attributes?.td ?? []), "colSpan", "rowSpan"],
+    th: [...(defaultSchema.attributes?.th ?? []), "colSpan", "rowSpan"],
+    col: [...(defaultSchema.attributes?.col ?? []), "span"],
+    colgroup: [...(defaultSchema.attributes?.colgroup ?? []), "span"],
+  },
 };
 
 /** A document body, rendered.
@@ -50,11 +61,12 @@ export function MarkdownView({
     <div className={`markdown-body text-sm leading-relaxed text-slate-700 ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], headingAnchors]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], fitConfluenceRichTables, headingAnchors]}
         components={{
           div: ({ className: panelClass, children, id }) => {
             const style = confluencePanelStyle(panelClass);
-            return <div id={id} className={style ? `my-2 rounded px-3 py-1 ${panelClass ?? ""}` : panelClass} style={style}>{children}</div>;
+            const richStyle = confluenceRichStyle(panelClass);
+            return <div id={id} className={style ? `my-2 rounded px-3 py-1 ${panelClass ?? ""}` : panelClass} style={style || richStyle ? { ...richStyle, ...style } : undefined}>{children}</div>;
           },
           h1: ({ children, id }) => (
             <h1 id={id} className="mb-2 mt-5 border-b border-slate-200 pb-1 text-xl font-semibold text-slate-900 first:mt-0">
@@ -74,7 +86,16 @@ export function MarkdownView({
           h4: ({ children, id }) => (
             <h4 id={id} className="mb-1 mt-3 text-sm font-semibold text-slate-800">{children}</h4>
           ),
-          p: ({ children }) => <p className="my-2">{children}</p>,
+          p: ({ children, className: richClass }) => <p className={`my-2 ${richClass ?? ""}`} style={confluenceRichStyle(richClass)}>{children}</p>,
+          span: ({ children, className: richClass, id }) => <span id={id} className={richClass} style={confluenceRichStyle(richClass)}>{children}</span>,
+          mark: ({ children, className: richClass }) => <mark className={richClass} style={confluenceRichStyle(richClass)}>{children}</mark>,
+          strong: ({ children, className: richClass }) => <strong className={richClass} style={confluenceRichStyle(richClass)}>{children}</strong>,
+          b: ({ children, className: richClass }) => <b className={richClass} style={confluenceRichStyle(richClass)}>{children}</b>,
+          em: ({ children, className: richClass }) => <em className={richClass} style={confluenceRichStyle(richClass)}>{children}</em>,
+          i: ({ children, className: richClass }) => <i className={richClass} style={confluenceRichStyle(richClass)}>{children}</i>,
+          u: ({ children, className: richClass }) => <u className={richClass} style={confluenceRichStyle(richClass)}>{children}</u>,
+          s: ({ children, className: richClass }) => <s className={richClass} style={confluenceRichStyle(richClass)}>{children}</s>,
+          del: ({ children, className: richClass }) => <del className={richClass} style={confluenceRichStyle(richClass)}>{children}</del>,
           a: ({ href, children }) =>
             // A page of ARGUS itself (a record an answer cites, a file) opens here, like any other link in the app;
             // a file's API address opens its page, which reads it signed in (issue #18).
@@ -125,6 +146,7 @@ export function MarkdownView({
               return (
                 <code
                   className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[0.85em] text-slate-800"
+                  style={confluenceRichStyle(lang)}
                   {...props}
                 >
                   {children}
@@ -147,19 +169,33 @@ export function MarkdownView({
           // Wide tables scroll inside their own box rather than pushing the
           // page sideways — a parameter table is usually the widest thing
           // on the page.
-          table: ({ children }) => (
-            <div className="my-3 overflow-x-auto rounded border border-slate-200">
-              <table className="w-full border-collapse text-sm">{children}</table>
-            </div>
-          ),
-          thead: ({ children }) => <thead className="bg-slate-50">{children}</thead>,
-          th: ({ children }) => (
-            <th className="border-b border-slate-200 px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+          table: ({ children, className: tableClass }) => {
+            const rich = richTableClass(tableClass, "argus-confluence-rich-table");
+            const nested = rich && richTableClass(tableClass, "argus-confluence-nested-table");
+            // Nested port grids need content-based minimum column widths. A fixed
+            // layout ignores later-row labels such as "Available" and lets whole
+            // words paint outside their cells. Percentage columns remain hints;
+            // auto layout can redistribute space while respecting those words.
+            const table = <table className={`w-full border-collapse text-sm ${tableClass ?? ""}`} style={nested ? { ...confluenceRichStyle(tableClass), tableLayout: "auto" } : confluenceRichStyle(tableClass)}>{children}</table>;
+            if (nested) return table;
+            return <div className="my-3 overflow-x-auto rounded border border-slate-200">{table}</div>;
+          },
+          thead: ({ children, className: richClass }) => <thead className={richTableClass(richClass, "argus-confluence-rich-node") ? richClass : "bg-slate-50"} style={confluenceRichStyle(richClass)}>{children}</thead>,
+          tbody: ({ children, className: richClass }) => <tbody className={richClass} style={confluenceRichStyle(richClass)}>{children}</tbody>,
+          tfoot: ({ children, className: richClass }) => <tfoot className={richClass} style={confluenceRichStyle(richClass)}>{children}</tfoot>,
+          tr: ({ children, className: richClass }) => <tr className={richClass} style={confluenceRichStyle(richClass)}>{children}</tr>,
+          colgroup: ({ children, className: richClass, span }) => <colgroup className={richClass} span={richCellSpan(span)} style={confluenceRichStyle(richClass)}>{children}</colgroup>,
+          col: ({ className: richClass, span }) => <col className={richClass} span={richCellSpan(span)} style={confluenceRichStyle(richClass)} />,
+          caption: ({ children, className: richClass }) => <caption className={richClass} style={confluenceRichStyle(richClass)}>{children}</caption>,
+          th: ({ children, className: richClass, colSpan, rowSpan }) => (
+            <th colSpan={richCellSpan(colSpan)} rowSpan={richCellSpan(rowSpan)} className={richTableClass(richClass, "argus-confluence-rich-node") ? `border border-slate-200 px-1.5 py-1.5 align-top text-sm font-semibold ${richClass ?? ""}` : "border-b border-slate-200 px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"}
+              style={richTableClass(richClass, "argus-confluence-rich-node") ? { textAlign: "inherit", ...confluenceRichStyle(richClass), ...richCellWrapping } : undefined}>
               {children}
             </th>
           ),
-          td: ({ children }) => (
-            <td className="border-b border-slate-100 px-3 py-1.5 align-top">{children}</td>
+          td: ({ children, className: richClass, colSpan, rowSpan }) => (
+            <td colSpan={richCellSpan(colSpan)} rowSpan={richCellSpan(rowSpan)} className={richTableClass(richClass, "argus-confluence-rich-node") ? `border border-slate-200 px-1.5 py-1.5 align-top ${richClass ?? ""}` : "border-b border-slate-100 px-3 py-1.5 align-top"}
+              style={richTableClass(richClass, "argus-confluence-rich-node") ? { ...confluenceRichStyle(richClass), ...richCellWrapping } : undefined}>{children}</td>
           ),
           hr: () => <hr className="my-4 border-slate-200" />,
           img: ({ src, alt }) => {
