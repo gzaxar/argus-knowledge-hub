@@ -49,9 +49,14 @@ def w():
     db.rollback()
     db.close()
     app.dependency_overrides[get_identity] = lambda: OidcIdentity(user=admin)
-    for ws in (it, cat):
-        TestClient(app).delete(f"/v1/workspaces/{ws}", headers=typed(ws))
+    # A test may have made `cat` the catalogue (a patched catalogue_workspace, still in place here), which cannot be
+    # deleted: left behind, its shared vendors would be found by the tests that follow.
+    from app.catalogue import install as inst
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(inst, "catalogue_workspace", lambda db: None)
+        gone = [TestClient(app).delete(f"/v1/workspaces/{ws}", headers=typed(ws)) for ws in (it, cat)]
     app.dependency_overrides.pop(get_identity, None)
+    assert [r.status_code for r in gone] == [204, 204], [r.text for r in gone]
 
 
 def record(w, schema, name, **attrs) -> Asset:

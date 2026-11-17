@@ -358,7 +358,16 @@ class _Export:
             t = self.types.get(e.get("instance_type", ""))
             if t and t[0] != "core-objects":
                 packages[t[0]] = ">=1.0"
-        return {"packages": packages, "collections": {"vendors": ">=0.1,<1"}}
+        return {"packages": packages, "collections": {"vendors": self._vendors_range()}}
+
+    def _vendors_range(self) -> str:
+        """The vendors a new collection needs: the shipped vendors' version, up to its next major."""
+        vendors = self.tree.get("vendors")
+        try:
+            major, minor = (int(x) for x in str(vendors.version).split(".")[:2])
+        except (AttributeError, ValueError):
+            return ">=0.1,<1"
+        return f">={major}.{minor},<{major + 1}"
 
     def candidates(self, out: Path) -> None:
         base = out / "collections"
