@@ -179,6 +179,236 @@ def read_photo(db: Session, workspace_id: str, actor: str, image: bytes, mime: s
             "note": None if p else "Nothing could be read on this photo: fill in what you see."}
 
 
+UNITS_SYSTEM = (
+    "You look at a photograph of a rack of a laboratory or technical facility, taken from its front or its rear.\n"
+    "List every unit mounted in it that you can see, from the top down: a server, a switch, a patch panel, an "
+    "instrument chassis, a power unit, a shelf with a device on it. A blank panel or an empty space is not a unit.\n"
+    "Answer with one JSON object only, no prose and no code fence:\n"
+    '{"rack": {"label": "the rack\'s own name or number, as written on it", "total_units": 42, "evidence": "..."},\n'
+    ' "units": [{"kind": "one of the types given, or what it is", "manufacturer": "...", "model": "...",\n'
+    '            "label": "the name written on its own label", "height_u": 1, "gap_above_u": 0, "start_u": null,\n'
+    '            "confidence": 0.8, "evidence": "what you see that says it"}]}\n'
+    "height_u is how many rack units it takes (1 U = 44.45 mm); gap_above_u how many empty units there are between "
+    "it and the unit above (0 for the first one, unless the top of the rack shows). Racks are often not full: measure "
+    "each gap against the height of a 1 U front panel and the holes of the rails (three holes a unit); a shelf, a "
+    "bracket or cables lying in the space are not units. start_u is its lowest unit only "
+    "when the unit numbers are printed on the rails and you can read them; otherwise null. total_units only when "
+    "it is written or the numbers on the rails show it. Leave out a manufacturer, a model or a label you cannot read: "
+    "never guess a name, a serial number or a number. Units that look the same are listed one by one.\n"
+)
+MAX_SEEN = 60
+
+
+def _int(v, lo: int, hi: int) -> Optional[int]:
+    try:
+        n = int(round(float(v)))
+    except (TypeError, ValueError):
+        return None
+    return n if lo <= n <= hi else None
+
+
+def _text(v) -> Optional[str]:
+    if v is None:
+        return None
+    t = str(v).strip()
+    return t[:120] if t and t.lower() not in ("null", "none", "unknown", "n/a", "-", "?") else None
+
+
+UNITS_SIDE = 3072
+UNITS_TIMEOUT = 300
+
+
+def _smaller(image: bytes, mime: str) -> tuple[bytes, str]:
+    """A phone's photo of a whole rack, at most UNITS_SIDE pixels a side: enough to tell the units apart, and a vision
+    model reads it in a fraction of the time (a 12-megapixel photo can outlast the gateway's wait)."""
+    import io
+    try:
+        from PIL import Image, ImageOps
+        with Image.open(io.BytesIO(image)) as im:
+            if max(im.size) <= UNITS_SIDE:
+                return image, mime
+            im = ImageOps.exif_transpose(im).convert("RGB")
+            im.thumbnail((UNITS_SIDE, UNITS_SIDE))
+            buf = io.BytesIO()
+            im.save(buf, "JPEG", quality=88)
+            return buf.getvalue(), "image/jpeg"
+    except Exception:  # noqa: BLE001 — not a picture PIL reads: sent as it is
+        return image, mime
+
+
+def start_units_reading(db: Session, workspace_id: str, image: bytes, mime: str) -> Optional[dict]:
+    """Ask the vision model for the units on a photo of the whole rack, in the background (it can take a minute or
+    two, as long as the photo's own reading, which goes on meanwhile); None when there is no vision model."""
+    import hashlib
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    from fastapi import HTTPException
+
+    from app.intake import assist
+    from app.routers.intake import _endpoint
+    from app.services import llm
+    try:
+        config, ep, profile_id = _endpoint(db, workspace_id, "asset")
+    except HTTPException:
+        return None
+    if not config.vision_model:
+        return None
+    types = [s.name for s in assist._visible_types(db, workspace_id, "objects")
+             if s.name not in racks.RACK_TYPES and s.name not in racks.NOT_MOUNTED][:400]
+    user = "Types: " + ", ".join(types) + "\n\nList the units in this rack, from the top down."
+    picture, kind = _smaller(image, mime or "image/jpeg")
+    pool = ThreadPoolExecutor(max_workers=1)
+    # A whole rack is a long answer: it may take longer than the usual wait (the ingress waits up to ten minutes).
+    future = pool.submit(lambda: llm.look(ep, picture, kind, UNITS_SYSTEM, user, timeout=UNITS_TIMEOUT))
+    pool.shutdown(wait=False)
+    return {"future": future, "ep": ep, "profile_id": profile_id, "types": types, "started": time.monotonic(),
+            "refs": [{"kind": "image", "bytes": len(image), "mime_type": mime}],
+            "hashes": [hashlib.sha256(image).hexdigest()]}
+
+
+def read_units(db: Session, workspace_id: str, actor: str, image: bytes, mime: str,
+               job: Optional[dict] = None) -> dict:
+    """The units the vision model sees in a photo of the whole rack, top down — each with what it is, its height and
+    the gap above it, and its maker, model and label when they can be read — and what is written on the rack itself.
+    Nothing when there is no vision model or the reading fails; then the units are photographed one by one. `job`:
+    the reading started before (start_units_reading), to wait for."""
+    from app.intake import assist
+    from app.services.llm import LLMError
+    job = job if job is not None else start_units_reading(db, workspace_id, image, mime)
+    if job is None:
+        return {"units": [], "rack": {}, "note": None}
+    ep, profile_id, types, started = job["ep"], job["profile_id"], job["types"], job["started"]
+    refs, hashes = job["refs"], job["hashes"]
+    try:
+        reply = job["future"].result()
+    except LLMError as e:
+        assist._record(db, workspace_id, actor, "asset", ep, input_refs=refs, hashes=hashes, redactions={}, output=None,
+                       validations=[], outcome="failed", error=str(e), started=started, model=ep.vision_model,
+                       profile_id=profile_id, operation="rack.units", rule_id="ai.rack.units/1")
+        return {"units": [], "rack": {}, "note": f"The units could not be read on the photo ({e})."}
+    data = assist._payload(reply) or {}
+    by_name = {t.lower(): t for t in types}
+    by_name.update({t.lower() + "es" if t.lower().endswith(("s", "x", "ch", "sh")) else t.lower() + "s": t
+                    for t in types})           # "switches" is a Switch
+    units = []
+    for u in (data.get("units") if isinstance(data.get("units"), list) else [])[:MAX_SEEN]:
+        if not isinstance(u, dict):
+            continue
+        kind = _text(u.get("kind"))
+        conf = u.get("confidence")
+        units.append({
+            "kind": kind, "type": by_name.get((kind or "").lower()),
+            "manufacturer": _text(u.get("manufacturer")), "model": _text(u.get("model")), "label": _text(u.get("label")),
+            "height_u": _int(u.get("height_u"), 1, 20), "gap_above_u": _int(u.get("gap_above_u"), 0, 59) or 0,
+            "start_u": _int(u.get("start_u"), 1, 60),
+            "confidence": max(0.0, min(1.0, float(conf))) if isinstance(conf, (int, float)) else None,
+            "evidence": _text(u.get("evidence"))})
+    r = data.get("rack") if isinstance(data.get("rack"), dict) else {}
+    rack = {"label": _text(r.get("label")), "total_units": _int(r.get("total_units"), 1, 60),
+            "evidence": _text(r.get("evidence"))}
+    run = assist._record(db, workspace_id, actor, "asset", ep, input_refs=refs, hashes=hashes, redactions={},
+                         output={"units": units, "rack": rack}, validations=[], outcome="proposed" if units else "draft_only",
+                         error=None, started=started, model=ep.vision_model, profile_id=profile_id,
+                         operation="rack.units", rule_id="ai.rack.units/1")
+    return {"units": units, "rack": rack, "run_id": run.id,
+            "note": None if units else "No unit could be told apart on this photo: photograph them one by one."}
+
+
+def positions(units: list[dict], top_u: Optional[int]) -> list[Optional[int]]:
+    """Each seen unit's lowest unit: read on the rails, or counted down from the top unit the person says, with the
+    heights and gaps seen. None where neither is known, or where the count runs out of the rack."""
+    out: list[Optional[int]] = []
+    top = top_u
+    for u in units:
+        h = u.get("height_u") or 1
+        if u.get("start_u"):
+            start = u["start_u"]
+        elif top is not None:
+            start = top - (u.get("gap_above_u") or 0) - h + 1
+        else:
+            start = None
+        out.append(start if start and start >= 1 else None)
+        top = start - 1 if start else None
+    return out
+
+
+def take_seen(db: Session, workspace_id: str, uid: str, *, units: Optional[list[int]] = None,
+              top_u: Optional[int] = None, use: bool = False, rack: bool = False) -> RackCensus:
+    """The units seen on the photo of the whole rack become units of the survey (those chosen, or all): each with what
+    was read as proposals — or, when the person says so (`use`), as its values, still to be checked in the review. A
+    name not written on the unit is made from what it is and its place from the top, and says so. `rack`: the rack
+    itself is a new record, named and sized from what was read on it where the person has not said."""
+    c = _open(db, workspace_id, uid)
+    d = _data(c)
+    seen = d["rack"].get("seen")
+    if not seen or not seen.get("units"):
+        raise CensusError("no units were seen on a photo of the whole rack: photograph its front first")
+    if top_u is not None and not 1 <= top_u <= 60:
+        raise CensusError("the top unit is between 1 and 60")
+    all_units = seen["units"]
+    chosen = sorted(set(units)) if units else list(range(len(all_units)))
+    if any(i < 0 or i >= len(all_units) for i in chosen):
+        raise CensusError("no such unit on the photo")
+    already = set(seen.get("taken") or [])
+    chosen = [i for i in chosen if i not in already]
+    if not chosen:
+        raise CensusError("those units are already in the survey")
+    starts = positions(all_units, top_u)
+    for i in chosen:
+        u = all_units[i]
+        n = i + 1
+        conf = u.get("confidence") or 0.6
+        ev = u.get("evidence") or "seen on the photo of the rack"
+        prop = lambda v, **k: {"value": v, "confidence": conf, "evidence": ev, "grounded": True,  # noqa: E731
+                               "source": "rack photo", **k}
+        p: dict = {}
+        if u.get("type"):
+            schema = db.scalar(select(Schema).where(Schema.name == u["type"], Schema.applies_to == "objects",
+                                                    or_(Schema.workspace_id == workspace_id, Schema.is_global.is_(True)))
+                               .order_by(Schema.is_global))
+            if schema is not None:
+                p["type"] = prop(schema.uid, label=schema.name)
+        for f in ("manufacturer", "model"):
+            if u.get(f):
+                p[f] = prop(u[f])
+        if u.get("label"):
+            p["name"] = prop(u["label"], evidence=f"written on it: {u['label']}")
+        else:
+            what = " ".join(x for x in (u.get("manufacturer"), u.get("model")) if x) or u.get("kind") or "Unit"
+            p["name"] = {"value": f"{what} {n}", "confidence": 0.3, "grounded": False, "source": "rack photo",
+                         "evidence": f"no name is written on it: made from what it is and its place ({n}) from the top"}
+        if u.get("height_u"):
+            p["height_u"] = prop(u["height_u"])
+        if starts[i]:
+            read = bool(u.get("start_u"))
+            p["start_u"] = prop(starts[i], confidence=conf if read else min(conf, 0.7), evidence=(
+                "read on the rails" if read else f"counted down from U{top_u}: heights and gaps seen on the photo"))
+        item = {"id": str(uuid.uuid4())[:8], "photos": [], "proposals": p, "values": {}, "decision": None,
+                "asset_uid": None, "created_at": now().isoformat(), "seen_in": {"photo": seen["photo"], "index": i}}
+        face = {"value": seen.get("face") or "front", "source": "rack photo"}
+        item["values"]["face"] = face
+        if use:
+            for k, v in p.items():
+                item["values"][k] = {"value": v["value"], "source": v["source"],
+                                     **({"confidence": v["confidence"]} if v.get("confidence") else {})}
+        _suggest(db, workspace_id, item)
+        item["duplicates"] = duplicates(db, workspace_id, item, _rack_uid(d))
+        if use and not any(x["strength"] in ("strong", "medium") for x in item["duplicates"]):
+            item["decision"] = "create"
+        d["items"].append(item)
+    seen["taken"] = sorted(already | set(chosen))
+    if rack and not _rack_uid(d):
+        rv, rp = d["rack"]["values"], d["rack"].get("proposals") or {}
+        for f in ("name", "units"):
+            if not rv.get(f) and (rp.get(f) or {}).get("value"):
+                rv[f] = rp[f]["value"]
+        if not rv.get("units") and top_u:
+            rv["units"] = top_u
+        d["rack"]["candidates"] = _rack_candidates(db, workspace_id, d)
+    _save(c, d)
+    return c
+
+
 def _catalogue(db: Session, workspace_id: str, manufacturer: Optional[str], model: Optional[str]) -> Optional[Asset]:
     """The product model a manufacturer and model name designate, if the catalogue has exactly one."""
     if not model:
@@ -289,11 +519,26 @@ def add_photo(db: Session, workspace_id: str, actor: str, uid: str, role: str, c
     d = _data(c)
     photo = _store(db, workspace_id, actor, content, filename, mime)
     if role.startswith("rack_"):
+        job = start_units_reading(db, workspace_id, content, mime)      # both readings at once
         reading = read_photo(db, workspace_id, actor, content, mime, rack=True)
         d["rack"]["photos"].append({"uid": photo, "role": role})
         for k, v in reading["proposals"].items():
             d["rack"]["proposals"].setdefault(k, v)
         d["rack"]["note"] = reading.get("note")
+        seen = read_units(db, workspace_id, actor, content, mime, job=job)
+        if seen["units"] or not (d["rack"].get("seen") or {}).get("units"):
+            d["rack"]["seen"] = {"photo": photo, "face": "rear" if role == "rack_rear" else "front",
+                                 "units": seen["units"], "note": seen.get("note"), "taken": [],
+                                 "run_id": seen.get("run_id")}
+        r = seen.get("rack") or {}
+        if r.get("label"):
+            d["rack"]["proposals"].setdefault("name", {"value": r["label"], "confidence": 0.8, "grounded": True,
+                                                       "evidence": r.get("evidence") or f"written on it: {r['label']}",
+                                                       "source": "rack photo"})
+        if r.get("total_units"):
+            d["rack"]["proposals"]["units"] = {"value": r["total_units"], "confidence": 0.7, "grounded": True,
+                                               "evidence": r.get("evidence") or "the numbers on the rails",
+                                               "source": "rack photo"}
         d["rack"]["candidates"] = _rack_candidates(db, workspace_id, d)
         _save(c, d)
         return {"photo": photo, "reading": reading, "survey": view(db, c)}
@@ -564,7 +809,9 @@ def apply(db: Session, workspace_id: str, uid: str, identity, actor: str) -> dic
         ops.append({"op": "place", "asset_uid": item["asset_uid"], "kind": "device",
                     "start_u": int(_value(item, "start_u")), "height_u": int(_value(item, "height_u")),
                     "face": _value(item, "face") or "front", "source": "census",
-                    "evidence": {"census": c.uid, "photos": [p["uid"] for p in item["photos"]], "values": sources}})
+                    "evidence": {"census": c.uid, "values": sources,
+                                 "photos": [p["uid"] for p in item["photos"]]
+                                 + ([item["seen_in"]["photo"]] if item.get("seen_in") else [])}})
         photos.setdefault(item["asset_uid"], []).extend(p["uid"] for p in item["photos"])
     result = racks.apply(db, rack, ops, actor) if ops else {"ok": True, "changes": [], "problems": []}
     if not result["ok"]:

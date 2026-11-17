@@ -12823,6 +12823,47 @@
         "title": "SchemaUpdate",
         "type": "object"
       },
+      "SeenIn": {
+        "properties": {
+          "rack": {
+            "default": false,
+            "title": "Rack",
+            "type": "boolean"
+          },
+          "top_u": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top U"
+          },
+          "units": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Units"
+          },
+          "use": {
+            "default": false,
+            "title": "Use",
+            "type": "boolean"
+          }
+        },
+        "title": "SeenIn",
+        "type": "object"
+      },
       "SemanticEdgeOut": {
         "description": "Two records whose written knowledge is about the same thing: how close (0 to 1), and the closest\npassages on each side, so the link explains itself.",
         "properties": {
@@ -68415,6 +68456,94 @@
           }
         ],
         "summary": "Review",
+        "tags": [
+          "rack census"
+        ]
+      }
+    },
+    "/v1/rack-census/{uid}/seen": {
+      "post": {
+        "description": "The units seen on the photo of the whole rack, into the survey: each still to be checked, linked or made.",
+        "operationId": "take_seen_v1_rack_census__uid__seen_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uid",
+            "required": true,
+            "schema": {
+              "title": "Uid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Take Seen",
         "tags": [
           "rack census"
         ]

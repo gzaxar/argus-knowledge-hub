@@ -1,5 +1,6 @@
 import { Suspense, lazy } from "react";
 import RackEditor from "./pages/racks/RackEditor";
+import { CensusStart, CensusSurvey } from "./pages/racks/Census";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useCurrentWorkspaceId } from "./api/useCurrentWorkspaceId";
 import { TokenGate } from "./auth/TokenGate";
@@ -127,6 +128,8 @@ export function App() {
           <Route path="/search/advanced" element={<AdvancedSearch />} />
           <Route path="/map" element={<MapPage />} />
           <Route path="/floor-plan" element={<FloorPlanPage />} />
+          <Route path="/racks/census" element={<CensusStart />} />
+          <Route path="/racks/census/:uid" element={<CensusSurvey />} />
           <Route path="/racks/:uid" element={<RackEditor />} />
           <Route path="/plans/:uid" element={<PlanLayersPage />} />
           <Route path="/plans/:uid/3d" element={<Suspense fallback={<p className="p-6 text-sm text-slate-500">Loading the 3D view…</p>}><Plan3DPage /></Suspense>} />

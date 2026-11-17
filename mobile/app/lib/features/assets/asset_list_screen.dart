@@ -99,6 +99,19 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
             icon: const Icon(Icons.add_box_outlined),
             onPressed: () => context.push('/register'),
           ),
+          PopupMenuButton<String>(
+            key: const Key('assets-menu'),
+            tooltip: 'More',
+            onSelected: (to) => context.push(to),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                key: Key('assets-census'),
+                value: '/census',
+                child: ListTile(leading: Icon(Icons.dns_outlined), title: Text('Survey a rack'),
+                    subtitle: Text('From photos: its units, the rack too'), contentPadding: EdgeInsets.zero),
+              ),
+            ],
+          ),
         ],
       ),
       body: Column(children: [

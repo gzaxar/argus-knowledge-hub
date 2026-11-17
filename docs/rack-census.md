@@ -1,8 +1,9 @@
 # Rack survey from the phone
 
-A guided survey of a rack with the ARGUS Field app (**Survey a rack** on the home screen): photograph the rack and
-its units, take or correct what is read, review the whole rack, save. Backend `app/services/rack_census.py`,
-API `/v1/rack-census`, app `mobile/app/lib/features/census/`.
+A guided survey of a rack, with the ARGUS Field app (**Assets → ⋮ → Survey a rack**) or on the web (**Assets →
+Tools → Survey a rack from photos**, `/racks/census`): photograph the rack and its units, take or correct what is
+read, review the whole rack, save. Backend `app/services/rack_census.py`, API `/v1/rack-census`, app
+`mobile/app/lib/features/census/`, web `webapp/src/pages/racks/Census.tsx`.
 
 ## The steps
 
@@ -11,6 +12,18 @@ API `/v1/rack-census`, app `mobile/app/lib/features/census/`.
    racks it may be — the same key or name, or the racks of the room said — are offered ("It is this one"). For a
    new rack the person says its name, height in units and room, and may choose its point on the room's floor plan;
    the point is used only once confirmed ("Is it here? — Yes, here"). Nothing is guessed about where it stands.
+   **The units seen on the photo of the whole rack.** The photo of the front (or rear) is also read for the units
+   mounted in it, top down: what each is (a type of the workspace, when it is one), its maker, model and the name on
+   its own label when they can be read, its height and the empty units above it, and its lowest unit only when the
+   numbers on the rails are readable — with the confidence and what was seen (`ai.rack.units/1`, an intake run
+   `rack.units`). The person chooses which to take and says the top unit of the first one: the others are counted
+   down from it with the heights and gaps seen ("counted down from U40", at most 70% sure). Taken, each becomes a
+   unit of the survey with those proposals; with **Use what was read** they are its values at once (a unit with a
+   possible duplicate is still left to decide), and a name not written on a unit is made from what it is and its
+   place from the top, and says it was not read. **Record the rack itself too** makes a rack not in ARGUS a new
+   record with them, named and sized from what was read on it where the person has not said. Every unit is still
+   checked in the review, and its label can be photographed to read its serial number. The photo is kept as the
+   evidence of each unit taken from it.
 2. **Each unit.** Photograph it; photograph its label or nameplate apart when the front does not show it. What the
    vision model reads — type, name, manufacturer, model, the serial number of that very unit, its height and its
    lowest unit when they are written on it — comes back as **proposals**, each with where it was read (the quoted
@@ -43,6 +56,7 @@ finds anything.
 | `GET /v1/rack-census` | the open surveys |
 | `GET`, `DELETE /v1/rack-census/{uid}` | read; leave it |
 | `POST /{uid}/photos` multipart `role` (rack_front, rack_rear, device, label), `item`, `file` | a photo and its reading |
+| `POST /{uid}/seen` `{units?, top_u?, use, rack}` | the units seen on the photo of the whole rack, into the survey |
 | `PUT /{uid}/rack` `{existing}` or `{values: {name, key, units, place_uid, plan_uid, x, y, position_confirmed}}` | which rack |
 | `PUT /{uid}/items/{item}` `{values, decision, asset_uid, duplicate_checked}` | a unit's values and record |
 | `GET /{uid}/review`, `POST /{uid}/apply` | review; make it so (409 with what is missing) |

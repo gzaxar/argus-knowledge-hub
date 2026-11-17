@@ -4,6 +4,8 @@
 - `GET /v1/rack-census/{uid}`; `DELETE` — leave it (abandoned, nothing changed).
 - `POST /{uid}/photos` (multipart: `role` rack_front|rack_rear|device|label, `item`, `file`) — a photo, and what was
   read on it as proposals with evidence and confidence.
+- `POST /{uid}/seen` `{units?, top_u?, use, rack}` — the units seen on the photo of the whole rack become units of
+  the survey (all, or those listed), and the rack itself a new record when `rack`.
 - `PUT /{uid}/rack` — the rack is an existing one, or a new one's name, units, room and confirmed plan point.
 - `PUT /{uid}/items/{item}` — the person's values, and link / create / skip; `DELETE` — drop a unit.
 - `GET /{uid}/review` — what is missing, overlapping or possibly a duplicate; `POST /{uid}/apply` — make it so.
@@ -36,6 +38,13 @@ class StartIn(BaseModel):
 class RackIn(BaseModel):
     existing: Optional[str] = None
     values: Optional[dict] = None
+
+
+class SeenIn(BaseModel):
+    units: Optional[list[int]] = None
+    top_u: Optional[int] = None
+    use: bool = False
+    rack: bool = False
 
 
 class ItemIn(BaseModel):
@@ -104,6 +113,19 @@ async def photo(uid: str, role: str = Form(...), item: str = Form(""), file: Upl
         _fail(e)
     db.commit()
     return out
+
+
+@router.post("/{uid}/seen")
+def take_seen(uid: str, body: SeenIn, workspace_id: str = Depends(require_permission("create")),
+              db: Session = Depends(get_db)):
+    """The units seen on the photo of the whole rack, into the survey: each still to be checked, linked or made."""
+    try:
+        c = census.take_seen(db, workspace_id, uid, units=body.units, top_u=body.top_u, use=body.use, rack=body.rack)
+    except (census.CensusError, ValueError) as e:
+        db.rollback()
+        _fail(e)
+    db.commit()
+    return census.view(db, c)
 
 
 @router.put("/{uid}/rack")

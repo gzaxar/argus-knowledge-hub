@@ -3593,3 +3593,95 @@ export const proposalsApi = {
   apply: (ids: string[]) => request<AssistantProposal[]>("/v1/proposals/apply", { method: "POST", body: json({ ids }) }),
   discard: (ids: string[]) => request<AssistantProposal[]>("/v1/proposals/discard", { method: "POST", body: json({ ids }) }),
 };
+
+// --------------------------------------------------------------------------- rack survey (docs/rack-census.md)
+
+export interface CensusProposal {
+  value: unknown; label?: string | null; confidence?: number | null; evidence?: string | null; grounded?: boolean;
+  source: string;
+}
+export type CensusValue = { value: unknown; source: string; confidence?: number } | string | number;
+export interface CensusDuplicate {
+  uid: string; key: string | null; name: string; type: string; why: string; strength: "strong" | "medium" | "weak";
+  mounted: { rack: string | null; start_u: number | null } | null;
+}
+export interface CensusItem {
+  id: string;
+  photos: { uid: string; role: string }[];
+  proposals: Record<string, CensusProposal>;
+  values: Record<string, CensusValue>;
+  decision: "link" | "create" | "skip" | null;
+  asset_uid: string | null;
+  duplicates?: CensusDuplicate[];
+  duplicate_checked?: boolean;
+  note?: string | null;
+  seen_in?: { photo: string; index: number };
+}
+export interface CensusSeenUnit {
+  kind: string | null; type: string | null; manufacturer: string | null; model: string | null; label: string | null;
+  height_u: number | null; gap_above_u: number; start_u: number | null; confidence: number | null; evidence: string | null;
+}
+export interface Census {
+  uid: string; state: "open" | "applied" | "abandoned"; created_by: string; updated_at: string;
+  rack: {
+    existing?: string;
+    photos: { uid: string; role: string }[];
+    proposals: Record<string, CensusProposal>;
+    values: Record<string, unknown>;
+    candidates: { uid: string; key: string | null; name: string; why: string }[];
+    note?: string | null;
+    seen?: { photo: string; face: string; units: CensusSeenUnit[]; note?: string | null; taken: number[] };
+    record: { uid: string; key: string | null; name: string; units: number } | null;
+  };
+  items: CensusItem[];
+}
+export interface CensusReview {
+  ok: boolean;
+  missing: { item: string | null; field: string; message: string }[];
+  problems: { code: string; message: string }[];
+  changes: string[];
+  new_records: number;
+  new_rack: boolean;
+  units: number;
+}
+
+const census = (uid: string, rest = "") => `/v1/rack-census/${encodeURIComponent(uid)}${rest}`;
+
+export const censusApi = {
+  start: (body: { rack_uid?: string; place_uid?: string } = {}) =>
+    request<Census>("/v1/rack-census", { method: "POST", body: json(body) }),
+  open: () => request<{ uid: string; updated_at: string; created_by: string; rack: string | null; items: number }[]>(
+    "/v1/rack-census"),
+  get: (uid: string) => request<Census>(census(uid)),
+  abandon: (uid: string) => request<Census>(census(uid), { method: "DELETE" }),
+  photo: (uid: string, role: "rack_front" | "rack_rear" | "device" | "label", file: File, item?: string) =>
+    upload<{ photo: string; item?: string; reading: { note?: string | null }; survey: Census }>(
+      census(uid, "/photos"), { role, item: item ?? "", file }),
+  takeSeen: (uid: string, body: { units?: number[]; top_u?: number; use?: boolean; rack?: boolean }) =>
+    request<Census>(census(uid, "/seen"), { method: "POST", body: json(body) }),
+  setRack: (uid: string, body: { existing?: string; values?: Record<string, unknown> }) =>
+    request<Census>(census(uid, "/rack"), { method: "PUT", body: json(body) }),
+  setItem: (uid: string, item: string, body: { values?: Record<string, unknown>; decision?: string;
+                                               asset_uid?: string; duplicate_checked?: boolean }) =>
+    request<Census>(census(uid, `/items/${encodeURIComponent(item)}`), { method: "PUT", body: json(body) }),
+  removeItem: (uid: string, item: string) =>
+    request<Census>(census(uid, `/items/${encodeURIComponent(item)}`), { method: "DELETE" }),
+  review: (uid: string) => request<CensusReview>(census(uid, "/review")),
+  apply: (uid: string) => request<{ ok: boolean; rack: { uid: string; key: string | null; name: string };
+                                    created: { uid: string; name: string }[]; changes: string[] }>(
+    census(uid, "/apply"), { method: "POST", body: json({}) }),
+  /** Records whose key, name, label or serial contains `q` — of these types when given. */
+  find: (q: string, types?: string[]) =>
+    request<Asset[]>(`/v1/assets?q=${encodeURIComponent(q)}&sort=name&limit=25`).then(
+      (rows) => (types ? rows.filter((a) => types.includes(a.type)) : rows)),
+};
+
+/** What the server said went wrong, also for the survey's own errors ({detail: {error}}). */
+export function censusProblem(e: unknown): string {
+  if (e instanceof ApiError) {
+    const d = (e.body as { detail?: unknown } | undefined)?.detail as { error?: string; missing?: { message: string }[] } | string | undefined;
+    if (d && typeof d === "object" && d.error) return d.error;
+    if (d && typeof d === "object" && d.missing?.length) return d.missing.map((m) => m.message).join("\n");
+  }
+  return problemText(e);
+}

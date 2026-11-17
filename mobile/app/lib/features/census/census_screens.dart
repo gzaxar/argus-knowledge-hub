@@ -53,7 +53,7 @@ class CensusListScreen extends ConsumerWidget {
           key: const Key('census-new'),
           leading: const Icon(Icons.add_box_outlined),
           title: const Text('A rack not recorded yet'),
-          subtitle: const Text('Start from its photo'),
+          subtitle: const Text('Start from a photo of its front: the units seen on it are proposed, the rack too'),
           onTap: () => _start(context, ref),
         ),
         const SectionHeader('Left half-way'),
@@ -278,9 +278,14 @@ class _CensusScreenState extends ConsumerState<CensusScreen> {
                 label: Text('Rear${c.rack.photos.any((p) => p.role == 'rack_rear') ? ' ✓' : ''}')),
           ]),
           if (c.rack.isNew)
-            for (final p in c.rack.proposals.values)
+            for (final p in c.rack.proposals.values.where((p) => const {'name', 'key', 'units'}.contains(p.field)))
               CensusProposalTile(p, onUse: () => _do(() =>
-                  ref.read(censusRepositoryProvider).setRack(widget.uid, values: {p.field == 'key' ? 'key' : 'name': p.value}))),
+                  ref.read(censusRepositoryProvider).setRack(widget.uid, values: {p.field: p.value}))),
+          if (c.rack.seen != null && (c.rack.seen!.units.isNotEmpty || c.rack.seen!.note != null))
+            _SeenUnits(key: ValueKey('seen-${c.rack.seen!.photo}-${c.rack.seen!.taken.length}'), census: c,
+                enabled: !_busy && c.state == 'open',
+                onTake: (units, topU, use, rack) => _do(() => ref.read(censusRepositoryProvider)
+                    .takeSeen(widget.uid, units: units, topU: topU, use: use, rack: rack))),
           if (c.rack.isNew && c.rack.candidates.isNotEmpty) ...[
             const ListTile(dense: true, title: Text('It may be one already recorded:')),
             for (final r in c.rack.candidates)
@@ -326,6 +331,101 @@ class _CensusScreenState extends ConsumerState<CensusScreen> {
         ]),
       ),
     );
+  }
+}
+
+/// The units seen on the photo of the whole rack, top down: chosen, counted down from the top unit said, taken into
+/// the survey at once — and the rack itself made a new record with them, when it is not in ARGUS.
+class _SeenUnits extends StatefulWidget {
+  const _SeenUnits({super.key, required this.census, required this.enabled, required this.onTake});
+  final Census census;
+  final bool enabled;
+  final Future<Object?> Function(List<int> units, int? topU, bool use, bool rack) onTake;
+
+  @override
+  State<_SeenUnits> createState() => _SeenUnitsState();
+}
+
+class _SeenUnitsState extends State<_SeenUnits> {
+  late final CensusSeen seen = widget.census.rack.seen!;
+  late final Set<int> _chosen = {for (var i = 0; i < seen.units.length; i++) if (!seen.taken.contains(i)) i};
+  final _top = TextEditingController();
+  bool _use = true;
+  bool _rack = true;
+
+  @override
+  void dispose() {
+    _top.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isNew = widget.census.rack.isNew;
+    final free = [for (var i = 0; i < seen.units.length; i++) if (!seen.taken.contains(i)) i];
+    final n = _chosen.where(free.contains).length;
+    final muted = Theme.of(context).textTheme.bodySmall;
+    return Column(key: const Key('census-seen'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      SectionHeader('Seen on the photo of the ${seen.face}', trailing: '${seen.units.length}'),
+      if (seen.note != null) ListTile(dense: true, title: Text(seen.note!)),
+      for (var i = 0; i < seen.units.length; i++)
+        CheckboxListTile(
+          key: Key('census-seen-$i'),
+          dense: true,
+          value: seen.taken.contains(i) || _chosen.contains(i),
+          onChanged: !widget.enabled || seen.taken.contains(i)
+              ? null
+              : (v) => setState(() => v == true ? _chosen.add(i) : _chosen.remove(i)),
+          title: Text('${i + 1}. ${seen.units[i].title}'),
+          subtitle: Text([
+            seen.units[i].type ?? (seen.units[i].kind == null ? 'type not read' : '${seen.units[i].kind} (not a type here)'),
+            '${seen.units[i].heightU ?? '?'} U',
+            if (seen.units[i].gapAboveU > 0) '${seen.units[i].gapAboveU} U empty above',
+            if (seen.units[i].startU != null) 'at U${seen.units[i].startU}',
+            if (seen.units[i].confidence != null) '${(seen.units[i].confidence! * 100).round()}%',
+            if (seen.taken.contains(i)) 'in the survey',
+          ].join(' · '), style: muted),
+        ),
+      if (free.isNotEmpty && widget.enabled)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            TextField(
+              key: const Key('census-seen-top'),
+              controller: _top,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                  labelText: 'Top unit of the first one (U), to count the others down',
+                  hintText: '${widget.census.rack.recordUid != null ? widget.census.rack.height : widget.census.rack.values['units'] ?? ''}'),
+            ),
+            SwitchListTile(
+              key: const Key('census-seen-use'),
+              contentPadding: EdgeInsets.zero,
+              value: _use,
+              onChanged: (v) => setState(() => _use = v),
+              title: const Text('Use what was read as the values'),
+              subtitle: const Text('Each still to check; a name not written on a unit is made up and says so'),
+            ),
+            if (isNew)
+              SwitchListTile(
+                key: const Key('census-seen-rack'),
+                contentPadding: EdgeInsets.zero,
+                value: _rack,
+                onChanged: (v) => setState(() => _rack = v),
+                title: const Text('Record the rack itself too, as a new record'),
+              ),
+            FilledButton.icon(
+              key: const Key('census-seen-take'),
+              onPressed: n == 0
+                  ? null
+                  : () => widget.onTake(_chosen.where(free.contains).toList()..sort(), int.tryParse(_top.text.trim()),
+                      _use, isNew && _rack),
+              icon: const Icon(Icons.playlist_add),
+              label: Text('Add $n unit${n == 1 ? '' : 's'} to the survey'),
+            ),
+          ]),
+        ),
+    ]);
   }
 }
 

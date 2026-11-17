@@ -128,4 +128,36 @@ void main() {
     expect(find.text('Rack B07'), findsOneWidget);
     expect(find.text('3 units so far'), findsOneWidget);
   });
+  testWidgets('the units seen on the photo of the whole rack are taken at once, the rack recorded too', (tester) async {
+    final app = await start(tester);
+    final s = app.server.routes;
+    s['GET /v1/rack-census/c1'] = _json(_survey(rack: {
+      'proposals': {'name': {'value': 'BPM-R3', 'confidence': 0.8, 'grounded': true, 'source': 'rack photo',
+                             'evidence': 'BPM-R3 on the top panel'}},
+      'seen': {'photo': 'ph0', 'face': 'front', 'taken': [], 'units': [
+        {'kind': 'Server', 'type': 'Server', 'label': 'BPM-1', 'height_u': 1, 'gap_above_u': 0, 'confidence': 0.8},
+        {'kind': 'Server', 'type': 'Server', 'label': 'BPM-2', 'height_u': 1, 'gap_above_u': 2, 'confidence': 0.8},
+        {'kind': 'Oscilloscope', 'height_u': 4, 'gap_above_u': 1},
+      ]}}));
+    s['GET /v1/rack-census/c1/review'] = _json(_review());
+    s['POST /v1/rack-census/c1/seen'] = _json(_survey());
+    await app.go('/census/c1');
+    expect(find.text('2. BPM-2'), findsOneWidget);
+    expect(find.textContaining('Oscilloscope (not a type here)'), findsOneWidget);
+    await app.tap('census-seen-2');                                     // left out
+    await app.type('census-seen-top', '40');
+    await app.tap('census-seen-take');
+    final sent = app.server.requests.where((r) => r.method == 'POST' && r.url.path == '/v1/rack-census/c1/seen');
+    expect(sent, hasLength(1));
+    expect(jsonDecode(sent.single.body), {'units': [0, 1], 'top_u': 40, 'use': true, 'rack': true});
+  });
+
+  testWidgets('a rack survey starts from the Assets menu', (tester) async {
+    final app = await start(tester);
+    app.server.routes['GET /v1/rack-census'] = _json([]);
+    await app.go('/assets');
+    await app.tap('assets-menu');
+    await app.tap('assets-census');
+    expect(find.byKey(const Key('census-new')), findsOneWidget);
+  });
 }
