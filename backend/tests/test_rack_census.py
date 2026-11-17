@@ -69,7 +69,7 @@ def site():
 
 
 def reads(monkeypatch, reply: dict):
-    monkeypatch.setattr("app.services.llm.look", lambda endpoint, image, mime, system, user: json.dumps(reply))
+    monkeypatch.setattr("app.services.llm.look", lambda endpoint, image, mime, system, user, **_: json.dumps(reply))
 
 
 def photo(w, uid, role, item=""):

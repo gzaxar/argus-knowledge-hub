@@ -42,6 +42,12 @@ class CensusRepository {
     return (survey: Census.parse(m['survey']), item: m['item'] as String?, note: _map(m['reading'])['note'] as String?);
   }
 
+  /// The units seen on the photo of the whole rack into the survey: those listed (all when none), counted down from
+  /// [topU]; [use] takes what was read as their values; [rack] makes the rack itself a new record.
+  Future<Census> takeSeen(String uid, {List<int>? units, int? topU, bool use = false, bool rack = false}) async =>
+      Census.parse(await _call('/v1/rack-census/$uid/seen', 'POST',
+          {'units': ?units, 'top_u': ?topU, 'use': use, 'rack': rack}));
+
   Future<Census> setRack(String uid, {String? existing, Map<String, Object?>? values}) async => Census.parse(
       await _call('/v1/rack-census/$uid/rack', 'PUT', {'existing': ?existing, 'values': ?values}));
 

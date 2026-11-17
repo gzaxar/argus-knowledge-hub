@@ -101,9 +101,51 @@ class CensusItem {
   }
 }
 
+/// One unit seen on the photo of the whole rack, top down: what it is, how tall, the empty units above it.
+class SeenUnit {
+  const SeenUnit({this.kind, this.type, this.manufacturer, this.model, this.label, this.heightU, this.gapAboveU = 0,
+      this.startU, this.confidence, this.evidence});
+  final String? kind, type, manufacturer, model, label, evidence;
+  final int? heightU, startU;
+  final int gapAboveU;
+  final double? confidence;
+
+  String get title => label ?? ([manufacturer, model].whereType<String>().join(' ').trim().isNotEmpty
+      ? [manufacturer, model].whereType<String>().join(' ')
+      : kind ?? 'Unit');
+
+  static SeenUnit parse(Object? o) {
+    final m = _map(o);
+    return SeenUnit(kind: m['kind'] as String?, type: m['type'] as String?, manufacturer: m['manufacturer'] as String?,
+        model: m['model'] as String?, label: m['label'] as String?, heightU: (m['height_u'] as num?)?.toInt(),
+        gapAboveU: (m['gap_above_u'] as num?)?.toInt() ?? 0, startU: (m['start_u'] as num?)?.toInt(),
+        confidence: (m['confidence'] as num?)?.toDouble(), evidence: m['evidence'] as String?);
+  }
+}
+
+/// The units seen on a photo of the whole rack, and which of them are already in the survey.
+class CensusSeen {
+  const CensusSeen({required this.photo, this.face = 'front', this.units = const [], this.note, this.taken = const {}});
+  final String photo;
+  final String face;
+  final List<SeenUnit> units;
+  final String? note;
+  final Set<int> taken;
+
+  static CensusSeen? parse(Object? o) {
+    if (o is! Map) return null;
+    final m = _map(o);
+    return CensusSeen(photo: m['photo'].toString(), face: (m['face'] ?? 'front').toString(),
+        units: _list(m['units']).map(SeenUnit.parse).toList(), note: m['note'] as String?,
+        taken: _list(m['taken']).whereType<num>().map((n) => n.toInt()).toSet());
+  }
+}
+
 class CensusRack {
   const CensusRack({this.recordUid, this.recordName, this.units, this.photos = const [], this.proposals = const {},
-      this.values = const {}, this.candidates = const [], this.note});
+      this.values = const {}, this.candidates = const [], this.note, this.seen});
+
+  final CensusSeen? seen;
 
   final String? recordUid;
   final String? recordName;
@@ -129,6 +171,7 @@ class CensusRack {
       candidates: _list(m['candidates']).map(_map).map((c) => (uid: c['uid'].toString(), key: c['key'] as String?,
           name: (c['name'] ?? '').toString(), why: (c['why'] ?? '').toString())).toList(),
       note: m['note'] as String?,
+      seen: CensusSeen.parse(m['seen']),
     );
   }
 }

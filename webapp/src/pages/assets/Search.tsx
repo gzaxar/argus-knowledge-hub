@@ -93,6 +93,8 @@ export function AssetSearch() {
   const tools = [
     { to: "/search/advanced?entity=assets", label: "Advanced query", hint: "Combine conditions on any field" },
     { to: "/assets/import", label: "Import a spreadsheet" },
+    ...(equipment && rights.can_create ? [{ to: "/racks/census", label: "Survey a rack from photos",
+                                            hint: "The units seen on a photo of its front, the rack too" }] : []),
     ...(equipment ? [{ to: "/labels", label: "Labels & QR codes" }] : []),
     { to: "/bulk-changes", label: "Bulk changes", hint: "Change a field on many records" },
     ...(equipment ? [{ to: "/migration/catalogue", label: "Map imported records" }] : []),

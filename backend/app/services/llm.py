@@ -660,7 +660,8 @@ def transcribe(endpoint: Endpoint, audio: bytes, filename: str, mime_type: str,
         return (resp.text or "").strip()
 
 
-def look(endpoint: Endpoint, image: bytes, mime_type: str, system: str, user: str) -> str:
+def look(endpoint: Endpoint, image: bytes, mime_type: str, system: str, user: str,
+         timeout: Optional[float] = None) -> str:
     """Ask the vision model about a picture.
 
     A separate model from `complete`'s, because they usually are: the chat
@@ -695,7 +696,7 @@ def look(endpoint: Endpoint, image: bytes, mime_type: str, system: str, user: st
                 **endpoint.budget(),
                 **endpoint.temperature(endpoint.vision_model, 0),
             },
-            timeout=COMPLETION_TIMEOUT_SECONDS,
+            timeout=timeout or COMPLETION_TIMEOUT_SECONDS,
         )
     except requests.RequestException as e:
         raise LLMError(f"Could not reach {endpoint.root}: {e}") from e
