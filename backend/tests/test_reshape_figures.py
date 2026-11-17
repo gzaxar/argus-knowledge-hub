@@ -129,7 +129,8 @@ def test_the_draft_shows_each_picture_under_its_entry_read_once_and_saved_with_t
     out = r.json()
     assert "source-images" not in seen["model"] and "[figure 1]" in seen["model"]   # the model gets no links
     assert len(seen["looks"]) == 3                      # four pictures, two the same: read once each
-    assert "The entry it belongs to: 10h35: misura emittanza driver AC1" in seen["looks"][0]
+    # Read four at a time: in any order.
+    assert any("The entry it belongs to: 10h35: misura emittanza driver AC1" in x for x in seen["looks"])
     draft = out["markdown"]
     assert "## Figures" in draft and "**Figure 1 — 10h35: misura emittanza driver AC1** (page 1)" in draft
     assert "> X fit εn = 1.7 µm" in draft and "to check" in draft
