@@ -5628,6 +5628,17 @@
             "title": "Name",
             "type": "string"
           },
+          "parent_document_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Document Uid"
+          },
           "parent_uid": {
             "anyOf": [
               {
