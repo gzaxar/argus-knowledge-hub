@@ -782,6 +782,17 @@ export interface AppDocument {
   superseded_by_uid?: string | null;
   created_at: string;
   updated_at: string;
+  /** The newest revision, whatever its state (in the list only): where the document stands in its review. */
+  latest_revision?: DocumentLatestRevision | null;
+}
+
+export interface DocumentLatestRevision {
+  uid: string;
+  revision_number: number;
+  state: "draft" | "in_review" | "approved" | "published" | "superseded" | "retired";
+  authored_by: string | null;
+  published_at: string | null;
+  updated_at: string;
 }
 
 export interface DocumentFolder {

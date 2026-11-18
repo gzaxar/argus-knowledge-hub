@@ -45,6 +45,17 @@ class DocumentUpdate(BaseModel):
     is_global: Optional[bool] = None
 
 
+class LatestRevisionOut(BaseModel):
+    """A document's newest revision, whatever its state: where the document stands in its review
+    (the documents board). The published one is current_revision_uid."""
+    uid: str
+    revision_number: int
+    state: str
+    authored_by: Optional[str] = None
+    published_at: Optional[datetime] = None
+    updated_at: datetime
+
+
 class DocumentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -65,6 +76,8 @@ class DocumentOut(BaseModel):
     superseded_by_uid: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    # Filled by the list only.
+    latest_revision: Optional[LatestRevisionOut] = None
 
 
 class DocumentRevisionCreate(BaseModel):

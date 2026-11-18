@@ -5,11 +5,12 @@ import { getActiveProfile } from "../api/session";
 import { useCurrentWorkspaceId } from "../api/useCurrentWorkspaceId";
 
 export type Rights = Pick<MyWorkspace, "can_create" | "can_modify" | "can_delete" | "can_create_tickets" |
-  "can_modify_tickets" | "can_delete_tickets" | "can_create_documents" | "can_modify_documents" | "can_delete_documents">;
+  "can_modify_tickets" | "can_delete_tickets" | "can_create_documents" | "can_modify_documents" | "can_delete_documents" | "can_approve_documents">;
 
 const ALL: Rights = {
   can_create: true, can_modify: true, can_delete: true, can_create_tickets: true, can_modify_tickets: true,
   can_delete_tickets: true, can_create_documents: true, can_modify_documents: true, can_delete_documents: true,
+  can_approve_documents: true,
 };
 
 /** What the signed-in person may do in the current workspace, to show only the actions they can take. A token

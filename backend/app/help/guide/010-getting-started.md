@@ -72,7 +72,7 @@ it):
 | **Cockpit** | what needs attention now: open and unassigned tickets, overdue activities, reviews and approvals |
 | **Assets** | the equipment: browse by type, search, filter by fields; the **Map** view; **Tools**: advanced query, spreadsheet import, labels and QR codes, bulk changes, imports' mapping |
 | **Tickets** | the service desk: the list and the **Board** view, by type, state and assignee; **Tools**: advanced query, workflows |
-| **Documents** | the knowledge base: **Hierarchy** or **Document types**, parent pages and folders, previews; **Full table** for advanced filters and bulk actions; templates and document creation |
+| **Documents** | the knowledge base: the **List**, the **Tree** (folders and parent pages, previews) and the review **Board**; **Tools**: templates, rework from raw text, advanced query, type suggestions |
 | **Activities** | planned and recurring work |
 | **Map** | records with a location, on the map |
 | **Knowledge graph** | how records are connected; what depends on what; what is about the same thing |
@@ -80,15 +80,15 @@ it):
 | **Ask ARGUS** | ask questions in your own words; it can also propose changes for you to apply |
 | **Review queue** | facts that wait for a person: inferred values, proposals, conflicts, installations |
 
-On the Assets and Tickets lists, and the Documents **Full table**, the **type panel** beside the results lists
+On the Assets, Tickets and Documents lists and boards, the **type panel** beside the results lists
 types and their record counts; choose one to see its records (and those of the types below it), **Clear** to see
 all again, and *type settings* to change the type. On a narrow screen it opens from the **Type** button above
 the results. Tick rows to show bulk actions; **Columns** chooses what the table displays.
 
-The default **Documents** browser instead offers **Hierarchy / Document types**, local title/code search,
-**Expand all / Collapse all**, breadcrumbs and **Page / List** views. In workspaces using WP overview pages as
+The Documents **Tree** view instead offers **Hierarchy / Document types**, a title/code filter,
+**Expand all / Collapse all**, breadcrumbs and **Preview / Contents**. In workspaces using WP overview pages as
 subsystems, root pages such as WP01 and WP02 appear directly at the top level, with their documents below.
-**Unfiled documents** holds ordinary pages still without a usable location. Use **Full table** for the table's
+**Unfiled documents** holds ordinary pages still without a usable location. Use the **List** view for the table's
 filters and bulk operations. See *Document hierarchy and subsystem pages* for moves, counts and revisions.
 
 At the top right: **Help** (this guide); **⚙ Workspace settings**: **Access** (who has which role), **Area permissions**,

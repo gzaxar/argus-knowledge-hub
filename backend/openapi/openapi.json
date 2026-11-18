@@ -4176,6 +4176,16 @@
             "title": "Is Global",
             "type": "boolean"
           },
+          "latest_revision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatestRevisionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "owner_user_id": {
             "anyOf": [
               {
@@ -9336,6 +9346,59 @@
           "last_check_error"
         ],
         "title": "LLMConfigOut",
+        "type": "object"
+      },
+      "LatestRevisionOut": {
+        "description": "A document's newest revision, whatever its state: where the document stands in its review\n(the documents board). The published one is current_revision_uid.",
+        "properties": {
+          "authored_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authored By"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "revision_number": {
+            "title": "Revision Number",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "uid": {
+            "title": "Uid",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "uid",
+          "revision_number",
+          "state",
+          "updated_at"
+        ],
+        "title": "LatestRevisionOut",
         "type": "object"
       },
       "LayoutIn": {

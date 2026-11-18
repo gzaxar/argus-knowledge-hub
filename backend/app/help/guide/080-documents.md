@@ -1,7 +1,7 @@
 ---
 title: Documents and the knowledge base
 summary: Browsing, writing and importing procedures, manuals and reports; document hierarchy, previews, revisions, review, publication, confidentiality, sharing and retention.
-keywords: [hierarchy, folder, preview, subsystem, WP, unfiled, full table, document, documents, logbook, log, running log, shift log, days, rework, raw text, notes, email, e-mail, transcript, minutes, template, templates, variant, rielabora, testo grezzo, procedure, manual, report, knowledge base, revision, draft, submit, review, reject, approval, approve, publish, new revision, edit, retire, confidentiality, riservato, shared, global, retention, markdown, controlled document, attachment, related by meaning, export, pdf, print, download, markdown file, .md, save as pdf]
+keywords: [hierarchy, folder, preview, subsystem, WP, unfiled, full table, list, tree, board, kanban, review board, bacheca, document, documents, logbook, log, running log, shift log, days, rework, raw text, notes, email, e-mail, transcript, minutes, template, templates, variant, rielabora, testo grezzo, procedure, manual, report, knowledge base, revision, draft, submit, review, reject, approval, approve, publish, new revision, edit, retire, confidentiality, riservato, shared, global, retention, markdown, controlled document, attachment, related by meaning, export, pdf, print, download, markdown file, .md, save as pdf]
 order: 80
 ---
 
@@ -10,9 +10,38 @@ drawings, notes. A document is linked to the equipment, types and other document
 
 ## Browse documents before creating another one
 
-Open **Documents** to browse **Hierarchy** or **Document types**. Select a page for its preview, use **List**
-for the selected branch, or **Full table** for advanced filters and bulk operations. Search first to avoid
+**Documents** has three views, switched at the top right as on Tickets and Assets:
+
+- **List**: every document in a table, with the type panel, search by title or code, the **Status** filter,
+  **Columns**, sorting and bulk operations (copy, move between workspaces, retype, delete).
+- **Tree**: folders and parent pages, **Hierarchy** or **Document types**; **Preview** a page or list a
+  branch's **Contents**; **+ Folder** and **Move in hierarchy** are here.
+- **Board**: documents by where their review stands (see *The review board* below).
+
+**Tools** holds Templates, Rework from raw text, Advanced query and Type suggestions. Search first to avoid
 creating a second copy of an existing document.
+
+## The review board
+
+**Documents → Board** shows each document in the column of its newest revision: **Draft**, **In review**,
+**Approved**, **Published**. A document whose second revision is a draft sits in Draft, marked *earlier one
+published*: readers still see the published one.
+
+Drag a card to the next column, or use the buttons on the card. Each move is the document's own review step,
+with the same rules as on the document:
+
+| Move | Means | Who |
+|---|---|---|
+| Draft → In review | Submit for review | anyone who may edit documents |
+| In review → Draft | Withdraw (the author) or Reject, with a reason (an approver) | the author, or an approver |
+| In review → Approved | Approve | an approver who did not write the revision |
+| Approved → Published | Publish | an approver |
+
+Columns a card cannot go to are dimmed while it is dragged; hover one for the reason. Other moves (Draft
+straight to Published, back from Published) do not exist: a published revision is changed by a new revision.
+Documents published more than 30 days ago are hidden unless **Published: Any time** is chosen, so years of
+logbook entries do not bury the work in progress; **Show retired** adds a Retired column. **Group by** Type or
+Owner shows the same cards by type or owner, for viewing only.
 
 Root WP overview pages, folders, imported child pages, icons and counters are explained in *Document hierarchy
 and subsystem pages*. In the preview, check **Revision** and the state badge: an open draft can be displayed
