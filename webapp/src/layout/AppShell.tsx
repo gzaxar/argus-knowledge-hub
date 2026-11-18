@@ -11,6 +11,8 @@ import { NotificationBell } from "../components/hub/WorkflowPanels";
 import { setShowKeys, useShowKeys } from "../api/displayPrefs";
 import { has, useCapabilities } from "../api/useCapabilities";
 import type { WorkspaceCapabilities } from "../api/client";
+import { useBrowseViewLinks } from "../components/browse/useBrowseViewLinks";
+import { preferredAreaHref } from "../lib/browseViews";
 
 /**
  * One application, three kinds of record, one stable sidebar: the major areas, always in the same place. What
@@ -61,6 +63,8 @@ export function areas(features: WorkspaceCapabilities["features"] | null, review
 
 export function SideNav({ items, onNavigate }: { items: Area[]; onNavigate?: () => void }) {
   const location = useLocation();
+  const views = useBrowseViewLinks();
+  const mapAvailable = items.some((area) => area.to === "/map");
   return (
     <nav aria-label="Main" className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
       <ul className="space-y-0.5">
@@ -70,7 +74,7 @@ export function SideNav({ items, onNavigate }: { items: Area[]; onNavigate?: () 
           return (
             <li key={a.to}>
               <Link
-                to={a.to}
+                to={preferredAreaHref(a.to, views, mapAvailable)}
                 onClick={onNavigate}
                 aria-current={current ? "page" : undefined}
                 className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${

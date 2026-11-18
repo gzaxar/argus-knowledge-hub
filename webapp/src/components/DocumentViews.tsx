@@ -1,14 +1,15 @@
 import { MenuButton, ViewSwitch } from "./browse/Browse";
 import type { Rights } from "../lib/permissions";
+import { DOCUMENT_TREE_PARAMS } from "../lib/viewLinks";
 
 export type DocumentView = "list" | "tree" | "board";
 
-/** List | Tree | Board, as Tickets have List | Board and Assets List | Map: the filters in the address follow. */
+/** List | Tree | Board, as Tickets have List | Board and Assets List | Map: shared filters follow; Tree selection stays in Tree. */
 export function DocumentViewSwitch({ current }: { current: DocumentView }) {
   return <ViewSwitch views={[
-    { label: "List", to: "/documents", current: current === "list" },
+    { label: "List", to: "/documents", current: current === "list", clearParams: DOCUMENT_TREE_PARAMS },
     { label: "Tree", to: "/documents/tree", current: current === "tree" },
-    { label: "Board", to: "/documents/board", current: current === "board" },
+    { label: "Board", to: "/documents/board", current: current === "board", clearParams: DOCUMENT_TREE_PARAMS },
   ]} />;
 }
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { viewHref } from "../../lib/viewLinks";
 
 /* The parts every browse page (Assets, Tickets, Documents) is made of, so the three read alike: a header with
    the title and the primary action, a contextual panel (the type explorer), a toolbar (search, filters, view,
@@ -47,7 +48,7 @@ export function useBrowseParams() {
 
 // --------------------------------------------------------------------------- layout
 
-export function BrowsePage({ title, count, primary, actions, explorer, explorerLabel, explorerSummary, storageKey, toolbar,
+export function BrowsePage({ title, count, primary, actions, viewSwitch, explorer, explorerLabel, explorerSummary, storageKey, toolbar,
   children }: {
   title: string;
   count?: React.ReactNode;
@@ -55,6 +56,8 @@ export function BrowsePage({ title, count, primary, actions, explorer, explorerL
   primary?: React.ReactNode;
   /** Its other actions (Templates, Rework, Tools…). */
   actions?: React.ReactNode;
+  /** Optional view selector on a stable full-width row below the header. */
+  viewSwitch?: React.ReactNode;
   explorer?: React.ReactNode;
   explorerLabel?: string;
   /** What the panel filters by now, shown on the narrow-screen button. */
@@ -79,6 +82,7 @@ export function BrowsePage({ title, count, primary, actions, explorer, explorerL
           {primary}
         </div>
       </header>
+      {viewSwitch && <div className="flex justify-end">{viewSwitch}</div>}
       <div className={`grid gap-4 ${explorer && wideOpen ? "lg:grid-cols-[13rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)]" : "grid-cols-1"}`}>
         {explorer && (
           <>
@@ -156,26 +160,39 @@ export function ToolbarSelect({ label, value, onChange, children }: {
 
 // --------------------------------------------------------------------------- views
 
-/** List, board, map: the same records seen differently. Each link keeps the filters in the address. */
-export function ViewSwitch({ views }: { views: { label: string; to: string; current: boolean }[] }) {
+/** Small inline SVGs keep view labels recognisable without adding an icon dependency. */
+function ViewIcon({ label }: { label: string }) {
+  const paths: Record<string, React.ReactNode> = {
+    List: <><path d="M8 5h12M8 12h12M8 19h12" /><path d="M3 5h.01M3 12h.01M3 19h.01" /></>,
+    Tree: <><rect x="3" y="3" width="6" height="5" rx="1" /><path d="M6 8v10h7M6 12h7" /><rect x="13" y="10" width="8" height="5" rx="1" /><rect x="13" y="17" width="8" height="5" rx="1" /></>,
+    Board: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M15 3v18M5.5 7h1M11.5 7h1M17.5 7h1" /></>,
+    Map: <><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z" /><path d="M9 3v15M15 6v15" /></>,
+  };
+  if (!Object.prototype.hasOwnProperty.call(paths, label)) return null;
+  return <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="16" height="16"
+              fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"
+              className="shrink-0">{paths[label]}</svg>;
+}
+
+/** List, tree, board, map: the same records seen differently. Each link keeps the filters in the address. */
+export function ViewSwitch({ views }: { views: { label: string; to: string; current: boolean; clearParams?: readonly string[] }[] }) {
   const { search } = useLocation();
   return (
-    <nav aria-label="View" className="inline-flex shrink-0 overflow-hidden rounded-md border border-slate-300 bg-white text-sm">
+    <div className="inline-flex shrink-0 items-center gap-2">
+      <span className="text-xs font-medium text-slate-600">View</span>
+      <nav aria-label="View" className="inline-flex overflow-hidden rounded-md border border-slate-300 bg-white text-sm">
       {views.map((v) => {
-        const [path, own] = v.to.split("?");
-        const merged = new URLSearchParams(search);
-        merged.delete("page");
-        new URLSearchParams(own ?? "").forEach((val, k) => merged.set(k, val));
-        const qs = merged.toString();
         return (
-          <Link key={v.label} to={`${path}${qs ? `?${qs}` : ""}`} aria-current={v.current ? "page" : undefined}
-                className={`px-3 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${
+          <Link key={v.label} to={viewHref(v.to, search, v.clearParams)} aria-current={v.current ? "page" : undefined}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 ${
                   v.current ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}>
+            <ViewIcon label={v.label} />
             {v.label}
           </Link>
         );
       })}
-    </nav>
+      </nav>
+    </div>
   );
 }
 

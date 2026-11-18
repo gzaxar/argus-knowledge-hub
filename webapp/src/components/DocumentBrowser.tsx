@@ -157,11 +157,11 @@ export function DocumentBrowser() {
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-baseline gap-2"><h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">Documents</h1><span className="text-sm tabular-nums text-slate-500" aria-label="Total documents">({snapshot.data ? totalDocuments : "…"})</span></div>
       <div className="flex flex-wrap gap-2">
-        <DocumentViewSwitch current="tree" />
         <DocumentTools rights={rights} />
         {rights.can_create_documents && <><button type="button" className={button} onClick={() => openDialog("create")} disabled={!snapshot.data}>+ Folder</button><Link className={active} to="/documents/new">New document</Link></>}
       </div>
     </header>
+    <div className="flex justify-end"><DocumentViewSwitch current="tree" /></div>
     {snapshot.isLoading && <p role="status" className="text-sm text-slate-500">Loading documents…</p>}
     {snapshot.isError && <div role="alert" className="rounded border border-rose-200 bg-rose-50 p-4 text-sm">The document browser could not load. <button className="underline" onClick={() => void snapshot.refetch()}>Retry</button> or <Link className="underline" to="/documents">open the list</Link>.</div>}
     {snapshot.data && <div className="grid items-start gap-4 lg:grid-cols-[19rem_minmax(0,1fr)]">
