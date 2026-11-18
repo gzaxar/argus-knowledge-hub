@@ -29,7 +29,8 @@ import { FloorPlanPage } from "./pages/map/FloorPlanPage";
 import { DocumentDetail } from "./pages/documents/Detail";
 import { AttachmentPage } from "./pages/attachments/AttachmentPage";
 import { DocumentForm } from "./pages/documents/Form";
-import { DocumentList } from "./pages/documents/List";
+import { DocumentList, DocumentTree } from "./pages/documents/List";
+import { DocumentBoard } from "./pages/documents/Board";
 import { DocumentSuggestions } from "./pages/documents/Suggestions";
 import { GlobalValueForm } from "./pages/globalvalues/Form";
 import { Ask } from "./pages/ai/Ask";
@@ -150,6 +151,8 @@ export function App() {
 
           <Route path="/documents" element={<DocumentList />} />
           <Route path="/documents/search" element={<KeepQuery to="/documents" />} />
+          <Route path="/documents/tree" element={<DocumentTree />} />
+          <Route path="/documents/board" element={<DocumentBoard />} />
           <Route path="/documents/suggestions" element={<DocumentSuggestions />} />
           <Route path="/documents/new" element={<DocumentForm />} />
           <Route path="/documents/reshape" element={<DocumentReshape />} />

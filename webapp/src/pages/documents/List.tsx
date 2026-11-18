@@ -9,7 +9,7 @@ import { useWorkspaceNames } from "../../api/useWorkspaceNames";
 import { AttributeFilterInput } from "../../components/AttributeFilterInput";
 import { activeFilterCount, defaultFilterFor, FilterState, matchesFilters } from "../../components/AttributeFilters";
 import {
-  BrowsePage, Clip, ColumnSettings, MenuButton, Pager, SearchBox, SelectAll, ToolbarSelect, useBrowseParams, useColumns,
+  BrowsePage, Clip, ColumnSettings, Pager, SearchBox, SelectAll, ToolbarSelect, useBrowseParams, useColumns,
   usePage, useSelection,
 } from "../../components/browse/Browse";
 import { countBy, TypeExplorer, typeFamily } from "../../components/browse/TypeExplorer";
@@ -18,7 +18,9 @@ import { ListDate, SortHeader, useSort } from "../../components/SortableTable";
 import { effectiveAttributes } from "../../lib/schemaAttributes";
 import { DocumentBrowser } from "../../components/DocumentBrowser";
 import { DocumentTypeIcon } from "../../components/DocumentTypeIcon";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
+import { DocumentTools, DocumentViewSwitch } from "../../components/DocumentViews";
+import { boardColumn } from "../../lib/documentBoard";
 import { useRights } from "../../lib/permissions";
 
 const AUTHORITY_STYLES: Record<string, string> = {
@@ -38,19 +40,21 @@ const COLUMNS = [
   { id: "created", label: "Created" },
 ];
 
+/** Documents: List here, Tree (/documents/tree) and Board (/documents/board) beside it — as Tickets and Assets. */
 export function DocumentList() {
-  const [params, setParams] = useSearchParams();
-  const changeMode = (table: boolean) => {
-    const next = new URLSearchParams(params);
-    if (table) next.set("browse", "table"); else next.delete("browse");
-    setParams(next);
-  };
-  if (params.get("browse") === "table") return <div className="space-y-3">
-    <button type="button" onClick={() => changeMode(false)} className="rounded border bg-white px-3 py-2 text-sm">← Document browser</button>
-    <DocumentTable />
-  </div>;
-  return <DocumentBrowser onFullTable={() => changeMode(true)} />;
+  const [params] = useSearchParams();
+  // An address of the former browser (a branch, a page, its panel) opens the Tree it now is.
+  if (["node", "nav", "panel", "type_group"].some((k) => params.has(k))) {
+    return <Navigate to={`/documents/tree?${params.toString()}`} replace />;
+  }
+  return <DocumentTable />;
 }
+
+export function DocumentTree() {
+  return <DocumentBrowser />;
+}
+
+const REVIEW_WORDS: Record<string, string> = { draft: "Draft", in_review: "In review", approved: "Approved" };
 
 function DocumentTable() {
   const showKeys = useShowKeys();
@@ -80,7 +84,8 @@ function DocumentTable() {
 
   const typeMatches = useMemo(() => (documents.data ?? []).filter((d) =>
     (!family || (d.document_type_uid && family.has(d.document_type_uid))) &&
-    (!status || (status === "published" ? !!d.current_revision_uid : !d.current_revision_uid))), [documents.data, family, status]);
+    (!status || (status === "published" ? !!d.current_revision_uid
+      : status === "unpublished" ? !d.current_revision_uid : boardColumn(d) === status))), [documents.data, family, status]);
   // A document's fields live on its current revision: fetched only once a type is chosen and a field filter set.
   const filtering = !!schema && activeFilterCount(fieldFilters) > 0;
   const revisions = useQueries({
@@ -116,7 +121,7 @@ function DocumentTable() {
       type: (d) => (d.document_type_uid ? typeName.get(d.document_type_uid) : null),
       authority: (d) => d.authority_level,
       confidentiality: (d) => d.confidentiality,
-      status: (d) => (d.current_revision_uid ? "published" : "unpublished"),
+      status: (d) => `${d.current_revision_uid ? "1" : "0"}${boardColumn(d)}`,
       created: (d) => d.created_at,
       updated: (d) => d.updated_at,
     },
@@ -133,23 +138,7 @@ function DocumentTable() {
       primary={rights.can_create_documents && (
         <Link to="/documents/new" className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800">New document</Link>
       )}
-      actions={
-        <>
-          {rights.can_create_documents && (
-            <Link to="/documents/reshape" title="Notes, an e-mail or a transcript, rewritten as a draft that follows the type's template"
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 hover:bg-slate-50">
-              Rework from raw text
-            </Link>
-          )}
-          <Link to="/documents/templates" className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 hover:bg-slate-50">
-            Templates
-          </Link>
-          <MenuButton label="Tools" items={[
-            { to: "/search/advanced?entity=documents", label: "Advanced query", hint: "Combine conditions on any field" },
-            { to: "/documents/suggestions", label: "Type suggestions", hint: "Documents whose type looks wrong" },
-          ]} />
-        </>
-      }
+      actions={<DocumentTools rights={rights} />}
       explorerLabel="Type"
       explorerSummary={schema?.name}
       explorer={<TypeExplorer appliesTo="documents" counts={counts} total={documents.data?.length ?? 0} selected={typeUid}
@@ -161,8 +150,14 @@ function DocumentTable() {
             <option value="">Any status</option>
             <option value="published">Published</option>
             <option value="unpublished">Not published</option>
+            <optgroup label="Newest revision">
+              <option value="draft">Draft</option>
+              <option value="in_review">In review</option>
+              <option value="approved">Approved</option>
+            </optgroup>
           </ToolbarSelect>
           <ColumnSettings columns={columns} />
+          <DocumentViewSwitch current="list" />
         </>
       }
     >
@@ -228,7 +223,7 @@ function DocumentTable() {
                 <SortHeader label="Title" column="title" sort={sort} onSort={sortBy} className="px-3 py-2" />
                 {columns.show("code") && <SortHeader label="Code" column="code" sort={sort} onSort={sortBy} className="hidden w-36 px-3 py-2 lg:table-cell" />}
                 {columns.show("type") && <SortHeader label="Type" column="type" sort={sort} onSort={sortBy} className="hidden w-36 px-3 py-2 sm:table-cell" />}
-                {columns.show("status") && <SortHeader label="Status" column="status" sort={sort} onSort={sortBy} className="hidden w-28 px-3 py-2 md:table-cell" />}
+                {columns.show("status") && <SortHeader label="Status" column="status" sort={sort} onSort={sortBy} className="hidden w-40 px-3 py-2 md:table-cell" />}
                 {columns.show("authority") && <SortHeader label="Authority" column="authority" sort={sort} onSort={sortBy} className="hidden w-32 px-3 py-2 lg:table-cell" />}
                 {columns.show("confidentiality") && <SortHeader label="Confidentiality" column="confidentiality" sort={sort} onSort={sortBy} className="hidden w-36 px-3 py-2 xl:table-cell" />}
                 {columns.show("updated") && <SortHeader label="Updated" column="updated" sort={sort} onSort={sortBy} time className="hidden w-24 px-3 py-2 md:table-cell" />}
@@ -264,6 +259,9 @@ function DocumentTable() {
                         {d.current_revision_uid
                           ? <span className="inline-flex items-center gap-1 rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-800"><span aria-hidden>✓</span>Published</span>
                           : <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700"><span aria-hidden>○</span>Not published</span>}
+                        {REVIEW_WORDS[boardColumn(d)] && (
+                          <span className="ml-1 text-xs text-amber-800" title="Its newest revision">v{d.latest_revision?.revision_number} {REVIEW_WORDS[boardColumn(d)].toLowerCase()}</span>
+                        )}
                       </td>
                     )}
                     {columns.show("authority") && (

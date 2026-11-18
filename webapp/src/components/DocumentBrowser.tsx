@@ -10,6 +10,8 @@ import { useRights } from "../lib/permissions";
 import { ancestorPath, branchCounts, descendants, previewBody, treeRows } from "../lib/documentNavigation";
 import { MarkdownView } from "./MarkdownView";
 import { DocumentTypeIcon } from "./DocumentTypeIcon";
+import { DocumentTools, DocumentViewSwitch } from "./DocumentViews";
+import { ListDate } from "./SortableTable";
 
 const button = "rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50";
 const active = "rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white";
@@ -29,7 +31,8 @@ function NodeIcon({ folder }: { folder: boolean }) {
 
 type Dialog = { kind: "create" | "folder" | "move"; uid?: string } | null;
 
-export function DocumentBrowser({ onFullTable }: { onFullTable: () => void }) {
+/** The Tree view of Documents: folders and parent pages, a page's preview or a branch's contents. */
+export function DocumentBrowser() {
   const workspaceId = useCurrentWorkspaceId();
   const workspaceName = useWorkspaceNames();
   const rights = useRights();
@@ -154,13 +157,13 @@ export function DocumentBrowser({ onFullTable }: { onFullTable: () => void }) {
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-baseline gap-2"><h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">Documents</h1><span className="text-sm tabular-nums text-slate-500" aria-label="Total documents">({snapshot.data ? totalDocuments : "…"})</span></div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={button} onClick={onFullTable}>Full table</button>
-        <Link className={button} to="/documents/templates">Templates</Link>
+        <DocumentViewSwitch current="tree" />
+        <DocumentTools rights={rights} />
         {rights.can_create_documents && <><button type="button" className={button} onClick={() => openDialog("create")} disabled={!snapshot.data}>+ Folder</button><Link className={active} to="/documents/new">New document</Link></>}
       </div>
     </header>
     {snapshot.isLoading && <p role="status" className="text-sm text-slate-500">Loading documents…</p>}
-    {snapshot.isError && <div role="alert" className="rounded border border-rose-200 bg-rose-50 p-4 text-sm">The document browser could not load. <button className="underline" onClick={() => void snapshot.refetch()}>Retry</button> or <button className="underline" onClick={onFullTable}>open the full table</button>.</div>}
+    {snapshot.isError && <div role="alert" className="rounded border border-rose-200 bg-rose-50 p-4 text-sm">The document browser could not load. <button className="underline" onClick={() => void snapshot.refetch()}>Retry</button> or <Link className="underline" to="/documents">open the list</Link>.</div>}
     {snapshot.data && <div className="grid items-start gap-4 lg:grid-cols-[19rem_minmax(0,1fr)]">
       <aside aria-label="Document navigation" className="rounded-lg border border-slate-200 bg-white p-3 lg:sticky lg:top-2">
         <div className="mb-3 flex gap-1 rounded-md border border-slate-200 p-1">
@@ -168,7 +171,7 @@ export function DocumentBrowser({ onFullTable }: { onFullTable: () => void }) {
           <button type="button" aria-pressed={tab === "types"} className={`flex-1 ${tab === "types" ? navigationTabActive : navigationTab}`} onClick={() => { option("nav", "types"); setExpanded((prev) => new Set([...prev, ...typeNodes.filter((n) => n.kind === "group").map((n) => n.id)])); }}>Document types</button>
         </div>
         <p className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-600"><span className="tabular-nums">({totalDocuments})</span><span>Total documents</span></p>
-        <input type="search" aria-label="Find a document or folder" placeholder="Find a document or folder…" value={query} onChange={(e) => setQuery(e.target.value)} className={navigationField} />
+        <input type="search" aria-label="Filter the tree by title or code" placeholder="Filter by title or code…" value={query} onChange={(e) => setQuery(e.target.value)} className={navigationField} />
         <div className="my-3 flex justify-between gap-2 text-xs text-indigo-700">
           <button onClick={() => setExpanded(new Set([...nodes, ...typeNodes].map((n) => n.id)))}>Expand all</button>
           <button onClick={() => setExpanded(new Set())}>Collapse all</button>
@@ -181,19 +184,19 @@ export function DocumentBrowser({ onFullTable }: { onFullTable: () => void }) {
               else { const next = new URLSearchParams(params); next.delete("type_group"); next.set("node", node.id); next.delete("rev"); setParams(next); }
             }}>{node.kind === "document" || node.id.startsWith("type:") ? <DocumentTypeIcon iconUid={iconForNode(node)} /> : <NodeIcon folder />}{(node.kind !== "document" || hasChildren) && <span className="shrink-0 tabular-nums text-slate-500" title="Documents below this branch">({counts.get(node.id) ?? 0})</span>}<span className="min-w-0 break-words">{node.title}</span></button>
           </div>)}
-          {!rows.length && <p className="p-3 text-sm text-slate-500">{query ? "No matching documents or folders." : "No documents yet. Create a folder or a document to start."}</p>}
+          {!rows.length && <p className="p-3 text-sm text-slate-500">{query ? "No document or folder has that title or code." : "No documents yet. Create a folder or a document to start."}</p>}
         </div>
       </aside>
       <main className="min-w-0 space-y-3">
         <nav aria-label="Document breadcrumbs" className="flex flex-wrap items-center gap-1 text-xs leading-6 text-indigo-700"><span>Documents</span>{activeType ? <span> › Document types › {typeNames.get(activeType) ?? "No type"}</span> : crumbs.map((n) => <span key={n.id} className="flex items-center gap-1"><span aria-hidden="true" className="text-slate-400">›</span><button type="button" className="text-left hover:underline" onClick={() => choose(n.id)}>{n.title}</button></span>)}</nav>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1.5 text-sm text-slate-500">{(activeType || selectedDoc) && <DocumentTypeIcon iconUid={typeIcons.get(activeType ?? selectedDoc?.document_type_uid ?? "")} />}{activeType ? typeNames.get(activeType) ?? "No type" : selectedDoc ? typeNames.get(selectedDoc.document_type_uid ?? "") ?? "No type" : selected?.title ?? "Document browser"}</span>
-          <div className="flex gap-1">{selected?.kind === "folder" && rights.can_modify_documents && <button type="button" className={button} onClick={() => openDialog("folder")}>Edit folder</button>}<button aria-pressed={panel === "page"} className={panel === "page" ? active : button} onClick={() => { const next = new URLSearchParams(params); next.delete("type_group"); next.set("panel", "page"); setParams(next); }}>Page</button><button aria-pressed={panel === "list"} className={panel === "list" ? active : button} onClick={() => option("panel", "list")}>List</button></div>
+          <div className="flex gap-1">{selected?.kind === "folder" && rights.can_modify_documents && <button type="button" className={button} onClick={() => openDialog("folder")}>Edit folder</button>}<button aria-pressed={panel === "page"} className={panel === "page" ? active : button} onClick={() => { const next = new URLSearchParams(params); next.delete("type_group"); next.set("panel", "page"); setParams(next); }}>Preview</button><button aria-pressed={panel === "list"} className={panel === "list" ? active : button} onClick={() => option("panel", "list")}>Contents</button></div>
         </div>
         {snapshot.data.warnings.map((w) => <p key={w} role="status" className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{w}</p>)}
         {panel === "list" ? <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-          <table className="w-full text-left text-sm"><caption className="sr-only">Documents in the selected branch or type</caption><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Title</th><th className="p-3">Type</th><th className="p-3">Publication</th></tr></thead>
-            <tbody>{visibleListDocs.map((d) => <tr key={d.uid} className="border-t border-slate-100"><td className="p-3"><button className="text-left font-medium hover:underline" onClick={() => { const next = new URLSearchParams(params); next.set("node", `d:${d.uid}`); next.set("panel", "page"); next.delete("type_group"); next.delete("rev"); setParams(next); }}>{d.title}</button><div className="text-xs text-slate-400">{d.code}</div></td><td className="p-3"><span className="inline-flex items-center gap-1.5"><DocumentTypeIcon iconUid={typeIcons.get(d.document_type_uid ?? "")} />{typeNames.get(d.document_type_uid ?? "") ?? "No type"}</span></td><td className="p-3">{d.current_revision_uid ? "Published revision available" : "Not published"}</td></tr>)}{!visibleListDocs.length && <tr><td colSpan={3} className="p-6 text-center text-slate-500">No documents match this branch and search.</td></tr>}</tbody>
+          <table className="w-full text-left text-sm"><caption className="sr-only">Documents in the selected branch or type</caption><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Title</th><th className="p-3">Type</th><th className="p-3">Publication</th><th className="hidden p-3 md:table-cell">Updated</th></tr></thead>
+            <tbody>{visibleListDocs.map((d) => <tr key={d.uid} className="border-t border-slate-100"><td className="p-3"><button className="text-left font-medium hover:underline" onClick={() => { const next = new URLSearchParams(params); next.set("node", `d:${d.uid}`); next.set("panel", "page"); next.delete("type_group"); next.delete("rev"); setParams(next); }}>{d.title}</button><div className="text-xs text-slate-400">{d.code}</div></td><td className="p-3"><span className="inline-flex items-center gap-1.5"><DocumentTypeIcon iconUid={typeIcons.get(d.document_type_uid ?? "")} />{typeNames.get(d.document_type_uid ?? "") ?? "No type"}</span></td><td className="p-3">{d.current_revision_uid ? "Published" : "Not published"}</td><td className="hidden whitespace-nowrap p-3 text-slate-500 md:table-cell"><ListDate value={d.updated_at} /></td></tr>)}{!visibleListDocs.length && <tr><td colSpan={4} className="p-6 text-center text-slate-500">No documents match this branch and search.</td></tr>}</tbody>
           </table>
         </div> : selectedDoc ? <>
           {preview.isLoading && <p role="status" className="p-4 text-sm text-slate-500">Loading document…</p>}

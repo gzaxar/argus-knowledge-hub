@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -30,6 +30,7 @@ from app.schemas.document import (
     DocumentRevisionOut,
     DocumentRevisionUpdate,
     DocumentUpdate,
+    LatestRevisionOut,
     RejectAction,
     RetireAction,
     MarkdownImportResult,
@@ -143,7 +144,25 @@ def list_documents(
     )
     if document_type_uid:
         stmt = stmt.where(Document.document_type_uid == document_type_uid)
-    return db.scalars(stmt).all()
+    docs = db.scalars(stmt).all()
+    # Each document's newest revision, in one query: where it stands in its review.
+    latest: dict[str, DocumentRevision] = {}
+    if docs:
+        newest = (select(DocumentRevision.document_uid, func.max(DocumentRevision.revision_number).label("n"))
+                  .where(DocumentRevision.document_uid.in_([d.uid for d in docs]))
+                  .group_by(DocumentRevision.document_uid).subquery())
+        rows = db.scalars(select(DocumentRevision).join(
+            newest, and_(DocumentRevision.document_uid == newest.c.document_uid,
+                         DocumentRevision.revision_number == newest.c.n)))
+        latest = {r.document_uid: r for r in rows}
+    out = []
+    for d in docs:
+        item = DocumentOut.model_validate(d)
+        r = latest.get(d.uid)
+        if r is not None:
+            item.latest_revision = LatestRevisionOut.model_validate(r, from_attributes=True)
+        out.append(item)
+    return out
 
 
 @router.post("", response_model=DocumentOut, status_code=201)

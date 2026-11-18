@@ -1,26 +1,28 @@
 ---
 title: Document hierarchy and subsystem pages
 summary: Browsing documents by hierarchy or type; WP subsystem roots, folders, moving pages, previews, icons, counts and unfiled documents.
-keywords: [hierarchy, gerarchia, subsystem, subsystems, sottosistemi, WP01, WP02, work package, folder, cartella, move, sposta, parent, child, imported parent, unfiled, shared, document types, icon, counter, count, breadcrumb, preview, full table, page, list]
+keywords: [hierarchy, gerarchia, subsystem, subsystems, sottosistemi, WP01, WP02, work package, folder, cartella, move, sposta, parent, child, imported parent, unfiled, shared, document types, icon, counter, count, breadcrumb, preview, contents, tree, list, board, full table]
 order: 82
 ---
 
-**Documents** has two ways to browse the same readable documents: **Hierarchy** follows folders and parent
-pages; **Document types** groups records by their assigned type. Changing the view does not copy or reclassify
+The **Tree** view of **Documents** (beside **List** and **Board**) has two ways to browse the same readable
+documents: **Hierarchy** follows folders and parent pages; **Document types** groups records by their assigned
+type. Changing the view does not copy or reclassify
 documents. For writing, review, publication and templates, see *Documents and the knowledge base*.
 
 ## Browse the hierarchy
 
-1. Choose the correct workspace, then open **Documents → Hierarchy**.
+1. Choose the correct workspace, then open **Documents → Tree → Hierarchy**.
 2. Expand a branch with its arrow, or use **Expand all**. **Collapse all** closes the branches.
-3. Select a document to read its **Page** preview. Select **List** to browse documents in the selected branch.
+3. Select a document to read its **Preview**. Select **Contents** to list the documents in the selected branch,
+   with their type, publication and last update.
 4. Use the breadcrumbs above the preview to return to a parent page or folder.
-5. **Find a document or folder…** searches titles and document codes in the browser; matching pages keep their
+5. **Filter by title or code…** searches titles and document codes in the browser; matching pages keep their
    ancestors visible so their location is clear. It is separate from the site's global search and from Ask
    ARGUS's search inside written content.
 
 The full document body is not searched by this local navigation box. For content, use global search, the
-document table's search tools or Ask ARGUS, as appropriate.
+**List** view's search tools or Ask ARGUS, as appropriate.
 
 ## WP subsystem pages at the top level
 
@@ -72,7 +74,7 @@ This removes the empty container; it does not delete WP01, WP02 or their documen
 
 ## Move a document under a folder or another page
 
-1. Select the document, open **Page**, and find **Move in hierarchy** below its content. Scroll down if needed.
+1. In **Tree**, select the document, open **Preview**, and find **Move in hierarchy** below its content. Scroll down if needed.
 2. Under **Place under**, choose the destination folder or the entry **Document: …** for the parent page.
 3. Choose **Save**. Expand the destination to check the result; refresh to confirm the placement persists.
 
@@ -103,7 +105,7 @@ without a configured icon uses a generic document symbol. Real folders and the U
 folder symbols.
 
 Moving a document does not change its type or icon. A WP overview can have type *Document* while a child has
-type *Work Instruction*. If the type is wrong, use the document's editing or **Full table** controls; changing
+type *Work Instruction*. If the type is wrong, use the document's editing or the **List** view's bulk retype; changing
 the title or creating a folder is not a type correction.
 
 ## Read the counters
@@ -147,9 +149,9 @@ Creating folders and child documents needs document-create rights; moving or ren
 rights; deleting an empty folder needs document-delete rights. Missing buttons can reflect your role or a
 foreign document's ownership. Ask the workspace administrator if the expected controls are absent.
 
-## Return to the full table
+## The List view
 
-Use **Full table** for the existing advanced document filters, columns, sorting and bulk operations, including
+Use **List** for the advanced document filters, columns, sorting and bulk operations, including
 copying, moving between workspaces, deletion and retyping. Those operations differ from **Move in hierarchy**,
 which only organises a page inside its owning workspace. The table and browser show the same records; neither
 creates another library.
