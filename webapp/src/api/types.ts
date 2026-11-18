@@ -800,6 +800,7 @@ export interface DocumentFolder {
   workspace_id: string;
   name: string;
   parent_uid: string | null;
+  parent_document_uid: string | null;
 }
 export interface DocumentNavigationNode {
   id: string;

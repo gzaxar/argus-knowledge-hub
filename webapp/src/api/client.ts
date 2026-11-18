@@ -841,11 +841,11 @@ export const documentNavigationApi = {
   snapshot: () => request<DocumentNavigationSnapshot>("/v1/document-navigation"),
   preview: (uid: string, revisionUid?: string) => request<DocumentNavigationPreview>(
     `/v1/document-navigation/documents/${encodeURIComponent(uid)}/preview${revisionUid ? `?revision_uid=${encodeURIComponent(revisionUid)}` : ""}`),
-  createFolder: (name: string, parent_uid: string | null) => request<DocumentFolder>("/v1/document-navigation/folders", {
-    method: "POST", body: json({ name, parent_uid }),
+  createFolder: (name: string, parent_uid: string | null, parent_document_uid: string | null = null) => request<DocumentFolder>("/v1/document-navigation/folders", {
+    method: "POST", body: json({ name, parent_uid, parent_document_uid }),
   }),
-  updateFolder: (uid: string, name: string, parent_uid: string | null) => request<DocumentFolder>(`/v1/document-navigation/folders/${encodeURIComponent(uid)}`, {
-    method: "PUT", body: json({ name, parent_uid }),
+  updateFolder: (uid: string, name: string, parent_uid: string | null, parent_document_uid: string | null = null) => request<DocumentFolder>(`/v1/document-navigation/folders/${encodeURIComponent(uid)}`, {
+    method: "PUT", body: json({ name, parent_uid, parent_document_uid }),
   }),
   deleteFolder: (uid: string) => request<void>(`/v1/document-navigation/folders/${encodeURIComponent(uid)}`, { method: "DELETE" }),
   locate: (uid: string, location: { folder_uid?: string; parent_document_uid?: string }) => request<{ok: boolean}>(

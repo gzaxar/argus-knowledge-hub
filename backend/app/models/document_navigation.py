@@ -15,7 +15,13 @@ class DocumentFolder(Base, WorkspaceScopedMixin, TimestampMixin):
     parent_uid: Mapped[Optional[str]] = mapped_column(
         String, ForeignKey("document_folders.uid", ondelete="CASCADE"), nullable=True, index=True,
     )
-    __table_args__ = (CheckConstraint("length(trim(name)) > 0", name="document_folder_name_not_empty"),)
+    parent_document_uid: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("documents.uid", ondelete="SET NULL"), nullable=True, index=True,
+    )
+    __table_args__ = (
+        CheckConstraint("length(trim(name)) > 0", name="document_folder_name_not_empty"),
+        CheckConstraint("parent_uid IS NULL OR parent_document_uid IS NULL", name="document_folder_one_parent"),
+    )
 
 
 class DocumentPlacement(Base, WorkspaceScopedMixin, TimestampMixin):

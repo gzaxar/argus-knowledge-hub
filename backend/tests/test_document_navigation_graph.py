@@ -13,6 +13,61 @@ def parents(folders=(), docs=(), placements=(), links=()):
 
 
 class NavigationGraphTests(unittest.TestCase):
+    def test_folder_can_be_a_child_of_a_document(self):
+        result, warnings = parents(
+            folders=[{"uid": "epik8s", "name": "EPIK8s", "parent_document_uid": "wp04"}],
+            docs=[document("wp04"), document("manual")],
+            placements=[{"document_uid": "manual", "folder_uid": "epik8s"}],
+        )
+        self.assertEqual(result["f:epik8s"], "d:wp04")
+        self.assertEqual(result["d:manual"], "f:epik8s")
+        self.assertFalse(warnings)
+
+    def test_alternating_folder_document_cycle_is_refused(self):
+        with self.assertRaises(ValueError):
+            assert_parent_move({"d:manual": "f:epik8s", "f:epik8s": "d:wp04"}, "f:epik8s", "d:manual")
+        with self.assertRaises(ValueError):
+            assert_parent_move({"d:manual": "f:epik8s", "f:epik8s": "d:wp04"}, "d:wp04", "d:manual")
+
+    def test_mixed_cycle_recovery_preserves_all_nodes(self):
+        result, warnings = parents(
+            folders=[{"uid": "f", "name": "Folder", "parent_document_uid": "d"}],
+            docs=[document("d")], placements=[{"document_uid": "d", "folder_uid": "f"}],
+        )
+        self.assertIsNone(result["f:f"])
+        self.assertEqual(result["d:d"], "group:unfiled")
+        self.assertTrue(warnings)
+
+    def test_folder_does_not_expose_an_unavailable_document_parent(self):
+        nodes, warnings = navigation_nodes(
+            [{"uid": "f", "name": "Workspace folder", "parent_document_uid": "private-sensitive-id"}],
+            [document("visible")], [], [], "eli",
+        )
+        self.assertNotIn("private-sensitive-id", repr(nodes) + repr(warnings))
+        self.assertIsNone(next(n for n in nodes if n["id"] == "f:f")["parent_id"])
+        self.assertTrue(warnings)
+
+    def test_foreign_shared_document_cannot_be_a_folder_parent(self):
+        result, warnings = parents(
+            folders=[{"uid": "f", "name": "Folder", "parent_document_uid": "shared"}],
+            docs=[document("shared", "other")],
+        )
+        self.assertIsNone(result["f:f"])
+        self.assertEqual(result["d:shared"], "group:shared")
+        self.assertTrue(warnings)
+
+    def test_nested_folder_tracks_its_document_ancestor(self):
+        result, warnings = parents(
+            folders=[{"uid": "first", "name": "First", "parent_document_uid": "parent"},
+                     {"uid": "second", "name": "Second", "parent_uid": "first"}],
+            docs=[document("parent"), document("child")],
+            placements=[{"document_uid": "child", "folder_uid": "second"}],
+        )
+        self.assertEqual(result["f:first"], "d:parent")
+        self.assertEqual(result["f:second"], "f:first")
+        self.assertEqual(result["d:child"], "f:second")
+        self.assertFalse(warnings)
+
     def test_imported_parent_is_used(self):
         result, _ = parents(docs=[document("wp02"), document("howto")], links=[{"from_document_uid": "howto", "to_uid": "wp02"}])
         self.assertEqual(result["d:howto"], "d:wp02")

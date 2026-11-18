@@ -22,8 +22,15 @@ def navigation_nodes(folders: list[dict], documents: list[dict], placements: lis
     own_docs = {d["uid"] for d in documents if d["workspace_id"] == workspace_id}
     for folder in folders:
         uid = folder["uid"]
+        parent_document = folder.get("parent_document_uid")
+        # Navigation is not an access grant. A hidden/foreign parent must not
+        # disclose its identifier; the workspace's folder stays available at root.
+        if parent_document and parent_document not in own_docs:
+            parent_document = None
+            warnings.add("Some navigation parents are unavailable; their visible items are shown at the root.")
         nodes[f"f:{uid}"] = dict(id=f"f:{uid}", kind="folder", uid=uid, title=folder["name"],
-                                  parent_id=f"f:{folder['parent_uid']}" if folder.get("parent_uid") else None)
+                                  parent_id=f"f:{folder['parent_uid']}" if folder.get("parent_uid") else (
+                                      f"d:{parent_document}" if parent_document else None))
     source_parents = {}
     for link in relations:
         if link["from_document_uid"] in own_docs and link["to_uid"] in own_docs:

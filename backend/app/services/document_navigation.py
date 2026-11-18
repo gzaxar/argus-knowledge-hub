@@ -14,6 +14,7 @@ def lock_workspace(db, workspace_id):
 
 def folder_dict(folder):
     return {"uid": folder.uid, "name": folder.name, "parent_uid": folder.parent_uid,
+            "parent_document_uid": folder.parent_document_uid,
             "workspace_id": folder.workspace_id}
 
 
@@ -51,20 +52,30 @@ def owned_folder(db, workspace_id, uid):
     return folder
 
 
-def write_folder(db, workspace_id, folder, name, parent_uid):
+def write_folder(db, workspace_id, folder, name, parent_uid, parent_document_uid=None):
+    """Caller holds the workspace lock and has checked the document parent's visibility."""
     name = name.strip()
     parent_uid = parent_uid or None
+    parent_document_uid = parent_document_uid or None
     if not name or len(name) > 240:
         raise ValueError("Give the folder a name of 1–240 characters.")
+    if parent_uid and parent_document_uid:
+        raise ValueError("Choose either a parent folder or a parent document.")
     if parent_uid:
         owned_folder(db, workspace_id, parent_uid)
-    assert_parent_move(all_parent_ids(db, workspace_id), f"f:{folder.uid}", f"f:{parent_uid}" if parent_uid else None)
+    if parent_document_uid:
+        parent = db.get(Document, parent_document_uid)
+        if parent is None or parent.workspace_id != workspace_id:
+            raise ValueError("The parent document must belong to this workspace.")
+    parent_id = f"f:{parent_uid}" if parent_uid else (f"d:{parent_document_uid}" if parent_document_uid else None)
+    assert_parent_move(all_parent_ids(db, workspace_id), f"f:{folder.uid}", parent_id)
     siblings = db.scalars(select(DocumentFolder).where(
         DocumentFolder.workspace_id == workspace_id, DocumentFolder.parent_uid == parent_uid,
+        DocumentFolder.parent_document_uid == parent_document_uid,
     )).all()
     if any(f.uid != folder.uid and f.name.casefold() == name.casefold() for f in siblings):
         raise ValueError("A folder with that name already exists under this parent.")
-    folder.name, folder.parent_uid = name, parent_uid
+    folder.name, folder.parent_uid, folder.parent_document_uid = name, parent_uid, parent_document_uid
     db.add(folder)
 
 
