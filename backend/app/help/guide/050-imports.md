@@ -1,7 +1,7 @@
 ---
 title: Importing data
 summary: Bringing equipment, tickets and documents in from EPIK8s, Jira, Confluence, DokuWiki, Git and Markdown; re-running imports, by hand or on a schedule; mapping imported records.
-keywords: [confluence contents, table of contents, section links, document owner, document status, table images, emoji, panel colours, confluence authentication, source metadata, source version, file viewer, missing attachment, imported parent, published import, dokuwiki, wiki, wiki.infn.it, namespace, schedule, scheduled, nightly, every day, every week, run by itself, confluence page link, share link, short link, prerequisite, missing package, install the catalogue, import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
+keywords: [nested tables, merged cells, rich tables, table colours, table colors, horizontal scroll, word wrapping, native import, confluence cloud, confluence contents, table of contents, section links, document owner, document status, table images, emoji, panel colours, confluence authentication, source metadata, source version, file viewer, missing attachment, imported parent, published import, dokuwiki, wiki, wiki.infn.it, namespace, schedule, scheduled, nightly, every day, every week, run by itself, confluence page link, share link, short link, prerequisite, missing package, install the catalogue, import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
 order: 50
 ---
 
@@ -173,7 +173,9 @@ controlled operating instruction.
 
 Use **Workspace → Administration → Imports → New → Confluence** to import Confluence pages and their
 attachments. The saved configuration reads the source pages directly and can be run again when they change.
-The following behaviour applies to this import:
+The following behaviour applies to this import. Use this saved native import for Confluence; the separate
+**Import from Confluence — ELI-NP** panel has been removed from **New document**. The normal document editor,
+file attachments and **Import a web page folder** remain available for their own purposes.
 
 - **Contents and section links**: a supported table-of-contents macro becomes links to headings in the
   imported body. Follow a few links after import, including nested sections where present. **Page hierarchy
@@ -187,10 +189,18 @@ The following behaviour applies to this import:
   assign an ARGUS reviewer or approver.
 - **Images in tables**: successfully copied images remain images inside table cells, with their captions
   where supplied, instead of being reduced to filenames. Files that could not be copied still need attention.
-- **Icons and panels**: supported Confluence emoji and panel background/border colours are retained. Emoji
-  appearance depends on the device; custom remote emoji, avatars and application-specific macros are not
-  recreated. Panel content inside a Markdown table is retained, but its panel background is omitted to keep
-  the table valid. The result need not have exactly the same layout as Confluence.
+- **Nested and formatted tables**: supported complex tables retain their nested grids, merged cells
+  (column and row spans), paragraphs, supported colours and alignment. They are stored as sanitised HTML
+  inside the Markdown body; keep that markup when editing or transferring the body. Simple tables can still
+  use ordinary Markdown table syntax.
+- **Responsive cell layout**: the renderer adapts supported tables to the available width and wraps text
+  between whole words. Nested grids allow columns to grow for their content. A very wide table can still
+  need horizontal scrolling; the import does not promise a pixel-for-pixel copy of Confluence on every screen.
+- **Icons and panels**: supported Confluence emoji and panel background/border colours are retained,
+  including supported panels inside preserved complex table cells. Panel text in a simple Markdown table
+  remains readable, but that path can omit its background. Emoji appearance depends on the device; custom
+  remote emoji, avatars and application-specific macros are not recreated. Unsupported styling and active
+  content are removed.
 
 ## Check imported Confluence content and files
 
@@ -206,7 +216,10 @@ The following behaviour applies to this import:
 5. Open a sample image inside a table, an image outside tables and a linked PDF or other attachment, where
    present. Check captions too. Supported Confluence file-viewer macros become attachment links; interactive
    source viewers are not copied as running applications.
-6. Check the run report for user-lookup, attachment-list, download, size-limit and conversion warnings. A page
+6. For a nested or coloured table, compare the inner grid, merged cells, panel text and colours with the
+   source. Check that complete words remain readable and that horizontal scrolling, if needed, exposes all
+   columns. The Markdown editor can show HTML for these tables; inspect the rendered preview as well.
+7. Check the run report for user-lookup, attachment-list, download, size-limit and conversion warnings. A page
    can import while a field or file needs attention. Do not infer that every source file was copied from the
    job's completion alone.
 
@@ -229,6 +242,11 @@ source updates. Keep controlled local work in the normal revision workflow and c
 If only a subtree was imported, a parent outside that selection is not invented. Ordinary pages without a
 usable parent appear under **Unfiled documents**; root WP overview pages follow the workspace's WP naming
 convention. See *Document hierarchy and subsystem pages*.
+
+Import conversion and display are separate: a renderer update can improve an existing rich table if its
+body already contains the required structure. It cannot recover nested cells, colours or panels that an older
+conversion discarded. A Markdown body alone also cannot supply rendering support missing from the running
+ARGUS version. Check both the saved body and the deployed application when diagnosing a table.
 
 Installing a conversion fix does not rewrite revisions that were already imported. Re-running an unchanged
 source page is not a general repair command: the version check can skip its content and files. Do not delete
