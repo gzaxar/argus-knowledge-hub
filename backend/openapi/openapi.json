@@ -63038,6 +63038,16 @@
         "operationId": "create_export_v1_portability_exports_post",
         "parameters": [
           {
+            "in": "query",
+            "name": "background",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Background",
+              "type": "boolean"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -63183,6 +63193,93 @@
           }
         ],
         "summary": "Get Export",
+        "tags": [
+          "portability"
+        ]
+      }
+    },
+    "/v1/portability/exports/{export_id}/analyse": {
+      "post": {
+        "operationId": "analyse_export_v1_portability_exports__export_id__analyse_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "title": "Export Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "background",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Background",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Analyse Export",
         "tags": [
           "portability"
         ]
@@ -63371,6 +63468,16 @@
             "schema": {
               "title": "Export Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "background",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Background",
+              "type": "boolean"
             }
           },
           {

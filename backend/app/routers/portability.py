@@ -395,7 +395,7 @@ NO_STORE = {"Cache-Control": "no-store", "Pragma": "no-cache", "Referrer-Policy"
 
 
 @exports_router.post("", status_code=201)
-def create_export(body: ExportIn, identity=Depends(get_identity), db: Session = Depends(get_db)):
+def create_export(body: ExportIn, background: bool = False, identity=Depends(get_identity), db: Session = Depends(get_db)):
     person = _person(identity)
     cfg = service.config()
     if body.mode in ("full",) or body.classifications or body.identity_profile == "full_identity" or body.recipients:
@@ -411,6 +411,11 @@ def create_export(body: ExportIn, identity=Depends(get_identity), db: Session = 
                      **({"recipients": body.recipients} if body.recipients else {})},
         decisions=body.decisions, base_export_id=body.base_export_id, identity_profile=body.identity_profile,
         purpose=body.purpose, cfg=cfg))
+    if background:
+        export_id, actor = exp.id, actor_of(person)
+        db.commit()  # The worker has its own session and must be able to see the request.
+        return _background("export", export_id, "analyse", actor,
+                           lambda s: service.analyse_export(s, s.get(PortabilityExport, export_id), actor, cfg))
     _guard(lambda: service.analyse_export(db, exp, actor_of(person), cfg))
     return _commit(db, service.export_view(exp))
 
@@ -434,10 +439,29 @@ class DecisionsIn(BaseModel):
 
 
 @exports_router.post("/{export_id}/decisions")
-def decide_export(export_id: str, body: DecisionsIn, identity=Depends(get_identity), db: Session = Depends(get_db)):
+def decide_export(export_id: str, body: DecisionsIn, background: bool = False,
+                  identity=Depends(get_identity), db: Session = Depends(get_db)):
     exp = _export(db, export_id, identity)
+    if background:
+        actor, cfg = actor_of(identity), service.config()
+        return _background("export", export_id, "analyse", actor,
+                           lambda s: service.set_export_decisions(s, s.get(PortabilityExport, export_id),
+                                                                  body.decisions, actor, cfg))
     _guard(lambda: service.set_export_decisions(db, exp, body.decisions, actor_of(identity), service.config()))
     return _commit(db, service.export_view(exp))
+
+
+@exports_router.post("/{export_id}/analyse")
+def analyse_export(export_id: str, background: bool = False,
+                   identity=Depends(get_identity), db: Session = Depends(get_db)):
+    exp = _export(db, export_id, identity)
+    actor, cfg = actor_of(identity), service.config()
+
+    def run(s: Session):
+        return service.analyse_export(s, s.get(PortabilityExport, export_id), actor, cfg)
+    if background:
+        return _background("export", export_id, "analyse", actor, run)
+    return _commit(db, service.export_view(_guard(lambda: run(db))))
 
 
 class ConfirmIn(BaseModel):

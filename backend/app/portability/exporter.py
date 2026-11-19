@@ -351,13 +351,16 @@ def prescan(db: Session, sc: Scope, classifications: list[str], decisions: dict,
             policy: Optional[Policy] = None) -> dict:
     """The blob inspection an approver sees before approving: what is blocked, what needs a decision,
     what will travel uninspected. Nothing is stored."""
+    from .jobs import report
     blobs = Blobs(None, decisions, encrypted, policy=policy)
     sc = Scope(workspaces=sc.workspaces, watermark={t: 2 ** 62 for t in SEQUENCED_TABLES},
                excluded_uids=sc.excluded_uids, hidden=sc.hidden, excluded_claims=sc.excluded_claims)
     for fam in FAMILIES:
         if fam.blobs:
-            for _ in rows_of(db, fam, sc, blobs, classifications):
-                pass
+            stage = f"Inspecting attachment records in {fam.name}"
+            report(stage, 0, force=True)
+            for count, _ in enumerate(rows_of(db, fam, sc, blobs, classifications), 1):
+                report(stage, count)
     return {"inspected": len(blobs.reports), "secrets": blobs.secrets[:50], "needs_decision": blobs.needs_decision,
             "excluded": blobs.excluded, "missing": blobs.missing[:50], "missing_count": len(blobs.missing),
             "uninspected": blobs.uninspected[:200],
@@ -446,6 +449,8 @@ def _generate(engine, export_id, mode, workspaces, out_dir, staging, store, sign
             for fam in [f for f in FAMILIES if f.group == group]:
                 if fam.group == "projection" and not include_projections:
                     continue
+                from .jobs import report
+                report(f"Exporting {fam.name}", force=True)
                 items = list(rows_of(db, fam, sc, blobs, classifications, ident))
                 findings += secret_scan.scan_rows(fam.name, items)
                 written = chunks.write_chunks(out_dir, f"{group}-{fam.name}", fam.name, items)
