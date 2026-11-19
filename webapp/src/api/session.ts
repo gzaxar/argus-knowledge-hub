@@ -5,6 +5,12 @@ const LEGACY_KEY = "assetmanagement.session";
 const PROFILES_KEY = "assetmanagement.profiles";
 const ACTIVE_KEY = "assetmanagement.activeProfileId";
 
+/** Stable provider identity; display names and email addresses are not account identifiers. */
+export interface OidcIdentity {
+  issuer: string;
+  subject: string;
+}
+
 export type AuthType = "pat" | "oidc";
 /** Who signed an "oidc" profile in. A profile saved before there was a choice has none, and is Firebase's. */
 export type OidcProvider = "firebase" | "infn";
@@ -21,6 +27,34 @@ export interface Profile {
   token?: string; // "pat" only — a stored bearer token
   activeWorkspaceId?: string; // "oidc" only — which workspace this profile currently acts as
   provider?: OidcProvider; // "oidc" only — whose token this is; absent means "firebase"
+  identity?: OidcIdentity; // Scope the workspace preference to this signed-in person.
+}
+
+/** A browser-local preference, separate from profiles and credentials so it survives logout.
+ * Scope it to the server, provider and stable issuer/subject pair; never guess from an email/name.
+ * Restoring it is only a suggestion: WorkspacePicker checks the current accessible workspace list. */
+function workspaceMemoryKey(profile: Profile): string | null {
+  if (profile.authType !== "oidc" || !profile.identity?.issuer || !profile.identity.subject) return null;
+  return `argus.lastWorkspace.v1:${JSON.stringify([
+    profile.baseUrl.replace(/\/+$/, ""), profile.provider ?? "firebase",
+    profile.identity.issuer, profile.identity.subject,
+  ])}`;
+}
+
+export function getRememberedWorkspaceId(profile: Profile): string | null {
+  const key = workspaceMemoryKey(profile);
+  try { return key ? localStorage.getItem(key) || null : null; } catch { return null; }
+}
+
+export function forgetRememberedWorkspace(profile: Profile): void {
+  const key = workspaceMemoryKey(profile);
+  try { if (key) localStorage.removeItem(key); } catch { /* Preferences are optional. */ }
+}
+
+function rememberWorkspace(profile: Profile): void {
+  const key = workspaceMemoryKey(profile);
+  if (!key || !profile.activeWorkspaceId) return;
+  try { localStorage.setItem(key, profile.activeWorkspaceId); } catch { /* Preferences are optional. */ }
 }
 
 /** What a request actually needs: a base URL, a bearer token (fetched fresh for
@@ -118,7 +152,11 @@ export function updateProfile(id: string, patch: Partial<Profile>): void {
   const profiles = readProfiles().map((p) => (p.id === id ? { ...p, ...patch } : p));
   writeProfiles(profiles);
   // Choosing a workspace is this tab's choice, and the default for tabs opened later.
-  if ("activeWorkspaceId" in patch) tabSet(tabWorkspaceKey(id), patch.activeWorkspaceId ?? null);
+  if ("activeWorkspaceId" in patch) {
+    tabSet(tabWorkspaceKey(id), patch.activeWorkspaceId ?? null);
+    const profile = profiles.find((p) => p.id === id);
+    if (profile) rememberWorkspace(profile);
+  }
 }
 
 /** Used throughout api/client.ts — resolves the active profile into what a
@@ -168,9 +206,11 @@ export function defaultApiBaseUrl(): string {
   );
 }
 
-export function addOidcProfile(name: string, baseUrl: string, provider: OidcProvider = "firebase"): Profile {
+export function addOidcProfile(name: string, baseUrl: string, provider: OidcProvider = "firebase",
+                               identity?: OidcIdentity): Profile {
   const profiles = readProfiles();
-  const profile: Profile = { id: crypto.randomUUID(), name, authType: "oidc", baseUrl, provider };
+  // Start without an active workspace: the picker validates any remembered choice before using it.
+  const profile: Profile = { id: crypto.randomUUID(), name, authType: "oidc", baseUrl, provider, identity };
   writeProfiles([...profiles, profile]);
   setActiveProfileId(profile.id);
   return profile;
@@ -188,8 +228,11 @@ export function removeProfile(id: string): void {
   }
 }
 
-/** Forgets every saved workspace profile — back to the sign-in screen. */
+/** Forgets credentials and login profiles, retaining the account-scoped workspace preference. */
 export function clearSession(): void {
+  // The tab signing out may be on a different workspace from another open tab.
+  const profile = getActiveProfile();
+  if (profile) rememberWorkspace(profile);
   localStorage.removeItem(LEGACY_KEY);
   localStorage.removeItem(PROFILES_KEY);
   localStorage.removeItem(ACTIVE_KEY);

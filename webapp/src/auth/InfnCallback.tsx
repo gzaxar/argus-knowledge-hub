@@ -19,7 +19,9 @@ export function InfnCallback() {
           return;
         }
         const who = user.profile.email ?? user.profile.preferred_username ?? user.profile.sub;
-        addOidcProfile(who, defaultApiBaseUrl(), "infn");
+        addOidcProfile(who, defaultApiBaseUrl(), "infn", {
+          issuer: user.profile.iss, subject: user.profile.sub,
+        });
         // Back to the page sign-in started from (a link someone sent), when it is a page of this app.
         window.location.replace(ownPage(state?.returnTo) ?? "/");
       })
