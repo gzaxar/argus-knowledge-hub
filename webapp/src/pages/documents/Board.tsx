@@ -157,6 +157,7 @@ export function DocumentBoard() {
         <Link to="/documents/new" className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800">New document</Link>
       )}
       actions={<DocumentTools rights={rights} />}
+      viewSwitch={<DocumentViewSwitch current="board" />}
       explorerLabel="Type"
       explorerSummary={typeUid ? typeName.get(typeUid) : undefined}
       explorer={<TypeExplorer appliesTo="documents" counts={counts} total={documents.data?.length ?? 0} selected={typeUid}
@@ -177,7 +178,6 @@ export function DocumentBoard() {
             <input type="checkbox" checked={showRetired} onChange={(e) => set({ retired: e.target.checked ? "1" : null })} />
             Show retired
           </label>
-          <DocumentViewSwitch current="board" />
         </>
       }
     >
