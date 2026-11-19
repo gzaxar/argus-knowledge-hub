@@ -34,6 +34,7 @@ def test_navigation_round_trips_with_folders_parent_pages_and_explicit_root(tmp_
         for name, uid in doc_ids.items():
             db.add(Document(uid=uid, workspace_id=source, code=f'{tag}-{name}', title=name))
         db.flush()
+        db.get(DocumentFolder, folder_root).parent_document_uid = doc_ids['wp']
         db.add_all([
             DocumentPlacement(document_uid=doc_ids['folder_doc'], workspace_id=source, folder_uid=folder_child),
             DocumentPlacement(document_uid=doc_ids['page_doc'], workspace_id=source, parent_document_uid=doc_ids['wp']),
@@ -68,6 +69,8 @@ def test_navigation_round_trips_with_folders_parent_pages_and_explicit_root(tmp_
             assert set(documents) == set(doc_ids)
             assert folders['Power supplies'].parent_uid == folders['Manuals'].uid
             assert folders['Manuals'].parent_uid is None
+            assert folders['Manuals'].parent_document_uid == documents['wp'].uid
+            assert folders['Power supplies'].parent_document_uid is None
             assert placements[documents['folder_doc'].uid].folder_uid == folders['Power supplies'].uid
             assert placements[documents['folder_doc'].uid].parent_document_uid is None
             assert placements[documents['page_doc'].uid].parent_document_uid == documents['wp'].uid
@@ -84,6 +87,7 @@ def test_navigation_round_trips_with_folders_parent_pages_and_explicit_root(tmp_
         assert copied_ids[0].isdisjoint(copied_ids[1])
         db.expire_all()
         assert db.get(DocumentFolder, folder_child).parent_uid == folder_root
+        assert db.get(DocumentFolder, folder_root).parent_document_uid == doc_ids['wp']
         assert db.get(DocumentPlacement, doc_ids['page_doc']).parent_document_uid == doc_ids['wp']
     finally:
         db.rollback()
@@ -98,6 +102,8 @@ def test_navigation_tables_are_carried_in_dependency_order():
     assert by_name['document_folders'].model is DocumentFolder
     assert by_name['document_navigation_placements'].model is DocumentPlacement
     assert 'parent_uid' in by_name['document_folders'].deferred
+    assert 'parent_document_uid' in by_name['document_folders'].deferred
+    assert names.index('documents') < names.index('document_folders')
     assert names.index('documents') < names.index('document_navigation_placements')
     assert names.index('document_folders') < names.index('document_navigation_placements')
     for table in ['document_folders', 'document_navigation_placements']:

@@ -123,7 +123,7 @@ export function DocumentBrowser() {
   const openDialog = (kind: "create" | "folder" | "move") => {
     returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setError(""); setName(selected?.kind === "folder" && kind === "folder" ? selected.title : "");
-    const parent = kind === "create" ? (selected?.kind === "folder" ? selected.id : "root") : selected?.parent_id;
+    const parent = kind === "create" ? (selected?.kind === "folder" || (selected?.kind === "document" && ownDoc) ? selected.id : "root") : selected?.parent_id;
     setDestination(parent?.startsWith("f:") || parent?.startsWith("d:") ? parent : "root");
     setDialog({ kind, uid: selected?.uid });
   };
@@ -135,7 +135,8 @@ export function DocumentBrowser() {
       let newId: string | undefined;
       if (dialog.kind === "create" || dialog.kind === "folder") {
         const parent = destination.startsWith("f:") ? destination.slice(2) : null;
-        const result = dialog.kind === "create" ? await nav.createFolder(name.trim(), parent) : await nav.updateFolder(dialog.uid!, name.trim(), parent);
+        const parentDocument = destination.startsWith("d:") ? destination.slice(2) : null;
+        const result = dialog.kind === "create" ? await nav.createFolder(name.trim(), parent, parentDocument) : await nav.updateFolder(dialog.uid!, name.trim(), parent, parentDocument);
         if (result) newId = `f:${result.uid}`;
       } else if (destination === "source") await nav.resetLocation(dialog.uid!);
       else await nav.locate(dialog.uid!, destination.startsWith("f:") ? { folder_uid: destination.slice(2) } : destination.startsWith("d:") ? { parent_document_uid: destination.slice(2) } : {});
@@ -237,11 +238,11 @@ export function DocumentBrowser() {
       }} role="dialog" aria-modal="true" aria-labelledby="document-navigation-dialog" className="w-full max-w-lg space-y-4 rounded-lg bg-white p-5 shadow-xl" onSubmit={(e) => { e.preventDefault(); void saveDialog(); }}>
         <h2 id="document-navigation-dialog" className="text-lg font-semibold">{dialog.kind === "create" ? "New folder" : dialog.kind === "folder" ? "Edit folder" : "Move document in hierarchy"}</h2>
         {dialog.kind !== "move" && <label className="block space-y-1 text-sm"><span>Folder name</span><input disabled={busy} autoFocus required maxLength={240} value={name} onChange={(e) => setName(e.target.value)} className={field} /></label>}
-        <label className="block space-y-1 text-sm"><span>{dialog.kind === "move" ? "Place under" : "Parent folder"}</span><select disabled={busy} value={destination} onChange={(e) => setDestination(e.target.value)} className={field}>
+        <label className="block space-y-1 text-sm"><span>Place under</span><select disabled={busy} value={destination} onChange={(e) => setDestination(e.target.value)} className={field}>
           <option value="root">{dialog.kind === "move" ? "Unfiled documents" : "Top level"}</option>
           {dialog.kind === "move" && <option value="source">Use relationship / imported parent</option>}
           {nodes.filter((n) => n.kind === "folder" && !prohibited.has(n.id)).map((n) => <option key={n.id} value={n.id}>{ancestorPath(nodes, n.id).map((p) => p.title).join(" / ")}</option>)}
-          {dialog.kind === "move" && nodes.filter((n) => n.kind === "document" && !prohibited.has(n.id) && documents.find((d) => d.uid === n.uid)?.workspace_id === workspaceId).map((n) => <option key={n.id} value={n.id}>Document: {n.title}</option>)}
+          {nodes.filter((n) => n.kind === "document" && !prohibited.has(n.id) && documents.find((d) => d.uid === n.uid)?.workspace_id === workspaceId).map((n) => <option key={n.id} value={n.id}>Document: {ancestorPath(nodes, n.id).map((p) => p.title).join(" / ")}</option>)}
         </select></label>
         {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
         <div className="flex flex-wrap gap-2"><button type="submit" disabled={busy} className={active}>{busy ? "Saving…" : "Save"}</button><button type="button" disabled={busy} className={button} onClick={() => setDialog(null)}>Cancel</button>{dialog.kind === "folder" && rights.can_delete_documents && <button type="button" disabled={busy} className={`${button} ml-auto text-rose-700`} onClick={() => void removeFolder()}>Delete empty folder</button>}</div>

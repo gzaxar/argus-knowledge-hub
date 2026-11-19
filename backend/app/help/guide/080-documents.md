@@ -46,6 +46,23 @@ preview selection is left behind when switching to List or Board. Old bookmarked
 Tree. **Document types** groups by classification; **Hierarchy** follows parent pages and folders. Neither
 switching views nor remembering one changes document content, placement, classification or review state.
 
+## Put a folder under a document
+
+In **Documents → Tree → Hierarchy**, select a parent document and choose **+ Folder**. The **Place under**
+selector initially uses that document. Give the folder a name and save. For example, place an **EPIK8s**
+folder under **WP04 - Controls**, then create documents inside that folder with **+ New document here**.
+
+To move an existing folder, select it, choose **Edit folder** and change **Place under**. The destination
+can be **Top level**, another folder, or a visible document belonging to the current workspace. A folder
+cannot be placed under itself or any descendant, including a document inside it. Names must be unique
+under the same parent. Moving a folder keeps its contents and updates breadcrumbs and branch counters.
+
+Folder placement is navigation: it does not change document text, revisions, approval state, sharing or
+access permissions. A parent document is not an access grant to its children. If a document parent is
+unavailable to the reader, the workspace folder is shown at the root without exposing the parent identifier.
+Deleting a document parent leaves its folders and their contents at the root; an empty folder is deleted
+separately with **Delete empty folder**. Imported parent relationships are not rewritten by these moves.
+
 ## The review board
 
 **Documents → Board** shows each document in the column of its newest revision: **Draft**, **In review**,

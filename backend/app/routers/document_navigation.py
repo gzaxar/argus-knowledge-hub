@@ -19,6 +19,7 @@ router = APIRouter(prefix="/v1/document-navigation", tags=["document-navigation"
 class FolderInput(BaseModel):
     name: str = Field(min_length=1, max_length=240)
     parent_uid: str | None = None
+    parent_document_uid: str | None = None
 
 
 class LocationInput(BaseModel):
@@ -53,7 +54,10 @@ def snapshot(workspace_id=Depends(require_permission("read", resource="documents
              identity: Identity = Depends(get_identity), db=Depends(get_db)):
     docs = [DocumentOut.model_validate(d).model_dump(mode="json") for d in visible(db, workspace_id, identity)]
     folders, nodes, warnings = nav.graph(db, workspace_id, docs)
-    return {"documents": docs, "folders": [nav.folder_dict(f) for f in folders], "nodes": nodes, "warnings": warnings}
+    own_visible = {d["uid"] for d in docs if d["workspace_id"] == workspace_id}
+    folder_rows = [dict(nav.folder_dict(f), parent_document_uid=(
+        f.parent_document_uid if f.parent_document_uid in own_visible else None)) for f in folders]
+    return {"documents": docs, "folders": folder_rows, "nodes": nodes, "warnings": warnings}
 
 
 @router.get("/documents/{uid}/preview")
@@ -80,11 +84,13 @@ def preview(uid: str, revision_uid: str | None = None,
 
 @router.post("/folders", status_code=201)
 def create_folder(body: FolderInput, workspace_id=Depends(require_permission("create", resource="documents")),
-                  db=Depends(get_db)):
+                  identity: Identity = Depends(get_identity), db=Depends(get_db)):
     try:
         nav.lock_workspace(db, workspace_id)
+        if body.parent_document_uid:
+            owned_visible(body.parent_document_uid, workspace_id, identity, db)
         folder = DocumentFolder(uid=str(uuid.uuid4()), workspace_id=workspace_id)
-        nav.write_folder(db, workspace_id, folder, body.name, body.parent_uid)
+        nav.write_folder(db, workspace_id, folder, body.name, body.parent_uid, body.parent_document_uid)
         db.commit()
         return nav.folder_dict(folder)
     except ValueError as exc:
@@ -94,11 +100,14 @@ def create_folder(body: FolderInput, workspace_id=Depends(require_permission("cr
 
 @router.put("/folders/{uid}")
 def update_folder(uid: str, body: FolderInput,
-                  workspace_id=Depends(require_permission("modify", resource="documents")), db=Depends(get_db)):
+                  workspace_id=Depends(require_permission("modify", resource="documents")),
+                  identity: Identity = Depends(get_identity), db=Depends(get_db)):
     try:
         nav.lock_workspace(db, workspace_id)
         folder = nav.owned_folder(db, workspace_id, uid)
-        nav.write_folder(db, workspace_id, folder, body.name, body.parent_uid)
+        if body.parent_document_uid:
+            owned_visible(body.parent_document_uid, workspace_id, identity, db)
+        nav.write_folder(db, workspace_id, folder, body.name, body.parent_uid, body.parent_document_uid)
         db.commit()
         return nav.folder_dict(folder)
     except ValueError as exc:
