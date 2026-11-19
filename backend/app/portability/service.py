@@ -266,15 +266,21 @@ def create_export(db: Session, actor: str, *, mode: str, workspaces: list[str], 
 def analyse_export(db: Session, exp: PortabilityExport, actor: str, cfg: Optional[Config] = None) -> PortabilityExport:
     cfg = cfg or config()
     from app.models.workspace import Workspace
+    from .jobs import report
+    report("Selecting workspaces", force=True)
     move(db, exp, "analysing", actor, "analyse")
     ws = exp.workspaces
     if exp.mode == "full" or (exp.mode == "incremental" and db.get(PortabilityExport, exp.base_export_id).mode == "full"):
         ws = sorted(db.scalars(select(Workspace.id).where(Workspace.import_state.is_(None))))
     sc = Scope(workspaces=list(ws), watermark={})
+    report("Checking classification restrictions", force=True)
     restriction = exporter.restrict(db, sc, exp.classifications)
+    report("Resolving workspace dependencies", force=True)
     analysis = closure.resolve(db, sc, exp.decisions or {})
+    report("Inspecting attachment content", force=True)
     blobs = exporter.prescan(db, sc, exp.classifications, exp.decisions or {}, bool(exp.classifications),
                              policy=cfg.policy)
+    report("Estimating export size and preparing results", force=True)
     estimate = _estimate(db, sc)
     ready = not analysis["unresolved"] and not analysis["blocked"] and blobs["ready"]
     exp.analysis = {"closure": analysis, "restriction": restriction, "estimate": estimate, "blobs": blobs,
@@ -282,6 +288,7 @@ def analyse_export(db: Session, exp: PortabilityExport, actor: str, cfg: Optiona
                     "policy": cfg.policy.describe(),
                     "warnings": _warnings(exp, restriction, analysis, blobs)}
     move(db, exp, "awaiting_approval", actor, "analysed", {"ready": ready})
+    report("Analysis complete", force=True)
     return exp
 
 
