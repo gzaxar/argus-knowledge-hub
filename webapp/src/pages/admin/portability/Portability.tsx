@@ -151,10 +151,10 @@ function NewExport({ c, exports }: { c: PortabilityConfig; exports: { id: string
       classifications: classes, repository: repository || null, artifact_store: store || null,
       base_export_id: mode === "incremental" ? base : null, identity_profile: profile,
       purpose: purpose || null, recipients: classes.length ? recipients : [],
-    }),
+    }, true),
     onSuccess: (e) => {
       void qc.invalidateQueries({ queryKey: ["portability-exports"] });
-      navigate(`/admin/portability/exports/${e.id}`);
+      navigate(`/admin/portability/exports/${e.job.subject_id}`);
     },
   });
   const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
@@ -291,7 +291,7 @@ function NewExport({ c, exports }: { c: PortabilityConfig; exports: { id: string
                 disabled={create.isPending || (needsWorkspaces && chosen.length === 0) || (mode === "incremental" && !base) ||
                           (classes.length > 0 && recipients.length === 0)}
                 className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-300">
-          {create.isPending ? "Analysing…" : "Request and analyse"}
+          {create.isPending ? "Starting analysis…" : "Request and analyse"}
         </button>
         {create.isError && <span className="text-sm text-rose-700">{problemText(create.error)}</span>}
       </div>

@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useCallback, useState } from "react";
 import { AddWorkspaceForm } from "../components/AddWorkspaceForm";
 import { signInWithGoogle } from "../api/firebase";
 import { CALLBACK_PATH, infnLoginEnabled, infnLoginLabel, startInfnLogin } from "../api/infnAuth";
@@ -46,7 +46,9 @@ function GoogleSignInButton({ onSignedIn }: { onSignedIn: (profile: Profile) => 
     setLoading(true);
     try {
       const user = await signInWithGoogle();
-      const profile = addOidcProfile(user.email ?? user.uid, baseUrl);
+      const { claims } = await user.getIdTokenResult();
+      const identity = typeof claims.iss === "string" ? { issuer: claims.iss, subject: user.uid } : undefined;
+      const profile = addOidcProfile(user.email ?? user.uid, baseUrl, "firebase", identity);
       onSignedIn(profile);
     } catch (err) {
       const code = err && typeof err === "object" && "code" in err ? String(err.code) : null;
@@ -73,6 +75,7 @@ function GoogleSignInButton({ onSignedIn }: { onSignedIn: (profile: Profile) => 
 
 export function TokenGate({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState(() => getActiveProfile());
+  const onPicked = useCallback(() => setProfile(getActiveProfile()), []);
 
   // Back from the identity provider with a one-time code to exchange.
   if (infnLoginEnabled && window.location.pathname === CALLBACK_PATH) {
@@ -104,7 +107,7 @@ export function TokenGate({ children }: { children: ReactNode }) {
     return (
       <WorkspacePicker
         profile={profile}
-        onPicked={() => setProfile(getActiveProfile())}
+        onPicked={onPicked}
       />
     );
   }

@@ -197,20 +197,54 @@ const JOB_TONE: Record<PortabilityJob["state"], string> = {
 };
 
 /** Polls a background job until it ends, then tells the page to reload. */
-export function useJob(onDone: () => void) {
+export function useJob(onDone: () => void, subject?: string) {
   const [job, setJob] = useState<PortabilityJob | null>(null);
+  const [pollError, setPollError] = useState(false);
+  // Reattach on navigation or refresh, including a job that finished before this page loaded.
+  useEffect(() => {
+    if (!subject) return;
+    let live = true;
+    setJob(null);
+    let timer: number;
+    const discover = async () => {
+      try {
+        const items = await portabilityApi.jobs(subject);
+        if (!live) return;
+        setPollError(false);
+        const latest = items.find((j) => j.state === "queued" || j.state === "running") ?? items[0];
+        if (latest) setJob(latest);
+        onDone();
+      } catch {
+        if (!live) return;
+        setPollError(true);
+        timer = window.setTimeout(discover, 2000);
+      }
+    };
+    void discover();
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [subject, onDone]);
   useEffect(() => {
     if (!job || job.state === "completed" || job.state === "failed") return;
-    const t = window.setTimeout(async () => {
+    let live = true;
+    let timer: number;
+    const poll = async () => {
       try {
         const next = await portabilityApi.job(job.id);
+        if (!live) return;
+        setPollError(false);
         setJob(next);
-        if (next.state === "completed" || next.state === "failed") onDone();
-      } catch { /* keep polling */ }
-    }, 2000);
-    return () => window.clearTimeout(t);
-  }, [job, onDone]);
-  return { job, setJob, running: !!job && (job.state === "queued" || job.state === "running") };
+        if (next.state === "completed" || next.state === "failed") { onDone(); return; }
+      } catch {
+        if (!live) return;
+        setPollError(true);
+      }
+      // A failed request must also schedule another poll.
+      if (live) timer = window.setTimeout(poll, 2000);
+    };
+    timer = window.setTimeout(poll, 1000);
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [job?.id, job?.state, onDone]);
+  return { job, setJob, pollError, running: !!job && (job.state === "queued" || job.state === "running") };
 }
 
 const STEP_WORDS: Record<string, string> = {
@@ -219,40 +253,46 @@ const STEP_WORDS: Record<string, string> = {
   execute: "Loading into staging, then rebuilding and reconciling there",
   resume: "Loading into staging, then rebuilding and reconciling there",
   finalize: "Moving it into the real database, then rebuilding and reconciling", generate: "Generating the archive",
-  "publish-git": "Committing and pushing to Git",
+  "publish-git": "Committing and pushing to Git", analyse: "Analysing content for export",
 };
 
 /** A running job, as it goes: what it is doing, how far it has got, and for how long. */
-export function JobProgress({ job }: { job: PortabilityJob }) {
+export function JobProgress({ job, pollError = false }: { job: PortabilityJob; pollError?: boolean }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, []);
   const p = job.metrics?.progress;
-  const since = job.started_at ? Math.max(0, Math.round((now - new Date(job.started_at).getTime()) / 1000)) : 0;
+  const since = Math.max(0, Math.round((now - new Date(job.started_at ?? job.created_at ?? now).getTime()) / 1000));
   const elapsed = since >= 60 ? `${Math.floor(since / 60)} min ${since % 60} s` : `${since} s`;
   return (
-    <div className="w-full space-y-1 rounded border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
+    <div role="status" aria-live="polite" className="w-full space-y-1 rounded border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="font-medium">{STEP_WORDS[job.action] ?? job.action}{job.state === "queued" ? " — queued" : "…"}</span>
         <span className="text-xs">{elapsed}</span>
       </div>
       {p && (
         <>
-          <div className="h-2 w-full overflow-hidden rounded bg-indigo-100">
+          <div role="progressbar" aria-label={p.stage} aria-valuemin={0} aria-valuemax={100}
+               aria-valuenow={p.percent == null ? undefined : Math.max(0, Math.min(100, p.percent))}
+               className="h-2 w-full overflow-hidden rounded bg-indigo-100">
             <div className={`h-2 rounded bg-indigo-500 transition-all ${p.percent == null ? "w-1/3 animate-pulse" : ""}`}
-                 style={p.percent != null ? { width: `${Math.min(100, p.percent)}%` } : undefined} />
+                 style={p.percent != null ? { width: `${Math.max(0, Math.min(100, p.percent))}%` } : undefined} />
           </div>
           <div className="flex flex-wrap justify-between gap-2 text-xs">
             <span>{p.stage.replace(/_/g, " ")}</span>
-            {p.done != null && p.total != null && (
-              <span>{p.done.toLocaleString()} of {p.total.toLocaleString()}{p.percent != null ? ` · ${p.percent}%` : ""}</span>
+            {p.done != null && (
+              <span>{p.done.toLocaleString()}{p.total != null ? ` of ${p.total.toLocaleString()}` : " processed"}
+                {p.percent != null ? ` · ${p.percent}%` : ""}</span>
             )}
           </div>
         </>
       )}
-      {!p && <div className="h-2 w-1/3 animate-pulse rounded bg-indigo-300" />}
+      {!p && <div role="progressbar" aria-label="Waiting for progress" className="h-2 w-full overflow-hidden rounded bg-indigo-100">
+        <div className="h-2 w-1/3 animate-pulse rounded bg-indigo-300" />
+      </div>}
+      {pollError && <p className="text-xs text-amber-800">Connection interrupted. Retrying progress updates…</p>}
       <p className="text-xs text-indigo-700">You can leave this page: the step goes on, and its result shows when you come back.</p>
     </div>
   );

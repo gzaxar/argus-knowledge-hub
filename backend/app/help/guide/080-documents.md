@@ -1,7 +1,7 @@
 ---
 title: Documents and the knowledge base
 summary: Browsing, writing and importing procedures, manuals and reports; document hierarchy, previews, revisions, review, publication, confidentiality, sharing and retention.
-keywords: [hierarchy, folder, preview, subsystem, WP, unfiled, full table, list, tree, board, kanban, review board, bacheca, document, documents, logbook, log, running log, shift log, days, rework, raw text, notes, email, e-mail, transcript, minutes, template, templates, variant, rielabora, testo grezzo, procedure, manual, report, knowledge base, revision, draft, submit, review, reject, approval, approve, publish, new revision, edit, retire, confidentiality, riservato, shared, global, retention, markdown, controlled document, attachment, related by meaning, export, pdf, print, download, markdown file, .md, save as pdf]
+keywords: [view selector, view icons, last view, remembered view, browser preference, list tree board, confluence tables, nested tables, merged cells, native confluence import, document types, hierarchy, folder, preview, subsystem, WP, unfiled, full table, list, tree, board, kanban, review board, bacheca, document, documents, logbook, log, running log, shift log, days, rework, raw text, notes, email, e-mail, transcript, minutes, template, templates, variant, rielabora, testo grezzo, procedure, manual, report, knowledge base, revision, draft, submit, review, reject, approval, approve, publish, new revision, edit, retire, confidentiality, riservato, shared, global, retention, markdown, controlled document, attachment, related by meaning, export, pdf, print, download, markdown file, .md, save as pdf]
 order: 80
 ---
 
@@ -10,7 +10,7 @@ drawings, notes. A document is linked to the equipment, types and other document
 
 ## Browse documents before creating another one
 
-**Documents** has three views, switched at the top right as on Tickets and Assets:
+**Documents** has three views, selected with **View** near the top right, as on Tickets and Assets:
 
 - **List**: every document in a table, with the type panel, search by title or code, the **Status** filter,
   **Columns**, sorting and bulk operations (copy, move between workspaces, retype, delete).
@@ -20,6 +20,31 @@ drawings, notes. A document is linked to the equipment, types and other document
 
 **Tools** holds Templates, Rework from raw text, Advanced query and Type suggestions. Search first to avoid
 creating a second copy of an existing document.
+
+### Choose a view and return to it
+
+The **View** selector shows icons alongside its text labels. The same selector is used for **Documents**
+(**List**, **Tree**, **Board**), **Tickets** (**List**, **Board**) and **Assets** (**List**, **Map**, where the
+workspace provides Map). An icon supplements the label; it does not change which views are available.
+In Documents, the selector stays on the same row below the header across its three views.
+
+When you return through the main sidebar, each section opens its last visited view. For example, choose
+**Documents → Tree**, go to **Cockpit**, then choose **Documents** in the sidebar: Tree opens again. Choosing
+Tickets Board does not change the Documents choice.
+
+The preference is kept in this browser, separately for each saved connection profile and section. Workspaces
+using that profile share the choice; other browsers or devices do not receive it. Clearing browser storage
+removes it. If the browser cannot save preferences, the sidebar uses List as its default. A workspace without
+Map opens Assets List even when Map was remembered elsewhere.
+
+A direct link still opens the view, document or revision named in its address. Visiting an explicit view
+also makes it the last visited view; a sidebar preference does not redirect that link. The saved preference
+remembers the view only, not a selected document, folder or previous filters.
+
+Switching views with the selector retains shared URL filters and starts on the first page. A Tree node or
+preview selection is left behind when switching to List or Board. Old bookmarked hierarchy links still open
+Tree. **Document types** groups by classification; **Hierarchy** follows parent pages and folders. Neither
+switching views nor remembering one changes document content, placement, classification or review state.
 
 ## Put a folder under a document
 
@@ -95,6 +120,20 @@ recording or a photo of a page — or take its text from photos with **Text from
 (if you ask) or the photos are attached to it; **Tidy with AI** writes rough text up (see *Guided and AI-assisted
 entry*).
 
+## Import from Confluence
+
+Use **Workspace → Administration → Imports → New → Confluence** for native Confluence imports, including
+Cloud with its supported email/API-token authentication. A saved configuration reads the selected pages and
+attachments and can be run again. **New document** no longer has the separate **Import from Confluence —
+ELI-NP** panel; ordinary document creation and attachment handling are still available.
+
+Supported complex tables retain nested grids, merged cells, colours and panels as sanitised HTML in the
+Markdown body. Review the rendered page, rather than judging that markup as plain text. Cells wrap between
+whole words; very wide tables can still scroll. See *Importing data* for source checks, attachment warnings
+and re-import limits. An unchanged source version can be skipped: re-running an import does not necessarily
+repair an older flattened table. Corrections to an existing published document go through a new editable
+draft and the normal review workflow; do not delete the document to refresh its layout.
+
 ## Import a web page folder
 
 An HTML page saved with its pictures — a LabVIEW or Doxygen export, a page saved by a browser — is imported from
@@ -118,7 +157,7 @@ be reworked with its type's template (**+ Revision from raw text** on its page).
 
 ## Rework from raw text
 
-**Documents → Rework from raw text** turns notes, an e-mail, a transcript or an imported page into a draft that
+**Documents → Tools → Rework from raw text** turns notes, an e-mail, a transcript or an imported page into a draft that
 follows the template of a document type. It is also offered from **New document** ("Rework with the template",
 for the text you described or the file you added) and on a document's page (**+ Revision from raw text**).
 
@@ -155,7 +194,7 @@ workspace allows it. **Draft with AI** and **Review** on the editor are unchange
 
 ## Document templates
 
-**Documents → Templates** lists, for each type, the official template shipped with ARGUS (read-only), the
+**Documents → Tools → Templates** lists, for each type, the official template shipped with ARGUS (read-only), the
 workspace's variants and your own copies. **Make a workspace variant** (for those who may approve documents) or
 **Make my copy** (for you alone) starts from the official one. In the editor:
 
@@ -245,12 +284,30 @@ retention runs out, only retired. A document never released (only drafts) can be
 
 ## Find what is written
 
-- **Documents → Hierarchy** for parent pages and folders, **Document types** for assigned types, or **Full
-  table** for status, text and type-field filters. The browser's local search finds titles and codes; it does
-  not search the whole body. The search box at the top searches across records. On the phone: the **Docs** tab,
-  searched, sorted and narrowed to a type.
+- **Documents → Tree → Hierarchy** shows parent pages and folders. **Document types** groups documents
+  by their assigned type: it is a classification, not the parent-page hierarchy. **Documents → List** gives
+  the table with type, status and column controls; **Documents → Board** groups documents by review state.
+  Switching views does not itself change a document's type, hierarchy or revision state.
+  The local title/code search does not search the whole body. **Tools → Advanced query** provides additional
+  filters; the search box at the top searches across records. On the phone: the **Docs** tab, searched,
+  sorted and narrowed to a type.
 - **Ask ARGUS** searches documents, tickets, comments and the text of attached files (page by page) by meaning,
   in any language.
 - **Related by meaning** on a document lists the equipment, tickets and other documents whose written knowledge
   is about the same thing.
 - **Type suggestions** proposes a type for documents that have none.
+
+## Questions to ask about document navigation and imports
+
+For example, ask **Ask ARGUS**:
+
+- "Where can I see the document hierarchy rather than the document types?"
+- "How do I switch between List, Tree and Board?"
+- "Why does Documents reopen in Tree, and is that preference shared with my other browser?"
+- "Where is the native Confluence import now that its New document panel is gone?"
+- "Why does an imported nested table contain HTML in its Markdown body?"
+- "Will re-running the import repair a table from an unchanged source page?"
+
+These questions ask for guidance. To change placement, edit a draft, run an import or submit a revision,
+use the corresponding ARGUS controls with the required permissions; asking for an explanation does not
+perform those actions.

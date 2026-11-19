@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { portabilityApi, problemText, workspacesApi } from "../../../api/client";
-import type { Dependency, ExportView } from "../../../api/portabilityTypes";
-import { ActionButton, bytes, Empty, ErrorBox, EXPORT_STEPS, JobsPanel, KV, Labels, LegalHold, Mono, PolicySummary, Section,
+import type { Dependency, ExportView, PortabilityJob } from "../../../api/portabilityTypes";
+import { ActionButton, bytes, Empty, ErrorBox, EXPORT_STEPS, JobProgress, JobsPanel, KV, Labels, LegalHold, Mono, PolicySummary, Section,
   StateBadge, Steps, UninspectedList, useJob, when } from "./shared";
 import { SchedulePanel } from "./Schedules";
 
@@ -62,20 +62,25 @@ export function ExportDetailPage() {
     void qc.invalidateQueries({ queryKey: ["portability-exports"] });
     void qc.invalidateQueries({ queryKey: ["portability-manifest", id] });
   }, [qc, id]);
-  const { job, setJob, running } = useJob(reload);
+  const { job, setJob, running, pollError } = useJob(reload, id);
   // Approving is quick; generating and publishing run as background jobs the page polls.
   const step = useMutation({
     mutationFn: async (s: "approve" | "generate" | "publish-git") => {
       if (s === "approve") return portabilityApi.exportStep(id, s, { confirm: confirmed });
       const { job: started } = await portabilityApi.exportJob(id, s, { confirm: confirmed });
       setJob(started);
+      if (started.state === "completed" || started.state === "failed") reload();
       return null;
     },
     onSuccess: (v) => { if (v) done(v); else setError(null); }, onError: fail });
   const [reason, setReason] = useState("");
   const revoke = useMutation({ mutationFn: () => portabilityApi.revokeExport(id, reason), onSuccess: done, onError: fail });
+  const analysisStarted = (v: { job: PortabilityJob }) => {
+    setJob(v.job); setError(null);
+    if (v.job.state === "completed" || v.job.state === "failed") reload();
+  };
   // Analysed again with no new outcome: what stopped it (a file not there, a record since restored) may have changed.
-  const reanalyse = useMutation({ mutationFn: () => portabilityApi.decideExport(id, {}), onSuccess: done, onError: fail });
+  const reanalyse = useMutation({ mutationFn: () => portabilityApi.exportJob(id, "analyse"), onSuccess: analysisStarted, onError: fail });
   const download = useMutation({
     mutationFn: () => portabilityApi.downloadArchive(id),
     onSuccess: (blob) => {
@@ -91,7 +96,7 @@ export function ExportDetailPage() {
 
   if (exp.isError) return <p className="text-sm text-rose-700">{problemText(exp.error)}</p>;
   if (!exp.data) return <p className="text-sm text-slate-500">Loading…</p>;
-  const e = exp.data;
+  const e = { ...exp.data, analysis: exp.data.analysis ?? {} };
   const myEmail = me.data?.email;
   const policy = cfg.data?.policy;
   const selfApproval = e.risk === "high" && myEmail === e.requested_by && !!policy?.separation_of_duties;
@@ -121,6 +126,9 @@ export function ExportDetailPage() {
       </div>
       <Steps steps={EXPORT_STEPS} state={e.state} />
       <ErrorBox error={error ?? (e.state === "failed" ? e.error : null)} />
+      {pollError && !running && <p role="status" className="text-sm text-amber-800">
+        Connection interrupted. Retrying progress updates…
+      </p>}
 
       <Section title="Next step">
         <div className="flex flex-wrap items-center gap-3">
@@ -134,11 +142,11 @@ export function ExportDetailPage() {
                 </label>
               )}
               <ActionButton label="Approve" busy={busy === "approve"} onClick={() => step.mutate("approve")}
-                            disabled={!e.analysis.ready || selfApproval}
+                            disabled={!e.analysis.ready || selfApproval || running || reanalyse.isPending}
                             title={selfApproval ? "A high-risk export needs another approver" : undefined}
                             confirm={`Approve this ${e.risk === "high" ? "high-risk " : ""}export?`} />
               {!e.analysis.ready && (
-                <ActionButton label="Analyse again" busy={reanalyse.isPending} onClick={() => reanalyse.mutate()}
+                <ActionButton label="Analyse again" busy={reanalyse.isPending || (running && job?.action === "analyse")} disabled={running} onClick={() => reanalyse.mutate()}
                               title="Run the analysis again, e.g. once a missing file is back" />
               )}
               {!e.analysis.ready && (
@@ -186,11 +194,14 @@ export function ExportDetailPage() {
               {download.isPending ? "Preparing…" : "Download checkpoint (.tar)"}
             </button>
           )}
-          {running && <span className="text-sm text-sky-700">{job?.action.replace("-", " ")} is {job?.state}… this page updates by itself.</span>}
+          {(e.state === "requested" || e.state === "failed") && !running && (
+            <ActionButton label="Analyse again" busy={reanalyse.isPending} onClick={() => reanalyse.mutate()} />
+          )}
+          {running && job && <JobProgress job={job} pollError={pollError} />}
           {job?.state === "failed" && <span className="text-sm text-rose-700">{job.action} failed: {job.error?.error}</span>}
           {e.state === "published" && <span className="text-sm text-emerald-700">Published. Import it elsewhere by its tag.</span>}
           {(e.state === "revoked" || e.state === "expired") && <span className="text-sm text-slate-500">This export is {e.state}.</span>}
-          {!["revoked", "expired", "generating", "verifying", "publishing"].includes(e.state) && (
+          {!running && !["revoked", "expired", "analysing", "generating", "verifying", "publishing"].includes(e.state) && (
             <span className="ml-auto flex items-center gap-2">
               <input value={reason} onChange={(ev) => setReason(ev.target.value)} placeholder="Reason to revoke"
                      className="w-48 rounded border border-slate-300 px-2 py-1 text-sm" />
@@ -237,8 +248,8 @@ export function ExportDetailPage() {
 
       <JobsPanel subject={e.id} current={job} />
 
-      <Dependencies e={e} onSaved={done} onError={fail} />
-      <BlobReview e={e} onSaved={done} onError={fail} />
+      <Dependencies e={e} running={running} onSaved={analysisStarted} onError={fail} />
+      <BlobReview e={e} running={running} onSaved={analysisStarted} onError={fail} />
 
       {e.watermark && (
         <Section title="Watermark">
@@ -278,16 +289,17 @@ export function ExportDetailPage() {
   );
 }
 
-function Dependencies({ e, onSaved, onError }: { e: ExportView; onSaved: (v: ExportView) => void; onError: (x: unknown) => void }) {
+function Dependencies({ e, running, onSaved, onError }: { e: ExportView; running: boolean;
+  onSaved: (v: { job: PortabilityJob }) => void; onError: (x: unknown) => void }) {
   const deps: Dependency[] = e.analysis.closure?.dependencies ?? [];
-  const editable = e.state === "awaiting_approval" || e.state === "failed";
+  const editable = !running && (e.state === "awaiting_approval" || e.state === "failed");
   // Rows still without an outcome start on the recommended one, so saving is one press.
   const suggested = useCallback(() => Object.fromEntries(
     deps.filter((d) => !d.outcome && recommended(d)).map((d) => [d.id, recommended(d)!])), [deps]);
   const [draft, setDraft] = useState<Record<string, string>>(() => (editable ? suggested() : {}));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setDraft(editable ? suggested() : {}), [e.id, e.state, e.analysis]);
-  const save = useMutation({ mutationFn: () => portabilityApi.decideExport(e.id, draft), onSuccess: onSaved, onError });
+  const save = useMutation({ mutationFn: () => portabilityApi.decideExportJob(e.id, draft), onSuccess: onSaved, onError });
   return (
     <Section title="Dependencies" id="dependencies"
              right={editable && Object.keys(draft).length > 0 && (
@@ -357,12 +369,13 @@ const BLOB_HELP: Record<string, string> = {
   block: "do not run this export",
 };
 
-function BlobReview({ e, onSaved, onError }: { e: ExportView; onSaved: (v: ExportView) => void; onError: (x: unknown) => void }) {
+function BlobReview({ e, running, onSaved, onError }: { e: ExportView; running: boolean;
+  onSaved: (v: { job: PortabilityJob }) => void; onError: (x: unknown) => void }) {
   const b = e.analysis.blobs;
-  const editable = e.state === "awaiting_approval" || e.state === "failed";
+  const editable = !running && (e.state === "awaiting_approval" || e.state === "failed");
   const [draft, setDraft] = useState<Record<string, string>>({});
   useEffect(() => setDraft({}), [e.id, e.state]);
-  const save = useMutation({ mutationFn: () => portabilityApi.decideExport(e.id, draft), onSuccess: onSaved, onError });
+  const save = useMutation({ mutationFn: () => portabilityApi.decideExportJob(e.id, draft), onSuccess: onSaved, onError });
   if (!b) return null;
   return (
     <Section title={`Content inspection (${b.inspected} blob${b.inspected === 1 ? "" : "s"})`}

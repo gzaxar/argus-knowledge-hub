@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { workspacesApi } from "../api/client";
 import { MyWorkspace } from "../api/types";
-import { Profile, updateProfile } from "../api/session";
+import { forgetRememberedWorkspace, getRememberedWorkspaceId, Profile, updateProfile } from "../api/session";
 import { signOut } from "../api/signOut";
 
 export function WorkspacePicker({
@@ -40,31 +40,48 @@ export function WorkspacePicker({
   };
 
   useEffect(() => {
+    let live = true;
     workspacesApi
       .listMine()
       .then((ws) => {
-        setWorkspaces(ws);
-        if (ws.length === 1) {
-          updateProfile(profile.id, { activeWorkspaceId: ws[0].id });
+        if (!live) return;
+        const remembered = getRememberedWorkspaceId(profile);
+        const previous = ws.find((w) => w.id === remembered);
+        if (remembered && !previous) forgetRememberedWorkspace(profile);
+        // A remembered id is never sent as the active workspace before access is checked.
+        const target = previous ?? (ws.length === 1 ? ws[0] : undefined);
+        if (target) {
+          updateProfile(profile.id, { activeWorkspaceId: target.id });
           onPicked();
+        } else {
+          setWorkspaces(ws);
         }
       })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err) => { if (live) setError(err instanceof Error ? err.message : String(err)); });
+    return () => { live = false; };
   }, [profile.id, onPicked]);
 
   const signOutAndRetry = () => void signOut();
+  const loading = !error && workspaces === null;
+  const returning = !!getRememberedWorkspaceId(profile);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
       <div className="w-full max-w-md space-y-4 rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Choose a workspace</h1>
+          <h1 className="text-xl font-semibold text-slate-900">
+            {loading ? returning ? "Returning to your last workspace…" : "Loading your workspaces…" : "Choose a workspace"}
+          </h1>
           <p className="mt-1 text-sm text-slate-500">Signed in as {profile.name}.</p>
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
-        {!error && workspaces === null && (
-          <p className="text-sm text-slate-500">Loading…</p>
+        {loading && (
+          <div role="status" aria-live="polite" className="flex items-center gap-3 text-sm text-slate-500">
+            <span aria-hidden="true"
+                  className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700 motion-reduce:animate-none" />
+            <span>{returning ? "Please wait while we open your workspace." : "Please wait a moment."}</span>
+          </div>
         )}
         {workspaces?.length === 0 && !isAdmin && (
           <p className="text-sm text-slate-500">

@@ -1865,18 +1865,22 @@ export const portabilityApi = {
     request<{ status: string }>(`${P}/setup/approve`, { method: "POST", body: json({ kind, id, confirm: true }) }),
   exports: () => request<ExportView[]>(`${P}/exports`),
   getExport: (id: string) => request<ExportView>(`${P}/exports/${encodeURIComponent(id)}`),
-  createExport: (body: {
+  createExport: <B extends boolean = false>(body: {
     mode: string; workspaces: string[]; classifications: string[]; repository: string | null;
     artifact_store: string | null; decisions?: Record<string, string>; base_export_id?: string | null;
     identity_profile?: string | null; purpose?: string | null; recipients?: string[];
-  }) => request<ExportView>(`${P}/exports`, { method: "POST", body: json(body) }),
+  }, background?: B) => request<B extends true ? { job: PortabilityJob } : ExportView>(
+    `${P}/exports${background ? "?background=true" : ""}`, { method: "POST", body: json(body) }),
   decideExport: (id: string, decisions: Record<string, string>) =>
     request<ExportView>(`${P}/exports/${encodeURIComponent(id)}/decisions`, { method: "POST", body: json({ decisions }) }),
+  decideExportJob: (id: string, decisions: Record<string, string>) =>
+    request<{ job: PortabilityJob }>(`${P}/exports/${encodeURIComponent(id)}/decisions?background=true`, {
+      method: "POST", body: json({ decisions }) }),
   exportStep: (id: string, step: "approve" | "generate" | "publish-git", opts: { confirm?: boolean } = {}) =>
     request<ExportView>(`${P}/exports/${encodeURIComponent(id)}/${step}`, {
       method: "POST", body: json({ confirm: !!opts.confirm }) }),
   /** A long step as a background job: returns the job to poll. */
-  exportJob: (id: string, step: "generate" | "publish-git", opts: { confirm?: boolean } = {}) =>
+  exportJob: (id: string, step: "analyse" | "generate" | "publish-git", opts: { confirm?: boolean } = {}) =>
     request<{ job: PortabilityJob }>(`${P}/exports/${encodeURIComponent(id)}/${step}?background=true`, {
       method: "POST", body: json({ confirm: !!opts.confirm }) }),
   legalHold: (kind: "exports" | "imports", id: string, on: boolean, reason: string) =>
