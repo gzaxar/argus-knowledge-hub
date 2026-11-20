@@ -168,6 +168,10 @@ networkPolicy:
   enabled: false
   # Who reaches the web and the API: the ingress controller's pods (NetworkPolicy "from" entries).
   ingressFrom: []
+  # The Prometheus allowed to scrape the metrics ports (metrics.enabled).
+  prometheusFrom:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+      podSelector: {matchLabels: {app.kubernetes.io/name: prometheus}}
   dnsPodLabels: {k8s-app: kube-dns}
   # Never reached from the API: private networks (the cluster's pods and services, the institute's hosts),
   # link-local (cloud metadata) and shared address space.
@@ -176,6 +180,33 @@ networkPolicy:
   internetPorts: [443, 587, 465]
   # Private addresses the API still needs, each with its ports: [{cidr: 192.168.1.10/32, ports: [443]}].
   allowedPrivateEgress: []
+
+# Metrics for the cluster's Prometheus (prometheus-operator): the API's requests, latency, database pool and
+# storage on their own port (never through the ingress), PostgreSQL's through postgres_exporter beside it, a
+# PodMonitor, and alert rules that say when to scale (docs/k8sda.md, "Metrics"). With networkPolicy on, only the
+# Prometheus pods named in networkPolicy.prometheusFrom reach the two ports.
+metrics:
+  enabled: false
+  port: 9100
+  # Labels the Prometheus picks monitors and rules by (kube-prometheus-stack: release: <its release>).
+  monitorLabels: {release: prometheus}
+  interval: 30s
+  postgresExporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
+    port: 9187
+    resources:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {memory: 128Mi}
+  rules:
+    enabled: true
+    # When to look at scaling (docs/k8sda.md, "When to scale").
+    apiP95Seconds: 1
+    errorRatio: 0.05
+    poolBusyRatio: 0.8
+    memoryRatio: 0.85
+    connectionsRatio: 0.8
+    rateLimitedPerSecond: 0.5
+    storageDaysLeft: 14
 
 # A ResourceQuota and default container limits for the namespace.
 quota:

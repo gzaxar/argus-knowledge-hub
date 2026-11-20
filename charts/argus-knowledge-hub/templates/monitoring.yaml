@@ -1,0 +1,91 @@
+{{- if .Values.metrics.enabled }}
+{{- $m := .Values.metrics }}
+{{- $ns := .Release.Namespace }}
+# The cluster's Prometheus scrapes the API (services/metrics.py) and postgres_exporter on their "metrics" ports.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: argus
+  labels:
+    {{- include "argus.labels" . | nindent 4 }}
+    {{- with $m.monitorLabels }}{{ toYaml . | nindent 4 }}{{ end }}
+spec:
+  selector:
+    matchExpressions:
+      - {key: app, operator: In, values: [argus-api, argus-postgres]}
+  podMetricsEndpoints:
+    - port: metrics
+      interval: {{ $m.interval }}
+{{- if $m.rules.enabled }}
+{{- $r := $m.rules }}
+{{- $hosts := printf "%s|%s" .Values.hosts.web .Values.hosts.api }}
+---
+# When to look at scaling (docs/k8sda.md, "When to scale"): each rule names what to do in its description.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: argus
+  labels:
+    {{- include "argus.labels" . | nindent 4 }}
+    {{- with $m.monitorLabels }}{{ toYaml . | nindent 4 }}{{ end }}
+spec:
+  groups:
+    - name: argus-load
+      rules:
+        - record: argus:http_request_duration_seconds:p95
+          expr: histogram_quantile(0.95, sum by (le) (rate(argus_http_request_duration_seconds_bucket{namespace="{{ $ns }}"}[5m])))
+        - record: argus:http_requests:rate5m
+          expr: sum(rate(argus_http_requests_total{namespace="{{ $ns }}"}[5m]))
+        - alert: ArgusApiSlow
+          expr: histogram_quantile(0.95, sum by (le) (rate(argus_http_request_duration_seconds_bucket{namespace="{{ $ns }}"}[10m]))) > {{ $r.apiP95Seconds }}
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: ARGUS API slow (95th percentile above {{ $r.apiP95Seconds }}s for 15 minutes)
+            description: Check the API's CPU and the database pool first; more API replicas help when the CPU is the limit, PgBouncer or a larger database when the pool or PostgreSQL is.
+        - alert: ArgusApiErrors
+          expr: sum(rate(argus_http_requests_total{namespace="{{ $ns }}",status=~"5.."}[10m])) / sum(rate(argus_http_requests_total{namespace="{{ $ns }}"}[10m])) > {{ $r.errorRatio }}
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: ARGUS API answering 5xx to more than {{ mulf $r.errorRatio 100 }}% of requests
+            description: Read the API's logs; errors under load often mean the database pool or memory ran out.
+        - alert: ArgusDbPoolBusy
+          expr: max by (pod) (argus_db_pool_checked_out{namespace="{{ $ns }}"} / (argus_db_pool_size{namespace="{{ $ns }}"} + argus_db_pool_max_overflow{namespace="{{ $ns }}"})) > {{ $r.poolBusyRatio }}
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: ARGUS API using most of its database connections
+            description: Requests wait for a connection. Look for slow queries first; then PgBouncer and more API replicas.
+        - alert: ArgusMemoryNearLimit
+          expr: max by (pod, container) (container_memory_working_set_bytes{namespace="{{ $ns }}",container!=""} / on (namespace, pod, container) kube_pod_container_resource_limits{namespace="{{ $ns }}",resource="memory"}) > {{ $r.memoryRatio }}
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: An ARGUS container is near its memory limit
+            description: Raise its limit in values-k8sda.yaml (and the namespace quota), or spread the load over more replicas.
+        - alert: ArgusPostgresConnections
+          expr: sum(pg_stat_activity_count{namespace="{{ $ns }}"}) / max(pg_settings_max_connections{namespace="{{ $ns }}"}) > {{ $r.connectionsRatio }}
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: PostgreSQL near its connection limit
+            description: More API replicas would hit the limit; put PgBouncer in front of PostgreSQL first.
+        - alert: ArgusRateLimited
+          expr: sum(rate(nginx_ingress_controller_requests{host=~"{{ $hosts }}",status="429"}[10m])) > {{ $r.rateLimitedPerSecond }}
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: Clients of ARGUS are being refused by the ingress's per-address limits (429)
+            description: A flood, or many people behind one address. Look at the addresses in the controller's log; raise the tier (deploy/k8sda/40-ingress-public.yaml) if they are legitimate.
+    - name: argus-storage
+      rules:
+        - alert: ArgusStorageFilling
+          expr: (argus_storage_available_bytes{namespace="{{ $ns }}"} / clamp_min(deriv(argus_storage_used_bytes{namespace="{{ $ns }}"}[1d]), 1)) < {{ mul $r.storageDaysLeft 86400 }}
+          for: 1h
+          labels: {severity: warning}
+          annotations:
+            summary: An ARGUS storage area will be full in less than {{ $r.storageDaysLeft }} days at the current rate
+            description: Enlarge the volume (and the namespace's requests.storage quota), or clear old portability archives.
+{{- end }}
+{{- end }}

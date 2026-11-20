@@ -53,10 +53,18 @@ spec:
       containers:
         - name: api
           image: "{{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}"
-          ports: [{containerPort: 8080}]
+          ports:
+            - {containerPort: 8080}
+            {{- if .Values.metrics.enabled }}
+            # Prometheus only (services/metrics.py): not in the Service, so no ingress reaches it.
+            - {name: metrics, containerPort: {{ .Values.metrics.port }}}
+            {{- end }}
           {{- include "argus.containerSecurity" (dict "root" .) | nindent 10 }}
           env:
             {{- include "argus.apiEnv" . | nindent 12 }}
+            {{- if .Values.metrics.enabled }}
+            - {name: ARGUS_METRICS_PORT, value: {{ .Values.metrics.port | quote }}}
+            {{- end }}
             # The room planned for each volume (local-path volumes do not enforce it): the Statistics page's
             # storage section measures what is used against it.
             - {name: ARGUS_STORAGE_ATTACHMENTS_SIZE, value: {{ .Values.api.attachmentsSize | quote }}}

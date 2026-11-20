@@ -24,6 +24,12 @@ spec:
         - {protocol: TCP, port: 80}
         - {protocol: TCP, port: 443}
         - {protocol: TCP, port: 8443}   # the admission webhook, called by the API server
+    # The cluster's Prometheus, on the metrics port only.
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: prometheus}}
+      ports:
+        - {protocol: TCP, port: 10254}
   egress:
     - to:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: argus-hub}}

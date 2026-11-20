@@ -24,10 +24,8 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    # Per client address: bursts of a page load pass, a flood does not.
-    nginx.ingress.kubernetes.io/limit-rps: "30"
-    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
-    nginx.ingress.kubernetes.io/limit-connections: "40"
+    # Requests and connections per client address are limited by the public controller itself, in two tiers
+    # (INFN's networks and the rest of the internet): deploy/k8sda/40-ingress-public.yaml.
 
 # The INFN login (INFN AAI, public client with PKCE) and Google, as on INFN Cloud; no bundled Keycloak.
 keycloak:
@@ -80,6 +78,11 @@ networkPolicy:
     - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ingress-public}}
       podSelector: {matchLabels: {app.kubernetes.io/name: ingress-nginx}}
   dnsPodLabels: {k8s-app: kube-dns}
+
+# The cluster's kube-prometheus-stack (namespace monitoring, release "prometheus") scrapes ARGUS; Grafana's
+# dashboard is deploy/k8sda/grafana-argus.json.
+metrics:
+  enabled: true
 
 quota:
   enabled: true

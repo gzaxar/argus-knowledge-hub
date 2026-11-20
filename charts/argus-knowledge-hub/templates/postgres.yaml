@@ -65,6 +65,19 @@ spec:
           volumeMounts:
             - {name: data, mountPath: /var/lib/postgresql/data}
             - {name: init, mountPath: /docker-entrypoint-initdb.d, readOnly: true}
+        {{- if .Values.metrics.enabled }}
+        # Connections, locks, transactions, cache hits and database size, for Prometheus.
+        - name: postgres-exporter
+          image: {{ .Values.metrics.postgresExporter.image }}
+          ports: [{name: metrics, containerPort: {{ .Values.metrics.postgresExporter.port }}}]
+          {{- include "argus.containerSecurity" (dict "root" . "readOnly" true) | nindent 10 }}
+          env:
+            - {name: DATA_SOURCE_URI, value: "localhost:5432/{{ .Values.postgres.database }}?sslmode=disable"}
+            - {name: DATA_SOURCE_USER, value: {{ .Values.postgres.user | quote }}}
+            {{- include "argus.secretEnv" (dict "name" "DATA_SOURCE_PASS" "secret" .Values.existingSecret "key" "postgres-password") | nindent 12 }}
+          args: ["--web.listen-address=:{{ .Values.metrics.postgresExporter.port }}"]
+          resources: {{- toYaml .Values.metrics.postgresExporter.resources | nindent 12 }}
+        {{- end }}
       volumes:
         - name: data
           persistentVolumeClaim: {claimName: argus-postgres-data}
