@@ -6,8 +6,8 @@ A second installation of ARGUS, beside INFN Cloud's, on the shared k8sda cluster
 
 | | |
 |---|---|
-| Web | `https://argus-hub.k8sda.lnf.infn.it` |
-| API | `https://argus-hub-api.k8sda.lnf.infn.it` |
+| Web | `https://argus-hub.lnf.infn.it` |
+| API | `https://argus-hub-api.lnf.infn.it` |
 | Namespace | `argus-hub` (Argo CD application `argus-hub`, project `argus-hub`) |
 | Public entry | namespace `ingress-public`: its own nginx, class `nginx-public`, address `192.168.108.226` |
 | Manifests | `deploy/k8sda/` (applied once by hand); the chart with `values-k8sda.yaml` (Argo CD, from `main`) |
@@ -49,14 +49,18 @@ installation's API is.
 ## What LNF's network service has to do
 
 - Forward a public address's TCP 80 and 443 to **192.168.108.226** (nothing else of the cluster).
-- Public DNS: `argus-hub.k8sda.lnf.infn.it` and `argus-hub-api.k8sda.lnf.infn.it` → that public address.
-  Inside LNF they should resolve to 192.168.108.226: today the wildcard `*.k8sda.lnf.infn.it` sends them to
-  the shared nginx (192.168.108.10), which does not serve them.
+- DNS, split-horizon: `argus-hub.lnf.infn.it` and `argus-hub-api.lnf.infn.it` resolve on the internet to that
+  public address, inside LNF to **192.168.108.226** directly.
 
-Until then ARGUS answers only inside LNF, with nginx's own certificate; Let's Encrypt issues the real ones
-once the names resolve publicly (cert-manager retries by itself).
+One name for each, inside and out: the web knows one API address (`web.runtimeConfig`), INFN AAI one redirect,
+e-mails one link, the mobile app one server, and a browser keeps one session. They are names of the service,
+not of the cluster (outside `*.k8sda.lnf.infn.it`, which leads to the shared nginx), so they outlive a move to
+another cluster.
 
-INFN AAI: the client `argus-knowledge-hub` needs the redirect URI `https://argus-hub.k8sda.lnf.infn.it/auth/callback`
+Until then ARGUS answers only where the names resolve to 192.168.108.226, with nginx's own certificate; Let's
+Encrypt issues the real ones once the names resolve publicly (cert-manager retries by itself).
+
+INFN AAI: the client `argus-knowledge-hub` needs the redirect URI `https://argus-hub.lnf.infn.it/auth/callback`
 (and the web origin) beside INFN Cloud's.
 
 ## First installation
@@ -145,7 +149,7 @@ done yet: these numbers say when it is needed.
 
 ## Checks
 
-- `curl -k --resolve argus-hub.k8sda.lnf.infn.it:443:192.168.108.226 https://argus-hub.k8sda.lnf.infn.it/`
+- `curl -k --resolve argus-hub.lnf.infn.it:443:192.168.108.226 https://argus-hub.lnf.infn.it/`
   answers ARGUS; the same address with another k8sda host (`btf-olog…`) answers 404.
 - From a pod in another namespace, `argus-postgres.argus-hub:5432`, `argus-api.argus-hub:80` do not answer.
 - `kubectl -n argus-hub exec deploy/argus-api -- python -c "import socket; socket.create_connection(('192.168.108.10', 80), 3)"`

@@ -2,8 +2,8 @@
 # internet through its own ingress controller (deploy/k8sda), isolated from the cluster's other namespaces.
 # See docs/k8sda.md. The image tags are set by the release workflow, as for values-production.yaml.
 hosts:
-  web: argus-hub.k8sda.lnf.infn.it
-  api: argus-hub-api.k8sda.lnf.infn.it
+  web: argus-hub.lnf.infn.it
+  api: argus-hub-api.lnf.infn.it
   keycloak: unused.invalid
 
 images:
@@ -58,7 +58,7 @@ api:
 web:
   # The same web image as INFN Cloud, told where this installation's API is.
   runtimeConfig:
-    apiBaseUrl: https://argus-hub-api.k8sda.lnf.infn.it
+    apiBaseUrl: https://argus-hub-api.lnf.infn.it
     oidcAuthority: https://idp-test.app.infn.it/auth/realms/aai
     oidcClientId: argus-knowledge-hub
     oidcLabel: INFN login

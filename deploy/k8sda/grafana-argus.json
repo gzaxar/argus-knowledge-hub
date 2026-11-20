@@ -31,13 +31,13 @@
    {
     "type": "constant",
     "name": "web",
-    "query": "argus-hub\\\\.k8sda\\\\.lnf\\\\.infn\\\\.it",
+    "query": "argus-hub\\\\.lnf\\\\.infn\\\\.it",
     "hide": 2
    },
    {
     "type": "constant",
     "name": "api",
-    "query": "argus-hub-api\\\\.k8sda\\\\.lnf\\\\.infn\\\\.it",
+    "query": "argus-hub-api\\\\.lnf\\\\.infn\\\\.it",
     "hide": 2
    }
   ]
