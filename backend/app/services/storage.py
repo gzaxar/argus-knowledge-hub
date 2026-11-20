@@ -99,6 +99,8 @@ def measure(db: Session) -> list[dict]:
 def snapshot(db: Session) -> list[dict]:
     """Measure, and keep it as today's measurement (replacing an earlier one of the day). The caller commits."""
     areas = measure(db)
+    from app.services import metrics
+    metrics.record_storage(areas)
     today = datetime.now(timezone.utc).date()
     from app.models.usage import UsageStorage
     for a in areas:

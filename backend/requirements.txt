@@ -30,4 +30,6 @@ pypdf==5.1.0
 pypdfium2==4.30.0
 # Compresses the chunks of portable archives (app/portability).
 zstandard==0.23.0
+# Request, latency and database-pool metrics for the cluster's Prometheus (services/metrics.py).
+prometheus-client==0.21.1
 packaging==26.3

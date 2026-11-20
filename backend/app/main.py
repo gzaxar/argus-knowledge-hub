@@ -1,4 +1,5 @@
 import logging
+import time
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import RedirectResponse
@@ -144,6 +145,30 @@ async def usage_counts(request: Request, call_next):
     finally:
         route = request.scope.get("route")
         usage.end(holder, f"{request.method} {getattr(route, 'path', None) or '(no route)'}", status)
+
+
+@app.middleware("http")
+async def request_metrics(request: Request, call_next):
+    """Requests, their duration and those in flight, by route template, for Prometheus (services/metrics.py)."""
+    from app.services import metrics
+    start = time.perf_counter()
+    status = 500
+    metrics.IN_FLIGHT.inc()
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        return response
+    finally:
+        metrics.IN_FLIGHT.dec()
+        route = request.scope.get("route")
+        metrics.observe(request.method, getattr(route, "path", None) or "(no route)", status,
+                        time.perf_counter() - start)
+
+
+@app.on_event("startup")
+def _metrics() -> None:
+    from app.services import metrics
+    metrics.start()
 
 
 @app.exception_handler(DBAPIError)

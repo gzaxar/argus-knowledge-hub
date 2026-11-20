@@ -59,6 +59,25 @@ spec:
     - from: {{- toYaml $np.ingressFrom | nindent 8 }}
       ports:
         - {protocol: TCP, port: 8089}
+{{- if .Values.metrics.enabled }}
+---
+# The metrics ports: the cluster's Prometheus only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argus-metrics
+  labels: {{- include "argus.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - {key: app, operator: In, values: [argus-api, argus-postgres]}
+  policyTypes: [Ingress]
+  ingress:
+    - from: {{- toYaml $np.prometheusFrom | nindent 8 }}
+      ports:
+        - {protocol: TCP, port: {{ .Values.metrics.port }}}
+        - {protocol: TCP, port: {{ .Values.metrics.postgresExporter.port }}}
+{{- end }}
 ---
 # The database: only the API and its jobs, nothing else (not the web, not another namespace).
 apiVersion: networking.k8s.io/v1

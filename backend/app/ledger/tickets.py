@@ -101,6 +101,23 @@ def _positions_of(db: Session, subject: Asset) -> list[str]:
 
 def derive_for_ticket(db: Session, issue: Issue) -> list[TicketLink]:
     db.execute(delete(TicketLink).where(TicketLink.ticket_uid == issue.uid))
+    links, source = plan_links(db, issue)
+    attrs = dict(issue.attributes or {})
+    if source == "legacy_created_fallback":
+        if attrs.get("occurrence_source") != source:
+            attrs["occurrence_source"] = source
+            issue.attributes = attrs
+    elif attrs.pop("occurrence_source", None) is not None:
+        issue.attributes = attrs
+    db.add_all(links)
+    db.flush()
+    return links
+
+
+def plan_links(db: Session, issue: Issue) -> tuple[list[TicketLink], str]:
+    """The links a ticket should have, and where its incident range came from — read only: nothing is added to
+    the session or changed, so the invariant report (I-TKT-3) can compare them inside the export's read-only
+    snapshot."""
     subject = db.get(Asset, issue.asset_uid) if issue.asset_uid else None
     links: list[TicketLink] = []
 
@@ -115,13 +132,6 @@ def derive_for_ticket(db: Session, issue: Issue) -> list[TicketLink]:
         if subject is None or uid != subject.uid:
             add(uid, "related", "definite", "ticket")
     earliest, latest, source = incident_range(issue)
-    attrs = dict(issue.attributes or {})
-    if source == "legacy_created_fallback":
-        if attrs.get("occurrence_source") != source:
-            attrs["occurrence_source"] = source
-            issue.attributes = attrs
-    elif attrs.pop("occurrence_source", None) is not None:
-        issue.attributes = attrs
     detail = {"incident": [earliest.isoformat(), latest.isoformat()], "source": source}
     if subject is not None:
         positions = _positions_of(db, subject)
@@ -149,9 +159,7 @@ def derive_for_ticket(db: Session, issue: Issue) -> list[TicketLink]:
                                     earliest, latest, "position_uid"):
                 if uid:
                     add(uid, "involved_position", c, "derived", detail)
-    db.add_all(links)
-    db.flush()
-    return links
+    return links, source
 
 
 def derive_ticket_links(db: Session, *, workspace_ids: Optional[Iterable[str]] = None,

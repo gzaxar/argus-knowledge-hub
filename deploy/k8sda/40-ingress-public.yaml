@@ -18,6 +18,16 @@ spec:
       valuesObject:
         controller:
           replicaCount: 2
+          # On the nodes MetalLB announces VLAN 108 from (L2Advertisement advert-valan-108): with
+          # externalTrafficPolicy Local only a node running a controller pod may announce the address, so a pod
+          # elsewhere leaves 192.168.108.226 unanswered. One per node, so a node's loss keeps the other.
+          nodeSelector: {lb-network-access: vlan-108}
+          topologySpreadConstraints:
+            - maxSkew: 1
+              topologyKey: kubernetes.io/hostname
+              whenUnsatisfiable: DoNotSchedule
+              labelSelector:
+                matchLabels: {app.kubernetes.io/name: ingress-nginx, app.kubernetes.io/component: controller}
           ingressClass: nginx-public
           ingressClassByName: true
           ingressClassResource:
@@ -54,6 +64,134 @@ spec:
             large-client-header-buffers: "4 16k"
             limit-req-status-code: "429"
             limit-conn-status-code: "429"
+            # Requests and connections per client address, in two tiers: INFN's networks (and LNF's own, reaching
+            # this address from inside) get five times what the rest of the internet gets. A key left empty is
+            # not counted, so each address falls in one zone only. The ARGUS ingresses carry no limits of their
+            # own. INFN's networks: the RIPE inetnum/inet6num objects of organisation ORG-INDF53-RIPE
+            # ("INFN"), collapsed, as of 2026-11-20 (docs/k8sda.md, "Request limits").
+            http-snippet: |
+              geo $argus_infn {
+                default 0;
+                10.0.0.0/8 1;
+                172.16.0.0/12 1;
+                192.168.0.0/16 1;
+                90.147.8.0/24 1;
+                90.147.16.0/23 1;
+                90.147.27.0/24 1;
+                90.147.40.0/23 1;
+                90.147.66.0/23 1;
+                90.147.74.0/23 1;
+                90.147.77.0/24 1;
+                90.147.90.248/29 1;
+                90.147.102.0/24 1;
+                90.147.112.0/21 1;
+                90.147.140.128/27 1;
+                90.147.150.192/26 1;
+                90.147.168.0/23 1;
+                90.147.170.0/24 1;
+                90.147.172.0/24 1;
+                90.147.174.0/23 1;
+                90.147.176.0/25 1;
+                90.147.176.128/26 1;
+                90.147.196.64/26 1;
+                90.147.197.0/24 1;
+                90.147.203.128/26 1;
+                90.147.203.240/28 1;
+                90.147.207.0/24 1;
+                90.147.232.0/24 1;
+                131.154.0.0/16 1;
+                140.105.0.0/24 1;
+                140.105.6.0/24 1;
+                140.105.12.0/23 1;
+                140.105.14.0/24 1;
+                140.105.31.0/24 1;
+                140.105.80.0/22 1;
+                140.105.84.0/23 1;
+                140.105.86.0/24 1;
+                140.105.176.0/20 1;
+                140.105.196.0/22 1;
+                140.105.200.0/24 1;
+                140.105.202.0/23 1;
+                140.105.204.0/23 1;
+                140.105.208.0/20 1;
+                141.108.0.0/16 1;
+                192.84.127.0/24 1;
+                192.84.128.0/20 1;
+                192.84.144.0/21 1;
+                192.84.152.0/22 1;
+                192.84.156.0/24 1;
+                192.135.8.0/21 1;
+                192.135.16.0/20 1;
+                192.135.32.0/22 1;
+                192.135.36.0/23 1;
+                192.167.0.0/24 1;
+                192.167.91.0/24 1;
+                192.167.201.0/24 1;
+                192.167.203.0/24 1;
+                193.204.2.0/23 1;
+                193.204.89.64/26 1;
+                193.205.57.0/24 1;
+                193.205.64.0/23 1;
+                193.205.66.0/24 1;
+                193.205.68.0/24 1;
+                193.205.70.0/23 1;
+                193.205.76.0/22 1;
+                193.205.156.128/25 1;
+                193.205.157.0/24 1;
+                193.205.159.0/24 1;
+                193.205.222.0/23 1;
+                193.205.228.0/24 1;
+                193.206.22.96/27 1;
+                193.206.80.0/21 1;
+                193.206.92.0/23 1;
+                193.206.144.0/21 1;
+                193.206.152.0/23 1;
+                193.206.156.0/23 1;
+                193.206.184.0/23 1;
+                193.206.188.0/24 1;
+                193.206.190.0/24 1;
+                193.206.208.0/23 1;
+                193.206.210.0/24 1;
+                193.206.219.0/24 1;
+                193.206.246.0/23 1;
+                212.189.144.0/23 1;
+                212.189.152.0/21 1;
+                212.189.164.0/24 1;
+                212.189.173.16/28 1;
+                212.189.176.0/23 1;
+                212.189.179.0/24 1;
+                212.189.202.0/24 1;
+                212.189.204.0/23 1;
+                2001:760:2002::/48 1;
+                2001:760:4002::/48 1;
+                2001:760:4204::/47 1;
+                2001:760:4206::/48 1;
+                2001:760:4208::/48 1;
+                2001:760:420c::/47 1;
+                2001:760:4210::/47 1;
+                2001:760:4214::/47 1;
+                2001:760:4219::/48 1;
+                2001:760:421a::/48 1;
+                2001:760:421e::/47 1;
+                2001:760:4220::/48 1;
+                2001:760:4224::/48 1;
+                2001:760:4226::/47 1;
+                2001:760:4228::/46 1;
+                2001:760:422c::/48 1;
+                2001:760:422e::/47 1;
+                2001:760:4230::/48 1;
+              }
+              map $argus_infn $argus_public_key { 0 $binary_remote_addr; default ""; }
+              map $argus_infn $argus_infn_key { 1 $binary_remote_addr; default ""; }
+              limit_req_zone $argus_public_key zone=argus_public_req:10m rate=30r/s;
+              limit_req_zone $argus_infn_key zone=argus_infn_req:10m rate=150r/s;
+              limit_conn_zone $argus_public_key zone=argus_public_conn:10m;
+              limit_conn_zone $argus_infn_key zone=argus_infn_conn:10m;
+            location-snippet: |
+              limit_req zone=argus_public_req burst=150 nodelay;
+              limit_req zone=argus_infn_req burst=750 nodelay;
+              limit_conn argus_public_conn 40;
+              limit_conn argus_infn_conn 200;
           addHeaders:
             X-Content-Type-Options: nosniff
             X-Frame-Options: SAMEORIGIN
@@ -62,7 +200,13 @@ spec:
           resources:
             requests: {cpu: 100m, memory: 128Mi}
             limits: {memory: 1Gi}
-          metrics: {enabled: false}
+          # Prometheus (the cluster's kube-prometheus-stack, namespace monitoring) scrapes requests, latency and
+          # status per host; 10-ingress-public-policy.yaml lets only it reach the port.
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: true
+              additionalLabels: {release: prometheus}
         defaultBackend: {enabled: false}
   syncPolicy:
     automated: {prune: true, selfHeal: true}

@@ -6,8 +6,8 @@ A second installation of ARGUS, beside INFN Cloud's, on the shared k8sda cluster
 
 | | |
 |---|---|
-| Web | `https://argus-hub.k8sda.lnf.infn.it` |
-| API | `https://argus-hub-api.k8sda.lnf.infn.it` |
+| Web | `https://argus-hub.lnf.infn.it` |
+| API | `https://argus-hub-api.lnf.infn.it` |
 | Namespace | `argus-hub` (Argo CD application `argus-hub`, project `argus-hub`) |
 | Public entry | namespace `ingress-public`: its own nginx, class `nginx-public`, address `192.168.108.226` |
 | Manifests | `deploy/k8sda/` (applied once by hand); the chart with `values-k8sda.yaml` (Argo CD, from `main`) |
@@ -22,8 +22,10 @@ So the internet reaches ARGUS through a separate entry, and ARGUS is walled off 
 1. **Its own ingress controller** (`deploy/k8sda/40-ingress-public.yaml`): class `nginx-public`, its own MetalLB
    address, and it watches the `argus-hub` namespace only. An ingress of class `nginx-public` made in another
    namespace is ignored, and the shared nginx's sites are not served on this address. It hides its version,
-   sends HSTS and security headers, refuses snippets, limits slow clients, and each ARGUS site limits requests
-   and connections per client address (`ingress.annotations` in `values-k8sda.yaml`).
+   sends HSTS and security headers, refuses snippet annotations, limits slow clients, and limits requests and
+   connections per client address, higher for INFN's networks (see "Request limits"). Its pods run only on
+   the nodes MetalLB announces VLAN 108 from (`lb-network-access=vlan-108`): with `externalTrafficPolicy:
+   Local` a pod elsewhere would leave the address unanswered.
 2. **The controller's namespace is closed** (`10-ingress-public-policy.yaml`): in only on 80, 443 and the
    admission webhook; out only to ARGUS's web and API (and cert-manager's solver), DNS and the Kubernetes API.
 3. **ARGUS's namespace is closed both ways** (the chart's `networkPolicy`): everything is denied, then only the
@@ -47,14 +49,18 @@ installation's API is.
 ## What LNF's network service has to do
 
 - Forward a public address's TCP 80 and 443 to **192.168.108.226** (nothing else of the cluster).
-- Public DNS: `argus-hub.k8sda.lnf.infn.it` and `argus-hub-api.k8sda.lnf.infn.it` → that public address.
-  Inside LNF they should resolve to 192.168.108.226: today the wildcard `*.k8sda.lnf.infn.it` sends them to
-  the shared nginx (192.168.108.10), which does not serve them.
+- DNS, split-horizon: `argus-hub.lnf.infn.it` and `argus-hub-api.lnf.infn.it` resolve on the internet to that
+  public address, inside LNF to **192.168.108.226** directly.
 
-Until then ARGUS answers only inside LNF, with nginx's own certificate; Let's Encrypt issues the real ones
-once the names resolve publicly (cert-manager retries by itself).
+One name for each, inside and out: the web knows one API address (`web.runtimeConfig`), INFN AAI one redirect,
+e-mails one link, the mobile app one server, and a browser keeps one session. They are names of the service,
+not of the cluster (outside `*.k8sda.lnf.infn.it`, which leads to the shared nginx), so they outlive a move to
+another cluster.
 
-INFN AAI: the client `argus-knowledge-hub` needs the redirect URI `https://argus-hub.k8sda.lnf.infn.it/auth/callback`
+Until then ARGUS answers only where the names resolve to 192.168.108.226, with nginx's own certificate; Let's
+Encrypt issues the real ones once the names resolve publicly (cert-manager retries by itself).
+
+INFN AAI: the client `argus-knowledge-hub` needs the redirect URI `https://argus-hub.lnf.infn.it/auth/callback`
 (and the web origin) beside INFN Cloud's.
 
 ## First installation
@@ -90,9 +96,60 @@ copy the attachments volume (`/data/attachments`), start the API (its migrations
 check, then point the users (and the mobile app's server address) here. Or an export and import
 (Administration → Portability) when moving a workspace at a time.
 
+## Request limits
+
+The public controller counts requests and connections per client address, in two tiers
+(`http-snippet`/`location-snippet` in `deploy/k8sda/40-ingress-public.yaml`):
+
+| | Requests per second | Burst | Connections at once |
+|---|---|---|---|
+| INFN's networks, and LNF's private ones reaching 192.168.108.226 from inside | 150 | 750 | 200 |
+| The rest of the internet | 30 | 150 | 40 |
+
+Past them nginx answers 429. INFN's networks are the RIPE objects of organisation `ORG-INDF53-RIPE` ("INFN"),
+collapsed (87 IPv4 and 18 IPv6 blocks, taken 2026-11-20); refresh them from
+`https://rest.db.ripe.net/search.json?inverse-attribute=org&query-string=ORG-INDF53-RIPE&type-filter=inetnum&type-filter=inet6num`
+when INFN's address space changes. The tiers rely on nginx seeing each client's own address: LNF's firewall must
+forward (DNAT) without rewriting the source. If it rewrote it, every client from the internet would share one
+address — and, rewritten to a private one, the INFN tier.
+
+## Metrics
+
+The cluster's kube-prometheus-stack (namespace `monitoring`, release `prometheus`, Grafana at
+`grafana.k8sda.lnf.infn.it`) scrapes:
+
+- **the public controller** (ServiceMonitor): requests, status, latency and bytes per host;
+- **the API** (`metrics.enabled`, PodMonitor, port 9100, never in the Service nor through the ingress):
+  `argus_http_requests_total` and `argus_http_request_duration_seconds` by route template, method and status,
+  `argus_http_requests_in_flight`, the database pool (`argus_db_pool_*`) and the hourly storage measurement
+  (`argus_storage_*_bytes` by area: local-path volumes report nothing to the kubelet);
+- **PostgreSQL** (postgres_exporter beside it, port 9187): connections, transactions, cache hits, size;
+- CPU and memory of every pod (cAdvisor and kube-state-metrics, already there).
+
+Network policies let only the Prometheus pods of `monitoring` reach the two ports. The dashboard is
+`deploy/k8sda/grafana-argus.json` (Grafana → Dashboards → New → Import; pick the Prometheus data source).
+
+## When to scale
+
+The chart's PrometheusRule `argus` raises a warning when one of these holds (thresholds in `metrics.rules`):
+
+| Alert | Holds when | First thing to do |
+|---|---|---|
+| `ArgusApiSlow` | the API's 95th percentile above 1 s for 15 min | see whether CPU or the pool is the limit; more API replicas for CPU |
+| `ArgusDbPoolBusy` | over 80% of the pool's connections in use for 10 min | slow queries first; then PgBouncer and more replicas |
+| `ArgusPostgresConnections` | over 80% of PostgreSQL's `max_connections` | PgBouncer before any more replicas |
+| `ArgusMemoryNearLimit` | a container over 85% of its memory limit for 15 min | raise the limit (and the quota) |
+| `ArgusApiErrors` | over 5% of answers 5xx for 10 min | the API's logs |
+| `ArgusRateLimited` | over 0.5 requests/s refused with 429 for 10 min | the controller's log: a flood, or a tier to raise |
+| `ArgusStorageFilling` | an area full within 14 days at the current rate | enlarge the volume and `requests.storage` |
+
+Where they are sent depends on the cluster's Alertmanager; they show in Prometheus and Grafana regardless.
+Scaling out (more replicas, shared volumes, migrations in a Job, PgBouncer, a replicated PostgreSQL) is not
+done yet: these numbers say when it is needed.
+
 ## Checks
 
-- `curl -k --resolve argus-hub.k8sda.lnf.infn.it:443:192.168.108.226 https://argus-hub.k8sda.lnf.infn.it/`
+- `curl -k --resolve argus-hub.lnf.infn.it:443:192.168.108.226 https://argus-hub.lnf.infn.it/`
   answers ARGUS; the same address with another k8sda host (`btf-olog…`) answers 404.
 - From a pod in another namespace, `argus-postgres.argus-hub:5432`, `argus-api.argus-hub:80` do not answer.
 - `kubectl -n argus-hub exec deploy/argus-api -- python -c "import socket; socket.create_connection(('192.168.108.10', 80), 3)"`
