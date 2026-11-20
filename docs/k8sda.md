@@ -153,7 +153,12 @@ The cluster's kube-prometheus-stack (namespace `monitoring`, release `prometheus
 - CPU and memory of every pod (cAdvisor and kube-state-metrics, already there).
 
 Network policies let only the Prometheus pods of `monitoring` reach the two ports. The dashboard is
-`deploy/k8sda/grafana-argus.json` (Grafana → Dashboards → New → Import; pick the Prometheus data source).
+`deploy/k8sda/grafana-argus.json`, imported in Grafana's organisation **System** ("ARGUS Knowledge Hub").
+
+Grafana itself goes out through LNF's proxy, and its `NO_PROXY` exempts only names ending in `.svc`: a
+Prometheus data source addressed by the bare service name (`http://prometheus-kube-prometheus-prometheus:9090`,
+as the existing ones were in 2026-11) is sent to the proxy and answers 503. The dashboard uses the data source
+`Prometheus (cluster, .svc)` (uid `argus-prometheus`), at `http://prometheus-kube-prometheus-prometheus.monitoring.svc:9090`.
 
 ## When to scale
 
