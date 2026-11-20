@@ -1,0 +1,69 @@
+# The public ingress controller: its own class (nginx-public), its own address (MetalLB 192.168.108.226, the one
+# LNF's firewall forwards ports 80 and 443 to), and it watches the argus-hub namespace only. The cluster's shared
+# nginx (rke2-ingress-nginx, every other namespace's sites) stays internal.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argus-ingress-public
+  namespace: argocd
+spec:
+  project: argus-hub
+  destination: {server: https://kubernetes.default.svc, namespace: ingress-public}
+  source:
+    repoURL: https://kubernetes.github.io/ingress-nginx
+    chart: ingress-nginx
+    targetRevision: 4.15.1
+    helm:
+      releaseName: ingress-public
+      valuesObject:
+        controller:
+          replicaCount: 2
+          ingressClass: nginx-public
+          ingressClassByName: true
+          ingressClassResource:
+            name: nginx-public
+            enabled: true
+            default: false
+            controllerValue: k8s.io/ingress-nginx-public
+          watchIngressWithoutClass: false
+          electionID: ingress-public-leader
+          # Only ARGUS's ingresses, whatever other namespaces ask for.
+          scope: {enabled: true, namespace: argus-hub}
+          service:
+            type: LoadBalancer
+            # The clients' own addresses reach nginx (per-address rate limits, logs).
+            externalTrafficPolicy: Local
+            annotations:
+              metallb.io/loadBalancerIPs: 192.168.108.226
+          config:
+            # One worker per core would be dozens on these nodes: four serve ARGUS.
+            worker-processes: "4"
+            server-tokens: "false"
+            hide-headers: "X-Powered-By,Server"
+            ssl-protocols: "TLSv1.2 TLSv1.3"
+            hsts: "true"
+            hsts-max-age: "31536000"
+            hsts-include-subdomains: "false"
+            use-forwarded-headers: "false"
+            allow-snippet-annotations: "false"
+            annotations-risk-level: High
+            # Slow-client and oversized-request limits; the API's ingress raises the body size for uploads.
+            client-header-timeout: "30"
+            client-body-timeout: "60"
+            keep-alive: "30"
+            large-client-header-buffers: "4 16k"
+            limit-req-status-code: "429"
+            limit-conn-status-code: "429"
+          addHeaders:
+            X-Content-Type-Options: nosniff
+            X-Frame-Options: SAMEORIGIN
+            Referrer-Policy: strict-origin-when-cross-origin
+            Permissions-Policy: "camera=(self), microphone=(self), geolocation=(self)"
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 1Gi}
+          metrics: {enabled: false}
+        defaultBackend: {enabled: false}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=false]

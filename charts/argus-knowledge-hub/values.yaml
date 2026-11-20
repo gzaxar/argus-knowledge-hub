@@ -12,6 +12,8 @@ hosts:
 ingress:
   className: nginx
   clusterIssuer: letsencrypt-prod-issuer
+  # Added to every ingress of this release (rate limits, security headers…); a site's own values win.
+  annotations: {}
 
 images:
   backend:
@@ -68,6 +70,9 @@ web:
   resources:
     requests: {cpu: 20m, memory: 32Mi}
     limits: {memory: 128Mi}
+  # This installation's addresses, read by the web app at start (config.js), over those built into the image:
+  # apiBaseUrl, oidcAuthority, oidcClientId, oidcTokenEndpoint, oidcLabel. Empty: the image's own.
+  runtimeConfig: {}
 
 keycloak:
   enabled: true
@@ -149,3 +154,40 @@ imagePrune:
   # RKE2's crictl and containerd socket, as paths on the node.
   crictl: /var/lib/rancher/rke2/bin/crictl
   socket: unix:///run/k3s/containerd/containerd.sock
+
+# Hardened pods (an installation reached from the internet): no Kubernetes token, non-root users (the API and its
+# jobs as apiUser, PostgreSQL as 999, nginx as 101), no capabilities nor privilege escalation, the web's
+# filesystem read-only. Fits the namespace's Pod Security "restricted" level.
+security:
+  hardened: false
+  apiUser: 10001
+
+# The namespace closed both ways (templates/networkpolicy.yaml): in only from the ingress controller, the
+# database only from the API and its jobs, out only to DNS and the internet's public addresses.
+networkPolicy:
+  enabled: false
+  # Who reaches the web and the API: the ingress controller's pods (NetworkPolicy "from" entries).
+  ingressFrom: []
+  dnsPodLabels: {k8s-app: kube-dns}
+  # Never reached from the API: private networks (the cluster's pods and services, the institute's hosts),
+  # link-local (cloud metadata) and shared address space.
+  privateRanges: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 100.64.0.0/10]
+  # Ports reached on the internet (empty: any): HTTPS, and SMTP for mail.
+  internetPorts: [443, 587, 465]
+  # Private addresses the API still needs, each with its ports: [{cidr: 192.168.1.10/32, ports: [443]}].
+  allowedPrivateEgress: []
+
+# A ResourceQuota and default container limits for the namespace.
+quota:
+  enabled: false
+  hard:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.memory: 16Gi
+    persistentvolumeclaims: "10"
+    requests.storage: 100Gi
+    services.loadbalancers: "0"
+    services.nodeports: "0"
+  containerDefault: {memory: 512Mi}
+  containerDefaultRequest: {cpu: 50m, memory: 128Mi}
+

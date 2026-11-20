@@ -1,0 +1,20 @@
+# Argo CD may deploy ARGUS's two applications only into their two namespaces, and only the cluster-wide
+# objects the ingress controller needs.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: argus-hub
+  namespace: argocd
+spec:
+  description: ARGUS Knowledge Hub, reached from the internet (docs/k8sda.md)
+  sourceRepos:
+    - https://github.com/infn-argus/argus-knowledge-hub
+    - https://kubernetes.github.io/ingress-nginx
+  destinations:
+    - {server: https://kubernetes.default.svc, namespace: argus-hub}
+    - {server: https://kubernetes.default.svc, namespace: ingress-public}
+  clusterResourceWhitelist:
+    - {group: networking.k8s.io, kind: IngressClass}
+    - {group: rbac.authorization.k8s.io, kind: ClusterRole}
+    - {group: rbac.authorization.k8s.io, kind: ClusterRoleBinding}
+    - {group: admissionregistration.k8s.io, kind: ValidatingWebhookConfiguration}

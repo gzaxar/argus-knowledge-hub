@@ -19,7 +19,7 @@ metadata:
   labels: {{- include "argus.labels" $root | nindent 4 }}
   annotations:
     cert-manager.io/cluster-issuer: {{ $root.Values.ingress.clusterIssuer }}
-    {{- range $k, $v := .annotations }}
+    {{- range $k, $v := merge (dict) .annotations ($root.Values.ingress.annotations | default dict) }}
     {{ $k }}: {{ $v | quote }}
     {{- end }}
 spec:

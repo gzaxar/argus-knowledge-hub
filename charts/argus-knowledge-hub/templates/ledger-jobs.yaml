@@ -19,8 +19,11 @@ spec:
       activeDeadlineSeconds: 1800
       template:
         metadata:
-          labels: {app: argus-ledger-escalate}
+          labels: 
+            app: argus-ledger-escalate
+            {{- include "argus.dbClient" . | nindent 12 }}
         spec:
+          {{- include "argus.podSecurity" (dict "root" . "user" .Values.security.apiUser) | nindent 10 }}
           restartPolicy: Never
           # Unfinished uploads are on the API's attachments volume, ReadWriteOnce on that node's disk.
           affinity:
@@ -31,6 +34,7 @@ spec:
           containers:
             - name: job
               image: "{{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}"
+              {{- include "argus.containerSecurity" (dict "root" .) | nindent 14 }}
               command: ["python", "-m", "app.ledger", "escalate"]
               env:
                 {{- include "argus.apiEnv" . | nindent 16 }}

@@ -42,8 +42,11 @@ spec:
     matchLabels: {app: argus-api}
   template:
     metadata:
-      labels: {app: argus-api}
+      labels:
+        app: argus-api
+        {{- include "argus.dbClient" . | nindent 8 }}
     spec:
+      {{- include "argus.podSecurity" (dict "root" . "user" .Values.security.apiUser) | nindent 6 }}
       {{- with .Values.api.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -51,6 +54,7 @@ spec:
         - name: api
           image: "{{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}"
           ports: [{containerPort: 8080}]
+          {{- include "argus.containerSecurity" (dict "root" .) | nindent 10 }}
           env:
             {{- include "argus.apiEnv" . | nindent 12 }}
             # The room planned for each volume (local-path volumes do not enforce it): the Statistics page's
@@ -82,12 +86,12 @@ spec:
         - name: portability-secret
           secret:
             secretName: {{ .Values.portabilitySecret }}
-            defaultMode: 0400
+            defaultMode: {{ include "argus.secretMode" . }}
             optional: true
         - name: portability-decryption
           secret:
             secretName: {{ .Values.portabilitySecret }}-decryption
-            defaultMode: 0400
+            defaultMode: {{ include "argus.secretMode" . }}
             optional: true
 ---
 apiVersion: v1

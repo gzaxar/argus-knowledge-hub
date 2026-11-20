@@ -1,0 +1,85 @@
+# The LNF k8sda cluster (kubectl --kubeconfig ~/kubeconfigs/kubeda/config), namespace argus-hub: reached from the
+# internet through its own ingress controller (deploy/k8sda), isolated from the cluster's other namespaces.
+# See docs/k8sda.md. The image tags are set by the release workflow, as for values-production.yaml.
+hosts:
+  web: argus-hub.k8sda.lnf.infn.it
+  api: argus-hub-api.k8sda.lnf.infn.it
+  keycloak: unused.invalid
+
+images:
+  backend:
+    tag: "1.35.125"
+  web:
+    tag: "1.35.125"
+  postgres: ghcr.io/infn-argus/argus-knowledge-hub-postgres:1.35.24
+
+# Kept when the release is removed; on the node the pod first runs on.
+storageClass: local-path-retain
+
+ingress:
+  # The public controller only (deploy/k8sda/ingress-public.yaml): the cluster's shared nginx serves every
+  # other namespace and is not exposed.
+  className: nginx-public
+  clusterIssuer: letsencrypt-public
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # Per client address: bursts of a page load pass, a flood does not.
+    nginx.ingress.kubernetes.io/limit-rps: "30"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+    nginx.ingress.kubernetes.io/limit-connections: "40"
+
+# The INFN login (INFN AAI, public client with PKCE) and Google, as on INFN Cloud; no bundled Keycloak.
+keycloak:
+  enabled: false
+
+api:
+  oidc:
+    issuer: https://idp-test.app.infn.it/auth/realms/aai
+    jwksUri: https://idp-test.app.infn.it/auth/realms/aai/protocol/openid-connect/certs
+    audience: argus-knowledge-hub,argus-librechat
+    emailDomains: ["infn.it", "*.infn.it"]
+  extraProviders:
+    - issuer: https://securetoken.google.com/seraphic-camera-479521-s5
+      jwks_uri: https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com
+      audience: seraphic-camera-479521-s5
+  mail:
+    url: https://api.app-pre.infn.it/mail/send/
+    tokenUrl: https://idp-test.app.infn.it/auth/realms/aai/protocol/openid-connect/token
+    clientOAuthSecretKey: back-end-client-oauth
+  env:
+    ARGUS_INSTANCE_NAME: argus-k8sda
+    ARGUS_BOOTSTRAP_ADMINS: andrea.michelotti@lnf.infn.it
+    ARGUS_PORTABILITY_POLICY: trusted
+    ARGUS_PORTABILITY_POLICY_RETENTION_DAYS: "1"
+    ARGUS_PORTABILITY_UI_CONFIG: "on"
+  resources:
+    requests: {cpu: 200m, memory: 512Mi}
+    limits: {memory: 2Gi}
+
+web:
+  # The same web image as INFN Cloud, told where this installation's API is.
+  runtimeConfig:
+    apiBaseUrl: https://argus-hub-api.k8sda.lnf.infn.it
+    oidcAuthority: https://idp-test.app.infn.it/auth/realms/aai
+    oidcClientId: argus-knowledge-hub
+    oidcLabel: INFN login
+
+email:
+  host: smtp.gmail.com
+  port: 587
+  security: starttls
+  from: michelottilabs@gmail.com
+
+security:
+  hardened: true
+
+networkPolicy:
+  enabled: true
+  ingressFrom:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ingress-public}}
+      podSelector: {matchLabels: {app.kubernetes.io/name: ingress-nginx}}
+  dnsPodLabels: {k8s-app: kube-dns}
+
+quota:
+  enabled: true

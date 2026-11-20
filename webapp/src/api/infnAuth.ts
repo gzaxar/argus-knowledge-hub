@@ -1,4 +1,5 @@
 import { User, UserManager, WebStorageStateStore } from "oidc-client-ts";
+import { setting } from "../lib/runtimeConfig";
 
 /**
  * Sign-in through the institute's own identity provider (OpenID Connect,
@@ -9,11 +10,11 @@ import { User, UserManager, WebStorageStateStore } from "oidc-client-ts";
  * INFN's. Both hand back the same thing, an ID token the API verifies against
  * the provider's published keys.
  */
-const authority = import.meta.env.VITE_OIDC_AUTHORITY;
-const clientId = import.meta.env.VITE_OIDC_CLIENT_ID;
-const tokenEndpoint = import.meta.env.VITE_OIDC_TOKEN_ENDPOINT;
+const authority = setting("oidcAuthority", import.meta.env.VITE_OIDC_AUTHORITY);
+const clientId = setting("oidcClientId", import.meta.env.VITE_OIDC_CLIENT_ID);
+const tokenEndpoint = setting("oidcTokenEndpoint", import.meta.env.VITE_OIDC_TOKEN_ENDPOINT);
 
-export const infnLoginLabel = import.meta.env.VITE_OIDC_LABEL || "INFN login";
+export const infnLoginLabel = setting("oidcLabel", import.meta.env.VITE_OIDC_LABEL) || "INFN login";
 /** Off unless a provider is configured, so a build with none simply doesn't show the button. */
 export const infnLoginEnabled = Boolean(authority && clientId);
 
