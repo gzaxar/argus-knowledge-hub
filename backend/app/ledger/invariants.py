@@ -161,12 +161,9 @@ def report(db: Session, workspace_ids: Iterable[str]) -> dict:
     uids = [i.uid for i in issues]
     derived_q = select(TicketLink).where(TicketLink.ticket_uid.in_(uids), TicketLink.origin != "ticket")
     now_links = sorted(key(l) for l in db.scalars(derived_q))
-    savepoint = db.begin_nested()
-    try:
-        tickets.derive_ticket_links(db, ticket_uids=uids)
-        derived = sorted(key(l) for l in db.scalars(derived_q))
-    finally:
-        savepoint.rollback()
+    # Planned, not written: the report also runs in an export's read-only snapshot, where a savepoint that
+    # rewrote the links and rolled back failed ("cannot execute DELETE in a read-only transaction").
+    derived = sorted(key(l) for issue in issues for l in tickets.plan_links(db, issue)[0] if l.origin != "ticket")
     if now_links != derived:
         missing, extra = set(derived) - set(now_links), set(now_links) - set(derived)
         bad("I-TKT-3", f"{len(missing)} derivable link(s) missing, {len(extra)} link(s) no derivation supports",

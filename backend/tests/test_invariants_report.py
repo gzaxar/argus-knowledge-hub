@@ -76,3 +76,47 @@ def test_each_violation_written_around_the_ledger_is_found():
     assert not rep["ok"]
     assert {"I-INS-1", "I-INS-4", "I-AP-1", "uniqueness", "I-TKT-1"} <= set(rep["failing"]), rep["failing"]
     assert rep["invariants"]["I-AP-1"]["examples"][0]["address"] == "10.0.0.7"
+
+
+def test_the_report_runs_in_a_read_only_snapshot_and_still_finds_a_missing_derived_link():
+    """An export takes the report inside its read-only snapshot. I-TKT-3 used to rewrite the links in a savepoint
+    and failed there ("cannot execute DELETE in a read-only transaction"), losing the whole report."""
+    from sqlalchemy import delete, func, select, text
+
+    from app.ledger import tickets
+    from app.models.ledger import TicketLink
+
+    L, done = migrated()
+    db = SessionLocal()
+    issue = Issue(uid=str(uuid.uuid4()), workspace_id=L.ws, asset_uid=done["vac:SIP02"]["position"],
+                  title="Vacuum trip", description="", state="new", attributes={}, labels=[], version=1,
+                  created_at=NOW, updated_at=NOW)
+    db.add(issue)
+    db.flush()
+    tickets.derive_for_ticket(db, issue)
+    db.commit()
+    derived = db.scalar(select(func.count()).select_from(TicketLink).where(
+        TicketLink.ticket_uid == issue.uid, TicketLink.origin == "derived"))
+    assert derived, "the position's installed unit is involved"
+    before = db.scalar(select(func.count()).select_from(TicketLink).where(TicketLink.workspace_id == L.ws))
+
+    def read_only_report():
+        s = SessionLocal()
+        try:
+            s.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"))
+            return invariants.report(s, [L.ws])
+        finally:
+            s.rollback()
+            s.close()
+
+    rep = read_only_report()
+    assert "I-TKT-3" not in rep["failing"], rep["invariants"]["I-TKT-3"]
+
+    # A derived link removed around the ledger is still found from the read-only snapshot.
+    db.execute(delete(TicketLink).where(TicketLink.ticket_uid == issue.uid, TicketLink.origin == "derived"))
+    db.commit()
+    rep = read_only_report()
+    assert "I-TKT-3" in rep["failing"]
+    assert db.scalar(select(func.count()).select_from(TicketLink).where(
+        TicketLink.workspace_id == L.ws)) == before - derived   # the report wrote nothing back
+    db.close()

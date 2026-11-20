@@ -53,9 +53,10 @@ def test_no_port_no_listener(monkeypatch):
 
 
 def test_storage_measurements_are_published():
-    metrics.record_storage([{"area": "attachments", "used_bytes": 1234, "planned_bytes": 15 * 2 ** 30,
+    # An area of its own: the hourly measurement of other tests publishes the real ones.
+    metrics.record_storage([{"area": "test-area", "used_bytes": 1234, "planned_bytes": 15 * 2 ** 30,
                              "available_bytes": 99, "disk_free_bytes": None}])
     text = generate_latest(metrics.REGISTRY).decode()
-    assert _value(text, 'argus_storage_used_bytes{area="attachments"}') == 1234
-    assert _value(text, 'argus_storage_available_bytes{area="attachments"}') == 99
-    assert 'argus_storage_disk_free_bytes{area="attachments"}' not in text
+    assert _value(text, 'argus_storage_used_bytes{area="test-area"}') == 1234
+    assert _value(text, 'argus_storage_available_bytes{area="test-area"}') == 99
+    assert 'argus_storage_disk_free_bytes{area="test-area"}' not in text
