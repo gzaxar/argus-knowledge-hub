@@ -40,6 +40,7 @@ spec:
     metadata:
       labels: {app: argus-postgres}
     spec:
+      {{- include "argus.podSecurity" (dict "root" . "user" 999) | nindent 6 }}
       {{- with .Values.postgres.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -47,6 +48,7 @@ spec:
         - name: postgres
           image: {{ .Values.images.postgres }}
           ports: [{containerPort: 5432}]
+          {{- include "argus.containerSecurity" (dict "root" .) | nindent 10 }}
           env:
             - {name: POSTGRES_DB, value: {{ .Values.postgres.database | quote }}}
             - {name: POSTGRES_USER, value: {{ .Values.postgres.user | quote }}}

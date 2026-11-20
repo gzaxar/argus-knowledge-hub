@@ -1,0 +1,77 @@
+# The public ingress controller's namespace, closed but for what it is for: in from anywhere on HTTP(S) (and
+# the API server on the admission webhook), out only to ARGUS's web and API, cert-manager's solver, DNS and
+# the Kubernetes API. Even taken over, it cannot reach another namespace or an LNF host.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: ingress-public
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: controller
+  namespace: ingress-public
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: ingress-nginx}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports:
+        - {protocol: TCP, port: 80}
+        - {protocol: TCP, port: 443}
+        - {protocol: TCP, port: 8443}   # the admission webhook, called by the API server
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: argus-hub}}
+      ports:
+        - {protocol: TCP, port: 8080}   # ARGUS's web and API
+        - {protocol: TCP, port: 8089}   # cert-manager's HTTP-01 solver
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    # The Kubernetes API (its service address, and the control-plane nodes it leads to).
+    - to:
+        - ipBlock: {cidr: 10.43.0.1/32}
+      ports:
+        - {protocol: TCP, port: 443}
+    - to:
+        - ipBlock: {cidr: 10.10.6.18/32}
+        - ipBlock: {cidr: 10.10.6.68/32}
+        - ipBlock: {cidr: 192.168.108.13/32}
+        - ipBlock: {cidr: 192.168.108.16/32}
+        - ipBlock: {cidr: 192.168.108.18/32}
+        - ipBlock: {cidr: 192.168.109.100/32}
+      ports:
+        - {protocol: TCP, port: 6443}
+---
+# The admission jobs the chart runs at install (create and patch the webhook's certificate): the Kubernetes API.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: admission-jobs
+  namespace: ingress-public
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/component: admission-webhook}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock: {cidr: 10.43.0.1/32}
+      ports:
+        - {protocol: TCP, port: 443}
+    - to:
+        - ipBlock: {cidr: 10.10.6.18/32}
+        - ipBlock: {cidr: 10.10.6.68/32}
+        - ipBlock: {cidr: 192.168.108.13/32}
+        - ipBlock: {cidr: 192.168.108.16/32}
+        - ipBlock: {cidr: 192.168.108.18/32}
+        - ipBlock: {cidr: 192.168.109.100/32}
+      ports:
+        - {protocol: TCP, port: 6443}

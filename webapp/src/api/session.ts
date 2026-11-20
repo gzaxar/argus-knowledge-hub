@@ -1,3 +1,4 @@
+import { setting } from "../lib/runtimeConfig";
 import { getFreshIdToken } from "./firebase";
 import { getInfnIdToken, infnForgetSession } from "./infnAuth";
 
@@ -199,7 +200,7 @@ export function addProfile(name: string, session: { baseUrl: string; token: stri
  * token: set at build time for a deployment that knows, else a guess by host. */
 export function defaultApiBaseUrl(): string {
   return (
-    import.meta.env.VITE_API_BASE_URL ||
+    setting("apiBaseUrl", import.meta.env.VITE_API_BASE_URL) ||
     (window.location.hostname.includes("localhost")
       ? "http://localhost:8000"
       : "https://argus-hub-api.90.147.174.30.myip.cloud.infn.it")

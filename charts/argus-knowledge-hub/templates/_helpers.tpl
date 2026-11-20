@@ -85,7 +85,45 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 # Pull requests (the IOC engineer's, and models proposed to the catalogue) only when this key is in the Secret.
 - name: ARGUS_GITHUB_TOKEN
   valueFrom: {secretKeyRef: {name: {{ .Values.existingSecret }}, key: ioc-github-token, optional: true}}
+{{- if .Values.security.hardened }}
+# Not root: git and the libraries keep their caches here.
+- {name: HOME, value: /tmp}
+{{- end }}
 {{- range $k, $v := .Values.api.env }}
 - {name: {{ $k }}, value: {{ $v | quote }}}
 {{- end }}
+{{- end }}
+
+{{/* Pods that may reach the database (NetworkPolicy argus-postgres-clients): the API and its jobs. */}}
+{{- define "argus.dbClient" -}}
+argus.infn.it/db-client: "true"
+{{- end }}
+
+{{/* Pod-level hardening (security.hardened): no Kubernetes token, a non-root user, the runtime's seccomp profile. */}}
+{{- define "argus.podSecurity" -}}
+{{- if .root.Values.security.hardened }}
+automountServiceAccountToken: false
+securityContext:
+  runAsNonRoot: true
+  runAsUser: {{ .user }}
+  runAsGroup: {{ .user }}
+  fsGroup: {{ .user }}
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile: {type: RuntimeDefault}
+{{- end }}
+{{- end }}
+
+{{/* Container-level hardening (security.hardened): no privilege escalation, no Linux capabilities. */}}
+{{- define "argus.containerSecurity" -}}
+{{- if .root.Values.security.hardened }}
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: {{ .readOnly | default false }}
+  capabilities: {drop: [ALL]}
+{{- end }}
+{{- end }}
+
+{{/* Mounted Secrets: owner-only as root; group-readable (the pod's fsGroup) when the pod runs as another user. */}}
+{{- define "argus.secretMode" -}}
+{{- if .Values.security.hardened }}0440{{ else }}0400{{ end }}
 {{- end }}

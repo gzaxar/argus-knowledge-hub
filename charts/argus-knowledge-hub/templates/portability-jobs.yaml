@@ -36,8 +36,11 @@ spec:
       {{- end }}
       template:
         metadata:
-          labels: {app: {{ .name }}}
+          labels:
+            app: {{ .name }}
+            {{- include "argus.dbClient" $root | nindent 12 }}
         spec:
+          {{- include "argus.podSecurity" (dict "root" $root "user" $root.Values.security.apiUser) | nindent 10 }}
           restartPolicy: Never
           # Its volumes are the API's, ReadWriteOnce on that node's disk.
           affinity:
@@ -48,6 +51,7 @@ spec:
           containers:
             - name: job
               image: "{{ $root.Values.images.backend.repository }}:{{ $root.Values.images.backend.tag }}"
+              {{- include "argus.containerSecurity" (dict "root" $root) | nindent 14 }}
               command: {{ toJson .command }}
               env:
                 {{- include "argus.apiEnv" $root | nindent 16 }}
@@ -68,6 +72,6 @@ spec:
             - name: portability-secret
               secret:
                 secretName: {{ $root.Values.portabilitySecret }}
-                defaultMode: 0400
+                defaultMode: {{ include "argus.secretMode" $root }}
                 optional: true
 {{- end }}

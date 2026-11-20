@@ -1,0 +1,21 @@
+# ARGUS itself, from this repository's chart with values-k8sda.yaml (image tags set by each release).
+# Its Secrets are made by hand first (docs/k8sda.md), never kept in Git.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argus-hub
+  namespace: argocd
+spec:
+  project: argus-hub
+  destination: {server: https://kubernetes.default.svc, namespace: argus-hub}
+  source:
+    repoURL: https://github.com/infn-argus/argus-knowledge-hub
+    path: charts/argus-knowledge-hub
+    targetRevision: main
+    helm:
+      releaseName: argus
+      valueFiles: [values-k8sda.yaml]
+  syncPolicy:
+    # The database and file volumes are never pruned (their own annotations say so too).
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=false]

@@ -1,0 +1,147 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $np := .Values.networkPolicy }}
+# The namespace is closed by default, both ways: a pod reached from the internet that is taken over cannot
+# reach the cluster's other namespaces, the institute's networks or the database (docs/k8sda.md).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argus-default-deny
+  labels: {{- include "argus.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Names are resolved by the cluster's DNS, and only there.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argus-dns
+  labels: {{- include "argus.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector:
+            matchLabels: {{- toYaml $np.dnsPodLabels | nindent 14 }}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+---
+# The web and the API are reached only from the ingress controller(s) named here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argus-from-ingress
+  labels: {{- include "argus.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - {key: app, operator: In, values: [argus-web, argus-api{{ if .Values.keycloak.enabled }}, argus-keycloak{{ end }}]}
+  policyTypes: [Ingress]
+  ingress:
+    - from: {{- toYaml (required "networkPolicy.ingressFrom names the ingress controller" $np.ingressFrom) | nindent 8 }}
+      ports:
+        - {protocol: TCP, port: 8080}
+---
+# Let's Encrypt's HTTP-01 check, answered by cert-manager's solver pod, through the same controller.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argus-acme-solver
+  labels: {{- include "argus.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {acme.cert-manager.io/http01-solver: "true"}
+  policyTypes: [Ingress]
+  ingress:
+    - from: {{- toYaml $np.ingressFrom | nindent 8 }}
+      ports:
+        - {protocol: TCP, port: 8089}
+---
+# The database: only the API and its jobs, nothing else (not the web, not another namespace).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argus-postgres-clients
+  labels: {{- include "argus.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {app: argus-postgres}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {{- include "argus.dbClient" . | nindent 14 }}
+        {{- if .Values.keycloak.enabled }}
+        - podSelector: {matchLabels: {app: argus-keycloak}}
+        {{- end }}
+      ports:
+        - {protocol: TCP, port: 5432}
+---
+# The API and its jobs: the database, and the internet (the identity provider, mail, the AI gateway, Git
+# hosting) — never the private networks, so not the cluster's pods and services nor the institute's hosts,
+# but for the addresses named in networkPolicy.allowedPrivateEgress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argus-api-egress
+  labels: {{- include "argus.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "argus.dbClient" . | nindent 6 }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector: {matchLabels: {app: argus-postgres}}
+      ports:
+        - {protocol: TCP, port: 5432}
+    {{- if .Values.keycloak.enabled }}
+    - to:
+        - podSelector: {matchLabels: {app: argus-keycloak}}
+      ports:
+        - {protocol: TCP, port: 8080}
+    {{- end }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: {{- toYaml $np.privateRanges | nindent 14 }}
+      {{- with $np.internetPorts }}
+      ports:
+        {{- range . }}
+        - {protocol: TCP, port: {{ . }}}
+        {{- end }}
+      {{- end }}
+    {{- range $np.allowedPrivateEgress }}
+    - to:
+        - ipBlock: {cidr: {{ .cidr }}}
+      ports:
+        {{- range .ports }}
+        - {protocol: TCP, port: {{ . }}}
+        {{- end }}
+    {{- end }}
+{{- if .Values.keycloak.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argus-keycloak-egress
+  labels: {{- include "argus.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {app: argus-keycloak}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector: {matchLabels: {app: argus-postgres}}
+      ports:
+        - {protocol: TCP, port: 5432}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: {{- toYaml $np.privateRanges | nindent 14 }}
+      ports:
+        - {protocol: TCP, port: 443}
+{{- end }}
+{{- end }}
