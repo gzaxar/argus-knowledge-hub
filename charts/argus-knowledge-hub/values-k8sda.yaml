@@ -51,6 +51,14 @@ api:
     ARGUS_PORTABILITY_POLICY: trusted
     ARGUS_PORTABILITY_POLICY_RETENTION_DAYS: "1"
     ARGUS_PORTABILITY_UI_CONFIG: "on"
+    # k8sda's nodes reach the internet only through LNF's proxy (as Argo CD does): INFN AAI's and Google's
+    # keys, the INFN mail service, the AI gateway, GitHub and baltig. Mail (SMTP) goes to the relay directly.
+    HTTPS_PROXY: http://squid.lnf.infn.it:3128
+    HTTP_PROXY: http://squid.lnf.infn.it:3128
+    https_proxy: http://squid.lnf.infn.it:3128
+    http_proxy: http://squid.lnf.infn.it:3128
+    NO_PROXY: localhost,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local
+    no_proxy: localhost,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local
   resources:
     requests: {cpu: 200m, memory: 512Mi}
     limits: {memory: 2Gi}
@@ -81,6 +89,9 @@ networkPolicy:
     - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ingress-public}}
       podSelector: {matchLabels: {app.kubernetes.io/name: ingress-nginx}}
   dnsPodLabels: {k8s-app: kube-dns}
+  # LNF's proxy (squid.lnf.infn.it): the API's only way to the internet's web from these nodes.
+  allowedPrivateEgress:
+    - {cidr: 193.206.84.225/32, ports: [3128]}
 
 # The cluster's kube-prometheus-stack (namespace monitoring, release "prometheus") scrapes ARGUS; Grafana's
 # dashboard is deploy/k8sda/grafana-argus.json.
