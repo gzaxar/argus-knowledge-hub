@@ -55,7 +55,13 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 {{- if $mail.url }}
 - {name: INFN_MAIL_URL, value: {{ $mail.url | quote }}}
 - {name: INFN_MAIL_TOKEN_URL, value: {{ required "api.mail.tokenUrl is required with api.mail.url" $mail.tokenUrl | quote }}}
-{{ include "argus.secretEnv" (dict "name" "BACK_END_CLIENT_OAUTH" "secret" $.Values.existingSecret "key" (required "api.mail.clientOAuthSecretKey is required with api.mail.url" $mail.clientOAuthSecretKey)) }}
+# Optional: without the key the API starts and sends e-mail through SMTP (email.host), if any.
+- name: BACK_END_CLIENT_OAUTH
+  valueFrom:
+    secretKeyRef:
+      name: {{ $.Values.existingSecret }}
+      key: {{ required "api.mail.clientOAuthSecretKey is required with api.mail.url" $mail.clientOAuthSecretKey }}
+      optional: true
 {{- end }}
 # Links in e-mails and notifications lead to the web app.
 - {name: ARGUS_WEB_URL, value: {{ printf "https://%s" .Values.hosts.web | quote }}}

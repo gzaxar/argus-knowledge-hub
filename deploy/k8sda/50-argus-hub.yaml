@@ -15,6 +15,13 @@ spec:
     helm:
       releaseName: argus
       valueFiles: [values-k8sda.yaml]
+      # The node holding this installation's data (local-path volumes stay where they were first made): a
+      # worker with room (1.7 TB free in 2026-11), not a control-plane/etcd node. The jobs follow the API.
+      valuesObject:
+        api:
+          nodeSelector: {kubernetes.io/hostname: plk8sdadom001.lnf.infn.it}
+        postgres:
+          nodeSelector: {kubernetes.io/hostname: plk8sdadom001.lnf.infn.it}
   syncPolicy:
     # The database and file volumes are never pruned (their own annotations say so too).
     automated: {prune: true, selfHeal: true}

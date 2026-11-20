@@ -63,11 +63,14 @@ web:
     oidcClientId: argus-knowledge-hub
     oidcLabel: INFN login
 
+# LNF's relay, without an account: the cluster's nodes are inside LNF. It delivers to INFN addresses only
+# ("unauthenticated not allowed to send outside"); a Google account's Gmail address gets no e-mail. The INFN
+# mail service (api.mail, key back-end-client-oauth) takes over when its key is in argus-secrets.
 email:
-  host: smtp.gmail.com
+  host: smtp.lnf.infn.it
   port: 587
   security: starttls
-  from: michelottilabs@gmail.com
+  from: argus-hub@lnf.infn.it
 
 security:
   hardened: true

@@ -86,6 +86,12 @@ INFN AAI: the client `argus-knowledge-hub` needs the redirect URI `https://argus
    ```
 
    (`argus-portability`, the portability signing keys, likewise if exports are signed here.)
+
+   Without INFN Cloud's keys (it unreachable, or its data brought here by an export rather than a dump),
+   `token-pepper` and `import-secrets-key` are new random values; personal tokens and stored import
+   credentials are then made again. `back-end-client-oauth` (JSON `{"client_id": …, "client_secret": …}`)
+   and `argus-smtp` are optional: without them e-mail goes through LNF's relay `smtp.lnf.infn.it:587`
+   (STARTTLS, no account — the nodes are inside LNF), which delivers to INFN addresses only.
 3. `kubectl apply -f deploy/k8sda/50-argus-hub.yaml`: Argo CD installs the chart from `main`.
 
 ## Moving INFN Cloud's data here
