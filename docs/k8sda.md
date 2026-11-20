@@ -102,6 +102,26 @@ copy the attachments volume (`/data/attachments`), start the API (its migrations
 check, then point the users (and the mobile app's server address) here. Or an export and import
 (Administration → Portability) when moving a workspace at a time.
 
+## Getting out: LNF's proxy
+
+k8sda's nodes have no direct way to the internet's web: HTTP and HTTPS go through LNF's proxy
+`squid.lnf.infn.it:3128` (193.206.84.225), as Argo CD's do. The API and its jobs carry `HTTPS_PROXY`,
+`HTTP_PROXY` and `NO_PROXY` (`api.env` in `values-k8sda.yaml`), and the network policy opens that address on
+3128 only (`networkPolicy.allowedPrivateEgress`). Through it go INFN AAI's and Google's signing keys, the INFN
+mail service, the AI gateway, and imports and exports:
+
+- **Git (portability, IOC pull requests):** over HTTPS with a token (`ARGUS_PORTABILITY_REPOSITORY_TOKENS`).
+  SSH (port 22) does not pass, neither LNF's firewall nor the policy: a repository is named by its
+  `https://` address, e.g. `https://baltig.infn.it/infn-epics/argus-knowledge.git`.
+- **Imports that fetch** (Jira, GLPI, web pages, catalogues, model providers): HTTP(S) through the proxy.
+  A source on LNF's private networks (192.168.x, 10.x) is not proxied (`NO_PROXY`) and is closed by the
+  policy: name it in `networkPolicy.allowedPrivateEgress` with its ports.
+- **Coming in:** uploads, imported archives and downloaded exports pass the public controller, up to 1 GB a
+  request with 10 minutes to answer (`templates/ingress.yaml`).
+- **Mail** does not use the proxy: SMTP goes to `smtp.lnf.infn.it:587` directly.
+
+The proxy is LNF's: what it lets through (and logs) is decided there, not by ARGUS.
+
 ## Request limits
 
 The public controller counts requests and connections per client address, in two tiers
