@@ -177,10 +177,14 @@ def _attr(fam: Family, column: str) -> str:
     return column
 
 
+# Columns that name a workspace: mapped to this instance's ids on the way in, back on the way out.
+WORKSPACE_COLUMNS = ("workspace_id", "site_id", "home_site_id")
+
+
 def _mapped_row(plan: Plan, fam: Family, row: dict) -> dict:
     """An archive row with this instance's workspace ids."""
     out = dict(row)
-    for col in ("workspace_id",):
+    for col in WORKSPACE_COLUMNS:
         if col in out:
             out[col] = plan.map_ws(out[col])
     if fam.name == "workspaces":
@@ -204,7 +208,7 @@ def archive_form(plan: Plan, fam: Family, obj, key: str) -> dict:
             row[col] = f"sha256:{hashlib.sha256(bytes(v)).hexdigest()}"
     if fam.sequenced:
         row["seq"] = int(key)
-    for col in ("workspace_id",):
+    for col in WORKSPACE_COLUMNS:
         if col in row:
             row[col] = plan.unmap_ws(row[col])
     if fam.name == "workspaces":

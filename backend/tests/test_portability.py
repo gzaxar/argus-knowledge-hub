@@ -1643,3 +1643,27 @@ def test_a_new_installations_empty_default_workspace_does_not_block_a_restore(db
         db.commit()
     _, report = run_import(used, env, tag, mode="restore", root="restore-used", expect_ready=False)
     assert not report["ready"] and any(b["family"] == "instance" for b in report["blocking"])
+
+
+def test_a_facility_whose_id_sorts_before_its_sites_imports_with_its_site(dbs, env):
+    """Workspaces travel in id order and site_id names another workspace: a facility sorting before its site
+    (btf before lnf) was inserted while its site was not there yet, and the first import of INFN Cloud's
+    export into k8sda failed on workspaces_site_id_fkey. site_id is set in a second pass."""
+    from app.models.workspace import SiteAdministrator
+    src, dst = dbs(), dbs()
+    s = populate(src, env.tmp)
+    site = f"zz-site-{secrets.token_hex(3)}"           # sorts after cfg-… and inv-…
+    with Session(src) as db:
+        db.add(Workspace(id=site, name="Laboratory", role="site"))
+        db.flush()
+        db.get(Workspace, s.ws).site_id = site
+        db.get(Workspace, s.inv).site_id = site
+        db.add(SiteAdministrator(site_id=site, user_id="u-rossi"))
+        db.commit()
+    view, manifest = run_export(src, env, s, workspaces=[s.ws, s.inv, site])
+    assert manifest["families"]["workspaces"]["rows"] == 3
+    run_import(dst, env, view["git"]["tag"])
+    with Session(dst) as db:
+        assert db.get(Workspace, s.ws).site_id == site and db.get(Workspace, s.inv).site_id == site
+        assert db.get(Workspace, site).role == "site"
+        assert db.scalar(select(SiteAdministrator.user_id).where(SiteAdministrator.site_id == site)) == "u-rossi"
