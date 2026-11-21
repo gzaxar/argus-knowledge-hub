@@ -8,6 +8,7 @@ from urllib.parse import quote
 import jwt
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select, text as sa_text
 
 import app.auth as auth
 from app.db import SessionLocal
@@ -274,3 +275,34 @@ def test_a_provider_that_gives_out_a_domains_addresses_vouches_for_them(world, i
     db.close()
     assert got == {e: v for e, (_, _, v) in cases.items()}
     assert auth_oidc.email_domains_of("infn.it, *.it, not a domain") == ("infn.it",)      # invalid ones never trusted
+
+
+def test_a_sign_in_does_not_queue_behind_a_transaction_holding_the_persons_row(idp, world):
+    """A portability finalization holds the account it takes over until it commits: signing in meanwhile goes on,
+    noting nothing (its last sign-in), instead of waiting for it — and every request of that person with it."""
+    import time
+    from app.db import engine
+    headers = idp(f"held-{world['t']}@argus.test")
+    assert client.get("/v1/me", headers=headers).status_code == 200            # the account exists
+    db = SessionLocal()
+    user = db.scalar(select(User).where(User.email == f"held-{world['t']}@argus.test"))
+    before = user.last_login_at
+    holder = engine.connect()
+    tx = holder.begin()
+    holder.execute(sa_text("SELECT 1 FROM users WHERE id = :id FOR UPDATE"), {"id": user.id})
+    try:
+        started = time.monotonic()
+        r = client.get("/v1/me", headers=headers)
+        assert r.status_code == 200 and r.json()["email"] == user.email
+        assert time.monotonic() - started < 5
+    finally:
+        tx.rollback()
+        holder.close()
+    db.expire_all()
+    assert db.get(User, user.id).last_login_at == before                       # not noted while held
+    assert client.get("/v1/me", headers=headers).status_code == 200
+    db.expire_all()
+    assert db.get(User, user.id).last_login_at > before                        # noted once free
+    db.delete(db.get(User, user.id))
+    db.commit()
+    db.close()

@@ -9,8 +9,8 @@ from typing import Literal, Optional, Union
 import jwt
 from fastapi import Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.auth_oidc import oidc_configured, verify_oidc_token
@@ -233,6 +233,38 @@ def _resolve_oidc_user(db: Session, claims: dict) -> User:
     return user
 
 
+# How long a request's own bookkeeping (when a person last signed in, a token last used) may wait for a row another
+# transaction holds — a portability finalization promotes a whole archive in one transaction, and taking over an
+# account holds its row until it commits. Longer, and every request of that person queues behind it.
+BOOKKEEPING_LOCK_TIMEOUT = "1s"
+
+
+def _bookkeeping_lock_timeout(db: Session) -> None:
+    """From here to the end of the request's transaction, a lock is waited for at most BOOKKEEPING_LOCK_TIMEOUT."""
+    if db.get_bind().dialect.name == "postgresql":
+        with db.no_autoflush:
+            db.execute(text(f"SET LOCAL lock_timeout = '{BOOKKEEPING_LOCK_TIMEOUT}'"))
+
+
+def _lock_unavailable(e: OperationalError) -> bool:
+    return getattr(getattr(e, "orig", None), "pgcode", None) == "55P03"
+
+
+def _commit_bookkeeping(db: Session, what: str) -> bool:
+    """Commit what a request notes in passing, never waiting long for a lock: when the row is held, the note is
+    dropped (the next request writes it) and the request goes on. False when it was dropped."""
+    _bookkeeping_lock_timeout(db)
+    try:
+        db.commit()
+        return True
+    except OperationalError as e:
+        if not _lock_unavailable(e):
+            raise
+        db.rollback()
+        log.info("%s not noted: its row is held by another transaction", what)
+        return False
+
+
 def _note_usage(identity) -> None:
     """Who is asking, for the anonymous usage counts (kept only as a keyed hash, services/usage.py)."""
     from app.services import usage
@@ -263,7 +295,10 @@ def get_identity(
                 if request.method not in ("GET", "HEAD", "OPTIONS") and request.url.path not in _READ_ONLY_POSTS
                 else "This token has no read scope"))
         token.last_used_at = datetime.now(timezone.utc)
-        db.commit()
+        if not _commit_bookkeeping(db, "a token's last use"):
+            identity = identity_for_token(db, db.get(ApiToken, token.id))
+            if identity is None:
+                raise HTTPException(status_code=401, detail="Invalid or revoked token")
         _note_usage(identity)
         return identity
 
@@ -280,11 +315,24 @@ def get_identity(
             except jwt.PyJWTError:
                 log.info("OIDC token refused (%s: %s): not a JWT", type(e).__name__, e)
         else:
-            user = _resolve_oidc_user(db, claims)
-            user.last_login_at = datetime.now(timezone.utc)
             from app.services import domain_groups
-            domain_groups.sync_user(db, user)
-            db.commit()
+            _bookkeeping_lock_timeout(db)
+            try:
+                user = _resolve_oidc_user(db, claims)
+                user.last_login_at = datetime.now(timezone.utc)
+                domain_groups.sync_user(db, user)
+                db.commit()
+            except OperationalError as e:
+                if not _lock_unavailable(e):
+                    raise
+                # The person's row is held (an import taking their account over, say): sign them in as they are,
+                # noting nothing, rather than queueing every request behind it.
+                db.rollback()
+                log.info("a sign-in not noted: its row is held by another transaction")
+                user = db.scalar(select(User).where(User.oidc_sub == claims.get("sub"))) if claims.get("sub") else None
+                if user is None:
+                    raise HTTPException(status_code=503, detail="Signing in is busy: try again in a moment",
+                                        headers={"Retry-After": "5"})
             identity = OidcIdentity(user=user, claims=claims)
             _note_usage(identity)
             return identity
