@@ -1667,3 +1667,118 @@ def test_a_facility_whose_id_sorts_before_its_sites_imports_with_its_site(dbs, e
         assert db.get(Workspace, s.ws).site_id == site and db.get(Workspace, s.inv).site_id == site
         assert db.get(Workspace, site).role == "site"
         assert db.scalar(select(SiteAdministrator.user_id).where(SiteAdministrator.site_id == site)) == "u-rossi"
+
+
+def test_a_sites_places_keep_site_shared_through_an_import(dbs, env):
+    """A site's places are site-shared, and the flush guard derives it from the type chain (Building below
+    Location). An import loads types before their parents (a second pass), so while the assets loaded the guard
+    saw no place types and cleared site_shared: the first import of INFN Cloud's export into k8sda found 208
+    assets differing in it. The archive's value is copied."""
+    from app.services import asset_types, sites
+    src, dst = dbs(), dbs()
+    s = populate(src, env.tmp)
+    site = f"zz-site-{secrets.token_hex(3)}"
+    with Session(src) as db:
+        db.add(Workspace(id=site, name="Laboratory", role="site"))
+        db.flush()
+        asset_types.ensure_asset_types(db, site)
+        db.get(Workspace, s.ws).site_id = site
+        uid = str(uuid.uuid4())
+        db.add(Asset(uid=uid, workspace_id=site, schema_uid=asset_types.type_uid(site, "Building"),
+                     key=f"B-{uid[:6]}", name="Edificio 2", type="Building", attributes={}))
+        db.commit()
+        assert db.get(Asset, uid).site_shared
+    view, _ = run_export(src, env, s, workspaces=[s.ws, s.inv, site])
+    run_import(dst, env, view["git"]["tag"])
+    with Session(dst) as db:
+        assert db.get(Asset, uid).site_shared
+        assert sites.LOADING_ARCHIVE not in db.info
+
+
+def test_a_column_an_older_archive_does_not_carry_reconciles_when_empty():
+    """An archive from an older release has no groups.email_domains: the local row, with nothing in it, is the
+    archive's row. A value there is a difference."""
+    row = {"uid": "g1", "name": "MAGNETI-LNF"}
+    assert importer.as_archived({"uid": "g1", "name": "MAGNETI-LNF", "email_domains": None}, row) == row
+    assert importer.as_archived({"uid": "g1", "name": "MAGNETI-LNF", "email_domains": ["lnf.infn.it"]}, row) != row
+
+
+def _plain_record(db, ws, name):
+    from app.ledger.engine import ensure_type
+    uid = str(uuid.uuid4())
+    db.add(Asset(uid=uid, workspace_id=ws, key=f"R-{uid[:6]}", name=name, type="Ion Pump",
+                 schema_uid=ensure_type(db, ws, "Ion Pump").uid, attributes={}))
+    return uid
+
+
+def test_ledger_relations_of_records_with_no_ledger_facts_survive_an_import(dbs, env):
+    """A ledger relation travels as a projection and a rebuild makes it again from the record's facts; a record
+    with none (INFN Cloud's medium-linac: 208, its Installations' among them) was not re-projected, and the
+    import dropped them. They are kept as the source had them."""
+    src, dst = dbs(), dbs()
+    s = populate(src, env.tmp)
+    with Session(src) as db:
+        a, b = _plain_record(db, s.ws, "Screen station"), _plain_record(db, s.ws, "Beam path")
+        db.flush()
+        db.add(Relation(workspace_id=s.ws, from_asset_uid=a, to_asset_uid=b, relation_type="part of",
+                        derivation="ledger", rule="projector/1"))
+        db.commit()
+    view, _ = run_export(src, env, s)
+    imp_id, _ = run_import(dst, env, view["git"]["tag"])
+    with Session(dst) as db:
+        rel = db.scalar(select(Relation).where(Relation.from_asset_uid == a, Relation.to_asset_uid == b))
+        assert rel is not None and (rel.derivation, rel.rule, rel.relation_type) == ("ledger", "projector/1", "part of")
+        assert db.get(PortabilityImport, imp_id).reconciliation["rebuild"]["relations_kept_without_ledger_facts"] >= 1
+
+
+def _execute_only(eng, env, ref, decisions):
+    cfg = env.cfg("dst")
+    with Session(eng) as db:
+        imp = service.create_import(db, "carol@example.org", mode="clone", source={"repository": "escrow", "ref": ref},
+                                    decisions=decisions, cfg=cfg)
+        db.commit()
+        service.fetch_git(db, imp, "carol@example.org", cfg)
+        service.verify_import(db, imp, "carol@example.org", cfg)
+        service.dry_run(db, imp, "carol@example.org", cfg)
+        db.commit()
+        service.approve_import(db, imp, "dave@example.org", acknowledge_uninspected=True, cfg=cfg)
+        db.commit()
+        service.execute(db, imp, "dave@example.org", cfg)
+        db.commit()
+        return imp.id, imp.reconciliation, imp.state
+
+
+def test_stale_projections_block_unless_the_rebuilt_ones_are_accepted_by_decision(dbs, env):
+    """An archive whose projections this release does not rebuild (stale at the source, or older rules) fails
+    reconciliation; decision `projections: accept_rebuilt` finalizes it with what the rebuild made, listing what
+    differed. The authoritative rows must still all be the archive's."""
+    src = dbs()
+    s = populate(src, env.tmp)
+    with Session(src) as db:
+        a, b = _plain_record(db, s.ws, "Pump"), _plain_record(db, s.ws, "Room")
+        db.flush()
+        db.add(Relation(workspace_id=s.ws, from_asset_uid=a, to_asset_uid=b, relation_type="located in",
+                        derivation="derived", rule="located-in/1"))      # nothing derives it: stale
+        db.commit()
+    view, _ = run_export(src, env, s)
+    _, rec, _ = _execute_only(dbs(), env, view["git"]["tag"], {})
+    assert not rec["passed"] and not rec["projections"]["p_derived_relations"]["ok"]
+    assert rec["accepted"] is None
+    dst = dbs()
+    _, rec, state = _execute_only(dst, env, view["git"]["tag"], {"projections": importer.PROJECTIONS_ACCEPT})
+    assert rec["passed"], json.dumps(_failures(rec), indent=1, default=str)
+    assert state == "ready_to_finalize"
+    assert "p_derived_relations" in rec["accepted"]["projections"]
+    with Session(dst) as db:
+        imp = db.scalar(select(PortabilityImport).order_by(PortabilityImport.created_at.desc()).limit(1))
+        service.finalize(db, imp, "dave@example.org", env.cfg("dst"))
+        db.commit()
+        assert imp.state == "finalized"
+        assert db.scalar(select(Relation).where(Relation.from_asset_uid == a, Relation.to_asset_uid == b)) is None
+
+
+def test_a_conflicts_values_compare_as_a_set():
+    fam = importer.BY_NAME["p_conflicts"]
+    one = {"conflict_id": "c", "detail": {"values": ["btf_transfer", "accumulator_pa"]}}
+    two = {"conflict_id": "c", "detail": {"values": ["accumulator_pa", "btf_transfer"]}}
+    assert importer._proj_key(fam, one) == importer._proj_key(fam, two)

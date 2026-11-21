@@ -314,9 +314,11 @@ export interface ReconciliationReport {
   export_id: string;
   families?: Record<string, FamilyReconciliation>;
   projections?: Record<string, { exported: number; rebuilt: number; ok: boolean }>;
-  invariants?: { ok: boolean | null; exported_ok: boolean | null; acceptable: boolean };
+  invariants?: { ok: boolean | null; exported_ok: boolean | null; acceptable: boolean; failing?: string[];
+                 examples?: Record<string, unknown[]> };
+  accepted?: { decision: string; archive_release?: string; this_release: string; projections: string[]; invariants: string[] } | null;
   deferred_references?: { family: string; key: string; missing: [string, string][]; row: string }[];
-  rebuild?: { events_written_by_rebuild: Record<string, number> };
+  rebuild?: { events_written_by_rebuild: Record<string, number>; relations_kept_without_ledger_facts?: number };
   staged?: boolean;
   origin_chain?: { sha256: string; rows?: number; ingestion_event?: number };
   promotion?: { origin_chain: { sha256: string; rows: number; ingestion_event: number }; passed: boolean };
