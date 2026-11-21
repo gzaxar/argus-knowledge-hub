@@ -79,8 +79,13 @@ def may_see(db: Session, issue: Issue, who: str) -> bool:
 
 
 def notify(db: Session, issue: Issue, kind: str, title: str, actor: Optional[str],
-           recipients: Iterable[Optional[str]], detail: Optional[dict] = None) -> list[Notification]:
+           recipients: Iterable[Optional[str]], detail: Optional[dict] = None, *,
+           requester_safe: bool = False) -> list[Notification]:
+    """`requester_safe`: a service portal notification written for the requester (app/services/service_portal.py).
+    Every other notification about a portal request goes only to people who may read tickets in its workspace,
+    so a requester — mentioned, or once a watcher — is never told what an internal note says."""
     out = []
+    portal = bool(getattr(issue, "service_uid", None)) and not requester_safe
     actor_ids = {actor}
     if actor:
         u = _user(db, actor)
@@ -89,6 +94,10 @@ def notify(db: Session, issue: Issue, kind: str, title: str, actor: Optional[str
     for who in dict.fromkeys(r for r in recipients if r):
         if who in actor_ids or not may_see(db, issue, who):
             continue
+        if portal:
+            from app.services.service_portal import staff_may_read
+            if not staff_may_read(db, issue, who):
+                continue
         n = Notification(workspace_id=issue.workspace_id, recipient=who, issue_uid=issue.uid, kind=kind, title=title,
                          detail=detail or {}, actor=actor, created_at=now())
         db.add(n)
@@ -101,8 +110,9 @@ def audience(db: Session, issue: Issue) -> list[str]:
     return [*watchers(db, issue), *([issue.assignee] if issue.assignee else [])]
 
 
-def on_created(db: Session, issue: Issue, actor: Optional[str]) -> None:
-    watch(db, issue, issue.created_by or actor, "reporter")
+def on_created(db: Session, issue: Issue, actor: Optional[str], *, watch_reporter: bool = True) -> None:
+    if watch_reporter:
+        watch(db, issue, issue.created_by or actor, "reporter")
     if issue.assignee:
         watch(db, issue, issue.assignee, "assignee")
         notify(db, issue, "assigned", f"Assigned to you: {issue.title}", actor, [issue.assignee])
@@ -121,6 +131,9 @@ def on_transition(db: Session, issue: Issue, actor: Optional[str], before: str, 
         return
     notify(db, issue, "transitioned", f"{issue.title}: {before} → {after}", actor, audience(db, issue),
            {"from": before, "to": after})
+    if getattr(issue, "service_uid", None):
+        from app.services import service_portal
+        service_portal.on_transition(db, issue, actor, before, after)
 
 
 EDIT_FIELDS = {"title": "title", "description": "description", "priority": "priority", "due_date": "due date",
@@ -204,6 +217,9 @@ def escalate_overdue(db: Session, at: Optional[datetime] = None, workspace_id: O
 EMAIL_CATEGORIES: dict[str, tuple[str, frozenset]] = {
     "direct": ("Assigned to you, mentions, and documents waiting for your review",
                frozenset({"assigned", "mentioned", "review_requested"})),
+    "requests": ("Replies and status changes on the service requests you sent",
+                 frozenset({"request_reply", "request_status", "request_resolved"})),
+    "queues": ("New requests in the service queues of your teams", frozenset({"queued"})),
     "tickets": ("Changes to tickets you watch: state, fields, comments",
                 frozenset({"transitioned", "updated", "commented"})),
     "escalations": ("Overdue tickets and review items",
@@ -282,6 +298,8 @@ def notification_path(n: Notification) -> Optional[str]:
     """Where a notification leads in the web app, as the bell links it."""
     detail = n.detail or {}
     uid = detail.get("uid")
+    if detail.get("portal") and detail.get("path"):
+        return detail["path"]               # a requester's own page in the portal, never the ticket itself
     if n.issue_uid:
         return f"/tickets/{n.issue_uid}"
     if detail.get("subject") in ("asset", "document", "ticket") and uid:
@@ -295,6 +313,8 @@ def notification_link(n: Notification) -> Optional[str]:
     path, base = notification_path(n), web_url()
     if not path or not base:
         return None
+    if (n.detail or {}).get("portal"):
+        return f"{base}{path}"              # not opened in the ticket's workspace: the requester has no rights there
     return f"{base}{path}{'&' if '?' in path else '?'}ws={quote(n.workspace_id)}"
 
 

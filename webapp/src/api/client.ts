@@ -1,5 +1,10 @@
 import { loadSession } from "./session";
 import type {
+  AdminService, PortalAssistResult, MyRequestDetail, MyRequestSummary, PortalCatalogue, PortalForm, PortalSite,
+  RequestTypeInput, RoutePreview, ServiceDesk, ServiceDeskOptions, ServiceInput, ServiceDeskSettings, SubmitPayload,
+  SubmitReceipt, TicketServiceRequest, WorkspaceQueues,
+} from "./portalTypes";
+import type {
   ArchiveManifest,
   ExportView,
   ImportView,
@@ -252,7 +257,9 @@ export async function checkHealth(baseUrl: string): Promise<boolean> {
 
 export async function checkToken(): Promise<boolean> {
   try {
-    await request("/v1/schemas");
+    // Who the token is, not what it reads: a personal token with no workspace (a help-centre requester's) is valid
+    // too, and /v1/schemas would refuse it for want of a workspace.
+    await request("/v1/me");
     return true;
   } catch {
     return false;
@@ -370,10 +377,17 @@ export const issuesApi = {
   labels: () => request<string[]>("/v1/issues/labels"),
   listComments: (uid: string) =>
     request<IssueComment[]>(`/v1/issues/${uid}/comments`),
-  addComment: (uid: string, author: string, body: string) =>
+  /** `audience`: "internal" (a note for staff, the default) or "requester" (a public reply on a portal request). */
+  addComment: (uid: string, author: string, body: string, audience: "internal" | "requester" = "internal") =>
     request<IssueComment>(`/v1/issues/${uid}/comments`, {
       method: "POST",
-      body: json({ uid: crypto.randomUUID(), author, body }),
+      body: json({ uid: crypto.randomUUID(), author, body, audience }),
+    }),
+  /** The portal request behind a ticket, for its staff; 404 when it did not come from the portal. */
+  serviceRequest: (uid: string) => request<TicketServiceRequest>(`/v1/issues/${uid}/service-request`),
+  setAttachmentAudience: (uid: string, attachmentUid: string, audience: "internal" | "requester") =>
+    request<Attachment>(`/v1/issues/${uid}/attachments/${attachmentUid}/audience`, {
+      method: "PUT", body: json({ audience }),
     }),
 };
 
@@ -793,12 +807,12 @@ export const workspacesApi = {
 export const issueSubresourcesApi = {
   history: (uid: string) => request<IssueHistoryEntry[]>(`/v1/issues/${uid}/history`),
   attachments: (uid: string) => request<Attachment[]>(`/v1/issues/${uid}/attachments`),
-  uploadAttachment: async (uid: string, file: File): Promise<Attachment> => {
+  uploadAttachment: async (uid: string, file: File, audience: "internal" | "requester" = "internal"): Promise<Attachment> => {
     const session = await loadSession();
     if (!session) throw new Error("Not signed in");
     const form = new FormData();
     form.append("file", file);
-    const resp = await fetch(`${session.baseUrl}/v1/issues/${uid}/attachments`, {
+    const resp = await fetch(`${session.baseUrl}/v1/issues/${uid}/attachments?audience=${audience}`, {
       method: "POST",
       headers: authHeaders(session),
       body: form,
@@ -3719,3 +3733,109 @@ export function censusProblem(e: unknown): string {
   }
   return problemText(e);
 }
+
+
+// --------------------------------------------------------------------------- the service portal (docs/service-portal.md)
+
+const site = (siteId: string) => `/v1/support/sites/${encodeURIComponent(siteId)}`;
+const desk = (siteId: string) => `/v1/admin/sites/${encodeURIComponent(siteId)}/service-desk`;
+
+async function portalUpload<T>(path: string, form: FormData): Promise<T> {
+  const session = await loadSession();
+  if (!session) throw new Error("Not signed in");
+  // A portal call names its site itself: no current workspace is sent with it.
+  const resp = await fetch(`${session.baseUrl}${path}`, {
+    method: "POST", headers: { Authorization: `Bearer ${session.token}` }, body: form,
+  });
+  const text = await resp.text();
+  const data = text ? JSON.parse(text) : undefined;
+  if (!resp.ok) throw new ApiError(resp.status, data);
+  return data as T;
+}
+
+/** The message a portal error carries (`detail.error`), else the API's own. */
+export function portalError(e: unknown): string | null {
+  if (!(e instanceof ApiError)) return e instanceof Error ? e.message : null;
+  const d = (e.body as { detail?: unknown } | null)?.detail;
+  if (d && typeof d === "object" && "error" in d) return String((d as { error: unknown }).error);
+  return e.detail;
+}
+
+export function portalErrorCode(e: unknown): string | null {
+  if (!(e instanceof ApiError)) return null;
+  const d = (e.body as { detail?: { code?: string } } | null)?.detail;
+  return d && typeof d === "object" ? d.code ?? null : null;
+}
+
+export const portalApi = {
+  sites: () => request<PortalSite[]>("/v1/support/sites"),
+  catalogue: (siteId: string) => request<PortalCatalogue>(site(siteId)),
+  form: (siteId: string, requestTypeUid: string) =>
+    request<PortalForm>(`${site(siteId)}/request-types/${encodeURIComponent(requestTypeUid)}`),
+  preview: (siteId: string, requestTypeUid: string | null, originWorkspaceId: string) =>
+    request<RoutePreview>(`${site(siteId)}/route-preview`, {
+      method: "POST", body: json({ request_type_uid: requestTypeUid, origin_workspace_id: originWorkspaceId }),
+    }),
+  submit: (siteId: string, payload: SubmitPayload, files: File[]) => {
+    const form = new FormData();
+    form.append("payload", JSON.stringify(payload));
+    for (const f of files) form.append("files", f);
+    return portalUpload<SubmitReceipt>(`${site(siteId)}/requests`, form);
+  },
+  mine: (siteId: string) => request<MyRequestSummary[]>(`${site(siteId)}/requests`),
+  get: (siteId: string, uid: string) => request<MyRequestDetail>(`${site(siteId)}/requests/${uid}`),
+  reply: (siteId: string, uid: string, body: string) =>
+    request<MyRequestDetail>(`${site(siteId)}/requests/${uid}/messages`, {
+      method: "POST", body: json({ body, uid: crypto.randomUUID() }),
+    }),
+  addFile: (siteId: string, uid: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return portalUpload<MyRequestDetail>(`${site(siteId)}/requests/${uid}/attachments`, form);
+  },
+  reopen: (siteId: string, uid: string, body: string) =>
+    request<MyRequestDetail>(`${site(siteId)}/requests/${uid}/reopen`, { method: "POST", body: json({ body }) }),
+  downloadFile: async (siteId: string, uid: string, attachmentUid: string, filename: string) => {
+    const session = await loadSession();
+    if (!session) throw new Error("Not signed in");
+    const resp = await fetch(`${session.baseUrl}${site(siteId)}/requests/${uid}/attachments/${attachmentUid}`, {
+      headers: { Authorization: `Bearer ${session.token}` },
+    });
+    if (!resp.ok) throw new ApiError(resp.status, await resp.text());
+    const url = URL.createObjectURL(await resp.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  },
+  assist: (siteId: string, text: string, originWorkspaceId: string, useAi: boolean) =>
+    request<PortalAssistResult>(`${site(siteId)}/assist`, {
+      method: "POST", body: json({ text, origin_workspace_id: originWorkspaceId, use_ai: useAi }),
+    }),
+  queues: () => request<WorkspaceQueues>("/v1/support/queues"),
+};
+
+export const serviceDeskApi = {
+  get: (siteId: string) => request<ServiceDesk>(desk(siteId)),
+  options: (siteId: string) => request<ServiceDeskOptions>(`${desk(siteId)}/options`),
+  saveSettings: (siteId: string, input: Omit<ServiceDeskSettings, "site_id" | "site_name" | "version">) =>
+    request<ServiceDesk>(`${desk(siteId)}/settings`, { method: "PUT", body: json(input) }),
+  createService: (siteId: string, input: ServiceInput) =>
+    request<AdminService>(`${desk(siteId)}/services`, { method: "POST", body: json(input) }),
+  updateService: (siteId: string, uid: string, input: ServiceInput) =>
+    request<AdminService>(`${desk(siteId)}/services/${uid}`, { method: "PUT", body: json(input) }),
+  authorize: (siteId: string, uid: string) =>
+    request<AdminService>(`${desk(siteId)}/services/${uid}/authorize`, { method: "POST" }),
+  revoke: (siteId: string, uid: string) =>
+    request<AdminService>(`${desk(siteId)}/services/${uid}/revoke`, { method: "POST" }),
+  publish: (siteId: string, uid: string) =>
+    request<AdminService>(`${desk(siteId)}/services/${uid}/publish`, { method: "POST" }),
+  unpublish: (siteId: string, uid: string) =>
+    request<AdminService>(`${desk(siteId)}/services/${uid}/unpublish`, { method: "POST" }),
+  createRequestType: (siteId: string, serviceUid: string, input: RequestTypeInput) =>
+    request<AdminService>(`${desk(siteId)}/services/${serviceUid}/request-types`, { method: "POST", body: json(input) }),
+  updateRequestType: (siteId: string, uid: string, input: RequestTypeInput) =>
+    request<AdminService>(`${desk(siteId)}/request-types/${uid}`, { method: "PUT", body: json(input) }),
+  myAuthorizations: () => request<AdminService[]>("/v1/admin/sites/service-desk/authorizations"),
+};

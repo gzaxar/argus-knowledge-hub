@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { globalValuesApi, issuesApi, membersApi, schemasApi } from "../../api/client";
+import { globalValuesApi, issuesApi, membersApi, portalApi, schemasApi } from "../../api/client";
 import { Issue } from "../../api/types";
 import { PriorityBadge, SearchBox, ViewSwitch } from "../../components/browse/Browse";
 import { typeFamily } from "../../components/browse/TypeExplorer";
-import { ticketMatches, useTicketFilters } from "./List";
+import { QueueFilters, ticketMatches, useTicketFilters } from "./List";
 
 const STATE_ORDER = ["new", "in_progress", "pending", "resolved", "closed"];
 
@@ -30,6 +30,7 @@ export function IssueBoard() {
   const [overColumn, setOverColumn] = useState<string | null>(null);
 
   const issues = useQuery({ queryKey: ["issues"], queryFn: () => issuesApi.list() });
+  const queues = useQuery({ queryKey: ["support-queues"], queryFn: portalApi.queues, staleTime: 60_000, retry: false });
   const schemas = useQuery({ queryKey: ["schemas"], queryFn: schemasApi.list });
   const members = useQuery({ queryKey: ["members"], queryFn: membersApi.directory });
   const globalValues = useQuery({ queryKey: ["global-values"], queryFn: globalValuesApi.list });
@@ -75,7 +76,7 @@ export function IssueBoard() {
   const { columns, cards } = useMemo(() => {
     const family = typeFamily(ticketTypes, typeFilter || null);
     // Columns are the states: every state shows, whatever the list's state filter.
-    const visible = (issues.data ?? []).filter((i) => ticketMatches(i, { q: f.q, family, state: "all", assignee: f.assignee }));
+    const visible = (issues.data ?? []).filter((i) => ticketMatches(i, { q: f.q, family, state: "all", assignee: f.assignee, service: f.service, team: f.team }));
     const grouped = new Map<string, Issue[]>();
     for (const issue of visible) {
       const raw =
@@ -108,7 +109,7 @@ export function IssueBoard() {
     }
     return { columns: keys, cards: grouped };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [issues.data, groupBy, typeFilter, f.q, f.assignee, priorityOptions, statusOptions, members.data, schemas.data]);
+  }, [issues.data, groupBy, typeFilter, f.q, f.assignee, f.service, f.team, priorityOptions, statusOptions, members.data, schemas.data]);
 
   if (issues.isLoading) return <p className="text-sm text-slate-500">Loading…</p>;
 
@@ -125,6 +126,7 @@ export function IssueBoard() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SearchBox value={f.q} onChange={(v) => f.set({ q: v })} label="Search tickets" placeholder="Search by title…" />
+          <QueueFilters f={f} queues={queues.data} />
           <select
             aria-label="Ticket type"
             value={typeFilter}

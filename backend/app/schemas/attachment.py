@@ -17,4 +17,6 @@ class AttachmentOut(BaseModel):
     author: Optional[str]
     backend_id: Optional[str] = None
     backend_url: Optional[str] = None
+    # A ticket file's audience: "internal" or "requester" (what a portal requester sees).
+    audience: str = "internal"
     created_at: datetime

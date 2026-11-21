@@ -52,6 +52,7 @@ from app.models.group import Group, GroupMember, GroupAdministrator
 from app.models.membership import Membership
 from app.models.role import Role, RoleBinding, SiteGroupRoleBinding
 from app.models.schema import Schema
+from app.models.service_portal import ServiceOffering, ServiceRequestType, SiteServiceSettings, SupportRequest
 from app.models.user import User
 from app.models.workflow import TicketWatcher, Workflow
 from app.models.workspace import Workspace, SiteAdministrator
@@ -219,6 +220,7 @@ def _users(db, sc):
     ids |= set(db.scalars(select(GroupAdministrator.user_id).where(GroupAdministrator.group_uid.in_(
         _groups(db, sc).with_only_columns(Group.uid)))))
     ids |= set(db.scalars(select(SiteAdministrator.user_id).where(SiteAdministrator.site_id.in_(sc.workspaces))))
+    ids |= set(db.scalars(select(SupportRequest.requester_id).where(SupportRequest.issue_uid.in_(sc.issues()))))
     for col in ("authored_by", "approved_by"):
         ids |= {u for u in db.scalars(select(getattr(DocumentRevision, col)).where(
             DocumentRevision.document_uid.in_(sc.documents()))) if u}
@@ -320,6 +322,19 @@ FAMILIES: list[Family] = [
     Family("ticket_watchers", "records", TicketWatcher, ("issue_uid", "user"),
            _by(TicketWatcher, "issue_uid", Scope.issues, (TicketWatcher.id,)), exclude=("id",),
            subjects=("issue_uid",), replace_set=True),
+    # The service portal (app/models/service_portal.py): a site's catalogue, and whose request each ticket is.
+    Family("site_service_settings", "records", SiteServiceSettings, ("site_id",),
+           lambda db, sc: select(SiteServiceSettings).where(SiteServiceSettings.site_id.in_(sc.workspaces))
+           .order_by(SiteServiceSettings.site_id)),
+    Family("service_offerings", "records", ServiceOffering, ("uid",),
+           lambda db, sc: select(ServiceOffering).where(ServiceOffering.site_id.in_(sc.workspaces))
+           .order_by(ServiceOffering.uid)),
+    Family("service_request_types", "records", ServiceRequestType, ("uid",),
+           lambda db, sc: select(ServiceRequestType).where(ServiceRequestType.service_uid.in_(
+               select(ServiceOffering.uid).where(ServiceOffering.site_id.in_(sc.workspaces))))
+           .order_by(ServiceRequestType.uid)),
+    Family("support_requests", "records", SupportRequest, ("uid",),
+           _by(SupportRequest, "issue_uid", Scope.issues, (SupportRequest.uid,)), subjects=("issue_uid",)),
     Family("documents", "records", Document, ("uid",), _ws(Document, (Document.uid,)),
            deferred=("current_revision_uid",), subjects=("responsible_service_asset_uid",)),
     Family("document_revisions", "records", DocumentRevision, ("uid",),

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -30,6 +30,10 @@ class IssueUpdate(BaseModel):
     assignee: Optional[str] = None
     labels: Optional[list[str]] = None
     due_date: Optional[datetime] = None
+    # The portal service and team queue: staff reroute a request between services of this workspace, or hand
+    # it to another team. Checked by the server (app/services/service_routing.py).
+    service_uid: Optional[str] = None
+    assigned_group_uid: Optional[str] = None
 
 
 class IssueOut(BaseModel):
@@ -54,6 +58,8 @@ class IssueOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime]
+    service_uid: Optional[str] = None
+    assigned_group_uid: Optional[str] = None
 
 
 class IssueHistoryOut(BaseModel):
@@ -126,6 +132,8 @@ class IssueCommentCreate(BaseModel):
     # Ignored for a signed-in person: the comment is theirs. An API token names it.
     author: Optional[str] = None
     body: str
+    # "internal" (the default: staff only) or "requester": a public reply the requester of a portal request reads.
+    audience: Literal["internal", "requester"] = "internal"
 
 
 class IssueCommentOut(BaseModel):
@@ -135,6 +143,7 @@ class IssueCommentOut(BaseModel):
     issue_uid: str
     author: str
     body: str
+    audience: str = "internal"
     created_at: datetime
     updated_at: datetime
 

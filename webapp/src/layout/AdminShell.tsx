@@ -29,6 +29,7 @@ export function AdminShell() {
         { to: w("groups"), label: "Groups" },
         { to: w("members"), label: "Area permissions" },
         { to: w("access-reviews"), label: "Access reviews" },
+        { to: "/admin/service-authorizations", label: "Help centre destinations" },
       ] },
       { label: "Content", items: [
         { to: w("imports"), label: "Imports" },
@@ -131,6 +132,7 @@ export function AdminShell() {
               { to: `/sites/${s.id}/administrators`, label: "Administrators" },
               { to: `/sites/${s.id}/group-access`, label: "Site-wide group access" },
               { to: `/sites/${s.id}/facilities`, label: "Facilities" },
+              { to: `/sites/${s.id}/service-desk`, label: "Help centre" },
             ] }]))}
           {installation.length > 0 && section("installation", "Installation", "text-amber-700",
             "Applies to every workspace", [{ items: installation }])}

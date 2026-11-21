@@ -33,6 +33,8 @@ class Attachment(Base, WorkspaceScopedMixin, TimestampMixin):
     storage_path: Mapped[str] = mapped_column(String)
     backend_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     backend_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # A ticket file's audience, as a comment's: "internal" unless chosen, "requester" for what its requester sees.
+    audience: Mapped[str] = mapped_column(String, default="internal", server_default="internal")
 
 
 def file_sha256(path: str) -> Optional[str]:

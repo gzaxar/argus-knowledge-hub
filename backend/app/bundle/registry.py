@@ -262,6 +262,9 @@ NOT_CARRIED = {
                  "transfer_jobs", "import_jobs")},
     **{t: "assistant conversations and their feedback are personal, and stay where they were held"
        for t in ("ask_conversations", "ask_messages", "ask_actions", "ask_feedback")},
+    **{t: "a site's service portal belongs to the site, not to one workspace: it travels in the signed portable "
+          "archive of the site" for t in ("site_service_settings", "service_offerings", "service_request_types",
+                                          "support_requests")},
     "rack_censuses": "a rack survey in progress on a phone; what it applied travels as records, mountings and photos",
     **{t: "evaluations and runs of the source installation's AI models: evaluate the models again where they run"
        for t in ("intake_runs", "intake_outcomes", "intake_profiles")},

@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { globalValuesApi, issuesApi, membersApi, schemasApi } from "../../api/client";
+import { globalValuesApi, issuesApi, membersApi, portalApi, schemasApi } from "../../api/client";
+import type { WorkspaceQueues } from "../../api/portalTypes";
 import type { Issue } from "../../api/types";
 import { AttributeFilterInput } from "../../components/AttributeFilterInput";
 import { activeFilterCount, defaultFilterFor, FilterState, matchesFilters } from "../../components/AttributeFilters";
@@ -33,12 +34,15 @@ export function useTicketFilters() {
     type: get("type") || null,
     state: get("state", "open"),
     assignee: get("assignee"),
+    service: get("service"),
+    team: get("team"),
     set,
   };
 }
 
 /** Whether a ticket passes the filters the list and the board share. */
-export function ticketMatches(i: Issue, f: { q: string; family: Set<string> | null; state: string; assignee: string }): boolean {
+export function ticketMatches(i: Issue, f: { q: string; family: Set<string> | null; state: string; assignee: string;
+  service?: string; team?: string }): boolean {
   const n = f.q.trim().toLowerCase();
   if (n && !i.title.toLowerCase().includes(n) && !(i.key ?? "").toLowerCase().includes(n)) return false;
   if (f.family && !(i.schema_uid && f.family.has(i.schema_uid))) return false;
@@ -47,6 +51,9 @@ export function ticketMatches(i: Issue, f: { q: string; family: Set<string> | nu
   if (!["open", "closed", "all"].includes(f.state) && i.state !== f.state) return false;
   if (f.assignee === "none" && i.assignee) return false;
   if (f.assignee && f.assignee !== "none" && i.assignee !== f.assignee) return false;
+  if (f.service && i.service_uid !== f.service) return false;
+  if (f.team === "none" && i.assigned_group_uid) return false;
+  if (f.team && f.team !== "none" && i.assigned_group_uid !== f.team) return false;
   return true;
 }
 
@@ -60,6 +67,8 @@ export function IssueList() {
   const columns = useColumns("tickets", COLUMNS);
 
   const issues = useQuery({ queryKey: ["issues"], queryFn: () => issuesApi.list() });
+  // The service portal's services and team queues in this workspace, when it has any.
+  const queues = useQuery({ queryKey: ["support-queues"], queryFn: portalApi.queues, staleTime: 60_000, retry: false });
   const schemas = useQuery({ queryKey: ["schemas"], queryFn: schemasApi.list, staleTime: 60_000 });
   const members = useQuery({ queryKey: ["members"], queryFn: membersApi.directory, staleTime: 60_000 });
   const globals = useQuery({ queryKey: ["global-values"], queryFn: globalValuesApi.list, staleTime: 60_000 });
@@ -81,9 +90,9 @@ export function IssueList() {
 
   const counts = useMemo(() => countBy(issues.data, (i) => i.schema_uid), [issues.data]);
   const matched = useMemo(() => (issues.data ?? []).filter((i) =>
-    ticketMatches(i, { q: f.q, family, state: f.state, assignee: f.assignee }) &&
+    ticketMatches(i, { q: f.q, family, state: f.state, assignee: f.assignee, service: f.service, team: f.team }) &&
     (!schema || Object.keys(fieldFilters).length === 0 || matchesFilters(i.attributes, fieldFilters))),
-  [issues.data, f.q, family, f.state, f.assignee, schema, fieldFilters]);
+  [issues.data, f.q, family, f.state, f.assignee, f.service, f.team, schema, fieldFilters]);
   const { sorted, sort, toggle: sortBy } = useSort(
     matched,
     {
@@ -135,6 +144,7 @@ export function IssueList() {
             <option value="none">Unassigned</option>
             {(members.data ?? []).map((m) => <option key={m.user_id} value={m.user_id}>{m.name || m.email}</option>)}
           </ToolbarSelect>
+          <QueueFilters f={f} queues={queues.data} />
           <ColumnSettings columns={columns} />
           <ViewSwitch views={[
             { label: "List", to: "/tickets", current: true },
@@ -234,5 +244,23 @@ export function IssueList() {
       )}
       {issues.data && <Pager paging={paging} noun="tickets" />}
     </BrowsePage>
+  );
+}
+
+/** Service and team filters, shown only where the service portal sends tickets. */
+export function QueueFilters({ f, queues }: { f: ReturnType<typeof useTicketFilters>; queues?: WorkspaceQueues }) {
+  if (!queues || (queues.services.length === 0 && queues.teams.length === 0)) return null;
+  return (
+    <>
+      <ToolbarSelect label="Service" value={f.service} onChange={(v) => f.set({ service: v })}>
+        <option value="">Any service</option>
+        {queues.services.map((s) => <option key={s.uid} value={s.uid}>{s.name}</option>)}
+      </ToolbarSelect>
+      <ToolbarSelect label="Team" value={f.team} onChange={(v) => f.set({ team: v })}>
+        <option value="">Any team</option>
+        <option value="none">No team</option>
+        {queues.teams.map((t) => <option key={t.uid} value={t.uid}>{t.name}</option>)}
+      </ToolbarSelect>
+    </>
   );
 }
