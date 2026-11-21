@@ -52,6 +52,10 @@ is in:
 Nobody is named: people are counted as a keyed hash per five minutes, and the ratings keep no author. Tokens a
 provider does not report are estimated. `ARGUS_USAGE_STATS=0` switches the counting off.
 
+The same figures, as aggregates by workspace (never by person), also reach Prometheus and the Grafana dashboard
+"ARGUS Knowledge Hub": active people, records held, created and changed, open tickets, the help centre's open
+requests and their age, language-model calls and tokens, Ask questions and ratings (docs/k8sda.md, "Metrics").
+
 ## Storage
 
 **Administration → Storage** is the whole installation's storage: for the attachment files, the database and the

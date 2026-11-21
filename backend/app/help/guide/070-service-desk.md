@@ -42,6 +42,8 @@ On the phone you can attach a **photo**, a **video**, a **recorded note** or **w
 - **Related by meaning** lists other tickets, documents and equipment whose written knowledge is about the same
   thing: an earlier fault fixed the same way, a procedure that applies. Each is a lead to check.
 - A state with a time limit (SLA) escalates a ticket that stays in it too long.
+- A request from a site's **help centre** has a **Service request** panel, **Service** and **Team** filters, and
+  the choice between **Internal note** and **Public reply**: see *Help centre (service portal)*.
 
 ## Workflows
 

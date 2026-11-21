@@ -34,6 +34,9 @@ def test_every_topic_is_well_formed():
     ("output-token limit for a reasoning model", "ai-settings"),
     ("report a fault ticket", "service-desk"),
     ("apply the changes the assistant proposed", "ask-argus"),
+    ("how do I configure a service in the help centre", "help-centre"),
+    ("publish a service request type for my site", "help-centre"),
+    ("reply to the requester or add an internal note", "help-centre"),
 ])
 def test_a_question_finds_the_topic_that_answers_it(question, topic):
     hits = guide.search(question)
@@ -52,7 +55,8 @@ def test_the_guide_names_only_pages_that_exist():
                   "In the repository, with the archive", "Change address or provider", "Artifact stores",
                   "Re-ranker model", "Give this workspace settings of its own", "Use the installation's settings instead",
                   "My account", "Robot tokens", "Generate token", "Generate robot token", "Daily logbook upload",
-                  "Read and write", "Administration → API tokens"):
+                  "Read and write", "Administration → API tokens", "Services & Support", "Help centre destinations",
+                  "Open the help centre to requesters", "Public reply", "Internal note", "Share with requester"):
         assert label in body, label
 
 
