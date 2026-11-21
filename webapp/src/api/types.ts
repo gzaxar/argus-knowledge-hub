@@ -143,6 +143,9 @@ export interface Issue {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  /** The portal service it was filed under, and the team whose queue it is in (not the assignee). */
+  service_uid?: string | null;
+  assigned_group_uid?: string | null;
 }
 
 export interface IssueInput {
@@ -157,6 +160,8 @@ export interface IssueInput {
   assignee?: string | null;
   labels?: string[];
   due_date?: string | null;
+  service_uid?: string | null;
+  assigned_group_uid?: string | null;
   created_by?: string | null;
 }
 
@@ -165,6 +170,8 @@ export interface IssueComment {
   issue_uid: string;
   author: string;
   body: string;
+  /** "internal": staff only; "requester": a public reply the portal requester reads. */
+  audience?: "internal" | "requester";
   created_at: string;
   updated_at: string;
 }
@@ -257,6 +264,8 @@ export interface Attachment {
   mime_type: string | null;
   file_size: number | null;
   author: string | null;
+  /** A ticket file's audience: "requester" when its portal requester sees it. */
+  audience?: "internal" | "requester";
   created_at: string;
 }
 

@@ -61,7 +61,10 @@ def _merge(into: dict[str, set[str]], permissions: dict) -> None:
             into[resource].add(action)
 
 
-def effective_permissions(db: Session, user: User, workspace_id: str) -> dict[str, set[str]]:
+def effective_permissions(db: Session, user: User, workspace_id: str, *,
+                          include_site_administration: bool = True) -> dict[str, set[str]]:
+    """`include_site_administration=False`: only what the person was granted, without what administering the
+    workspace's site gives them (the service portal asks who owns a workspace, not who manages its access)."""
     granted: dict[str, set[str]] = {resource: set() for resource in RESOURCES}
 
     group_uids = user_group_uids(db, user.id)
@@ -98,7 +101,7 @@ def effective_permissions(db: Session, user: User, workspace_id: str) -> dict[st
         # which combination counted as an owner before roles existed.
         _merge(granted, membership_permissions(legacy))
 
-    if administers_site(db, user.id, workspace_id):
+    if include_site_administration and administers_site(db, user.id, workspace_id):
         # Access management needs read access to the workspace's access UI.
         _merge(granted, {"objects": ["read"], "tickets": ["read"],
                          "documents": ["read"], "workspace": ["manage_members"]})

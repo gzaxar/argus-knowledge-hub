@@ -24,6 +24,7 @@ from app.models.membership import Membership
 from app.models.role import Role, RoleBinding, SiteGroupRoleBinding
 from app.models.access_event import AccessEvent
 from app.models.schema import Schema
+from app.models.service_portal import ServiceOffering, ServiceRequestType, SiteServiceSettings, SupportRequest  # noqa: F401
 from app.models.transfer_job import TransferJob
 from app.models.user import User
 from app.models.workspace import Workspace, SiteAdministrator

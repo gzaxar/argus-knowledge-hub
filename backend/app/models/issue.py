@@ -44,6 +44,10 @@ class Issue(Base, WorkspaceScopedMixin, TimestampMixin):
     # refused only when it touches what changed since (app.services.versions).
     field_versions: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     deleted_at: Mapped[Optional[object]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The service portal (app/models/service_portal.py): the service a request was filed under, and the team whose
+    # queue it is in. The team is not the assignee, who stays a person; neither grants any access.
+    service_uid: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    assigned_group_uid: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
 
 
 class IssueLink(Base):
@@ -107,6 +111,9 @@ class IssueComment(Base, TimestampMixin):
     )
     author: Mapped[str] = mapped_column(String)
     body: Mapped[str] = mapped_column(String)
+    # "internal" (staff only, every comment made before the portal) or "requester": a public reply the requester
+    # of a portal request reads. Only an explicit choice makes a comment public.
+    audience: Mapped[str] = mapped_column(String, default="internal", server_default="internal")
 
 
 @event.listens_for(Session, "before_flush")

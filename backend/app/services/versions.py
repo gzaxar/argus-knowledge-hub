@@ -152,7 +152,8 @@ def close_review(db: Session, cid: str, actor: str, outcome: str) -> None:
 
 # --------------------------------------------------------------------------- tickets
 
-TICKET_FIELDS = ("title", "description", "state", "priority", "assignee", "asset_uid", "schema_uid", "due_date")
+TICKET_FIELDS = ("title", "description", "state", "priority", "assignee", "asset_uid", "schema_uid", "due_date",
+                 "service_uid", "assigned_group_uid")
 
 
 def ticket_snapshot(issue) -> dict:

@@ -26,6 +26,7 @@ import { TicketWorkflowCard, WatchersCard } from "../../components/hub/WorkflowP
 import { ExportMenu } from "../../components/ExportMenu";
 import { workflowApi } from "../../api/client";
 import { SemanticRelated } from "../../components/SemanticRelated";
+import { ServiceRequestCard } from "../../components/hub/ServiceRequestCard";
 
 const STATE_STYLES: Record<string, string> = {
   new: "bg-slate-100 text-slate-600",
@@ -165,6 +166,8 @@ export function IssueDetail() {
   const queryClient = useQueryClient();
   const [commentAuthor, setCommentAuthor] = useState("web-user");
   const [commentBody, setCommentBody] = useState("");
+  // On a portal request: an internal note (the default) or a public reply its requester reads.
+  const [audience, setAudience] = useState<"internal" | "requester">("internal");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pasteHint, setPasteHint] = useState<string | null>(null);
 
@@ -215,10 +218,27 @@ export function IssueDetail() {
     },
   });
   const addCommentMutation = useMutation({
-    mutationFn: () => issuesApi.addComment(uid!, commentAuthor, commentBody),
-    onSuccess: () => {
+    mutationFn: (sent: "internal" | "requester") => issuesApi.addComment(uid!, commentAuthor, commentBody, sent),
+    onSuccess: (_c, sent) => {
       setCommentBody("");
+      // After a public reply, back to the safe default; a note sent meanwhile never changes the choice made.
+      if (sent === "requester") setAudience("internal");
       queryClient.invalidateQueries({ queryKey: ["issue-comments", uid] });
+    },
+  });
+  const serviceRequest = useQuery({
+    queryKey: ["issue-service-request", uid],
+    queryFn: () => issuesApi.serviceRequest(uid!),
+    enabled: !!uid && !!issue.data?.service_uid,
+    retry: false,
+  });
+  const portalRequest = !!serviceRequest.data?.requester;
+  const shareMutation = useMutation({
+    mutationFn: ({ att, to }: { att: string; to: "internal" | "requester" }) =>
+      issuesApi.setAttachmentAudience(uid!, att, to),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["issue-attachments", uid] });
+      queryClient.invalidateQueries({ queryKey: ["issue-history", uid] });
     },
   });
   const attachments = useQuery({
@@ -675,8 +695,21 @@ export function IssueDetail() {
                       <span className="text-xs text-slate-400">
                         ({att.file_size ? `${Math.round(att.file_size / 1024)} KB` : "?"})
                       </span>
+                      {portalRequest && att.audience === "requester" && (
+                        <span className="ml-1 rounded bg-indigo-100 px-1 text-[10px] font-semibold uppercase text-indigo-800">
+                          Shared with requester
+                        </span>
+                      )}
                     </span>
                     <span className="flex shrink-0 gap-3">
+                      {portalRequest && (
+                        <button
+                          onClick={() => shareMutation.mutate({ att: att.uid, to: att.audience === "requester" ? "internal" : "requester" })}
+                          className="text-xs text-indigo-600 hover:text-indigo-800"
+                        >
+                          {att.audience === "requester" ? "Make internal" : "Share with requester"}
+                        </button>
+                      )}
                       <button
                         onClick={() => downloadAttachment(att.uid, att.filename)}
                         className="text-xs text-indigo-600 hover:text-indigo-800"
@@ -702,10 +735,13 @@ export function IssueDetail() {
           <Panel title={`Activity${comments.data?.length ? ` (${comments.data.length})` : ""}`}>
             <ul className="space-y-3">
               {comments.data?.map((c) => (
-                <li key={c.uid} className="border-l-2 border-slate-100 pl-3">
+                <li key={c.uid} className={`border-l-2 pl-3 ${c.audience === "requester" ? "border-indigo-300" : "border-slate-100"}`}>
                   <p className="whitespace-pre-wrap break-words text-sm text-slate-800">{c.body}</p>
                   <p className="mt-1 text-xs text-slate-400">
                     {who(c.author)} · {new Date(c.created_at).toLocaleString()}
+                    {portalRequest && (c.audience === "requester"
+                      ? <span className="ml-2 rounded bg-indigo-100 px-1 text-[10px] font-semibold uppercase text-indigo-800">Public reply</span>
+                      : <span className="ml-2 rounded bg-amber-100 px-1 text-[10px] font-semibold uppercase text-amber-900">Internal note</span>)}
                   </p>
                 </li>
               ))}
@@ -717,7 +753,8 @@ export function IssueDetail() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (commentBody.trim()) addCommentMutation.mutate();
+                if (commentBody.trim() && !addCommentMutation.isPending)
+                  addCommentMutation.mutate(portalRequest ? audience : "internal");
               }}
               className="mt-4 space-y-2 border-t border-slate-100 pt-3"
             >
@@ -730,24 +767,41 @@ export function IssueDetail() {
                   placeholder="Your name"
                 />
               )}
+              {portalRequest && (
+                <div role="radiogroup" aria-label="Who reads it" className="inline-flex overflow-hidden rounded border border-slate-300 text-xs">
+                  {(["internal", "requester"] as const).map((a) => (
+                    <button key={a} type="button" role="radio" aria-checked={audience === a} onClick={() => setAudience(a)}
+                            className={`px-3 py-1.5 ${audience === a
+                              ? (a === "requester" ? "bg-indigo-600 text-white" : "bg-amber-500 text-white")
+                              : "bg-white text-slate-700 hover:bg-slate-50"}`}>
+                      {a === "requester" ? "Public reply" : "Internal note"}
+                    </button>
+                  ))}
+                </div>
+              )}
               <textarea
                 value={commentBody}
                 onChange={(e) => setCommentBody(e.target.value)}
                 rows={3}
-                className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
-                placeholder="Add a comment…"
+                aria-label={portalRequest ? (audience === "requester" ? "Public reply to the requester" : "Internal note") : "Comment"}
+                className={`w-full rounded border px-3 py-2 text-sm ${portalRequest && audience === "internal"
+                  ? "border-amber-300 bg-amber-50/40" : "border-slate-300"}`}
+                placeholder={portalRequest
+                  ? (audience === "requester" ? "Reply to the requester — they will read this…" : "Internal note — only staff see this…")
+                  : "Add a comment…"}
               />
               <button
                 type="submit"
                 className="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
               >
-                Comment
+                {portalRequest ? (audience === "requester" ? "Send public reply" : "Add internal note") : "Comment"}
               </button>
             </form>
           </Panel>
         </div>
 
         <div className="space-y-4">
+          <ServiceRequestCard issue={i} />
           <TicketWorkflowCard ticketUid={i.uid} />
           <WatchersCard ticketUid={i.uid} />
           <TicketContextPanel ticketUid={i.uid} />

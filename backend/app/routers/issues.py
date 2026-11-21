@@ -39,7 +39,7 @@ from app.schemas.issue import (
     IssueUpdate,
 )
 from app.services.asset_ticket_links import ensure_asset_link, sync_subject_link
-from app.services import field_policy, markdown_export, notify, pdf_export, versions, workflows
+from app.services import field_policy, markdown_export, notify, pdf_export, tickets, versions, workflows
 from app.services.visibility import can_see, hidden_fields, redacted_attributes, visible_issues_clause
 from app.services.issue_history import (
     TRACKED_FIELDS,
@@ -62,21 +62,14 @@ def _get_owned_issue(uid: str, workspace_id: str, db: Session) -> Issue:
 
 
 def _guard_ticket_write(db: Session, workspace_id: str, schema_uid: Optional[str], attributes: dict) -> None:
-    """No dual write during a ticket domain's migration (§17.2), and an
-    operational incident says when it happened (I-TKT-4)."""
-    try:
-        assert_writable(db, workspace_id, "tickets")
-    except LedgerError as exc:
-        raise HTTPException(status_code=409, detail={"error": str(exc), "invariant": "I-SOR-1"})
-    try:
-        validate_occurrence(db, schema_uid, attributes or {})
-    except OccurrenceRequired as exc:
-        raise HTTPException(status_code=422, detail={"error": str(exc), "invariant": exc.code})
+    tickets.guard_ticket_write(db, workspace_id, schema_uid, attributes)
 
 
 @router.get("", response_model=list[IssueOut])
 def list_issues(
     schema_uid: Optional[str] = None,
+    service_uid: Optional[str] = Query(None, description="Only the requests filed under this portal service"),
+    assigned_group_uid: Optional[str] = Query(None, description="Only the tickets in this team's queue"),
     mine: bool = Query(False, description="Only the open tickets assigned to the caller (the field client's prefetch)"),
     workspace_id: str = Depends(require_permission("read", resource="tickets")),
     current_user_id: Optional[str] = Depends(get_current_user_id),
@@ -85,6 +78,10 @@ def list_issues(
     stmt = select(Issue).where(Issue.workspace_id == workspace_id, visible_issues_clause())
     if schema_uid:
         stmt = stmt.where(Issue.schema_uid == schema_uid)
+    if service_uid:
+        stmt = stmt.where(Issue.service_uid == service_uid)
+    if assigned_group_uid:
+        stmt = stmt.where(Issue.assigned_group_uid == assigned_group_uid)
     if mine:
         from app.models.user import User
         user = db.get(User, current_user_id) if current_user_id else None
@@ -111,27 +108,7 @@ def create_issue(
     if db.get(Issue, body.uid) is not None:
         raise HTTPException(status_code=409, detail="Issue uid already exists")
     field_policy.check_ticket_fields(x_argus_client, {}, body.attributes)
-    _guard_ticket_write(db, workspace_id, body.schema_uid, body.attributes)
-    schema = db.get(Schema, body.schema_uid) if body.schema_uid else None
-    stamp_current_user_attributes(db, schema, body.attributes, current_user_id)
-    validate_attributes(db, schema, body.attributes, workspace_id, Issue)
-    issue = Issue(workspace_id=workspace_id, **body.model_dump())
-    wf = workflows.workflow_for(db, workspace_id, issue.schema_uid)
-    if workflows.state_of(wf, issue.state) is None:
-        # A new ticket starts where its type's workflow starts.
-        issue.state = wf["initial"]
-    issue.attributes = {**(issue.attributes or {}), "argus_state_entered_at": workflows.now().isoformat()}
-    db.add(issue)
-    db.flush()
-    record_issue_created(db, issue, current_user_id)
-    notify.on_created(db, issue, current_user_id)
-    notify.announce(db, issue.workspace_id, "tickets", "new_ticket", f"New ticket: {issue.title}", current_user_id,
-                    issue.uid, issue=issue)
-    # A ticket raised on an object has to appear on that object, or the
-    # link only exists in one direction.
-    if issue.asset_uid:
-        sync_subject_link(db, issue, None)
-    derive_for_ticket(db, issue)
+    issue = tickets.create_ticket(db, workspace_id, body.model_dump(), current_user_id)
     db.commit()
     db.refresh(issue)
     return issue
@@ -239,6 +216,9 @@ def update_issue(
         hidden = hidden_fields(db, issue)
         patch["attributes"] = {**{k: v for k, v in patch["attributes"].items() if k not in hidden},
                                **{k: v for k, v in (issue.attributes or {}).items() if k in hidden}}
+    if "service_uid" in patch or "assigned_group_uid" in patch:
+        from app.services.service_portal import check_staff_routing
+        check_staff_routing(db, issue, patch)
     versions.check_ticket(issue, if_match, versions.ticket_fields_in(patch, issue))
     if patch.get("attributes") is not None:
         field_policy.check_ticket_fields(x_argus_client, issue.attributes, patch["attributes"])
@@ -252,6 +232,12 @@ def update_issue(
     notify.on_assigned(db, issue, current_user_id, previous_assignee)
 
     record_issue_changes(db, issue, before, current_user_id)
+    if issue.assigned_group_uid and issue.assigned_group_uid != before.get("assigned_group_uid"):
+        from app.models.service_portal import ServiceOffering
+        from app.services.service_portal import queue_notify
+        svc = db.get(ServiceOffering, issue.service_uid) if issue.service_uid else None
+        if svc is not None:
+            queue_notify(db, issue, svc, current_user_id)
     sync_subject_link(db, issue, previous_asset_uid)
     notify.on_edited(db, issue, current_user_id, edited_from, previous_assignee)
 
@@ -296,11 +282,14 @@ def list_issue_attachments(
 async def upload_issue_attachment(
     uid: str,
     file: UploadFile,
+    audience: str = Query("internal", description="internal (staff only) or requester: shared with the requester "
+                                                  "of a portal request"),
     workspace_id: str = Depends(require_permission("modify", resource="tickets")),
     current_user_id: Optional[str] = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     issue = _get_owned_issue(uid, workspace_id, db)
+    _check_audience(db, issue, audience)
 
     attachment_uid = str(uuid.uuid4())
     os.makedirs(ATTACHMENTS_DIR, exist_ok=True)
@@ -318,8 +307,12 @@ async def upload_issue_attachment(
         file_size=len(contents),
         storage_path=storage_path,
         author=current_user_id,
+        audience=audience,
     )
     db.add(attachment)
+    if audience == "requester":
+        from app.services.service_portal import on_public_file
+        on_public_file(db, issue, attachment.filename, current_user_id)
     db.add(IssueHistory(
         uid=str(uuid.uuid4()),
         issue_uid=issue.uid,
@@ -332,6 +325,79 @@ async def upload_issue_attachment(
     db.commit()
     db.refresh(attachment)
     return attachment
+
+
+def _check_audience(db: Session, issue: Issue, audience: str) -> None:
+    """Only a portal request has a requester to share with; anything else stays internal."""
+    if audience not in ("internal", "requester"):
+        raise HTTPException(status_code=422, detail={"error": "audience is internal or requester",
+                                                     "code": "audience"})
+    if audience == "requester":
+        from app.services.service_portal import support_request_for
+        if support_request_for(db, issue.uid) is None:
+            raise HTTPException(status_code=422, detail={
+                "error": "This ticket has no portal requester to reply to: it can only take internal notes.",
+                "code": "no_requester"})
+
+
+class AttachmentAudienceIn(BaseModel):
+    audience: str
+
+
+@router.put("/{uid}/attachments/{attachment_uid}/audience", response_model=AttachmentOut)
+def set_attachment_audience(uid: str, attachment_uid: str, body: AttachmentAudienceIn,
+                            workspace_id: str = Depends(require_permission("modify", resource="tickets")),
+                            current_user_id: Optional[str] = Depends(get_current_user_id),
+                            db: Session = Depends(get_db)):
+    """Share a ticket's file with its requester, or stop sharing it: a deliberate choice, kept in the history."""
+    issue = _get_owned_issue(uid, workspace_id, db)
+    _check_audience(db, issue, body.audience)
+    attachment = db.get(Attachment, attachment_uid)
+    if attachment is None or attachment.issue_uid != issue.uid:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    if attachment.audience != body.audience:
+        db.add(IssueHistory(uid=str(uuid.uuid4()), issue_uid=issue.uid, type="updated",
+                            author=current_user_id or "api", field="Attachment audience",
+                            from_value=attachment.audience, to_value=body.audience, details=attachment.filename,
+                            timestamp=datetime.now(timezone.utc)))
+        attachment.audience = body.audience
+        if body.audience == "requester":
+            from app.services.service_portal import on_public_file
+            on_public_file(db, issue, attachment.filename, current_user_id)
+    db.commit()
+    db.refresh(attachment)
+    return attachment
+
+
+@router.get("/{uid}/service-request")
+def get_service_request(uid: str, workspace_id: str = Depends(require_permission("read", resource="tickets")),
+                        db: Session = Depends(get_db)):
+    """For staff: the portal request behind this ticket — who asked, from where, under which service — and the
+    services and teams it may be moved to. 404 for a ticket not made by the portal."""
+    from app.models.group import Group
+    from app.models.service_portal import ServiceOffering
+    from app.models.user import User
+    from app.services.service_portal import status_of, support_request_for
+    issue = _get_owned_issue(uid, workspace_id, db)
+    request = support_request_for(db, issue.uid)
+    if request is None and not issue.service_uid:
+        raise HTTPException(status_code=404, detail="Not a service request")
+    requester = db.get(User, request.requester_id) if request else None
+    svc = db.get(ServiceOffering, issue.service_uid) if issue.service_uid else None
+    team = db.get(Group, issue.assigned_group_uid) if issue.assigned_group_uid else None
+    others = db.scalars(select(ServiceOffering).where(ServiceOffering.provider_workspace_id == workspace_id)
+                        .order_by(ServiceOffering.name)).all()
+    return {
+        "service": {"uid": svc.uid, "name": svc.name} if svc else None,
+        "team": {"uid": team.uid, "name": team.name} if team else None,
+        "request_type_name": request.request_type_name if request else None,
+        "requester": {"id": requester.id, "name": requester.name, "email": requester.email} if requester else None,
+        "origin_name": (request.route or {}).get("origin_name") if request else None,
+        "route_reason": (request.route or {}).get("reason") if request else None,
+        "submitted": request.submitted if request else [],
+        "requester_status": status_of(db, issue),
+        "services": [{"uid": o.uid, "name": o.name, "team_group_uid": o.team_group_uid} for o in others],
+    }
 
 
 @router.get("/{uid}/links", response_model=IssueLinksOut)
@@ -676,11 +742,15 @@ def create_issue_comment(
         if existing.issue_uid != uid:
             raise HTTPException(status_code=409, detail={"error": "That comment uid is taken.", "code": "conflict"})
         return existing                     # a retry of the same comment (flutter-app-design §3.2)
+    _check_audience(db, issue, body.audience)
     author = current_user_id or body.author or "api"
-    comment = IssueComment(issue_uid=uid, uid=body.uid, author=author, body=body.body)
+    comment = IssueComment(issue_uid=uid, uid=body.uid, author=author, body=body.body, audience=body.audience)
     db.add(comment)
     db.flush()
     notify.on_comment(db, issue, author, body.body)
+    if body.audience == "requester":
+        from app.services.service_portal import on_public_reply
+        on_public_reply(db, issue, body.body, author)
     db.commit()
     db.refresh(comment)
     return comment

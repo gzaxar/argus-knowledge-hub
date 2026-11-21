@@ -15,7 +15,8 @@ from app.models.issue import Issue, IssueHistory
 # Changes worth a line in the history. Description and attributes are
 # deliberately absent: a diff of prose or of a JSON blob is noise in a
 # timeline, and the current value is always on the ticket.
-TRACKED_FIELDS = ("title", "state", "priority", "assignee", "asset_uid", "schema_uid")
+TRACKED_FIELDS = ("title", "state", "priority", "assignee", "asset_uid", "schema_uid", "service_uid",
+                  "assigned_group_uid")
 
 FIELD_LABELS = {
     "title": "Title",
@@ -24,6 +25,8 @@ FIELD_LABELS = {
     "assignee": "Assignee",
     "asset_uid": "Linked object",
     "schema_uid": "Type",
+    "service_uid": "Service",
+    "assigned_group_uid": "Team",
 }
 
 

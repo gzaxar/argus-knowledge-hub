@@ -349,6 +349,10 @@ for _r in portability_router.ROUTERS:
 from app.routers import ask_eval as ask_eval_router  # noqa: E402
 
 app.include_router(ask_eval_router.router)
+from app.routers import service_portal as service_portal_router  # noqa: E402
+
+app.include_router(service_portal_router.router)
+app.include_router(service_portal_router.admin_router)
 
 
 @app.on_event("startup")

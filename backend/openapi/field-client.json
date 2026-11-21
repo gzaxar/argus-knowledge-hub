@@ -1589,6 +1589,11 @@
             ],
             "title": "Asset Uid"
           },
+          "audience": {
+            "default": "internal",
+            "title": "Audience",
+            "type": "string"
+          },
           "author": {
             "anyOf": [
               {
@@ -3299,6 +3304,14 @@
       },
       "IssueCommentCreate": {
         "properties": {
+          "audience": {
+            "enum": [
+              "internal",
+              "requester"
+            ],
+            "title": "Audience",
+            "type": "string"
+          },
           "author": {
             "anyOf": [
               {
@@ -3328,6 +3341,11 @@
       },
       "IssueCommentOut": {
         "properties": {
+          "audience": {
+            "default": "internal",
+            "title": "Audience",
+            "type": "string"
+          },
           "author": {
             "title": "Author",
             "type": "string"
@@ -3492,6 +3510,17 @@
             ],
             "title": "Asset Uid"
           },
+          "assigned_group_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Group Uid"
+          },
           "assignee": {
             "anyOf": [
               {
@@ -3610,6 +3639,17 @@
             ],
             "title": "Schema Uid"
           },
+          "service_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Uid"
+          },
           "state": {
             "title": "State",
             "type": "string"
@@ -3662,6 +3702,17 @@
               }
             ],
             "title": "Asset Uid"
+          },
+          "assigned_group_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Group Uid"
           },
           "assignee": {
             "anyOf": [
@@ -3743,6 +3794,17 @@
               }
             ],
             "title": "Schema Uid"
+          },
+          "service_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Uid"
           },
           "state": {
             "anyOf": [
@@ -11367,6 +11429,42 @@
                 }
               ],
               "title": "Schema Uid"
+            }
+          },
+          {
+            "description": "Only the requests filed under this portal service",
+            "in": "query",
+            "name": "service_uid",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only the requests filed under this portal service",
+              "title": "Service Uid"
+            }
+          },
+          {
+            "description": "Only the tickets in this team's queue",
+            "in": "query",
+            "name": "assigned_group_uid",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only the tickets in this team's queue",
+              "title": "Assigned Group Uid"
             }
           },
           {

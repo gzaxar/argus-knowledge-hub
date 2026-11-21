@@ -51,6 +51,10 @@ export function areas(features: WorkspaceCapabilities["features"] | null, review
       also: (p, s) => p.startsWith("/documents") || (p.startsWith("/search/advanced") && s.includes("entity=documents")) ||
         (p.startsWith("/schemas") && s.includes("applies_to=documents")),
     },
+    {
+      // The help centre opens full screen, outside this shell.
+      to: "/support", label: "Services & Support", icon: "☏",
+    },
     { to: "/activities", label: "Activities", icon: "↻" },
     { to: "/map", label: "Map", icon: "⌖", needs: "map" },
     { to: "/graph", label: "Knowledge graph", icon: "⌗" },

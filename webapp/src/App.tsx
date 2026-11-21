@@ -75,6 +75,10 @@ import { SchemaForm } from "./pages/schemas/Form";
 import { InstallationAI, WorkspaceAI } from "./pages/workspace/AI";
 import { WorkspaceAccess } from "./pages/workspace/Access";
 import { SiteAdministratorsPage, SiteFacilitiesPage, SiteGroupAccessPage } from "./pages/site/SiteAdministration";
+import { ServiceAuthorizationsPage, ServiceDeskPage } from "./pages/site/ServiceDesk";
+import { PortalHome, SitePortal } from "./pages/portal/SitePortal";
+import { RequestForm } from "./pages/portal/RequestForm";
+import { MyRequests, RequestDetail } from "./pages/portal/MyRequests";
 import { WorkspaceMembers } from "./pages/workspace/Members";
 import { WorkspaceIntegrity } from "./pages/workspace/Integrity";
 import { WorkspaceKeys } from "./pages/workspace/Keys";
@@ -111,12 +115,29 @@ function LegacyImportRedirect() {
   );
 }
 
+/** /sites/:siteId/services… → /support/:siteId… */
+function PortalRedirect() {
+  const location = useLocation();
+  const to = location.pathname
+    .replace(/^\/sites\/([^/]+)\/services\/new\//, "/support/$1/new/")
+    .replace(/^\/sites\/([^/]+)\/services$/, "/support/$1")
+    .replace(/^\/sites\/([^/]+)\/requests/, "/support/$1/requests");
+  return <Navigate to={to + location.search} replace />;
+}
+
 export function App() {
   return (
     <TokenGate>
       <Routes>
         {/* Export ▸ PDF / Print: the record alone on the page, no app around it. */}
         <Route path="/print/:kind/:uid" element={<PrintPage />} />
+        {/* The service portal (docs/service-portal.md): full screen, its own header, none of ARGUS's own menus —
+            a person asking for help needs no workspace to work in. */}
+        <Route path="/support" element={<PortalHome />} />
+        <Route path="/support/:siteId" element={<SitePortal />} />
+        <Route path="/support/:siteId/new/:requestTypeUid" element={<RequestForm />} />
+        <Route path="/support/:siteId/requests" element={<MyRequests />} />
+        <Route path="/support/:siteId/requests/:uid" element={<RequestDetail />} />
         <Route element={<AppShell />}>
           <Route path="/" element={<Dashboard />} />
 
@@ -145,6 +166,12 @@ export function App() {
           <Route path="/assets/:uid" element={<AssetDetail />} />
           <Route path="/assets/:uid/edit" element={<AssetForm />} />
 
+          {/* The help centre's first addresses, kept working: it now lives under /support. */}
+          <Route path="/services" element={<Navigate to="/support" replace />} />
+          <Route path="/sites/:siteId/services" element={<PortalRedirect />} />
+          <Route path="/sites/:siteId/services/new/:requestTypeUid" element={<PortalRedirect />} />
+          <Route path="/sites/:siteId/requests" element={<PortalRedirect />} />
+          <Route path="/sites/:siteId/requests/:uid" element={<PortalRedirect />} />
           <Route path="/tickets" element={<IssueList />} />
           <Route path="/tickets/board" element={<IssueBoard />} />
           <Route path="/tickets/workflows" element={<WorkflowsPage />} />
@@ -224,6 +251,8 @@ export function App() {
           <Route path="/sites/:siteId/administrators" element={<SiteAdministratorsPage />} />
           <Route path="/sites/:siteId/group-access" element={<SiteGroupAccessPage />} />
           <Route path="/sites/:siteId/facilities" element={<SiteFacilitiesPage />} />
+          <Route path="/sites/:siteId/service-desk" element={<ServiceDeskPage />} />
+          <Route path="/admin/service-authorizations" element={<ServiceAuthorizationsPage />} />
           <Route path="/workspaces/:workspaceId/packages" element={<WorkspacePackages />} />
           <Route path="/workspaces/:workspaceId/glpi" element={<GlpiPage />} />
           <Route path="/workspaces/:workspaceId/icons" element={<IconLibrary />} />

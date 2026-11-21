@@ -103,7 +103,8 @@ export function TokenGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (profile.authType === "oidc" && !profile.activeWorkspaceId) {
+  // The help centre names its site itself: someone who only asks for help never has to pick a workspace.
+  if (profile.authType === "oidc" && !profile.activeWorkspaceId && !window.location.pathname.startsWith("/support")) {
     return (
       <WorkspacePicker
         profile={profile}

@@ -7,9 +7,9 @@ type Features = Parameters<typeof areas>[0];
 const ALL = { equipment: true, map: true, beam_model: true } as unknown as Features;
 
 describe("the main navigation", () => {
-  it("lists the ten areas in a stable order", () => {
+  it("lists the eleven areas in a stable order", () => {
     expect(areas(ALL, 0).map((a) => a.label)).toEqual([
-      "Cockpit", "Assets", "Tickets", "Documents", "Activities", "Map", "Knowledge graph", "Beam model", "Ask ARGUS",
+      "Cockpit", "Assets", "Tickets", "Documents", "Services & Support", "Activities", "Map", "Knowledge graph", "Beam model", "Ask ARGUS",
       "Review queue",
     ]);
   });
