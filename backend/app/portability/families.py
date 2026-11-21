@@ -257,9 +257,11 @@ FAMILIES: list[Family] = [
     Family("identities", "identity", User, ("id",), _users,
            exclude=("last_login_at", "synced_at", "is_admin")),
     # access
+    # site_id names another workspace of the same family (docs/sites.md): set in a second pass, so a facility
+    # whose id sorts before its site's (btf before lnf) does not refer to a site not yet loaded.
     Family("workspaces", "access", Workspace, ("id",),
            lambda db, sc: select(Workspace).where(Workspace.id.in_(sc.workspaces)).order_by(Workspace.id),
-           exclude=("import_state",)),
+           exclude=("import_state",), deferred=("site_id",)),
     Family("roles", "access", Role, ("id",), _roles),
     Family("groups", "access", Group, ("uid",), _groups),
     Family("group_members", "access", GroupMember, ("group_uid", "user_id"),
