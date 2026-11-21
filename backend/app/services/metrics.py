@@ -62,6 +62,11 @@ class _PoolCollector(Collector):
 
 REGISTRY.register(_PoolCollector())
 
+# What ARGUS holds and how it is used (services/app_metrics.py), read from the database at most once a minute.
+if os.environ.get("ARGUS_APP_METRICS", "on").lower() not in ("off", "0", "false"):
+    from app.services.app_metrics import AppCollector
+    REGISTRY.register(AppCollector())
+
 _started = False
 _lock = threading.Lock()
 
