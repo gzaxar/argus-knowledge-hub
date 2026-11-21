@@ -728,6 +728,21 @@ def dry_run(import_id: str, body: Optional[DryRunIn] = None, background: bool = 
     return _commit(db, {**service.import_view(out), "dry_run": out.dry_run})
 
 
+class ReconcileDecisionsIn(BaseModel):
+    decisions: dict = Field(default_factory=dict)
+
+
+@imports_router.post("/{import_id}/reconcile-decisions")
+def reconcile_decisions(import_id: str, body: ReconcileDecisionsIn, identity=Depends(get_identity),
+                        db: Session = Depends(get_db)):
+    """On an import whose reconciliation failed: change a decision that acts only on the reconciliation
+    (`projections`). Resuming it then reconciles again in its staging database, loading nothing again."""
+    imp = _import(db, import_id, identity)
+    _may_import(db, imp, identity, service.config())
+    out = _guard(lambda: service.set_reconcile_decisions(db, imp, body.decisions, actor_of(identity)))
+    return _commit(db, service.import_view(out))
+
+
 @imports_router.post("/{import_id}/upload")
 async def upload(import_id: str, file: UploadFile = File(...), identity=Depends(get_identity),
                  db: Session = Depends(get_db)):

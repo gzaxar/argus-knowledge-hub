@@ -11575,6 +11575,16 @@
         "title": "ReassignIn",
         "type": "object"
       },
+      "ReconcileDecisionsIn": {
+        "properties": {
+          "decisions": {
+            "title": "Decisions",
+            "type": "object"
+          }
+        },
+        "title": "ReconcileDecisionsIn",
+        "type": "object"
+      },
       "RegistryExceptionIn": {
         "properties": {
           "reason": {
@@ -65981,6 +65991,94 @@
           }
         ],
         "summary": "Provenance",
+        "tags": [
+          "portability"
+        ]
+      }
+    },
+    "/v1/portability/imports/{import_id}/reconcile-decisions": {
+      "post": {
+        "description": "On an import whose reconciliation failed: change a decision that acts only on the reconciliation\n(`projections`). Resuming it then reconciles again in its staging database, loading nothing again.",
+        "operationId": "reconcile_decisions_v1_portability_imports__import_id__reconcile_decisions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "title": "Import Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Workspace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileDecisionsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reconcile Decisions",
         "tags": [
           "portability"
         ]

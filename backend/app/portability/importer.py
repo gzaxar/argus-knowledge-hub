@@ -414,6 +414,10 @@ def dry_run(db: Session, plan: Plan) -> dict:
             if seen % 200 == 0:
                 jobs.report(f"checking {fam.name}", seen, total)
             local, rm = find_local(db, plan, fam, key, row)
+            if local is None and fam.name == "identities" and _signed_in_here(db, row) is not None:
+                identity_notes.append({"user": key, "note": f"{row.get('email')} signed in here before under another "
+                                       "id: the archive's account takes it over (what it holds here, and its "
+                                       "administrator flag, move to it)"})
             if local is None:
                 missing = _missing_refs(db, fam, _values_for_check(plan, fam, row), pending)
                 if missing:
@@ -707,11 +711,55 @@ def _load_chunk(db: Session, plan: Plan, fam: Family, chunk: dict, pending: dict
             report["deferred"].append({"family": fam.name, "key": key, "missing": missing, "row": "loaded"})
         if fam.name == "types":
             _ensure_owner(db, plan, values.get("workspace_id"))
+        signed_in = _signed_in_here(db, values) if fam.name == "identities" else None
+        if signed_in is not None:
+            signed_in.oidc_sub = None             # its sign-in passes to the archive's row, loaded next
+            db.flush()
         obj = fam.model(**values)
         db.add(obj)
         db.flush()
+        if signed_in is not None:
+            _take_over(db, signed_in, obj)
+            report.setdefault("identities_taken_over", []).append({"here": signed_in.id, "archive": obj.id})
         _remember(db, plan, fam, key, _local_key(fam, obj), True, archive_form(plan, fam, obj, key))
         report["created"] += 1
+
+
+def _signed_in_here(db: Session, values: dict):
+    """The person the archive names, already here under another id: someone who signed in (same identity-provider
+    subject) before the import, typically the administrator of a new installation about to restore it."""
+    from app.models.user import User
+    sub = values.get("oidc_sub")
+    if not sub:
+        return None
+    return db.scalar(select(User).where(User.oidc_sub == sub, User.id != values["id"]))
+
+
+def _take_over(db: Session, here, archived) -> None:
+    """The archive's row becomes the person: what the local row held here (memberships, roles, tokens, watches …)
+    moves to it, and so does the administrator flag this installation granted (never carried by an archive); the
+    local row goes. A conflict (both rows hold the same membership) blocks the import instead of choosing."""
+    from sqlalchemy import update
+    from app.db import Base
+    from app.models.role import RoleBinding
+    from app.models.user import User
+    old, new = here.id, archived.id
+    try:
+        with db.begin_nested():
+            for table in Base.metadata.sorted_tables:
+                for col in table.columns:
+                    if any(fk.column.table.name == User.__tablename__ for fk in col.foreign_keys):
+                        db.execute(update(table).where(col == old).values({col.name: new}))
+            db.execute(update(RoleBinding).where(RoleBinding.subject_type == "user", RoleBinding.subject_id == old)
+                       .values(subject_id=new))
+            archived.is_admin = archived.is_admin or here.is_admin
+            archived.last_login_at = here.last_login_at
+            db.delete(here)
+            db.flush()
+    except Exception as e:  # noqa: BLE001
+        raise ImportBlocked(f"{archived.email} signed in here before the import under another id, and what that "
+                            f"account holds here clashes with the archive's: {str(e).splitlines()[0][:200]}",
+                            "identity_conflict", {"here": old, "archive": new}) from e
 
 
 def _ensure_owner(db: Session, plan: Plan, ws: Optional[str]) -> None:
