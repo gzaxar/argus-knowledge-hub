@@ -70,6 +70,17 @@ export function ImportDetailPage() {
     onError: (e) => { setError(problemText(e)); refresh(); },
   });
 
+  // A failed reconciliation: accept what this release rebuilds, then reconcile again in staging (nothing loads again).
+  const acceptAndReconcile = useMutation({
+    mutationFn: async () => {
+      await portabilityApi.reconcileDecisions(id, { projections: "accept_rebuilt" });
+      const { job: started } = await portabilityApi.importJob(id, "resume");
+      setJob(started);
+    },
+    onSuccess: () => { setError(null); refresh(); },
+    onError: (e) => { setError(problemText(e)); refresh(); },
+  });
+
   if (imp.isError) return <p className="text-sm text-rose-700">{problemText(imp.error)}</p>;
   if (!imp.data) return <p className="text-sm text-slate-500">Loading…</p>;
   const i = imp.data;
@@ -85,6 +96,8 @@ export function ImportDetailPage() {
     ? { count: i.manifest.blobs.inspection.uninspected, warning: "", items: i.manifest.blobs.uninspected ?? [] } : undefined);
   const stepBusy = (s: Step) => busy === s || (running && job?.action === s);
   const final = i.state === "finalized" || i.state === "discarded";
+  const reconcileOnly = i.state === "failed" && !!rec.data?.report.staged && !!i.staging?.database;
+  const projectionsDecision = (i.decisions as { projections?: string }).projections;
 
   return (
     <div className="max-w-6xl space-y-4">
@@ -142,7 +155,8 @@ export function ImportDetailPage() {
                             "Load the archive into staged workspaces, rebuild and reconcile?"} />
           )}
           {(i.state === "importing" || i.state === "failed") && (
-            <ActionButton label={`Resume in staging (${i.checkpoints.done} steps done)`} busy={stepBusy("resume")} disabled={running} onClick={() => step.mutate("resume")} />
+            <ActionButton label={reconcileOnly ? "Reconcile again in staging (nothing loads again)" : `Resume in staging (${i.checkpoints.done} steps done)`}
+                          busy={stepBusy("resume")} disabled={running} onClick={() => step.mutate("resume")} />
           )}
           {i.state === "ready_to_finalize" && (
             <ActionButton label="Finalize" busy={stepBusy("finalize")} disabled={running} onClick={() => step.mutate("finalize")}
@@ -171,10 +185,15 @@ export function ImportDetailPage() {
       )}
       {hasDryRun && (
         <DryRun r={report} resolving={dryRunning || running}
+                onAccept={(i.state === "dry_run_ready" || i.state === "awaiting_approval") && projectionsDecision !== "accept_rebuilt"
+                  ? () => dry.mutate({ ...(i.decisions as Record<string, unknown>), projections: "accept_rebuilt" }) : undefined}
                 current={(i.decisions as { catalogue_conflicts?: Record<string, string> }).catalogue_conflicts ?? {}}
                 onResolve={(catalogue_conflicts) => dry.mutate({ ...(i.decisions as Record<string, unknown>), catalogue_conflicts })} />
       )}
-      {rec.data && <Reconciliation r={rec.data.report} sha={rec.data.sha256} />}
+      {rec.data && <Reconciliation r={rec.data.report} sha={rec.data.sha256}
+                                   onAccept={reconcileOnly && !rec.data.report.passed && projectionsDecision !== "accept_rebuilt"
+                                     ? () => acceptAndReconcile.mutate() : undefined}
+                                   accepting={acceptAndReconcile.isPending || (running && job?.action === "resume")} />}
       {chain.data && !chain.data.ok && (
         <p className="text-sm text-rose-700">The origin chain no longer verifies: open the details below (Origin chain).</p>
       )}
@@ -343,8 +362,8 @@ function DecisionsForm({ i, onRun, running }: { i: ImportView; onRun: (d: Record
 const OUTCOMES = ["create", "identical", "update_same_origin", "known_identity", "unresolved_reference", "divergent"];
 const RED_OUTCOMES = ["divergent", "unresolved_reference"];
 
-function DryRun({ r, current, onResolve, resolving }: { r: DryRunReport; current: Record<string, string>;
-    onResolve: (decisions: Record<string, string>) => void; resolving: boolean }) {
+function DryRun({ r, current, onResolve, resolving, onAccept }: { r: DryRunReport; current: Record<string, string>;
+    onResolve: (decisions: Record<string, string>) => void; resolving: boolean; onAccept?: () => void }) {
   const resolvable = (r.blocking ?? []).filter((b) => b.resolvable);
   const otherBlocking = (r.blocking ?? []).filter((b) => !b.resolvable);
   const [open, setOpen] = useState<string | null>(null);
@@ -354,6 +373,17 @@ function DryRun({ r, current, onResolve, resolving }: { r: DryRunReport; current
     <Section title="Dry run" right={<span className={`text-sm font-medium ${r.ready ? "text-emerald-700" : "text-rose-700"}`}>
       {r.ready ? "Ready for approval" : "Blocked"}</span>}>
       {r.note && <p className="mb-2 text-sm text-slate-600">{r.note}</p>}
+      {(r.advice ?? []).map((a) => (
+        <div key={a.code} role="note" className="mb-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p>{a.message}</p>
+          {onAccept && (
+            <button type="button" disabled={resolving} onClick={onAccept}
+                    className="mt-2 rounded bg-amber-700 px-3 py-1 text-xs font-medium text-white disabled:bg-slate-300">
+              {resolving ? "Running…" : "Accept what this release rebuilds and run the dry run again"}
+            </button>
+          )}
+        </div>
+      ))}
       {r.chain && <p className="mb-2 text-sm text-slate-600">Chain: <b>{r.chain.status.replace(/_/g, " ")}</b>
         {r.chain.applied !== undefined && ` · ${r.chain.applied} export(s) from this origin applied here`}</p>}
       {flagged.length > 0 && (
@@ -491,7 +521,8 @@ function Issues({ title, items, tone }: { title: string; items: string[]; tone: 
 
 type Selected = { kind: "family" | "projection" | "invariant"; name: string } | null;
 
-function Reconciliation({ r, sha }: { r: ReconciliationReport; sha: string }) {
+function Reconciliation({ r, sha, onAccept, accepting }: { r: ReconciliationReport; sha: string; onAccept?: () => void;
+                                                            accepting?: boolean }) {
   const fams = Object.entries(r.families ?? {});
   const projs = Object.entries(r.projections ?? {});
   const events = Object.entries(r.rebuild?.events_written_by_rebuild ?? {});
@@ -559,6 +590,17 @@ function Reconciliation({ r, sha }: { r: ReconciliationReport; sha: string }) {
         </ul>
       )}
       {panel}
+      {onAccept && badFams.every(([f]) => f === "assets") && (
+        <div className="mt-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p>If these differences come from the archive being exported by another release, accept what this
+            release rebuilds from the archive's ledger: the reconciliation runs again in staging, nothing is loaded again, and what was
+            accepted is listed in the signed report. It still blocks if any other authoritative row differs.</p>
+          <button type="button" disabled={accepting} onClick={onAccept}
+                  className="mt-2 rounded bg-amber-700 px-3 py-1 text-xs font-medium text-white disabled:bg-slate-300">
+            {accepting ? "Reconciling…" : "Accept what this release rebuilds and reconcile again"}
+          </button>
+        </div>
+      )}
       {r.accepted && (
         <p className="mt-2 text-sm text-amber-800">
           Accepted by decision: the projections this release rebuilds{r.accepted.record_fields?.count

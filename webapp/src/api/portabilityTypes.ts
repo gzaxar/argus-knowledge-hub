@@ -260,6 +260,8 @@ export interface DryRunReport {
   unresolved_reference_count?: number;
   unresolved_references_outcome?: string;
   quota_warnings?: { workspace: string; quota: string; limit: number; used: number; adding: number; message: string }[];
+  /** An archive another release exported: the reconciliation will likely need decision `projections: accept_rebuilt`. */
+  advice?: { code: string; archive_release: string; this_release: string; decision: Record<string, string>; message: string }[];
   identities?: { user: string; note: string }[];
   governance_not_loaded?: string[];
   chain?: { status: string; problem?: string; applied?: number };

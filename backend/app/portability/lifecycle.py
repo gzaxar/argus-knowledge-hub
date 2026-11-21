@@ -44,7 +44,8 @@ IMPORT = {
     "rebuilding": {"reconciling", "failed", "discarded"},
     "reconciling": {"ready_to_finalize", "failed", "discarded"},
     "ready_to_finalize": {"finalized", "discarded"},
-    "failed": {"importing", "discarded"},
+    # From failed: resume loading, or (once it was reconciled, its staging kept) only reconcile again.
+    "failed": {"importing", "reconciling", "discarded"},
     "finalized": set(), "discarded": set(),
 }
 TERMINAL_EXPORT = {"published", "expired", "revoked"}

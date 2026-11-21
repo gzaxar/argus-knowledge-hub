@@ -1804,3 +1804,103 @@ def test_a_record_field_the_ledger_projects_is_accepted_as_rebuilt_only_by_decis
     assert rec["passed"] and state == "ready_to_finalize", json.dumps(_failures(rec), indent=1, default=str)
     assert rec["accepted"]["record_fields"]["count"] == 1
     assert rec["accepted"]["record_fields"]["examples"][0]["fields"] == ["attributes.argus_location"]
+
+
+def test_a_failed_reconciliation_takes_the_projections_decision_and_reconciles_again_without_loading(dbs, env,
+                                                                                                      monkeypatch):
+    """An archive of another release is flagged in the dry run. Approved without the decision, its reconciliation
+    fails; the decision is still set then (only the ones acting on the reconciliation), and resuming reconciles
+    again in the staging database it was loaded into — nothing is loaded twice — and it finalizes."""
+    from sqlalchemy.orm.attributes import flag_modified
+    src = dbs()
+    s = populate(src, env.tmp)
+    with Session(src) as db:
+        unit = db.get(Asset, s.unit)
+        unit.attributes = {**unit.attributes, "argus_location": "Rack Z98"}
+        flag_modified(unit, "attributes")
+        db.commit()
+    monkeypatch.setenv("ARGUS_VERSION", "1.35.99")
+    view, _ = run_export(src, env, s)
+    monkeypatch.setenv("ARGUS_VERSION", "1.36.0")
+    dst = dbs()
+    cfg = env.cfg("dst")
+    with Session(dst) as db:
+        imp = service.create_import(db, "carol@example.org", mode="clone",
+                                    source={"repository": "escrow", "ref": view["git"]["tag"]}, decisions={}, cfg=cfg)
+        db.commit()
+        service.fetch_git(db, imp, "carol@example.org", cfg)
+        service.verify_import(db, imp, "carol@example.org", cfg)
+        service.dry_run(db, imp, "carol@example.org", cfg)
+        db.commit()
+        advice = imp.dry_run["advice"]
+        assert advice[0]["code"] == "projections_from_another_release"
+        assert (advice[0]["archive_release"], advice[0]["this_release"]) == ("1.35.99", "1.36.0")
+        service.approve_import(db, imp, "dave@example.org", acknowledge_uninspected=True, cfg=cfg)
+        db.commit()
+        service.execute(db, imp, "dave@example.org", cfg)
+        db.commit()
+        imp = db.get(PortabilityImport, imp.id)
+        assert imp.state == "failed" and not imp.reconciliation["passed"]
+        done = sorted(imp.checkpoints["done"])
+
+        with pytest.raises(service.ServiceError) as e:
+            service.set_reconcile_decisions(db, imp, {"workspace_map": {"a": "b"}}, "dave@example.org")
+        assert e.value.code == "decision_locked"
+        with pytest.raises(service.ServiceError) as e:
+            service.set_reconcile_decisions(db, imp, {"projections": "whatever"}, "dave@example.org")
+        assert e.value.code == "bad_decision"
+        service.set_reconcile_decisions(db, imp, {"projections": importer.PROJECTIONS_ACCEPT}, "dave@example.org")
+        db.commit()
+
+        service.execute(db, imp, "dave@example.org", cfg)
+        db.commit()
+        imp = db.get(PortabilityImport, imp.id)
+        assert imp.state == "ready_to_finalize", json.dumps(_failures(imp.reconciliation), indent=1, default=str)
+        assert imp.reconciliation["accepted"]["record_fields"]["count"] == 1
+        assert imp.reconciliation["rebuild"] is not None
+        assert sorted(imp.checkpoints["done"]) == done
+        kinds = [ev.kind for ev in db.scalars(select(PortabilityEvent).where(
+            PortabilityEvent.subject_id == imp.id).order_by(PortabilityEvent.seq))]
+        assert "decisions_changed" in kinds and "reconcile_again" in kinds and "resume" not in kinds
+        service.finalize(db, imp, "dave@example.org", cfg)
+        db.commit()
+        assert db.get(PortabilityImport, imp.id).state == "finalized"
+
+
+def test_a_person_who_signed_in_before_a_restore_is_taken_over_by_the_archives_account(dbs, env):
+    """A new installation's administrator signs in (same identity-provider subject as in the archive, another id)
+    and then restores: the archive's account takes theirs over — what it held here and the administrator flag move
+    to it — instead of finalization failing on the subject being held twice."""
+    from app.models.membership import Membership
+    from app.models.role import RoleBinding
+    src, fresh = dbs(), dbs()
+    s = populate(src, env.tmp)
+    with Session(src) as db:
+        exp = service.create_export(db, "alice", mode="full", workspaces=[], classifications=[],
+                                    destination={"repository": "escrow", "artifact_store": "vault"},
+                                    decisions={"opaque_blobs": "approve_opaque"}, cfg=env.cfg("src"),
+                                    identity_profile="full_identity")
+        service.analyse_export(db, exp, "alice", env.cfg("src"))
+        service.approve_export(db, exp, "bob", admin=True, fresh_auth=True, cfg=env.cfg("src"))
+        db.commit()
+        service.generate_export(src, db, exp, "bob", env.cfg("src"))
+        service.publish_export(db, exp, "bob", env.cfg("src"))
+        db.commit()
+        tag = exp.git["tag"]
+    with Session(fresh) as db:
+        db.add(Workspace(id="main", name="Main"))
+        db.add(User(id="local-rossi", email="rossi@example.org", oidc_sub="sub-rossi", is_admin=True))
+        db.flush()
+        db.add(Membership(workspace_id="main", user_id="local-rossi", can_read=True))
+        db.add(RoleBinding(workspace_id="main", subject_type="user", subject_id="local-rossi", role_id="viewer",
+                           created_at=datetime.now(timezone.utc)))
+        db.commit()
+    _, report = run_import(fresh, env, tag, mode="restore", root="restore-signed-in", expect_ready=False)
+    assert any("signed in here before" in n["note"] for n in report["identities"])
+    run_import(fresh, env, tag, mode="restore", root="restore-signed-in-2")
+    with Session(fresh) as db:
+        assert db.get(User, "local-rossi") is None
+        rossi = db.get(User, "u-rossi")
+        assert rossi.oidc_sub == "sub-rossi" and rossi.is_admin
+        assert db.scalar(select(Membership).where(Membership.user_id == "u-rossi", Membership.workspace_id == "main"))
+        assert db.scalar(select(RoleBinding).where(RoleBinding.subject_id == "u-rossi", RoleBinding.workspace_id == "main"))

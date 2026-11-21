@@ -1913,6 +1913,10 @@ export const portabilityApi = {
       method: "POST", ...(step === "approve" ? { body: json({ acknowledge_uninspected: !!opts.acknowledge_uninspected }) } : {}) }),
   importJob: (id: string, step: "fetch-git" | "verify" | "execute" | "resume" | "finalize") =>
     request<{ job: PortabilityJob }>(`${P}/imports/${encodeURIComponent(id)}/${step}?background=true`, { method: "POST" }),
+  /** On an import whose reconciliation failed: a decision acting only on the reconciliation (projections);
+   *  resuming it then reconciles again in its staging database. */
+  reconcileDecisions: (id: string, decisions: Record<string, unknown>) =>
+    request<ImportView>(`${P}/imports/${encodeURIComponent(id)}/reconcile-decisions`, { method: "POST", body: json({ decisions }) }),
   discardImport: (id: string, reason: string) =>
     request<ImportView>(`${P}/imports/${encodeURIComponent(id)}/discard`, { method: "POST", body: json({ reason }) }),
   originChain: (id: string) => request<OriginChainCheck>(`${P}/imports/${encodeURIComponent(id)}/origin-chain`),

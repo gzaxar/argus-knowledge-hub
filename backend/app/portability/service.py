@@ -751,6 +751,23 @@ def _plan(imp: PortabilityImport, cfg: Config, *, staged: bool) -> importer.Plan
                          manifest_sha256=((imp.verification or {}).get("checkpoint") or {}).get("manifest_sha256", ""))
 
 
+def _release_advice(imp: PortabilityImport) -> list:
+    """An archive another release exported: its projections (facts, derived relations, conflicts) and the record
+    fields the ledger projects were derived by that release's rules, and this one rebuilds them by its own, so the
+    reconciliation is expected to find them different unless the decision accepts what this release rebuilds."""
+    archive = (imp.manifest.get("argus") or {}).get("application_version")
+    here = os.environ.get("ARGUS_VERSION", "1.0.0")
+    if not archive or archive == here or (imp.decisions or {}).get("projections") == importer.PROJECTIONS_ACCEPT:
+        return []
+    return [{"code": "projections_from_another_release", "archive_release": archive, "this_release": here,
+             "decision": {"projections": importer.PROJECTIONS_ACCEPT},
+             "message": f"This archive was exported by release {archive}; this one ({here}) rebuilds the projections "
+                        "and the record fields the ledger projects by its own rules, so the reconciliation will "
+                        "likely find them different and block finalization. Unless they must equal the archive's, "
+                        "set Projections to \"accept what this release rebuilds\" before approving (it can still "
+                        "be set after a failed reconciliation)."}]
+
+
 def dry_run(db: Session, imp: PortabilityImport, actor: str, cfg: Config,
             decisions: Optional[dict] = None) -> PortabilityImport:
     expect(imp, "dry_run_ready", "awaiting_approval")
@@ -788,6 +805,9 @@ def dry_run(db: Session, imp: PortabilityImport, actor: str, cfg: Config,
                                                       "restore needs an empty instance; use clone or merge"})
             report["ready"] = False
     if imp.mode != "evidence":
+        advice = _release_advice(imp)
+        if advice:
+            report["advice"] = advice
         over = _quota_preview(db, plan)
         if over:
             report["quota_warnings"] = over
@@ -852,6 +872,71 @@ def approve_import(db: Session, imp: PortabilityImport, actor: str, *, acknowled
     return imp
 
 
+# Decisions that act only on the reconciliation, so they may still change once the archive is loaded: an import
+# that failed its reconciliation is reconciled again in its staging database, without loading anything again.
+RECONCILE_DECISIONS = {"projections": (importer.PROJECTIONS_ACCEPT, "verify")}
+
+
+def set_reconcile_decisions(db: Session, imp: PortabilityImport, decisions: dict, actor: str) -> PortabilityImport:
+    """Change, on an import whose reconciliation failed, a decision that acts only on the reconciliation
+    (RECONCILE_DECISIONS); resuming it then reconciles again. Audited, and the signed report names it."""
+    expect(imp, "failed")
+    if not _reconcile_only(imp):
+        raise ServiceError("this import has not reached its reconciliation, or its staging database is gone: "
+                           "resume it, or discard it and import again", "not_reconciled", 409)
+    other = sorted(k for k in decisions if k not in RECONCILE_DECISIONS)
+    if other:
+        raise ServiceError(f"once loaded, only {', '.join(RECONCILE_DECISIONS)} can change "
+                           f"({', '.join(other)} acts on the load: discard and import again)", "decision_locked", 422)
+    for k, v in decisions.items():
+        if v not in RECONCILE_DECISIONS[k]:
+            raise ServiceError(f"{k}: one of {', '.join(RECONCILE_DECISIONS[k])}", "bad_decision", 422)
+    before = {k: (imp.decisions or {}).get(k) for k in decisions}
+    imp.decisions = {**(imp.decisions or {}), **decisions}
+    audit(db, imp, "decisions_changed", actor, {"before": before, "after": decisions, "after_load": True})
+    return imp
+
+
+def _reconcile_only(imp: PortabilityImport) -> bool:
+    """A failed import that was loaded, rebuilt and reconciled in a staging database still there: resuming it
+    reconciles again, nothing more."""
+    return imp.state == "failed" and bool((imp.reconciliation or {}).get("staged")) and \
+        bool((imp.staging or {}).get("database"))
+
+
+def _store_reconciliation(db: Session, imp: PortabilityImport, sdb: Session, plan, deferred: list, rebuilt,
+                          actor: str, cfg: Config) -> PortabilityImport:
+    imp = db.get(PortabilityImport, imp.id)
+    rec = importer.reconcile(sdb, plan, deferred)
+    rec["rebuild"] = rebuilt
+    rec["git"] = (imp.verification or {}).get("git")
+    rec["staged"] = True
+    imp.reconciliation = rec
+    _sign_report(imp, cfg)
+    move(db, imp, "ready_to_finalize" if rec["passed"] else "failed", actor, "reconciled",
+         {"passed": rec["passed"], "sha256": imp.reconciliation_sha256, "where": "staging"})
+    db.commit()
+    return imp
+
+
+def _reconcile_again(db: Session, imp: PortabilityImport, actor: str, cfg: Config) -> PortabilityImport:
+    previous = imp.reconciliation or {}
+    move(db, imp, "reconciling", actor, "reconcile_again", {"decisions": imp.decisions or {}})
+    db.commit()
+    plan = _plan(imp, cfg, staged=True)
+    stage_engine = staging.engine_for(db.get_bind().url, imp.staging["database"])
+    deferred = list((imp.checkpoints or {}).get("deferred") or [])
+    try:
+        with Session(stage_engine) as sdb:
+            plan.ingested_at = datetime.now(timezone.utc)
+            return _store_reconciliation(db, imp, sdb, plan, deferred, previous.get("rebuild"), actor, cfg)
+    except Exception as e:  # noqa: BLE001
+        _fail(db, imp, actor, e)
+        raise ServiceError(str(e), getattr(e, "code", "import_failed"), 409, getattr(e, "detail", None)) from e
+    finally:
+        stage_engine.dispose()
+
+
 def execute(db: Session, imp: PortabilityImport, actor: str, cfg: Config,
             stop_after: Optional[int] = None) -> PortabilityImport:
     """Load, rebuild and reconcile the import in its own staging database. Nothing reaches the active
@@ -859,6 +944,8 @@ def execute(db: Session, imp: PortabilityImport, actor: str, cfg: Config,
     if imp.state in ("ready_to_finalize", "finalized"):
         return imp
     expect(imp, "approved", "importing", "failed")
+    if _reconcile_only(imp):
+        return _reconcile_again(db, imp, actor, cfg)
     if imp.state != "importing":
         move(db, imp, "importing", actor, "execute" if imp.state == "approved" else "resume")
         db.commit()
@@ -911,16 +998,7 @@ def execute(db: Session, imp: PortabilityImport, actor: str, cfg: Config,
             imp = db.get(PortabilityImport, imp.id)
             move(db, imp, "reconciling", actor, "rebuilt", rebuilt)
             db.commit()             # seen as reconciling while it runs, not only when it ends
-            imp = db.get(PortabilityImport, imp.id)
-            rec = importer.reconcile(sdb, plan, deferred)
-            rec["rebuild"] = rebuilt
-            rec["git"] = (imp.verification or {}).get("git")
-            rec["staged"] = True
-            imp.reconciliation = rec
-            _sign_report(imp, cfg)
-            move(db, imp, "ready_to_finalize" if rec["passed"] else "failed", actor, "reconciled",
-                 {"passed": rec["passed"], "sha256": imp.reconciliation_sha256, "where": "staging"})
-            db.commit()
+            imp = _store_reconciliation(db, imp, sdb, plan, deferred, rebuilt, actor, cfg)
     except InterruptedError as e:
         db.rollback()
         row = db.get(PortabilityImport, imp.id)
