@@ -277,10 +277,16 @@ def inside(db: Session, place_uid: str) -> list[str]:
 
 # --------------------------------------------------------------------------- the flush guard
 
+# Set on a session while a portable archive is loaded into it (portability/importer.execute).
+LOADING_ARCHIVE = "portability_loading_archive"
+
 def _on_flush(session, flush_context, instances) -> None:
     """A record created in a site, or retyped or moved into one, gets `site_shared` there and then; one that
     leaves a site stops being shared. Containment and withholding are kept by `refresh` where they change."""
     from sqlalchemy import inspect as sa_inspect
+    if session.info.get(LOADING_ARCHIVE):
+        return                               # an import copies the archive's site_shared; the types it rests on
+                                             # have no parents yet (their second pass), so it cannot be derived
     touched = []
     for o in session.new:
         if isinstance(o, Asset):

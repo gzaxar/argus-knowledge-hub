@@ -260,10 +260,13 @@ export function ImportDetailPage() {
 }
 
 function DecisionsForm({ i, onRun, running }: { i: ImportView; onRun: (d: Record<string, unknown>) => void; running: boolean }) {
-  const current = i.decisions as { workspace_map?: Record<string, string>; unresolved_references?: string; governance?: string };
+  const current = i.decisions as { workspace_map?: Record<string, string>; unresolved_references?: string; governance?: string;
+                                   projections?: string };
   const [map, setMap] = useState<Record<string, string>>(current.workspace_map ?? {});
   const [refs, setRefs] = useState(current.unresolved_references ?? "block");
   const [gov, setGov] = useState(current.governance === "load");
+  const [proj, setProj] = useState(current.projections ?? "verify");
+  const archiveRelease = (i.manifest as { argus?: { application_version?: string } } | undefined)?.argus?.application_version;
   const [chosen, setChosen] = useState<string[]>((i.decisions as { select_workspaces?: string[] }).select_workspaces ?? []);
   return (
     <Section title="Decisions for the dry run">
@@ -301,6 +304,17 @@ function DecisionsForm({ i, onRun, running }: { i: ImportView; onRun: (d: Record
             <option value="defer">leave unresolved and list them in the reconciliation</option>
           </select>
         </label>
+        <label className="flex items-center gap-2">
+          Projections (facts, derived relations, conflicts, ticket links):
+          <select value={proj} onChange={(e) => setProj(e.target.value)} className="rounded border border-slate-300 px-2 py-1">
+            <option value="verify">must equal the archive's</option>
+            <option value="accept_rebuilt">accept what this release rebuilds from the archive's ledger{archiveRelease ? ` (archive from ${archiveRelease})` : ""}</option>
+          </select>
+        </label>
+        {proj === "accept_rebuilt" && (
+          <p className="text-xs text-amber-800">Only when every authoritative row equals the archive's. The differences, and any invariant
+            failing on the archive's data, are listed in the signed reconciliation; new conflicts stay open for review.</p>
+        )}
         {(i.mode === "merge" || i.mode === "selective") && (
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={gov} onChange={(e) => setGov(e.target.checked)} />
@@ -310,6 +324,7 @@ function DecisionsForm({ i, onRun, running }: { i: ImportView; onRun: (d: Record
         <button type="button" disabled={running}
                 onClick={() => onRun({ workspace_map: Object.fromEntries(Object.entries(map).filter(([k, v]) => v && v !== k)),
                                        unresolved_references: refs, ...(gov ? { governance: "load" } : {}),
+                                       projections: proj,
                                        ...(i.mode === "selective" ? { select_workspaces: chosen } : {}) })}
                 className="rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white disabled:bg-slate-300">
           {running ? "Running…" : "Run the dry run with these decisions"}
@@ -458,7 +473,11 @@ function Reconciliation({ r, sha }: { r: ReconciliationReport; sha: string }) {
       {r.passed ? "Passed" : "Failed — finalization blocked"}</span>}>
       <KV rows={[["Report", <Mono>{sha}</Mono>], ["Signed", r.signature ? `${r.signature.algorithm} by ${r.signature.principal}` : "no"],
                  ["Note", r.evidence_only ? "evidence only: no projection to rebuild" : r.already_applied ? "this export was already applied here: nothing changed" : undefined],
-                 ["Invariants", r.invariants ? `${r.invariants.ok ? "ok" : "failing"} here; ${r.invariants.exported_ok ? "ok" : "failing"} at the source` : undefined]]} />
+                 ["Invariants", r.invariants ? `${r.invariants.ok ? "ok" : `failing here (${(r.invariants.failing ?? []).join(", ")})`}; ${
+                   r.invariants.exported_ok === null || r.invariants.exported_ok === undefined ? "not checked" : r.invariants.exported_ok ? "ok" : "failing"} at the source` : undefined],
+                 ["Accepted", r.accepted ? `rebuilt projections (${r.accepted.projections.join(", ") || "none differ"})${
+                   r.accepted.invariants.length ? ` and invariants failing on the archive's data (${r.accepted.invariants.join(", ")})` : ""}, by decision; archive from ${r.accepted.archive_release ?? "?"}, here ${r.accepted.this_release}` : undefined],
+                 ["Kept", r.rebuild?.relations_kept_without_ledger_facts ? `${r.rebuild.relations_kept_without_ledger_facts} ledger relation(s) of records with no ledger facts, as the source had them` : undefined]]} />
       {fams.length > 0 && (
         <div className="mt-3 grid gap-4 md:grid-cols-2">
           <div>

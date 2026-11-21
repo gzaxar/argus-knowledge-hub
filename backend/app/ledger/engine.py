@@ -1038,7 +1038,9 @@ def _project_key(db: Session, record: Asset, predicate: str, member: Optional[st
         conflicts.append(("authority_vs_authority", "blocking", {"values": distinct}))
     else:
         eff = max(top, key=lambda e: (e[2] or temporal.NEG_INF, e[3]))[0]
-        conflicts.append(("contributory_disagreement", "non-blocking", {"values": distinct}))
+        # In a stable order: which contributor came first is not what the conflict says, and a rebuild elsewhere
+        # (an import) must say the same.
+        conflicts.append(("contributory_disagreement", "non-blocking", {"values": sorted(distinct, key=canonical)}))
     for v, rank, _o, _s, contributor, _m in eligible:
         wins = RANK_ORDER[rank] == best_rank and canonical(v) == canonical(eff)
         statuses[contributor] = ("accepted" if wins else "outranked", rank, wins)

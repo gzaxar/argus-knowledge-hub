@@ -498,6 +498,10 @@ Imported history is never inserted into a local audit day that is already sealed
 | same uid, divergent content | block (A12) |
 | matching immutable external identifier | identity candidate; never a merge (A13) |
 | same type id, other definition | a catalogue conflict to review; never overwritten (A14) |
+| a column this release added, absent from an older archive and empty here | equal (`groups.email_domains`) |
+| a derived column (`assets.site_shared`) | the archive's value; the flush guards that derive it stand aside while an archive loads |
+| a `ledger` relation of a record with no ledger facts (no binding, no decision) | kept as the source had it: a rebuild has nothing to make it from |
+| projections this release rebuilds differently (an archive from an older release, or stale at the source) | reconciliation fails, unless decision `projections: accept_rebuilt` and every authoritative row equal: then the rebuilt projections stand, and what differed, with any invariant failing on the archive's data, is listed under `accepted` in the signed report |
 | missing reference | block, or `defer` by decision (listed in the reconciliation) |
 | unknown person | a historical reference |
 

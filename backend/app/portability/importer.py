@@ -312,6 +312,9 @@ def _missing_refs(db: Session, fam: Family, values: dict, pending: dict) -> list
 # stored twice by an older import (two rows, created microseconds apart) is loaded once and cannot match both stamps.
 # A policy is its body and vocabulary; when it was activated is this instance's own history — an import that
 # activates one of the archive's policies again here (_activate_archive_sources) moves only that.
+# The decision that accepts this release's rebuilt projections over the archive's (reconcile).
+PROJECTIONS_ACCEPT = "accept_rebuilt"
+
 RECONCILE_IGNORES = {"relations": {"created_at"}, "policies": {"activated_at"}}
 
 
@@ -338,7 +341,14 @@ def _normalize_legacy_multi(attrs: object) -> object:
     return out
 
 
+def as_archived(form: dict, row: dict) -> dict:
+    """A local row in the shape of an archive row: a column this release added and an older archive does not
+    carry (groups.email_domains) is left out when it holds nothing — the archive could not have said it."""
+    return {k: v for k, v in form.items() if k in row or v is not None}
+
+
 def _reconciles(fam: Family, local, row: dict, form: dict) -> bool:
+    form = as_archived(form, row)
     if form == row or (local is not None and _installation_defined(fam, local, row)):
         return True
     if isinstance(form.get("attributes"), dict) and isinstance(row.get("attributes"), dict):
@@ -388,7 +398,7 @@ def dry_run(db: Session, plan: Plan) -> dict:
                 if fam.name == "assets":
                     candidates += _candidates(db, row)
                 continue
-            form = archive_form(plan, fam, local, key)
+            form = as_archived(archive_form(plan, fam, local, key), row)
             if form == row or _installation_defined(fam, local, row) or \
                     (fam.name in RECONCILE_IGNORES and _reconciles(fam, local, row, form)):
                 counts[fam.name]["identical"] += 1
@@ -546,6 +556,7 @@ def execute(db: Session, plan: Plan, done: set, save: Callable[[set], None],
     steps = 0
 
     from app.portability import jobs
+    from app.services.sites import LOADING_ARCHIVE
     planned = sum(len(plan.manifest["families"][f.name]["chunks"]) + (1 if f.deferred else 0) for f in plan.families())
 
     def step(name: str, fn):
@@ -562,16 +573,26 @@ def execute(db: Session, plan: Plan, done: set, save: Callable[[set], None],
         steps += 1
         report["steps"] += 1
 
-    for fam in plan.families():
-        for c in plan.manifest["families"][fam.name]["chunks"]:
-            step(f"{fam.name}:{c['file']}", lambda fam=fam, c=c: _load_chunk(db, plan, fam, c, pending, report))
-        if fam.replace_set and plan.manifest["mode"] == "incremental":
-            step(f"{fam.name}:replace", lambda fam=fam: _replace(db, plan, fam))
-    # References inside and across families (a document's current revision, a merge survivor, a parent
-    # type) once everything they can name is loaded.
-    for fam in plan.families():
-        if fam.deferred:
-            step(f"{fam.name}:deferred", lambda fam=fam: _deferred(db, plan, fam, pending, report))
+    # The archive's rows are what it says, derived columns included: a flush guard that would derive one
+    # (sites: site_shared) stands aside while they load.
+    was = db.info.get(LOADING_ARCHIVE)
+    db.info[LOADING_ARCHIVE] = True
+    try:
+        for fam in plan.families():
+            for c in plan.manifest["families"][fam.name]["chunks"]:
+                step(f"{fam.name}:{c['file']}", lambda fam=fam, c=c: _load_chunk(db, plan, fam, c, pending, report))
+            if fam.replace_set and plan.manifest["mode"] == "incremental":
+                step(f"{fam.name}:replace", lambda fam=fam: _replace(db, plan, fam))
+        # References inside and across families (a document's current revision, a merge survivor, a parent
+        # type) once everything they can name is loaded.
+        for fam in plan.families():
+            if fam.deferred:
+                step(f"{fam.name}:deferred", lambda fam=fam: _deferred(db, plan, fam, pending, report))
+    finally:
+        if was is None:
+            db.info.pop(LOADING_ARCHIVE, None)
+        else:
+            db.info[LOADING_ARCHIVE] = was
     if "policies" in {f.name for f in plan.families()}:
         step("policies:activate", lambda: _activate_archive_sources(db, plan))
     return report
@@ -619,7 +640,7 @@ def _load_chunk(db: Session, plan: Plan, fam: Family, chunk: dict, pending: dict
             continue
         local, rm = find_local(db, plan, fam, key, row)
         if local is not None:
-            form = archive_form(plan, fam, local, key)
+            form = as_archived(archive_form(plan, fam, local, key), row)
             if form == row or fam.name in REFERENCE_ONLY or _installation_defined(fam, local, row) or \
                     (fam.name in RECONCILE_IGNORES and _reconciles(fam, local, row, form)):
                 if rm is None:
@@ -734,6 +755,7 @@ def rebuild(db: Session, plan: Plan) -> dict:
     jobs.report("rebuilding what the ledger derives (identities, heads, facts, relations)", force=True)
     before = {m.__tablename__: db.scalar(select(func.count()).select_from(m)) for m in EVENT_TABLES}
     with writing(db):
+        adopted = _adopt_unbacked_relations(db, plan)
         refs = {db.get(IdentityEvent, int(rm.local_key)).source_ref for rm in _imported(db, plan, "identity_events")}
         for ref in sorted(refs):
             state = None
@@ -797,7 +819,48 @@ def rebuild(db: Session, plan: Plan) -> dict:
     db.expire_all()
     _refresh_row_map(db, plan)
     after = {m.__tablename__: db.scalar(select(func.count()).select_from(m)) for m in EVENT_TABLES}
-    return {"events_written_by_rebuild": {k: after[k] - before[k] for k in after if after[k] != before[k]}}
+    return {"events_written_by_rebuild": {k: after[k] - before[k] for k in after if after[k] != before[k]},
+            "relations_kept_without_ledger_facts": adopted}
+
+
+def _ledger_managed(db: Session, uid: str) -> bool:
+    """What engine.rebuild re-projects: a record with an identity binding or a decision."""
+    return bool(db.scalar(select(IdentityBinding.uid).where(IdentityBinding.uid == uid).limit(1))
+                or db.scalar(select(Decision.decision_id).where(Decision.subject_uid == uid).limit(1)))
+
+
+def _adopt_unbacked_relations(db: Session, plan: Plan) -> int:
+    """A `ledger` relation is a projection and travels as one; a rebuild makes it again from the record's facts.
+    A record with no ledger facts at all (no binding, no decision) is not re-projected, and its ledger relations
+    were exported with nothing to make them from: INFN Cloud's medium-linac had 208 (its Installations' `installed
+    at` and `installation of` among them), and every import dropped them. They are kept as the source had them —
+    the record's facts, whatever made them — and the derive stage builds on them (realized by)."""
+    from app.models.asset import Asset, Relation
+    fam = BY_NAME["p_derived_relations"]
+    if fam.name not in plan.manifest["families"]:
+        return 0
+    managed: dict = {}
+    n = 0
+    for _, _, row in archive_rows(plan, fam):
+        if row.get("derivation") != "ledger":
+            continue
+        if plan.selected is not None and _names_unselected(plan, fam, row):
+            continue
+        m = _mapped_row(plan, fam, row)
+        frm, to = m.get("from_asset_uid"), m.get("to_asset_uid")
+        if frm not in managed:
+            managed[frm] = _ledger_managed(db, frm)
+        if managed[frm] or db.get(Asset, frm) is None or db.get(Asset, to) is None:
+            continue
+        here = db.scalar(select(Relation.id).where(
+            Relation.from_asset_uid == frm, Relation.to_asset_uid == to, Relation.relation_type == m["relation_type"],
+            Relation.derivation == "ledger").limit(1))
+        if here is None:
+            db.add(Relation(workspace_id=m["workspace_id"], from_asset_uid=frm, to_asset_uid=to,
+                            relation_type=m["relation_type"], derivation="ledger", rule=m.get("rule")))
+        n += 1
+    db.flush()
+    return n
 
 
 def _refresh_row_map(db: Session, plan: Plan) -> None:
@@ -847,7 +910,7 @@ def reconcile(db: Session, plan: Plan, deferred: Optional[list] = None) -> dict:
                              (plan.decisions.get("catalogue_conflicts") or {}).get(f"{fam.name}:{key}") == "keep_local")
                 if not same and (fam.name, key) not in explained and fam.name not in REFERENCE_ONLY and not kept_local:
                     mismatches.append({"key": key, "missing": local is None,
-                                       "fields": sorted(_differs(row, form))[:10]})
+                                       "fields": sorted(_differs(row, as_archived(form, row)))[:10]})
                 # A row accepted as the archive's (a built-in role, a relation's stamp) is hashed as the archive has
                 # it, so staging and promotion, each with its own local stamps, agree.
                 ch.update(chunks.line(fam.name, key, row if same else form))
@@ -864,11 +927,29 @@ def reconcile(db: Session, plan: Plan, deferred: Optional[list] = None) -> dict:
     local_inv = invariants.report(db, [w for w in plan.workspaces if db.get(Workspace, w) is not None])
     exported_ok = (plan.manifest.get("invariants") or {}).get("ok")
     inv_ok = bool(local_inv.get("ok")) or exported_ok is False
-    passed = all(f["ok"] for f in fams.values()) and all(p["ok"] for p in projections.values()) and inv_ok
+    authoritative_ok = all(f["ok"] for f in fams.values())
+    projections_ok = all(p["ok"] for p in projections.values())
+    # Decision `projections: accept_rebuilt`: the projections are what this release rebuilds from the archive's
+    # ledger, not what the source had (an archive from an older release, whose projections were stale or derived
+    # by older rules). Only when every authoritative row is the archive's: then an invariant failing here fails on
+    # the source's own data, and is listed, not hidden.
+    accepting = plan.decisions.get("projections") == PROJECTIONS_ACCEPT and authoritative_ok
+    accepted = None
+    if accepting and not (projections_ok and inv_ok):
+        accepted = {"decision": PROJECTIONS_ACCEPT,
+                    "archive_release": (plan.manifest.get("argus") or {}).get("application_version"),
+                    "this_release": os.environ.get("ARGUS_VERSION", "1.0.0"),
+                    "projections": sorted(k for k, p in projections.items() if not p["ok"]),
+                    "invariants": [] if inv_ok else list(local_inv.get("failing") or [])}
+    passed = authoritative_ok and ((projections_ok and inv_ok) or accepted is not None)
+    failing = list(local_inv.get("failing") or [])
     return {"import_id": plan.import_id, "export_id": plan.manifest["export_id"], "origin": plan.origin,
             "watermark": plan.manifest["watermark"], "families": fams, "projections": projections,
-            "invariants": {"ok": local_inv.get("ok"), "exported_ok": exported_ok, "acceptable": inv_ok},
-            "deferred_references": deferred or [], "passed": passed}
+            "invariants": {"ok": local_inv.get("ok"), "exported_ok": exported_ok, "acceptable": inv_ok,
+                           "failing": failing,
+                           "examples": {k: ((local_inv.get("invariants") or {}).get(k) or {}).get("examples", [])[:5]
+                                        for k in failing}},
+            "accepted": accepted, "deferred_references": deferred or [], "passed": passed}
 
 
 def _differs(expected: dict, got: dict) -> list[str]:
@@ -889,8 +970,13 @@ PROJECTION_TIMESTAMPS = ("created_at", "updated_at")   # when a projection row w
 
 
 def _proj_key(fam: Family, row: dict) -> str:
-    return json.dumps({k: v for k, v in sorted(row.items()) if k not in PROJECTION_TIMESTAMPS},
-                      sort_keys=True, default=str)
+    row = {k: v for k, v in row.items() if k not in PROJECTION_TIMESTAMPS}
+    detail = row.get("detail")
+    if isinstance(detail, dict) and isinstance(detail.get("values"), list):
+        # A conflict's values are a set (engine: sorted since 1.35.132; an older archive has them in arrival order).
+        row["detail"] = {**detail, "values": sorted(detail["values"],
+                                                   key=lambda v: json.dumps(v, sort_keys=True, default=str))}
+    return json.dumps(row, sort_keys=True, default=str)
 
 
 def _names_unselected(plan: Plan, fam: Family, row: dict) -> bool:
