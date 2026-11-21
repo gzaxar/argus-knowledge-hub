@@ -332,12 +332,18 @@ def _normalize_legacy_multi(attrs: object) -> object:
     out = dict(attrs)
     for key in keys & set(out):
         v = out[key]
+        if v is None:
+            out.pop(key)                     # nothing, as an empty list is (below)
+            continue
         if not isinstance(v, list):
             continue
         flat = []
         for item in v:
             flat.extend(item) if isinstance(item, list) else flat.append(item)
-        out[key] = list(dict.fromkeys(flat))
+        if flat:
+            out[key] = list(dict.fromkeys(flat))
+        else:
+            out.pop(key)                     # [] and [[]] say no member, and a rebuild leaves the key out
     return out
 
 
@@ -359,6 +365,26 @@ def _reconciles(fam: Family, local, row: dict, form: dict) -> bool:
     ignore = RECONCILE_IGNORES.get(fam.name)
     return bool(ignore) and local is not None and \
         {k: v for k, v in form.items() if k not in ignore} == {k: v for k, v in row.items() if k not in ignore}
+
+
+# A record's fields the ledger projects onto it (engine.project_subject): its name, type and status, and every
+# attribute a claim or a decision names. On a record the ledger manages they are as much a projection as the fact
+# state, and decision `projections: accept_rebuilt` accepts them as rebuilt.
+LEDGER_RECORD_FIELDS = {"name", "type", "schema_uid", "record_status", "merged_into_uid"}
+
+
+def _ledger_fields(db: Session, uid: str) -> set:
+    """The fields of this record the ledger writes, or nothing when it manages none of it."""
+    from app.models.ledger import Claim
+    if not _ledger_managed(db, uid):
+        return set()
+    refs = [b for b in db.scalars(select(IdentityBinding.source_ref).where(IdentityBinding.uid == uid))]
+    attrs = {"installation_status", "temporal_uncertain"}
+    attrs |= {p[5:] for p in db.scalars(select(Claim.predicate).where(Claim.source_ref.in_(refs + [f"uid:{uid}"])))
+              if p and p.startswith("attr:")}
+    attrs |= {p[5:] for p in db.scalars(select(Decision.predicate).where(Decision.subject_uid == uid))
+              if p and p.startswith("attr:")}
+    return LEDGER_RECORD_FIELDS | {f"attributes.{a}" for a in attrs}
 
 
 def _installation_defined(fam: Family, local, row: dict) -> bool:
@@ -883,6 +909,8 @@ def reconcile(db: Session, plan: Plan, deferred: Optional[list] = None) -> dict:
     """Authoritative families row by row against the archive (and so against the manifest's hashes),
     projections rebuilt here against the projections the export carried, invariants."""
     explained = {(d["family"], d["key"]) for d in (deferred or [])}
+    accepting = plan.decisions.get("projections") == PROJECTIONS_ACCEPT
+    rebuilt_rows: list = []
     fams: dict = {}
     from app.portability import jobs
     total = sum((plan.manifest["families"].get(f.name) or {}).get("rows") or 0 for f in plan.families()) or None
@@ -909,8 +937,12 @@ def reconcile(db: Session, plan: Plan, deferred: Optional[list] = None) -> dict:
                 kept_local = (fam.name in CATALOGUE_RESOLVABLE and local is not None and
                              (plan.decisions.get("catalogue_conflicts") or {}).get(f"{fam.name}:{key}") == "keep_local")
                 if not same and (fam.name, key) not in explained and fam.name not in REFERENCE_ONLY and not kept_local:
-                    mismatches.append({"key": key, "missing": local is None,
-                                       "fields": sorted(_differs(row, as_archived(form, row)))[:10]})
+                    fields = sorted(_differs(_normal(row), _normal(as_archived(form, row))))
+                    if accepting and fam.name == "assets" and local is not None and fields and \
+                            set(fields) <= _ledger_fields(db, local.uid):
+                        rebuilt_rows.append({"key": key, "fields": fields[:10]})
+                    else:
+                        mismatches.append({"key": key, "missing": local is None, "fields": fields[:10]})
                 # A row accepted as the archive's (a built-in role, a relation's stamp) is hashed as the archive has
                 # it, so staging and promotion, each with its own local stamps, agree.
                 ch.update(chunks.line(fam.name, key, row if same else form))
@@ -933,13 +965,13 @@ def reconcile(db: Session, plan: Plan, deferred: Optional[list] = None) -> dict:
     # ledger, not what the source had (an archive from an older release, whose projections were stale or derived
     # by older rules). Only when every authoritative row is the archive's: then an invariant failing here fails on
     # the source's own data, and is listed, not hidden.
-    accepting = plan.decisions.get("projections") == PROJECTIONS_ACCEPT and authoritative_ok
     accepted = None
-    if accepting and not (projections_ok and inv_ok):
+    if accepting and authoritative_ok and (rebuilt_rows or not (projections_ok and inv_ok)):
         accepted = {"decision": PROJECTIONS_ACCEPT,
                     "archive_release": (plan.manifest.get("argus") or {}).get("application_version"),
                     "this_release": os.environ.get("ARGUS_VERSION", "1.0.0"),
                     "projections": sorted(k for k, p in projections.items() if not p["ok"]),
+                    "record_fields": {"count": len(rebuilt_rows), "examples": rebuilt_rows[:20]},
                     "invariants": [] if inv_ok else list(local_inv.get("failing") or [])}
     passed = authoritative_ok and ((projections_ok and inv_ok) or accepted is not None)
     failing = list(local_inv.get("failing") or [])
@@ -950,6 +982,12 @@ def reconcile(db: Session, plan: Plan, deferred: Optional[list] = None) -> dict:
                            "examples": {k: ((local_inv.get("invariants") or {}).get(k) or {}).get("examples", [])[:5]
                                         for k in failing}},
             "accepted": accepted, "deferred_references": deferred or [], "passed": passed}
+
+
+def _normal(row: dict) -> dict:
+    if isinstance(row.get("attributes"), dict):
+        return {**row, "attributes": _normalize_legacy_multi(row["attributes"])}
+    return row
 
 
 def _differs(expected: dict, got: dict) -> list[str]:

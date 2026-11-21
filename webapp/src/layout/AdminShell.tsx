@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { directoryApi, workspacesApi } from "../api/client";
 import { useCurrentWorkspaceId } from "../api/useCurrentWorkspaceId";
+import { QuotaBanner } from "../pages/workspace/Quotas";
 
 type Item = { to: string; label: string };
 type Group = { label?: string; items: Item[] };
@@ -38,6 +39,8 @@ export function AdminShell() {
         { to: w("transfer"), label: "Transfer" },
         { to: "/admin/migration", label: "Migration from Jira" },
         { to: w("integrity"), label: "Data integrity" },
+        { to: w("storage"), label: "Storage" },
+        { to: w("quotas"), label: "Quotas" },
       ] },
       { label: "Integrations", items: [
         { to: w("ai"), label: "AI endpoint" },
@@ -67,6 +70,8 @@ export function AdminShell() {
       { to: "/admin/portability", label: "Portability" },
       { to: "/admin/type-migrations", label: "Type migrations" },
       { to: "/admin/statistics", label: "Statistics" },
+      { to: "/admin/storage", label: "Storage" },
+      { to: "/admin/quotas", label: "Quotas" },
       { to: "/admin/ask-evaluation", label: "Ask evaluation" },
       { to: "/admin/settings", label: "Settings" },
     );
@@ -154,6 +159,7 @@ export function AdminShell() {
             Whole installation — what you change here applies to every workspace.
           </p>
         ) : null}
+        {pageWorkspace && <div className="mb-4"><QuotaBanner workspaceId={pageWorkspace} /></div>}
         <Outlet />
       </main>
     </div>

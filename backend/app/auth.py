@@ -238,6 +238,9 @@ def _note_usage(identity) -> None:
     from app.services import usage
     user = getattr(identity, "user", None)
     usage.note_user(getattr(user, "id", None), getattr(identity, "workspace_id", None))
+    from app.services import quotas
+    # An instance administrator signed in (not with a token) is never stopped by a quota (services/quotas.py).
+    quotas.note_admin(isinstance(identity, OidcIdentity) and identity.token is None and bool(getattr(user, "is_admin", False)))
 
 
 def get_identity(

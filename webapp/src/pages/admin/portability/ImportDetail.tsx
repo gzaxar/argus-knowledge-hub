@@ -3,8 +3,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { portabilityApi, problemText, workspacesApi } from "../../../api/client";
 import type { DryRunReport, ImportView, ReconciliationReport } from "../../../api/portabilityTypes";
-import { ActionButton, bytes, Empty, ErrorBox, IMPORT_STEPS, JobProgress, JobsPanel, KV, Labels, LegalHold, Mono, PolicySummary,
-  Section, StateBadge, Steps, UninspectedList, useJob, when } from "./shared";
+import { ActionButton, bytes, Details, Empty, ErrorBox, ExplanationPanel, FailedItem, IMPORT_STEPS, JobProgress, JobsPanel, KV, Labels,
+  LegalHold, Mono, PolicySummary, Section, StateBadge, Steps, UninspectedList, useJob, when } from "./shared";
+import { DRY_RUN_OUTCOMES, familyExplanation, invariantExplanation, projectionExplanation } from "./explain";
 
 type Step = "fetch-git" | "verify" | "approve" | "execute" | "resume" | "finalize";
 
@@ -163,56 +164,6 @@ export function ImportDetailPage() {
         </div>
       </Section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Section title="Source and signature">
-          <KV rows={[
-            ["Registered by", i.requested_by], ["Approved by", i.approved_by ?? "—"], ["Created", when(i.created_at)],
-            ["Tag", i.verification.git?.tag ? <Mono>{i.verification.git.tag}</Mono> : undefined],
-            ["Commit", <Mono>{i.commit}</Mono>],
-            ["Signed by", i.verification.git?.signed_by ?? i.verification.checkpoint?.signed_by ?? undefined],
-            ["Repository identity", i.verification.git ? <Mono>{i.verification.git.repository_id}</Mono> : undefined],
-            ["Previous export tag", i.verification.git?.previous_tag ? <Mono>{i.verification.git.previous_tag}</Mono> : undefined],
-            ["Upload", i.verification.upload ? `${bytes(i.verification.upload.bytes)}, sha256 ${i.verification.upload.sha256.slice(0, 12)}` : undefined],
-            ["Staging", i.staging?.database ? `${i.staging.database} — isolated; nothing is visible here before finalization` : undefined],
-          ]} />
-        </Section>
-        <Section title="Verification">
-          {i.verification.checkpoint ? (
-            <KV rows={[
-              ["Files", i.verification.checkpoint.files], ["Chunks", i.verification.checkpoint.chunks],
-              ["Rows", i.verification.checkpoint.rows],
-              ["Artifacts", `${i.verification.checkpoint.blobs} (${bytes(i.verification.checkpoint.blob_bytes)})${i.verification.checkpoint.artifact_complete ? ", all present" : ""}`],
-              ["External chunks", i.verification.checkpoint.external_chunks ?? undefined],
-              ["Content", i.verification.checkpoint.content_verified ? "verified" + (i.manifest?.labels?.encrypted ? " (decrypted for this session)" : "") : "not verified"],
-              ["Manifest", <Mono>{i.verification.checkpoint.manifest_sha256}</Mono>],
-            ]} />
-          ) : <Empty>Not verified yet: checksums, signature, chunks and artifacts are checked in quarantine.</Empty>}
-        </Section>
-      </div>
-
-      {i.manifest && (
-        <Section title="Archive">
-          <KV rows={[
-            ["Export", i.manifest.export_id], ["Mode", i.manifest.mode],
-            ["Workspaces", i.manifest.workspaces.join(", ")],
-            ["Watermark", <>checkpoint {i.manifest.watermark.checkpoint_sequence} · <Mono short>{i.manifest.watermark.vector_sha256}</Mono> at {when(i.manifest.watermark.snapshot_time)}</>],
-            ["People", i.manifest.identity?.profile.replace(/_/g, " ")],
-            ["Base export", i.manifest.base?.export_id],
-            ["From", `${i.manifest.argus.instance_name ?? ""} ${i.manifest.argus.instance_id} · ARGUS ${i.manifest.argus.application_version}`],
-            ["Restricted classes included", (i.manifest.classifications.included ?? []).join(", ") || "none"],
-            ["Classes left out", (i.manifest.classifications.excluded_classes ?? []).join(", ") || "none"],
-            ["Purpose", i.manifest.purpose?.replace(/_/g, " ")],
-          ]} />
-          {i.manifest.policy && (
-            <div className="mt-3 border-t border-slate-100 pt-3">
-              <div className="mb-1 text-xs text-slate-500">Made under</div>
-              <PolicySummary policy={i.manifest.policy} />
-            </div>
-          )}
-        </Section>
-      )}
-
-      <JobsPanel subject={i.id} current={job} />
       {uninspected && uninspected.items.length > 0 && <UninspectedList items={uninspected.items} total={uninspected.count} />}
 
       {(i.state === "dry_run_ready" || i.state === "awaiting_approval") && i.mode !== "evidence" && (
@@ -224,37 +175,92 @@ export function ImportDetailPage() {
                 onResolve={(catalogue_conflicts) => dry.mutate({ ...(i.decisions as Record<string, unknown>), catalogue_conflicts })} />
       )}
       {rec.data && <Reconciliation r={rec.data.report} sha={rec.data.sha256} />}
-      {chain.data && (
-        <Section title="Origin chain" right={<span className={`text-sm font-medium ${chain.data.ok ? "text-emerald-700" : "text-rose-700"}`}>
-          {chain.data.ok ? "Verifies" : "Changed"}</span>}>
-          <KV rows={[["Chain", <Mono>{chain.data.origin_chain_sha256}</Mono>], ["Ingestion event", chain.data.ingestion_event],
-                     ["Problems", chain.data.problems?.length ? chain.data.problems.map((p) => `${p.family} ${p.key}: ${p.problem}`).join("; ") : undefined]]} />
-          <p className="mt-2 text-xs text-slate-500">Every imported ledger row, recomputed from what is here, against the hash of the archive line it came from.</p>
-        </Section>
+      {chain.data && !chain.data.ok && (
+        <p className="text-sm text-rose-700">The origin chain no longer verifies: open the details below (Origin chain).</p>
       )}
       {i.state === "finalized" && i.mode === "evidence" && <Evidence id={i.id} />}
-      {prov.data && (
-        <Section title="Provenance and audit">
-          <ol className="space-y-1 text-xs">
-            {prov.data.events.map((e) => (
-              <li key={e.seq} className="flex flex-wrap gap-2">
-                <span className="w-40 shrink-0 text-slate-500">{when(e.at)}</span>
-                <span className="w-32 shrink-0 font-medium">{e.kind.replace(/_/g, " ")}</span>
-                <span className="text-slate-500">{e.from && e.to ? `${e.from} → ${e.to}` : e.to ?? ""}</span>
-                <span className="ml-auto text-slate-500">{e.actor}</span>
-              </li>
-            ))}
-          </ol>
-        </Section>
-      )}
-      {cfg.data?.is_admin && (
-        <Section title="Retention">
-          <p className="mb-2 text-xs text-slate-500">Quarantine, staging and evidence copies are deleted {policy?.retention_days ?? 90} days
-            after registration unless held; the import's record and audit are kept.</p>
-          <LegalHold kind="imports" id={i.id} on={i.legal_hold} reason={i.legal_hold_reason} purgedAt={i.purged_at}
-                     onChange={reload} />
-        </Section>
-      )}
+      <Details label="Show details: source and signature, verification, archive, jobs, origin chain, audit, retention">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Section title="Source and signature">
+              <KV rows={[
+                ["Registered by", i.requested_by], ["Approved by", i.approved_by ?? "—"], ["Created", when(i.created_at)],
+                ["Tag", i.verification.git?.tag ? <Mono>{i.verification.git.tag}</Mono> : undefined],
+                ["Commit", <Mono>{i.commit}</Mono>],
+                ["Signed by", i.verification.git?.signed_by ?? i.verification.checkpoint?.signed_by ?? undefined],
+                ["Repository identity", i.verification.git ? <Mono>{i.verification.git.repository_id}</Mono> : undefined],
+                ["Previous export tag", i.verification.git?.previous_tag ? <Mono>{i.verification.git.previous_tag}</Mono> : undefined],
+                ["Upload", i.verification.upload ? `${bytes(i.verification.upload.bytes)}, sha256 ${i.verification.upload.sha256.slice(0, 12)}` : undefined],
+                ["Staging", i.staging?.database ? `${i.staging.database} — isolated; nothing is visible here before finalization` : undefined],
+              ]} />
+            </Section>
+            <Section title="Verification">
+              {i.verification.checkpoint ? (
+                <KV rows={[
+                  ["Files", i.verification.checkpoint.files], ["Chunks", i.verification.checkpoint.chunks],
+                  ["Rows", i.verification.checkpoint.rows],
+                  ["Artifacts", `${i.verification.checkpoint.blobs} (${bytes(i.verification.checkpoint.blob_bytes)})${i.verification.checkpoint.artifact_complete ? ", all present" : ""}`],
+                  ["External chunks", i.verification.checkpoint.external_chunks ?? undefined],
+                  ["Content", i.verification.checkpoint.content_verified ? "verified" + (i.manifest?.labels?.encrypted ? " (decrypted for this session)" : "") : "not verified"],
+                  ["Manifest", <Mono>{i.verification.checkpoint.manifest_sha256}</Mono>],
+                ]} />
+              ) : <Empty>Not verified yet: checksums, signature, chunks and artifacts are checked in quarantine.</Empty>}
+            </Section>
+          </div>
+
+          {i.manifest && (
+            <Section title="Archive">
+              <KV rows={[
+                ["Export", i.manifest.export_id], ["Mode", i.manifest.mode],
+                ["Workspaces", i.manifest.workspaces.join(", ")],
+                ["Watermark", <>checkpoint {i.manifest.watermark.checkpoint_sequence} · <Mono short>{i.manifest.watermark.vector_sha256}</Mono> at {when(i.manifest.watermark.snapshot_time)}</>],
+                ["People", i.manifest.identity?.profile.replace(/_/g, " ")],
+                ["Base export", i.manifest.base?.export_id],
+                ["From", `${i.manifest.argus.instance_name ?? ""} ${i.manifest.argus.instance_id} · ARGUS ${i.manifest.argus.application_version}`],
+                ["Restricted classes included", (i.manifest.classifications.included ?? []).join(", ") || "none"],
+                ["Classes left out", (i.manifest.classifications.excluded_classes ?? []).join(", ") || "none"],
+                ["Purpose", i.manifest.purpose?.replace(/_/g, " ")],
+              ]} />
+              {i.manifest.policy && (
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <div className="mb-1 text-xs text-slate-500">Made under</div>
+                  <PolicySummary policy={i.manifest.policy} />
+                </div>
+              )}
+            </Section>
+          )}
+
+          <JobsPanel subject={i.id} current={job} />
+          {chain.data && (
+            <Section title="Origin chain" right={<span className={`text-sm font-medium ${chain.data.ok ? "text-emerald-700" : "text-rose-700"}`}>
+              {chain.data.ok ? "Verifies" : "Changed"}</span>}>
+              <KV rows={[["Chain", <Mono>{chain.data.origin_chain_sha256}</Mono>], ["Ingestion event", chain.data.ingestion_event],
+                         ["Problems", chain.data.problems?.length ? chain.data.problems.map((p) => `${p.family} ${p.key}: ${p.problem}`).join("; ") : undefined]]} />
+              <p className="mt-2 text-xs text-slate-500">Every imported ledger row, recomputed from what is here, against the hash of the archive line it came from.</p>
+            </Section>
+          )}
+          {prov.data && (
+            <Section title="Provenance and audit">
+              <ol className="space-y-1 text-xs">
+                {prov.data.events.map((e) => (
+                  <li key={e.seq} className="flex flex-wrap gap-2">
+                    <span className="w-40 shrink-0 text-slate-500">{when(e.at)}</span>
+                    <span className="w-32 shrink-0 font-medium">{e.kind.replace(/_/g, " ")}</span>
+                    <span className="text-slate-500">{e.from && e.to ? `${e.from} → ${e.to}` : e.to ?? ""}</span>
+                    <span className="ml-auto text-slate-500">{e.actor}</span>
+                  </li>
+                ))}
+              </ol>
+            </Section>
+          )}
+          {cfg.data?.is_admin && (
+            <Section title="Retention">
+              <p className="mb-2 text-xs text-slate-500">Quarantine, staging and evidence copies are deleted {policy?.retention_days ?? 90} days
+                after registration unless held; the import's record and audit are kept.</p>
+              <LegalHold kind="imports" id={i.id} on={i.legal_hold} reason={i.legal_hold_reason} purgedAt={i.purged_at}
+                         onChange={reload} />
+            </Section>
+          )}
+      </Details>
     </div>
   );
 }
@@ -335,35 +341,52 @@ function DecisionsForm({ i, onRun, running }: { i: ImportView; onRun: (d: Record
 }
 
 const OUTCOMES = ["create", "identical", "update_same_origin", "known_identity", "unresolved_reference", "divergent"];
+const RED_OUTCOMES = ["divergent", "unresolved_reference"];
 
 function DryRun({ r, current, onResolve, resolving }: { r: DryRunReport; current: Record<string, string>;
     onResolve: (decisions: Record<string, string>) => void; resolving: boolean }) {
   const resolvable = (r.blocking ?? []).filter((b) => b.resolvable);
   const otherBlocking = (r.blocking ?? []).filter((b) => !b.resolvable);
+  const [open, setOpen] = useState<string | null>(null);
+  const flagged = RED_OUTCOMES.map((o) => [o, Object.values(r.families ?? {}).reduce((n, c) => n + (c[o] ?? 0), 0)] as const)
+    .filter(([, n]) => n > 0);
   return (
     <Section title="Dry run" right={<span className={`text-sm font-medium ${r.ready ? "text-emerald-700" : "text-rose-700"}`}>
       {r.ready ? "Ready for approval" : "Blocked"}</span>}>
       {r.note && <p className="mb-2 text-sm text-slate-600">{r.note}</p>}
       {r.chain && <p className="mb-2 text-sm text-slate-600">Chain: <b>{r.chain.status.replace(/_/g, " ")}</b>
         {r.chain.applied !== undefined && ` · ${r.chain.applied} export(s) from this origin applied here`}</p>}
+      {flagged.length > 0 && (
+        <p className="mb-2 text-sm">
+          {flagged.map(([o, n], k) => (
+            <span key={o}>{k > 0 && " · "}<FailedItem label={`${n} ${o.replace(/_/g, " ")}`} selected={open === o}
+                                                     onSelect={() => setOpen(open === o ? null : o)} /></span>
+          ))}
+        </p>
+      )}
+      {open && DRY_RUN_OUTCOMES[open] && <ExplanationPanel e={DRY_RUN_OUTCOMES[open]} onClose={() => setOpen(null)} />}
       {r.families && (
-        <table className="mb-3 w-full text-xs">
-          <thead className="text-left text-slate-500">
-            <tr><th className="py-1">Family</th>{OUTCOMES.map((o) => <th key={o} className="px-2 text-right">{o.replace(/_/g, " ")}</th>)}</tr>
-          </thead>
-          <tbody>
-            {Object.entries(r.families).map(([f, c]) => (
-              <tr key={f} className="border-t border-slate-100">
-                <td className="py-0.5">{f}</td>
-                {OUTCOMES.map((o) => (
-                  <td key={o} className={`px-2 text-right tabular-nums ${c[o] && (o === "divergent" || o === "unresolved_reference") ? "font-semibold text-rose-700" : ""}`}>
-                    {c[o] ?? ""}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <Details label="Show the outcome of every family" className="mb-3">
+          <table className="w-full text-xs">
+            <thead className="text-left text-slate-500">
+              <tr><th className="py-1">Family</th>{OUTCOMES.map((o) => <th key={o} className="px-2 text-right">{o.replace(/_/g, " ")}</th>)}</tr>
+            </thead>
+            <tbody>
+              {Object.entries(r.families).map(([f, c]) => (
+                <tr key={f} className="border-t border-slate-100">
+                  <td className="py-0.5">{f}</td>
+                  {OUTCOMES.map((o) => (
+                    <td key={o} className="px-2 text-right tabular-nums">
+                      {c[o] && RED_OUTCOMES.includes(o)
+                        ? <FailedItem label={c[o]} selected={open === o} onSelect={() => setOpen(open === o ? null : o)} />
+                        : c[o] ?? ""}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Details>
       )}
       {resolvable.length > 0 && <DivergentCatalogue items={resolvable} current={current} onResolve={onResolve} running={resolving} />}
       <Issues title="Blocking" items={otherBlocking.map((b) => `${b.family} ${b.key}: ${b.reason}`)} tone="rose" />
@@ -373,6 +396,8 @@ function DryRun({ r, current, onResolve, resolving }: { r: DryRunReport; current
               items={(r.identity_candidates ?? []).map((c) => `${c.identifier} ${c.value}: archive ${c.archive.slice(0, 8)} ↔ here ${c.here.slice(0, 8)}`)} />
       <Issues title={`Unresolved references (${r.unresolved_reference_count ?? 0}; outcome: ${r.unresolved_references_outcome})`} tone="amber"
               items={(r.unresolved_references ?? []).map((u) => `${u.family} ${u.key} → ${u.missing.map((m) => m[1]).join(", ")}`)} />
+      <Issues title="Over a workspace's quota once loaded (an import loads anyway; raise the quota in Administration → Quotas, or the workspace will refuse new records and files)" tone="amber"
+              items={(r.quota_warnings ?? []).map((w) => w.message)} />
       <Issues title="Governance not loaded" tone="amber" items={r.governance_not_loaded ?? []} />
       <Issues title="People already known here (kept as they are)" tone="slate" items={(r.identities ?? []).map((x) => x.user)} />
       {r.workspaces && (
@@ -464,58 +489,134 @@ function Issues({ title, items, tone }: { title: string; items: string[]; tone: 
   );
 }
 
+type Selected = { kind: "family" | "projection" | "invariant"; name: string } | null;
+
 function Reconciliation({ r, sha }: { r: ReconciliationReport; sha: string }) {
   const fams = Object.entries(r.families ?? {});
   const projs = Object.entries(r.projections ?? {});
   const events = Object.entries(r.rebuild?.events_written_by_rebuild ?? {});
+  const failing = r.invariants && !r.invariants.ok ? r.invariants.failing ?? [] : [];
+  const [sel, setSel] = useState<Selected>(null);
+  const pick = (kind: NonNullable<Selected>["kind"], name: string) =>
+    setSel(sel?.kind === kind && sel.name === name ? null : { kind, name });
+  const is = (kind: NonNullable<Selected>["kind"], name: string) => sel?.kind === kind && sel.name === name;
+  const badFams = fams.filter(([, v]) => !v.ok);
+  const badProjs = projs.filter(([, v]) => !v.ok);
+  const blocked = badFams.length + (r.accepted ? 0 : badProjs.length + (r.invariants?.acceptable ? 0 : failing.length));
+
+  let panel: React.ReactNode = null;
+  if (sel?.kind === "family" && r.families?.[sel.name]) {
+    const v = r.families[sel.name];
+    panel = (
+      <ExplanationPanel e={familyExplanation(sel.name, v)} onClose={() => setSel(null)}>
+        <Sample title={`First ${v.mismatches.length} of ${v.mismatch_count}`} rows={v.mismatches} />
+      </ExplanationPanel>
+    );
+  } else if (sel?.kind === "projection" && r.projections?.[sel.name]) {
+    const v = r.projections[sel.name];
+    panel = (
+      <ExplanationPanel e={projectionExplanation(sel.name, v)} onClose={() => setSel(null)}>
+        <Sample title="Only in the export (first 5)" rows={v.only_in_export ?? []} />
+        <Sample title="Only rebuilt here (first 5)" rows={v.only_rebuilt ?? []} />
+      </ExplanationPanel>
+    );
+  } else if (sel?.kind === "invariant") {
+    const ex = r.invariants?.examples?.[sel.name] ?? [];
+    panel = (
+      <ExplanationPanel e={invariantExplanation(sel.name, ex)} onClose={() => setSel(null)}>
+        <Sample title="Examples" rows={ex} />
+      </ExplanationPanel>
+    );
+  }
+
   return (
     <Section title="Reconciliation" right={<span className={`text-sm font-medium ${r.passed ? "text-emerald-700" : "text-rose-700"}`}>
       {r.passed ? "Passed" : "Failed — finalization blocked"}</span>}>
-      <KV rows={[["Report", <Mono>{sha}</Mono>], ["Signed", r.signature ? `${r.signature.algorithm} by ${r.signature.principal}` : "no"],
-                 ["Note", r.evidence_only ? "evidence only: no projection to rebuild" : r.already_applied ? "this export was already applied here: nothing changed" : undefined],
-                 ["Invariants", r.invariants ? `${r.invariants.ok ? "ok" : `failing here (${(r.invariants.failing ?? []).join(", ")})`}; ${
-                   r.invariants.exported_ok === null || r.invariants.exported_ok === undefined ? "not checked" : r.invariants.exported_ok ? "ok" : "failing"} at the source` : undefined],
-                 ["Accepted", r.accepted ? `rebuilt projections (${r.accepted.projections.join(", ") || "none differ"})${
-                   r.accepted.invariants.length ? ` and invariants failing on the archive's data (${r.accepted.invariants.join(", ")})` : ""}, by decision; archive from ${r.accepted.archive_release ?? "?"}, here ${r.accepted.this_release}` : undefined],
-                 ["Kept", r.rebuild?.relations_kept_without_ledger_facts ? `${r.rebuild.relations_kept_without_ledger_facts} ledger relation(s) of records with no ledger facts, as the source had them` : undefined]]} />
+      {r.evidence_only && <p className="text-sm text-slate-600">Evidence only: no projection to rebuild.</p>}
+      {r.already_applied && <p className="text-sm text-slate-600">This export was already applied here: nothing changed.</p>}
       {fams.length > 0 && (
-        <div className="mt-3 grid gap-4 md:grid-cols-2">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Authoritative, row by row</div>
-            <table className="mt-1 w-full text-xs"><tbody>
-              {fams.map(([f, v]) => (
-                <tr key={f} className="border-t border-slate-100">
-                  <td className="py-0.5">{f}</td>
-                  <td className="text-right tabular-nums">{v.rows}/{v.expected_rows}</td>
-                  <td className={`pl-2 ${v.ok ? "text-emerald-700" : "text-rose-700"}`}>{v.ok ? "equal" : `${v.mismatch_count} differ`}</td>
-                </tr>
-              ))}
-            </tbody></table>
+        <p className="text-sm text-slate-700">
+          {fams.length - badFams.length} of {fams.length} authoritative families equal the archive;{" "}
+          {projs.length - badProjs.length} of {projs.length} projections rebuilt as exported
+          {r.invariants && <>; invariants {r.invariants.ok ? "hold" : "fail"}</>}.
+          {!r.passed && blocked > 0 && <> Click a red item to see what it means and what to do.</>}
+        </p>
+      )}
+      {(badFams.length > 0 || badProjs.length > 0 || failing.length > 0) && (
+        <ul className="mt-2 space-y-1 text-sm">
+          {badFams.map(([f, v]) => (
+            <li key={`f-${f}`}><FailedItem label={`${f}: ${v.mismatch_count} row(s) differ from the archive`}
+                                           selected={is("family", f)} onSelect={() => pick("family", f)} /></li>
+          ))}
+          {badProjs.map(([f, v]) => (
+            <li key={`p-${f}`}><FailedItem label={`${f}: rebuilt ${v.rebuilt}, exported ${v.exported}${r.accepted ? " (accepted by decision)" : ""}`}
+                                           selected={is("projection", f)} onSelect={() => pick("projection", f)} /></li>
+          ))}
+          {failing.map((c) => (
+            <li key={`i-${c}`}><FailedItem label={`invariant ${c} fails${r.accepted?.invariants.includes(c) ? " (on the archive's data, accepted)" : ""}`}
+                                           selected={is("invariant", c)} onSelect={() => pick("invariant", c)} /></li>
+          ))}
+        </ul>
+      )}
+      {panel}
+      {r.accepted && (
+        <p className="mt-2 text-sm text-amber-800">
+          Accepted by decision: the projections this release rebuilds{r.accepted.record_fields?.count
+            ? `, and ${r.accepted.record_fields.count} record(s) whose ledger-managed fields were rebuilt` : ""}{" "}
+          (archive from {r.accepted.archive_release ?? "?"}, here {r.accepted.this_release}).
+        </p>
+      )}
+      <Details label="Show details: signature, every family and projection" className="mt-3">
+        <KV rows={[["Report", <Mono>{sha}</Mono>], ["Signed", r.signature ? `${r.signature.algorithm} by ${r.signature.principal}` : "no"],
+                   ["Invariants", r.invariants ? `${r.invariants.ok ? "ok" : `failing here (${failing.join(", ")})`}; ${
+                     r.invariants.exported_ok === null || r.invariants.exported_ok === undefined ? "not checked" : r.invariants.exported_ok ? "ok" : "failing"} at the source` : undefined],
+                   ["Kept", r.rebuild?.relations_kept_without_ledger_facts ? `${r.rebuild.relations_kept_without_ledger_facts} ledger relation(s) of records with no ledger facts, as the source had them` : undefined],
+                   ["Rebuild wrote", events.length ? events.map(([k, n]) => `${k} ${n}`).join(", ") : undefined]]} />
+        {fams.length > 0 && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Authoritative, row by row</div>
+              <table className="mt-1 w-full text-xs"><tbody>
+                {fams.map(([f, v]) => (
+                  <tr key={f} className="border-t border-slate-100">
+                    <td className="py-0.5">{f}</td>
+                    <td className="text-right tabular-nums">{v.rows}/{v.expected_rows}</td>
+                    <td className="pl-2">{v.ok ? <span className="text-emerald-700">equal</span>
+                      : <FailedItem label={`${v.mismatch_count} differ`} selected={is("family", f)} onSelect={() => pick("family", f)} />}</td>
+                  </tr>
+                ))}
+              </tbody></table>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Projections rebuilt here vs exported</div>
+              <table className="mt-1 w-full text-xs"><tbody>
+                {projs.map(([f, v]) => (
+                  <tr key={f} className="border-t border-slate-100">
+                    <td className="py-0.5">{f}</td>
+                    <td className="text-right tabular-nums">{v.rebuilt}/{v.exported}</td>
+                    <td className="pl-2">{v.ok ? <span className="text-emerald-700">equal</span>
+                      : <FailedItem label="differ" selected={is("projection", f)} onSelect={() => pick("projection", f)} />}</td>
+                  </tr>
+                ))}
+              </tbody></table>
+            </div>
           </div>
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Projections rebuilt here vs exported</div>
-            <table className="mt-1 w-full text-xs"><tbody>
-              {projs.map(([f, v]) => (
-                <tr key={f} className="border-t border-slate-100">
-                  <td className="py-0.5">{f}</td>
-                  <td className="text-right tabular-nums">{v.rebuilt}/{v.exported}</td>
-                  <td className={`pl-2 ${v.ok ? "text-emerald-700" : "text-rose-700"}`}>{v.ok ? "equal" : "differ"}</td>
-                </tr>
-              ))}
-            </tbody></table>
-            {events.length > 0 && <p className="mt-2 text-xs text-slate-500">Events the rebuild wrote: {events.map(([k, n]) => `${k} ${n}`).join(", ")}</p>}
-          </div>
-        </div>
-      )}
-      {fams.some(([, v]) => !v.ok) && (
-        <pre className="mt-3 max-h-48 overflow-auto rounded bg-rose-50 p-2 text-xs text-rose-800">
-          {JSON.stringify(Object.fromEntries(fams.filter(([, v]) => !v.ok).map(([f, v]) => [f, v.mismatches])), null, 1)}
-        </pre>
-      )}
-      {(r.deferred_references ?? []).length > 0 && (
-        <p className="mt-2 text-xs text-amber-800">{r.deferred_references!.length} reference(s) left unresolved by decision.</p>
-      )}
+        )}
+        {(r.deferred_references ?? []).length > 0 && (
+          <p className="text-xs text-amber-800">{r.deferred_references!.length} reference(s) left unresolved by decision.</p>
+        )}
+      </Details>
     </Section>
+  );
+}
+
+function Sample({ title, rows }: { title: string; rows: unknown[] }) {
+  if (!rows.length) return null;
+  return (
+    <div className="mt-2">
+      <div className="font-semibold text-slate-700">{title}</div>
+      <pre className="mt-0.5 max-h-48 overflow-auto rounded bg-white p-2 text-[11px] text-slate-700">{JSON.stringify(rows, null, 1)}</pre>
+    </div>
   );
 }
 

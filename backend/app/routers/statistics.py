@@ -342,12 +342,12 @@ class CleanupIn(BaseModel):
 
 
 @router.get("/storage/cleanup")
-def storage_cleanup_preview(identity=Depends(get_identity)):
+def storage_cleanup_preview(identity=Depends(get_identity), db: Session = Depends(get_db)):
     """What the portability area holds, part by part, and what each cleanup would free (services/storage_cleanup.py).
     Nothing changes. Administrators signed in."""
     from app.services import storage_cleanup
     _person_admin(identity)
-    return storage_cleanup.preview()
+    return storage_cleanup.preview(db)
 
 
 @router.post("/storage/cleanup")
@@ -356,7 +356,7 @@ def storage_cleanup_run(body: CleanupIn, identity=Depends(get_identity), db: Ses
     from app.services import storage, storage_cleanup
     import logging
     _person_admin(identity)
-    out = storage_cleanup.run(body.actions)
+    out = storage_cleanup.run(body.actions, db, actor=identity.user.email or identity.user.id)
     logging.getLogger("argus.storage").info("storage cleanup by %s: %s", identity.user.id, out)
     try:
         storage.snapshot(db)

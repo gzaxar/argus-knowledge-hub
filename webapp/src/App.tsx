@@ -11,6 +11,10 @@ import { NewWorkspace } from "./pages/admin/NewWorkspace";
 import { AdminSettings } from "./pages/admin/Settings";
 import { AdminUsers } from "./pages/admin/Users";
 import { StatisticsPage } from "./pages/admin/Statistics";
+import { AdminStoragePage } from "./pages/admin/Storage";
+import { AdminQuotasPage } from "./pages/admin/Quotas";
+import { WorkspaceQuotas } from "./pages/workspace/Quotas";
+import { WorkspaceStorage } from "./pages/workspace/Storage";
 import { DocumentReshape } from "./pages/documents/Reshape";
 import { ActivitiesPage } from "./pages/activities/Activities";
 import { DocumentTemplatePage, DocumentTemplates } from "./pages/documents/Templates";
@@ -212,6 +216,8 @@ export function App() {
           <Route path="/workspaces/:workspaceId/access-reviews" element={<AccessReviews />} />
           <Route path="/workspaces/:workspaceId/members" element={<WorkspaceMembers />} />
           <Route path="/workspaces/:workspaceId/integrity" element={<WorkspaceIntegrity />} />
+          <Route path="/workspaces/:workspaceId/storage" element={<WorkspaceStorage />} />
+          <Route path="/workspaces/:workspaceId/quotas" element={<WorkspaceQuotas />} />
           <Route path="/workspaces/:workspaceId/keys" element={<WorkspaceKeys />} />
           <Route path="/workspaces/:workspaceId/groups" element={<WorkspaceGroups />} />
           <Route path="/admin/my-groups" element={<WorkspaceGroups />} />
@@ -228,6 +234,8 @@ export function App() {
           <Route path="/admin/new-workspace" element={<NewWorkspace />} />
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/statistics" element={<StatisticsPage />} />
+          <Route path="/admin/storage" element={<AdminStoragePage />} />
+          <Route path="/admin/quotas" element={<AdminQuotasPage />} />
           <Route path="/admin/packages" element={<AdminPackagesPage />} />
           <Route path="/admin/catalogue" element={<AdminCataloguePage />} />
           <Route path="/admin/settings" element={<AdminSettings />} />

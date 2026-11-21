@@ -259,6 +259,7 @@ export interface DryRunReport {
   unresolved_references?: { family: string; key: string; missing: [string, string][] }[];
   unresolved_reference_count?: number;
   unresolved_references_outcome?: string;
+  quota_warnings?: { workspace: string; quota: string; limit: number; used: number; adding: number; message: string }[];
   identities?: { user: string; note: string }[];
   governance_not_loaded?: string[];
   chain?: { status: string; problem?: string; applied?: number };
@@ -313,10 +314,12 @@ export interface ReconciliationReport {
   already_applied?: boolean;
   export_id: string;
   families?: Record<string, FamilyReconciliation>;
-  projections?: Record<string, { exported: number; rebuilt: number; ok: boolean }>;
+  projections?: Record<string, { exported: number; rebuilt: number; ok: boolean; outside_selection?: number;
+                                 only_in_export?: unknown[]; only_rebuilt?: unknown[] }>;
   invariants?: { ok: boolean | null; exported_ok: boolean | null; acceptable: boolean; failing?: string[];
                  examples?: Record<string, unknown[]> };
-  accepted?: { decision: string; archive_release?: string; this_release: string; projections: string[]; invariants: string[] } | null;
+  accepted?: { decision: string; archive_release?: string; this_release: string; projections: string[]; invariants: string[];
+              record_fields?: { count: number; examples: { key: string; fields: string[] }[] } } | null;
   deferred_references?: { family: string; key: string; missing: [string, string][]; row: string }[];
   rebuild?: { events_written_by_rebuild: Record<string, number>; relations_kept_without_ledger_facts?: number };
   staged?: boolean;
