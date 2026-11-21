@@ -1,9 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { ApiError, statisticsApi } from "../../api/client";
-import type { Statistics, StorageArea, StorageCleanupPreview, StorageReport } from "../../api/types";
-import { ask } from "../../lib/dialogs";
+import type { Statistics } from "../../api/types";
 
 const CLIENT_COLORS: Record<string, string> = {
   web: "bg-indigo-500",
@@ -13,8 +12,8 @@ const CLIENT_COLORS: Record<string, string> = {
 };
 const CLIENT_LABELS: Record<string, string> = { web: "Web", app: "Android app", mcp: "MCP (assistants)", api: "API & scripts" };
 
-const n = (v: number) => v.toLocaleString();
-const bytes = (v: number | null | undefined): string => {
+export const n = (v: number) => v.toLocaleString();
+export const bytes = (v: number | null | undefined): string => {
   if (v == null) return "—";
   if (v < 0) return `−${bytes(-v)}`;
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -25,11 +24,11 @@ const bytes = (v: number | null | undefined): string => {
 /** Growth a day in words: shrinking is said so, not as a negative number of bytes. */
 export const growth = (v: number | null | undefined) =>
   v == null ? "—" : Math.abs(v) < 1024 ? "steady" : v < 0 ? `shrinking, ${bytes(-v)}/day` : `${bytes(v)}/day`;
-const AREA_LABELS: Record<string, string> = { attachments: "Attachment files", database: "Database", portability: "Portability archives" };
+export const AREA_LABELS: Record<string, string> = { attachments: "Attachment files", database: "Database", portability: "Portability archives" };
 const tokens = (v: number) => (v >= 1e6 ? `${(v / 1e6).toFixed(1)} M` : v >= 1e3 ? `${(v / 1e3).toFixed(1)} k` : String(v));
 
 /** A bar per day, stacked by series. */
-function DayBars({ rows, series, height = 120 }: {
+export function DayBars({ rows, series, height = 120 }: {
   rows: { day: string; [k: string]: number | string | null }[];
   series: { key: string; color: string; label: string }[];
   height?: number;
@@ -67,7 +66,7 @@ function DayBars({ rows, series, height = 120 }: {
   );
 }
 
-function Card({ title, children, hint }: { title: string; children: React.ReactNode; hint?: string }) {
+export function Card({ title, children, hint }: { title: string; children: React.ReactNode; hint?: string }) {
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4">
       <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
@@ -99,7 +98,7 @@ function Figure({ label, value, sub, before }: { label: string; value: string | 
   );
 }
 
-function Table({ head, rows }: { head: string[]; rows: (string | number | React.ReactNode)[][] }) {
+export function Table({ head, rows }: { head: string[]; rows: (string | number | React.ReactNode)[][] }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -247,108 +246,25 @@ function RecordsCard({ rows }: { rows: Statistics["records_per_day"] }) {
   );
 }
 
-/** One storage area: how full against its planned room, what is left and, at the recent growth, for how long. */
-function StorageGauge({ a }: { a: StorageArea }) {
-  const capacity = a.available_bytes != null ? a.used_bytes + a.available_bytes : a.planned_bytes;
-  const share = capacity ? Math.min(1, a.used_bytes / capacity) : null;
-  const color = share == null ? "bg-slate-400" : share > 0.9 ? "bg-rose-500" : share > 0.75 ? "bg-amber-500" : "bg-emerald-500";
-  const diskBound = a.disk_free_bytes != null && a.planned_bytes != null && a.disk_free_bytes < a.planned_bytes - a.used_bytes;
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-sm font-semibold text-slate-900">{AREA_LABELS[a.area] ?? a.area}</span>
-        {share != null && <span className="text-xs tabular-nums text-slate-500">{Math.round(share * 100)}%</span>}
-      </div>
-      <div className="mt-2 h-2.5 overflow-hidden rounded bg-slate-100">
-        <div className={`h-full ${color}`} style={{ width: `${(share ?? 0) * 100}%` }} />
-      </div>
-      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
-        <dt className="text-slate-500">Used</dt>
-        <dd className="text-right tabular-nums">{bytes(a.used_bytes)}{a.files != null ? ` · ${n(a.files)} files` : ""}{a.complete ? "" : "+"}</dd>
-        <dt className="text-slate-500">Planned</dt><dd className="text-right tabular-nums">{bytes(a.planned_bytes)}</dd>
-        <dt className="text-slate-500">Available</dt>
-        <dd className={`text-right tabular-nums ${diskBound ? "text-rose-700" : ""}`}>{bytes(a.available_bytes)}</dd>
-        <dt className="text-slate-500">Growth</dt>
-        <dd className="text-right tabular-nums">{growth(a.growth_per_day_bytes)}</dd>
-        <dt className="text-slate-500">Full in</dt>
-        <dd className={`text-right tabular-nums ${a.days_left != null && a.days_left < 30 ? "font-semibold text-rose-700" : ""}`}>
-          {a.days_left == null ? "—" : a.days_left > 3650 ? "over 10 years" : `about ${n(a.days_left)} days`}
-        </dd>
-      </dl>
-      {diskBound && <p className="mt-1 text-[11px] text-rose-700">The disk under it has less free space than its planned room.</p>}
-      {a.area === "database" && <p className="mt-1 text-[11px] text-slate-400">On another node: only its planned room is known.</p>}
-      {a.area === "portability" && <FreeRoom />}
-    </div>
-  );
-}
-
-function StorageSection({ storage, refreshing, onRefresh }: { storage: StorageReport; refreshing: boolean; onRefresh: () => void }) {
-  return (
-    <Card title="Storage" hint={`What is used, how much is left and how fast it grows. Measured hourly${storage.measured_at ? `, last at ${new Date(storage.measured_at).toLocaleString()}` : ""}; a volume's planned room is its size in the deployment, and the disk under it can run out first.`}>
-      <div className="mb-3 flex justify-end">
-        <button type="button" onClick={onRefresh} disabled={refreshing}
-                className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50">
-          {refreshing ? "Measuring…" : "Measure now"}
-        </button>
-      </div>
-      <div className="grid gap-3 md:grid-cols-3">
-        {storage.areas.map((a) => <StorageGauge key={a.area} a={a} />)}
-      </div>
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <div>
-          <div className="mb-1 text-xs font-medium text-slate-600">Attachments over time (from their upload dates)</div>
-          <DayBars height={90} rows={storage.attachment_growth.map((g) => ({ day: g.day, total: g.total_bytes }))}
-                   series={[{ key: "total", color: "bg-indigo-400", label: "attachment bytes in total" }]} />
-          <div className="mt-2">
-            <DayBars height={50} rows={storage.attachment_growth.map((g) => ({ day: g.day, added: g.added_bytes }))}
-                     series={[{ key: "added", color: "bg-emerald-500", label: "added that day" }]} />
-          </div>
-        </div>
-        <div>
-          <div className="mb-1 text-xs font-medium text-slate-600">Measured each day</div>
-          {storage.trend.length < 2 ? (
-            <p className="text-xs text-slate-400">The trend builds up from today: one measurement a day.</p>
-          ) : (
-            <DayBars height={90} rows={storage.trend.map((t) => ({ day: t.day, attachments: t.attachments ?? 0, database: t.database ?? 0, portability: t.portability ?? 0 }))}
-                     series={[{ key: "attachments", color: "bg-indigo-400", label: "attachments" },
-                              { key: "database", color: "bg-sky-500", label: "database" },
-                              { key: "portability", color: "bg-amber-400", label: "portability" }]} />
-          )}
-        </div>
-      </div>
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <Table head={["Attachments by workspace", "Files", "Size"]}
-               rows={storage.attachments_by_workspace.map((w) => [w.workspace, w.files, bytes(w.bytes)])} />
-        <Table head={["Largest database tables", "Size"]} rows={storage.largest_tables.map((t) => [t.table, bytes(t.bytes)])} />
-      </div>
-    </Card>
-  );
-}
-
 /** How ARGUS is used, counted without saying by whom. Administrators. */
 const TABS = [
   { id: "usage", label: "Usage" },
   { id: "ai", label: "AI" },
-  { id: "storage", label: "Storage" },
   { id: "nerds", label: "Nerds" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
+/** Storage moved to Administration → Storage; an old link to its tab lands there. */
 export function StatisticsPage() {
+  const [params] = useSearchParams();
+  return params.get("tab") === "storage" ? <Navigate to="/admin/storage" replace /> : <StatisticsBody />;
+}
+
+function StatisticsBody() {
   const [days, setDays] = useState(30);
   const [params, setParams] = useSearchParams();
   const tab: Tab = (TABS.find((t) => t.id === params.get("tab"))?.id ?? "usage") as Tab;
   const setTab = (t: Tab) => setParams((p) => { p.set("tab", t); return p; }, { replace: true });
-  const queryClient = useQueryClient();
-  const [refreshing, setRefreshing] = useState(false);
-  const measureNow = async () => {
-    setRefreshing(true);
-    try {
-      queryClient.setQueryData(["statistics", days], await statisticsApi.get(days, true));
-    } finally {
-      setRefreshing(false);
-    }
-  };
   const q = useQuery({ queryKey: ["statistics", days], queryFn: () => statisticsApi.get(days), retry: false,
                        refetchInterval: 60_000 });
   if (q.isError) {
@@ -507,10 +423,6 @@ export function StatisticsPage() {
             </>
           )}
 
-          {tab === "storage" && (
-<StorageSection storage={s.storage} refreshing={refreshing} onRefresh={() => void measureNow()} />
-          )}
-
           {tab === "nerds" && (
             <>
           <p className="text-sm text-slate-500">For whoever looks after ARGUS: which routes are called, how long they
@@ -547,65 +459,8 @@ export function StatisticsPage() {
   );
 }
 
-const said = (e: unknown, fallback: string) => {
+export const said = (e: unknown, fallback: string) => {
   const d = e instanceof ApiError ? e.detail as unknown : null;
   return typeof d === "string" ? d : d && typeof d === "object" && "error" in d ? String((d as { error: unknown }).error) : fallback;
 };
 
-/** Freeing room in the portability area (services/storage_cleanup.py): what is there, what may go, chosen and done
- *  by an administrator. Each cleanup says what it frees and why it is safe; one that is not is not offered. */
-function FreeRoom() {
-  const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [chosen, setChosen] = useState<Set<string>>(new Set());
-  const preview = useQuery({ queryKey: ["storage-cleanup"], queryFn: statisticsApi.cleanupPreview, enabled: open });
-  const run = useMutation({
-    mutationFn: (ids: string[]) => statisticsApi.cleanup(ids),
-    onSuccess: () => { setChosen(new Set()); void qc.invalidateQueries({ queryKey: ["storage-cleanup"] });
-                       void qc.invalidateQueries({ queryKey: ["statistics"] }); },
-  });
-  const p: StorageCleanupPreview | undefined = preview.data;
-  const toggle = (id: string) => setChosen((c) => { const n2 = new Set(c); if (n2.has(id)) n2.delete(id); else n2.add(id); return n2; });
-  const total = (p?.actions ?? []).filter((a) => chosen.has(a.id)).reduce((t, a) => t + a.frees_up_to, 0);
-  if (!open) {
-    return <button type="button" onClick={() => setOpen(true)}
-                   className="mt-2 rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">Free up space…</button>;
-  }
-  return (
-    <div className="mt-3 space-y-2 border-t border-slate-200 pt-2 text-xs" aria-label="Free up space">
-      {preview.isLoading && <p className="text-slate-500">Looking at what is there…</p>}
-      {preview.isError && <p className="text-rose-700">{said(preview.error, "Could not look.")}</p>}
-      {p && (
-        <>
-          <ul className="space-y-0.5 text-slate-600">
-            {p.holds.filter((h) => h.bytes > 0).map((h) => (
-              <li key={h.part} className="flex justify-between gap-2"><span><b>{h.part}</b> · {h.what}</span>
-                <span className="tabular-nums">{bytes(h.bytes)}</span></li>
-            ))}
-          </ul>
-          <ul className="space-y-1">
-            {p.actions.map((a) => (
-              <li key={a.id}>
-                <label className={`flex items-start gap-2 ${a.available ? "" : "text-slate-400"}`}>
-                  <input type="checkbox" disabled={!a.available} checked={chosen.has(a.id)} onChange={() => toggle(a.id)} className="mt-0.5" />
-                  <span className="flex-1">{a.label}{a.count != null && a.count > 0 ? ` (${a.count})` : ""}
-                    <span className="block text-[11px] text-slate-500">{a.note}</span></span>
-                  <span className="tabular-nums">{a.frees_up_to ? `up to ${bytes(a.frees_up_to)}` : "—"}</span>
-                </label>
-              </li>
-            ))}
-          </ul>
-          <div className="flex items-center justify-between gap-2">
-            <button type="button" onClick={() => setOpen(false)} className="text-slate-500 underline">close</button>
-            <button type="button" disabled={chosen.size === 0 || run.isPending}
-                    onClick={async () => { if (await ask(`Remove these files from the portability area? Up to ${bytes(total)} is freed.`)) run.mutate([...chosen]); }}
-                    className="rounded bg-slate-900 px-2 py-1 font-medium text-white disabled:opacity-40">
-              {run.isPending ? "Freeing…" : "Free the space"}</button>
-          </div>
-          {run.data && <p role="status" className="text-emerald-700">Freed {bytes(run.data.freed)}.</p>}
-          {run.isError && <p className="text-rose-700">{said(run.error, "Could not do it.")}</p>}
-        </>
-      )}
-    </div>
-  );
-}

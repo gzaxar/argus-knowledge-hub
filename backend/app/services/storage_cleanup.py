@@ -11,6 +11,9 @@ What the area holds and what is kept:
 - `bundles/exports/<id>`: workspace bundles exported to be downloaded; older than a month can go.
 - `staging`, `quarantine`, `verify`, `exports`: transient files of exports and imports in progress; what is older
   than a week is left over and can go.
+- the files of exports and imports that are **over** (an import finalized, discarded or invalid; an export failed,
+  revoked or expired), at any age: what the retention period would delete later, done now, audited the same way
+  (portability service.purge_finished); a legal hold keeps them.
 
 Nothing else is touched: the database's own records of exports and imports, the evidence they cite (kept in the
 repository) and the attachments are not in this area or are not removed here.
@@ -82,7 +85,14 @@ def _old(parent: Path, older_than: float) -> list[Path]:
     return [p for p in sorted(parent.iterdir()) if _age(p) > older_than] if parent.is_dir() else []
 
 
-def preview() -> dict:
+def _finished(db):
+    from app.portability import service
+    cfg = service.config()
+    exps, imps = service.finished(db)
+    return cfg, exps, imps, service.finished_paths(cfg, exps, imps)
+
+
+def preview(db=None) -> dict:
     """What the area holds, by part, and what each cleanup would free."""
     base = root()
     parts = []
@@ -111,6 +121,13 @@ def preview() -> dict:
     actions.append({"id": "leftovers", "label": "Remove left-over files of exports and imports older than a week",
                     "frees_up_to": sum(_size(p) for p in leftovers), "available": bool(leftovers),
                     "count": len(leftovers), "note": "From staging, quarantine and verification."})
+    if db is not None:
+        _cfg, exps, imps, paths = _finished(db)
+        actions.append({"id": "finished", "label": "Remove the files of exports and imports that are over, at any age",
+                        "frees_up_to": sum(_size(p) for p in paths), "available": bool(paths),
+                        "count": len(exps) + len(imps),
+                        "note": "Imports finalized, discarded or invalid; exports failed, revoked or expired. Their records "
+                                "and audit stay; a legal hold keeps them. The retention would delete them later."})
     holds = [{"part": "work", "bytes": _size(work), "what": "local copy of the export Git repository"},
              {"part": "bundles", "bytes": _size(_bundles()), "what": "workspace bundles uploaded or exported"}]
     holds += [{"part": d, "bytes": _size(base / d), "what": "files of exports and imports in progress"}
@@ -118,10 +135,10 @@ def preview() -> dict:
     return {"root": str(base), "holds": holds, "repositories": parts, "actions": actions}
 
 
-def run(action_ids: list[str]) -> dict:
+def run(action_ids: list[str], db=None, actor: str = "administrator") -> dict:
     """Do the cleanups asked for that are available now; what each freed."""
     base = root()
-    current = {a["id"]: a for a in preview()["actions"]}
+    current = {a["id"]: a for a in preview(db)["actions"]}
     done = []
     for aid in action_ids:
         a = current.get(aid)
@@ -150,6 +167,12 @@ def run(action_ids: list[str]) -> dict:
             for d in TRANSIENT:
                 for p in _old(base / d, WEEK):
                     shutil.rmtree(p, ignore_errors=True) if p.is_dir() else p.unlink(missing_ok=True)
+            ok = True
+        elif kind == "finished" and db is not None:
+            from app.portability import service
+            cfg = service.config()
+            service.purge_finished(db, cfg, actor)
+            db.commit()
             ok = True
         else:
             ok = False

@@ -92,10 +92,26 @@ class LLMError(RuntimeError):
     """Something the caller should show a person, not a stack trace."""
 
 
+class LLMQuotaExceeded(LLMError):
+    """The workspace's AI quota is used up (services/quotas.py): said to the person as it is."""
+
+    def __init__(self, message: str, quota=None):
+        super().__init__(message)
+        self.quota = quota
+
+
 def _post(purpose: str, model: Optional[str], url: str, **kwargs) -> requests.Response:
     """requests.post, counted for the usage statistics: the call, how long it took and the tokens the provider
     reports (estimated from the text when it reports none; services/usage.py)."""
-    from app.services import usage
+    from app.services import quotas, usage
+    ws = quotas.current_workspace()
+    if ws:
+        from app.db import SessionLocal
+        with SessionLocal() as qdb:
+            try:
+                quotas.check_ai(qdb, ws)
+            except quotas.QuotaExceeded as e:
+                raise LLMQuotaExceeded(str(e), e) from e
     started = time.monotonic()
     try:
         resp = requests.post(url, **kwargs)

@@ -142,6 +142,7 @@ import type {
   PlanEntry,
   MappingSourceType,
   WorkspaceIdSuggestion,
+  StorageAdminReport, StoragePlanned, WorkspaceStorage, QuotasOverview, QuotaDefinition, QuotaStatus,
 } from "./types";
 import type {
   AssetContext,
@@ -2749,6 +2750,31 @@ export const statisticsApi = {
   cleanupPreview: () => request<StorageCleanupPreview>("/v1/admin/statistics/storage/cleanup"),
   cleanup: (actions: string[]) =>
     request<StorageCleanupResult>("/v1/admin/statistics/storage/cleanup", { method: "POST", body: json({ actions }) }),
+};
+
+/** Administration → Storage, and a workspace's share of it (backend routers/storage.py). */
+export const storageApi = {
+  report: (days = 30, refresh = false) =>
+    request<StorageAdminReport>(`/v1/admin/storage?days=${days}${refresh ? "&refresh=true" : ""}`),
+  setPlanned: (planned: Record<string, number | null>) =>
+    request<{ planned: Record<string, StoragePlanned> }>("/v1/admin/storage/settings", { method: "PUT", body: json({ planned }) }),
+  workspace: (workspaceId: string, days = 30) =>
+    request<WorkspaceStorage>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/storage?days=${days}`),
+  removeBundle: (workspaceId: string, bundleId: string) =>
+    request<{ removed: string; freed: number }>(
+      `/v1/workspaces/${encodeURIComponent(workspaceId)}/storage/bundles/${encodeURIComponent(bundleId)}`, { method: "DELETE" }),
+};
+
+/** Administration → Quotas, and a workspace's own (backend routers/quotas.py). */
+export const quotasApi = {
+  all: () => request<QuotasOverview>("/v1/admin/quotas"),
+  setDefaults: (values: Record<string, number | null>, reset: string[] = []) =>
+    request<{ quotas: QuotaDefinition[] }>("/v1/admin/quotas/defaults", { method: "PUT", body: json({ values, reset }) }),
+  setWorkspace: (workspaceId: string, values: Record<string, number | null>, reset: string[] = []) =>
+    request<{ quotas: QuotaStatus[]; overrides: Record<string, number | null> }>(
+      `/v1/admin/quotas/workspaces/${encodeURIComponent(workspaceId)}`, { method: "PUT", body: json({ values, reset }) }),
+  workspace: (workspaceId: string) =>
+    request<{ workspace_id: string; quotas: QuotaStatus[] }>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/quotas`),
 };
 
 /** Templates for documents reworked from raw text, and the rework itself. */

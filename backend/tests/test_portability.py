@@ -1782,3 +1782,25 @@ def test_a_conflicts_values_compare_as_a_set():
     one = {"conflict_id": "c", "detail": {"values": ["btf_transfer", "accumulator_pa"]}}
     two = {"conflict_id": "c", "detail": {"values": ["accumulator_pa", "btf_transfer"]}}
     assert importer._proj_key(fam, one) == importer._proj_key(fam, two)
+
+
+def test_a_record_field_the_ledger_projects_is_accepted_as_rebuilt_only_by_decision(dbs, env):
+    """A record's attribute the ledger manages, overwritten at the source outside the ledger (INFN Cloud: 155
+    argus_source "epik8s" against the ledger's "EPIK8s"), is a projection the rebuild makes again from the claim.
+    It blocks; decision `projections: accept_rebuilt` accepts it and counts it. An empty multi-value is nothing."""
+    from sqlalchemy.orm.attributes import flag_modified
+    src = dbs()
+    s = populate(src, env.tmp)
+    with Session(src) as db:
+        unit = db.get(Asset, s.unit)
+        unit.attributes = {**unit.attributes, "argus_location": "Rack Z99", "argus_keywords": [[]]}
+        flag_modified(unit, "attributes")
+        db.commit()
+    view, _ = run_export(src, env, s)
+    _, rec, _ = _execute_only(dbs(), env, view["git"]["tag"], {})
+    assert not rec["passed"]
+    assert [m["fields"] for m in rec["families"]["assets"]["mismatches"]] == [["attributes.argus_location"]]
+    _, rec, state = _execute_only(dbs(), env, view["git"]["tag"], {"projections": importer.PROJECTIONS_ACCEPT})
+    assert rec["passed"] and state == "ready_to_finalize", json.dumps(_failures(rec), indent=1, default=str)
+    assert rec["accepted"]["record_fields"]["count"] == 1
+    assert rec["accepted"]["record_fields"]["examples"][0]["fields"] == ["attributes.argus_location"]

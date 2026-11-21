@@ -1,8 +1,9 @@
 import logging
 import time
+from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
@@ -133,10 +134,18 @@ async def attachment_links_open_in_the_app(request: Request, call_next):
 @app.middleware("http")
 async def usage_counts(request: Request, call_next):
     """Counts the request, anonymously, for the Statistics page (services/usage.py)."""
-    from app.services import usage
-    if not usage.counted(request.method, request.url.path):
+    from app.services import quotas, usage
+    counted = usage.counted(request.method, request.url.path)
+    holder = usage.begin(request.headers, request.url.path)     # also what the quotas read (workspace, admin)
+    if holder["client"] in ("api", "mcp") and holder["workspace"] and request.method != "OPTIONS" \
+            and request.url.path not in ("/health", "/v1/meta/version"):
+        refused = quotas.check_api(holder["workspace"])
+        if refused is not None:
+            return JSONResponse(status_code=429, content={"detail": refused.detail()},
+                                headers={"Retry-After": str(max(1, int((refused.frees_at - datetime.now(timezone.utc))
+                                                                       .total_seconds())))} if refused.frees_at else {})
+    if not counted:
         return await call_next(request)
-    holder = usage.begin(request.headers, request.url.path)
     status = 500
     try:
         response = await call_next(request)
@@ -280,6 +289,20 @@ app.include_router(spatial_router.router)
 
 
 from app.packages.requirements import MissingPrerequisite  # noqa: E402
+from app.services import quotas as _quotas  # noqa: E402  (installs the quota flush guard)
+from app.services.llm import LLMQuotaExceeded  # noqa: E402
+
+
+@app.exception_handler(_quotas.QuotaExceeded)
+async def _quota_exceeded(_request, exc):
+    """A quota reached (services/quotas.py): which, its limit, what is used, and when it frees up."""
+    return JSONResponse(status_code=429, content={"detail": exc.detail()})
+
+
+@app.exception_handler(LLMQuotaExceeded)
+async def _ai_quota_exceeded(_request, exc):
+    detail = exc.quota.detail() if exc.quota is not None else {"error": str(exc), "code": "quota_exceeded"}
+    return JSONResponse(status_code=429, content={"detail": detail})
 
 
 @app.exception_handler(MissingPrerequisite)
@@ -312,6 +335,12 @@ from app.routers import statistics as statistics_router  # noqa: E402
 
 app.include_router(help_router.router)
 app.include_router(statistics_router.router)
+from app.routers import storage as storage_router  # noqa: E402
+
+app.include_router(storage_router.router)
+from app.routers import quotas as quotas_router  # noqa: E402
+
+app.include_router(quotas_router.router)
 from app.routers import activities as activities_router  # noqa: E402
 
 app.include_router(activities_router.router)

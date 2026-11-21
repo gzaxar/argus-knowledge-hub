@@ -603,6 +603,11 @@ def create_import(db: Session, actor: str, *, mode: str, source: dict, decisions
         raise ServiceError(f"unknown mode {mode!r}", "invalid", 422)
     if source.get("repository") and source["repository"] not in cfg.repositories:
         raise ServiceError(f"repository {source['repository']!r} is not registered", "invalid", 422)
+    from app.services import quotas
+    try:
+        quotas.check_import_slot(db)
+    except quotas.QuotaExceeded as e:
+        raise ServiceError(str(e), "quota_exceeded", 429, e.detail()) from e
     imp = PortabilityImport(id=f"imp-{time.strftime('%Y%m%d')}-{uuid.uuid4().hex[:8]}", mode=mode,
                             source=source, state="created", requested_by=actor, decisions=decisions or {})
     db.add(imp)
@@ -782,12 +787,49 @@ def dry_run(db: Session, imp: PortabilityImport, actor: str, cfg: Config,
             report.setdefault("blocking", []).append({"family": "instance", "key": "-", "reason":
                                                       "restore needs an empty instance; use clone or merge"})
             report["ready"] = False
+    if imp.mode != "evidence":
+        over = _quota_preview(db, plan)
+        if over:
+            report["quota_warnings"] = over
     imp.dry_run = report
     imp.state = "dry_run_ready" if imp.state == "awaiting_approval" else imp.state
     audit(db, imp, "dry_run", actor, {"ready": report.get("ready"), "blocking": len(report.get("blocking", []))})
     if report.get("ready"):
         move(db, imp, "awaiting_approval", actor, "dry_run_ready")
     return imp
+
+
+def _quota_preview(db: Session, plan) -> list[dict]:
+    """What the archive would bring each workspace past a quota (services/quotas.py). An import is an instance
+    administrator's and loads anyway: said here, before it starts, not halfway through."""
+    from collections import Counter
+    from app.models.workspace import Workspace
+    from app.services import quotas
+    adds: dict = {"assets": Counter(), "documents": Counter(), "storage_bytes": Counter()}
+    for fam_name, key in (("assets", "assets"), ("documents", "documents"), ("attachments", "storage_bytes")):
+        fam = importer.BY_NAME.get(fam_name)
+        if fam is None or fam_name not in plan.manifest["families"]:
+            continue
+        for _, _k, row in importer.archive_rows(plan, fam):
+            if fam_name == "assets" and row.get("deleted_at"):
+                continue
+            ws = plan.map_ws(row.get("workspace_id")) if hasattr(plan, "map_ws") else row.get("workspace_id")
+            adds[key][ws] += int(row.get("file_size") or 0) if key == "storage_bytes" else 1
+    out = []
+    for key, per_ws in adds.items():
+        for ws, n in per_ws.items():
+            if not ws:
+                continue
+            limit = quotas.limits(db, ws)[key]
+            if limit is None:
+                continue
+            used = quotas.usage(db, ws)[key] if db.get(Workspace, ws) is not None else 0
+            if used + n > limit:
+                q = quotas.BY_KEY[key]
+                out.append({"workspace": ws, "quota": key, "limit": limit, "used": used, "adding": n,
+                            "message": f"{ws}: the {q.label.lower()} quota is {quotas.fmt(q, limit)}; it has "
+                                       f"{quotas.fmt(q, used)} and the archive brings {quotas.fmt(q, n)}"})
+    return out
 
 
 def approve_import(db: Session, imp: PortabilityImport, actor: str, *, acknowledge_uninspected: bool = False,
@@ -1176,15 +1218,7 @@ def cleanup(db: Session, cfg: Config, actor: str = "retention", now: Optional[da
         if exp.legal_hold:
             report["held"] += 1
             continue
-        if exp.out_dir:
-            exporter.secure_delete(Path(exp.out_dir))
-        staged = cfg.root / "repository-stores" / exp.id      # data waiting to be committed with it
-        if staged.exists():
-            exporter.secure_delete(staged)
-        if exp.state in ("published", "ready_to_publish"):
-            move(db, exp, "expired", actor, "expire", {"retention_days": cfg.policy.retention_days})
-        exp.purged_at = now
-        audit(db, exp, "purged", actor, {"what": "local archive files", "retention_days": cfg.policy.retention_days})
+        _purge_export(db, cfg, exp, actor, now, {"retention_days": cfg.policy.retention_days})
         report["exports"].append(exp.id)
     for imp in db.scalars(select(PortabilityImport).where(PortabilityImport.created_at < cutoff,
                                                           PortabilityImport.purged_at.is_(None),
@@ -1192,14 +1226,69 @@ def cleanup(db: Session, cfg: Config, actor: str = "retention", now: Optional[da
         if imp.legal_hold:
             report["held"] += 1
             continue
-        staging.drop(db.get_bind().url, (imp.staging or {}).get("database"))
-        for p in (Path(imp.quarantine_dir) if imp.quarantine_dir else None, cfg.staged_files(imp.id),
-                  cfg.evidence(imp.id)):
-            if p is not None:
-                exporter.secure_delete(p)
-        imp.purged_at = now
-        audit(db, imp, "purged", actor, {"what": "quarantine, staging and evidence files",
-                                         "retention_days": cfg.policy.retention_days})
+        _purge_import(db, cfg, imp, actor, now, {"retention_days": cfg.policy.retention_days})
         report["imports"].append(imp.id)
     db.flush()
     return report
+
+
+# Over for good, whatever their age: nothing can resume them or download from them. A failed import can resume and
+# a published export is still downloaded; they wait for the retention period.
+IMPORT_OVER = ("finalized", "discarded", "invalid")
+EXPORT_OVER = ("failed", "revoked", "expired")
+
+
+def finished(db: Session) -> tuple[list, list]:
+    """The exports and imports that are over and still have files here, legal holds left out."""
+    exps = [e for e in db.scalars(select(PortabilityExport).where(PortabilityExport.purged_at.is_(None),
+                                                                  PortabilityExport.state.in_(EXPORT_OVER)))
+            if not e.legal_hold]
+    imps = [i for i in db.scalars(select(PortabilityImport).where(PortabilityImport.purged_at.is_(None),
+                                                                  PortabilityImport.state.in_(IMPORT_OVER)))
+            if not i.legal_hold]
+    return exps, imps
+
+
+def finished_paths(cfg: Config, exps: list, imps: list) -> list[Path]:
+    out = []
+    for e in exps:
+        out += [p for p in (Path(e.out_dir) if e.out_dir else None, cfg.root / "repository-stores" / e.id,
+                            cfg.root / "verify" / e.id) if p is not None]
+    for i in imps:
+        out += [p for p in (Path(i.quarantine_dir) if i.quarantine_dir else None, cfg.staged_files(i.id),
+                            cfg.evidence(i.id)) if p is not None]
+    return [p for p in out if p.exists()]
+
+
+def purge_finished(db: Session, cfg: Config, actor: str) -> dict:
+    """An administrator's cleanup (services/storage_cleanup.py): the files of the exports and imports that are
+    over, at any age — as the retention would delete them later, audited the same way."""
+    now = datetime.now(timezone.utc)
+    exps, imps = finished(db)
+    for e in exps:
+        _purge_export(db, cfg, e, actor, now, {"by": "administrator", "state": e.state})
+    for i in imps:
+        _purge_import(db, cfg, i, actor, now, {"by": "administrator", "state": i.state})
+    db.flush()
+    return {"exports": [e.id for e in exps], "imports": [i.id for i in imps]}
+
+
+def _purge_export(db: Session, cfg: Config, exp: PortabilityExport, actor: str, now: datetime, why: dict) -> None:
+    if exp.out_dir:
+        exporter.secure_delete(Path(exp.out_dir))
+    for p in (cfg.root / "repository-stores" / exp.id, cfg.root / "verify" / exp.id):   # data waiting to be committed
+        if p.exists():
+            exporter.secure_delete(p)
+    if exp.state in ("published", "ready_to_publish"):
+        move(db, exp, "expired", actor, "expire", why)
+    exp.purged_at = now
+    audit(db, exp, "purged", actor, {"what": "local archive files", **why})
+
+
+def _purge_import(db: Session, cfg: Config, imp: PortabilityImport, actor: str, now: datetime, why: dict) -> None:
+    staging.drop(db.get_bind().url, (imp.staging or {}).get("database"))
+    for p in (Path(imp.quarantine_dir) if imp.quarantine_dir else None, cfg.staged_files(imp.id), cfg.evidence(imp.id)):
+        if p is not None:
+            exporter.secure_delete(p)
+    imp.purged_at = now
+    audit(db, imp, "purged", actor, {"what": "quarantine, staging and evidence files", **why})

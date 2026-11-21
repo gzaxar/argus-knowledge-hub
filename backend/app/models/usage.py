@@ -88,3 +88,12 @@ class UsageStorage(Base):
     disk_free_bytes: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     files: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     measured_at = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class QuotaAIUsage(Base):
+    """Language-model tokens a workspace used in an hour, for its AI quotas (services/quotas.py). Kept 8 days."""
+    __tablename__ = "quota_ai_usage"
+
+    hour: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String, primary_key=True)
+    tokens: Mapped[int] = mapped_column(BigInteger, default=0)

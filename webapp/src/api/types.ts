@@ -2202,6 +2202,40 @@ export interface StorageReport {
   attachments_by_workspace: { workspace: string; files: number; bytes: number }[];
   largest_tables: { table: string; bytes: number }[];
 }
+/** An area's planned room and where it comes from (GET /v1/admin/storage/settings). */
+export interface StoragePlanned {
+  planned_bytes: number | null; setting_bytes: number | null; deployment_bytes: number | null; default_bytes: number | null;
+  source: "setting" | "deployment" | "default" | null;
+}
+export interface StorageAdminReport extends StorageReport { planned: Record<string, StoragePlanned> }
+/** One workspace's share of the storage (GET /v1/workspaces/{id}/storage). */
+export interface WorkspaceStorage {
+  workspace_id: string;
+  attachments: {
+    files: number; bytes: number; share_of_area: number | null; area_bytes: number;
+    per_day: { day: string; added_bytes: number; added_files: number }[];
+    largest: { uid: string; filename: string; bytes: number; mime_type: string | null; asset_uid: string | null;
+               issue_uid: string | null; created_at: string | null }[];
+    by_type: { mime_type: string; files: number; bytes: number }[];
+  };
+  bundles: { id: string; created_at: string | null; created_by: string | null; bytes: number; files: number }[];
+}
+/** A quota (backend services/quotas.py): its built-in default and the installation's. */
+export interface QuotaDefinition {
+  key: string; label: string; unit: "bytes" | "tokens" | "count"; what: string;
+  builtin: number | null; default: number | null; scope: "workspace" | "installation";
+}
+/** A workspace's quota: its limit (null: unlimited), where it comes from, what is used. */
+export interface QuotaStatus {
+  key: string; label: string; unit: "bytes" | "tokens" | "count"; what: string; limit: number | null;
+  used: number | null; ratio: number | null; source: "workspace" | "default"; level: "ok" | "warn" | "over" | null;
+}
+export interface QuotasOverview {
+  quotas: QuotaDefinition[];
+  workspaces: { id: string; name: string; quotas: QuotaStatus[]; overrides: Record<string, number | null>;
+                level: "ok" | "warn" | "over" }[];
+  installation: { imports_at_once: { limit: number | null; used: number; imports: string[] } };
+}
 export interface StatisticsTotals {
   requests: number; people: number; records_new: number; records_changed: number; ask_questions: number; tokens: number;
 }

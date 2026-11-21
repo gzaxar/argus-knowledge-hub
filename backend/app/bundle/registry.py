@@ -267,7 +267,8 @@ NOT_CARRIED = {
        for t in ("intake_runs", "intake_outcomes", "intake_profiles")},
     **{t: "secret or runtime state of the source installation"
        for t in ("api_tokens", "devices", "uploads", "idempotency_records", "notifications", "notification_preferences",
-                 "usage_llm", "usage_requests", "usage_presence", "usage_storage", "app_settings")},
+                 "usage_llm", "usage_requests", "usage_presence", "usage_storage", "quota_ai_usage",
+                 "app_settings")},
     **{t: "the signed portable archive's own records"
        for t in ("portability_chain", "portability_download_tokens", "portability_events", "portability_exports",
                  "portability_imports", "portability_jobs", "portability_origin_records", "portability_repositories",

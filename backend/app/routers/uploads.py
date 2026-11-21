@@ -102,6 +102,8 @@ def create_upload(body: UploadIn, identity=Depends(get_identity),
         raise HTTPException(status_code=413, detail={
             "error": f"The file is {body.size // MB} MB; the limit for this type is {limit // MB} MB.",
             "code": "too_large", "limit": limit, "field": "size"})
+    from app.services import quotas
+    quotas.check_file(db, workspace_id, body.size)
     from app import idempotency
     uid = str(uuid.uuid4())
     u = Upload(uid=uid, workspace_id=workspace_id, principal=_principal(identity),

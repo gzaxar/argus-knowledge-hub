@@ -15,7 +15,7 @@ is in:
 
 - **Workspace**: changes only the workspace named there. Its pages are grouped under **People & access** (Access,
   Groups, Area permissions, Access reviews), **Content** (Imports, Packages, Keys, Icon library, GLPI, Transfer,
-  Migration from Jira, Data integrity) and **Integrations** (AI endpoint, Robot tokens).
+  Migration from Jira, Data integrity, Storage, Quotas) and **Integrations** (AI endpoint, Robot tokens).
 - **Site** *name*: for the site's administrators, whichever workspace is open, and for administrators of the
   installation when the open workspace is at that site. **Administrators**, **Site-wide group access** (with its
   changes to access) and **Facilities** apply to every facility currently at the site.
@@ -33,10 +33,12 @@ is in:
 | **All tokens** | every personal and robot token: who made it, what it may do, expiry, last use; revoke any |
 | **Portability** | exports and imports (see *Export and import*) |
 | **Statistics** | how ARGUS is used, anonymously (below) |
+| **Storage** | what each storage area uses and has left, its planned room, and freeing space (below) |
+| **Quotas** | what a workspace may hold and use, and what each uses (below) |
 
 ## Statistics
 
-**Administration → Statistics** has four tabs, for the last 7 to 365 days:
+**Administration → Statistics** has three tabs, for the last 7 to 365 days:
 
 - **Usage**: who is on now and the most at the same time (per five minutes), sign-ins, requests and people per
   day by client (web, Android app, assistants through MCP, scripts), and the activity in each workspace
@@ -44,35 +46,66 @@ is in:
 - **AI**: the language model's calls and tokens by day, model, purpose and workspace; Ask ARGUS questions, how
   the answers ended, the lookups it uses most, and the ratings, with the answers rated not useful (each one a
   ticket).
-- **Storage**: for the attachment files, the database and the portability archives, what is used, the room
-  planned (the volume's size in the deployment), what is still available (the planned room left or the free
-  space on the disk under it, whichever runs out first; the database's disk is on another node and is not seen),
-  the growth per day and, at that rate, roughly when it is full; the attachments' growth since their first
-  upload, the daily measurements (taken hourly, the trend builds up from the first day), the attachments by
-  workspace and the largest database tables. **Measure now** measures again. Growth that is negative is shown
-  as *shrinking*.
-
-### Freeing room in the portability archives
-
-The portability archives card has **Free up space…**: what the area holds, part by part, and the cleanups that
-can be done, each with what it frees and why it is safe. Tick the ones you want and **Free the space**.
-
-- **The export repository copy** (`work/…`) is the local copy of the Git repository the scheduled exports are
-  pushed to (for example `infn-epics/argus-knowledge` on baltig): it is most of the space. **Compact** packs the
-  objects each export wrote loose; nothing is lost. **Drop** removes the copy when the remote repository has all of
-  it (it is not offered otherwise): the next export clones it again. Since 1.35.120 each export compacts it by
-  itself.
-- **Uploaded workspace bundles** older than a week: not needed once the import is done.
-- **Exported workspace bundles** older than a month: export the workspace again for a fresh one.
-- **Left-overs** of exports and imports older than a week (staging, quarantine, verification).
-
-The records of exports and imports, the evidence they cite (in the repository) and the attachments are not
-touched. Only an administrator signed in can do it, never with a token.
 - **Nerds**: for whoever looks after ARGUS — the most used routes, the slowest, those that failed (server
   errors), and the most used by client.
 
 Nobody is named: people are counted as a keyed hash per five minutes, and the ratings keep no author. Tokens a
 provider does not report are estimated. `ARGUS_USAGE_STATS=0` switches the counting off.
+
+## Storage
+
+**Administration → Storage** is the whole installation's storage: for the attachment files, the database and the
+portability archives, what is used, the room planned, what is still available (the planned room left or the free
+space on the disk under it, whichever runs out first; the database's disk is on another node and is not seen), the
+growth per day and, at that rate, roughly when it is full; the attachments' growth, the daily measurements, the
+attachments by workspace and the largest database tables. **Measure now** measures again.
+
+**Planned room** sets what each area is measured against. Empty uses the deployment's size (the Helm chart) or the
+default (portability archives: 10 GB). It does not resize a volume: on a volume that does not enforce its size
+(local-path) the disk under it is what runs out, and the gauge says so.
+
+### Freeing space
+
+The portability archives card has **Free up space…**: what the area holds, part by part, and the cleanups that
+can be done, each with what it frees and why it is safe. Tick the ones you want and **Free the space**.
+
+- **The export repository copy** (`work/…`): **Compact** packs the objects each export wrote loose; nothing is
+  lost. **Drop** removes the copy when the remote repository has all of it: the next export clones it again.
+- **Exports and imports that are over**, at any age: an import finalized, discarded or invalid, an export failed,
+  revoked or expired. Their files (quarantine, staging, evidence copy, archive) go, as the retention period would
+  delete them later; their records and audit stay, and a legal hold keeps them. A failed import can still resume,
+  and a published export is still downloaded: they wait for the retention period.
+- **Uploaded workspace bundles** older than a week, **exported workspace bundles** older than a month.
+- **Left-overs** of exports and imports older than a week (staging, quarantine, verification).
+
+Only an administrator signed in can do it, never with a token.
+
+**Workspace → Storage** is one workspace's share, for its administrators: its attachment files (how many, how big,
+their share of all attachments, what was added each day, the largest, by type) and the workspace bundles exported
+of it, which an administrator of the installation can remove.
+
+## Quotas
+
+**Administration → Quotas** sets what a workspace may hold and use: defaults every workspace has, and a workspace's
+own (open it: *the default*, *unlimited* or *its own* number).
+
+| Quota | Counts | Built-in default |
+|---|---|---|
+| Storage | the workspace's attachment files | 50 GB |
+| Largest file | one file uploaded or attached | 2 GB |
+| AI tokens, 5 hours / week | language-model tokens over the last 5 hours / 7 days | unlimited |
+| Records, Documents | those not deleted | unlimited |
+| Members | people given access directly (a group counts as none) | unlimited |
+| API operations, day / minute | requests made with a token (scripts, robots, assistants through MCP) | unlimited |
+| Imports at once (installation) | portability imports not finalized, discarded or invalid | 1 |
+
+Past a quota ARGUS refuses what would add to it — a new record, document or member, a file, a call to the language
+model, an API request — and says which quota, what is used and when it frees up (a window: the 5 hours, the week,
+the minute, the day). Reading, editing and deleting always work, so a workspace can get back under it. Every way
+in is held to it: forms, the API, the Jira, GLPI and Confluence imports, workspace bundles. Administrators of the
+installation signed in are never stopped, and a portability import loads anyway: its dry run lists what it would
+bring over a quota first. At 80% a workspace's administrators see a warning on its administration pages
+(**Workspace → Quotas** shows each), and the `ArgusQuotaNearLimit` alert fires. Every change to a quota is audited.
 
 ## Workspace templates (packages)
 

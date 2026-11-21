@@ -79,6 +79,21 @@ def record_storage(areas: list[dict]) -> None:
                 gauge.labels(a["area"]).set(value)
 
 
+QUOTA = Gauge("argus_quota_ratio", "What a workspace uses of a quota (1 is the limit; absent: unlimited).",
+              ["workspace", "quota"], registry=REGISTRY)
+
+
+def record_quota(workspace: str, ratios: dict) -> None:
+    for key, ratio in ratios.items():
+        if ratio is None:
+            try:
+                QUOTA.remove(workspace, key)
+            except KeyError:
+                pass
+        else:
+            QUOTA.labels(workspace, key).set(ratio)
+
+
 def start() -> None:
     """Listen on ARGUS_METRICS_PORT, once per process; no port, no listener."""
     global _started

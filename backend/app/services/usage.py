@@ -124,8 +124,6 @@ def note_llm(model: Optional[str], purpose: str, *, prompt_tokens: Optional[int]
                      "completion_tokens": (completion_tokens if completion_tokens is not None
                                            else len(completion_text) // 4),
                      "estimated": prompt_tokens is None and completion_tokens is None})
-    if not enabled():
-        return
     estimated = prompt_tokens is None and completion_tokens is None and not failed
     if prompt_tokens is None:
         prompt_tokens = len(prompt_text) // 4
@@ -133,6 +131,11 @@ def note_llm(model: Optional[str], purpose: str, *, prompt_tokens: Optional[int]
         completion_tokens = len(completion_text) // 4
     holder = _request.get()
     workspace = (holder or {}).get("workspace") or ""
+    from app.services import quotas
+    quotas.note_tokens(workspace if workspace != UNKNOWN_WORKSPACE else None,
+                       int(prompt_tokens or 0) + int(completion_tokens or 0))
+    if not enabled():
+        return
     with _lock:
         row = _llm.setdefault((datetime.now(timezone.utc).date(), workspace, (model or "?")[:200], purpose),
                               [0, 0, 0, 0, 0, 0])
@@ -229,8 +232,9 @@ def flush() -> None:
 def prune(db, now: Optional[datetime] = None) -> int:
     from sqlalchemy import delete
 
-    from app.models.usage import UsagePresence
+    from app.models.usage import QuotaAIUsage, UsagePresence
     cutoff = (now or datetime.now(timezone.utc)) - timedelta(days=PRESENCE_DAYS)
+    db.execute(delete(QuotaAIUsage).where(QuotaAIUsage.hour < (now or datetime.now(timezone.utc)) - timedelta(days=8)))
     return db.execute(delete(UsagePresence).where(UsagePresence.bucket < cutoff)).rowcount or 0
 
 
@@ -245,6 +249,14 @@ def _measure_storage() -> None:
     except Exception:  # noqa: BLE001
         db.rollback()
         log.warning("storage not measured", exc_info=True)
+    try:
+        from app.models.workspace import Workspace
+        from app.services import quotas
+        for ws in db.scalars(select(Workspace.id)).all():
+            quotas.status(db, ws)                 # argus_quota_ratio, for the alert at 80%
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        log.warning("quotas not measured", exc_info=True)
     finally:
         db.close()
 

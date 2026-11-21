@@ -87,5 +87,12 @@ spec:
           annotations:
             summary: An ARGUS storage area will be full in less than {{ $r.storageDaysLeft }} days at the current rate
             description: Enlarge the volume (and the namespace's requests.storage quota), or clear old portability archives.
+        - alert: ArgusQuotaNearLimit
+          expr: max by (workspace, quota) (argus_quota_ratio{namespace="{{ $ns }}"}) >= 0.8
+          for: 15m
+          labels: {severity: warning}
+          annotations:
+            summary: "Workspace {{`{{ $labels.workspace }}`}} uses {{`{{ $value | humanizePercentage }}`}} of its {{`{{ $labels.quota }}`}} quota"
+            description: At 100% ARGUS refuses what would add to it. Raise it in Administration → Quotas, or free some.
 {{- end }}
 {{- end }}

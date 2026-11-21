@@ -389,3 +389,54 @@ export function PolicySummary({ policy }: { policy: PortabilityPolicy }) {
     </div>
   );
 }
+
+/** Secondary information, folded away until asked for. */
+export function Details({ label = "Show details", children, className = "" }: { label?: string; children: React.ReactNode;
+                                                                                 className?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={className}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}
+              className="text-xs font-medium text-slate-600 hover:text-slate-900">
+        {open ? "▾ Hide details" : `▸ ${label}`}
+      </button>
+      {open && <div className="mt-3 space-y-4">{children}</div>}
+    </div>
+  );
+}
+
+/** A failed item: red, and clicking it says what it means (explain.ts). */
+export function FailedItem({ label, selected, onSelect }: { label: React.ReactNode; selected: boolean; onSelect: () => void }) {
+  return (
+    <button type="button" onClick={onSelect} aria-pressed={selected} title="What does this mean?"
+            className={`text-rose-700 underline decoration-dotted underline-offset-2 hover:text-rose-900 ${selected ? "font-semibold" : ""}`}>
+      {label} <span aria-hidden>ⓘ</span>
+    </button>
+  );
+}
+
+export function ExplanationPanel({ e, onClose, children }: {
+  e: import("./explain").Explanation; onClose: () => void; children?: React.ReactNode }) {
+  return (
+    <div role="region" aria-label={e.title} className="mt-3 rounded border border-rose-200 bg-rose-50 p-3 text-xs text-slate-800">
+      <div className="flex items-start justify-between gap-2">
+        <div className="font-semibold text-rose-900">{e.title}</div>
+        <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-800" aria-label="Close">✕</button>
+      </div>
+      <p className="mt-1">{e.what}</p>
+      {e.why && e.why.length > 0 && (
+        <>
+          <div className="mt-2 font-semibold text-slate-700">Why it can happen</div>
+          <ul className="mt-0.5 list-disc pl-5">{e.why.map((w, k) => <li key={k}>{w}</li>)}</ul>
+        </>
+      )}
+      {e.todo && e.todo.length > 0 && (
+        <>
+          <div className="mt-2 font-semibold text-slate-700">What to do</div>
+          <ul className="mt-0.5 list-disc pl-5">{e.todo.map((w, k) => <li key={k}>{w}</li>)}</ul>
+        </>
+      )}
+      {children}
+    </div>
+  );
+}

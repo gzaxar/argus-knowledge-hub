@@ -39,6 +39,9 @@ postgres:
 api:
   attachmentsSize: 15Gi
   portabilitySize: 5Gi
+  # The room the Storage page measures the portability area against (Administration → Storage can change it). Not the
+  # volume's size: a volume that does not grow (local-path) keeps its size, and the disk under it is what runs out.
+  portabilityPlanned: 10Gi
   nodeSelector: {}
   # Sign-in providers besides Keycloak, as the API's OIDC_EXTRA_PROVIDERS entries: {issuer, jwks_uri, audience}.
   extraProviders: []

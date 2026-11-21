@@ -15,6 +15,9 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
 BACKEND = Path(__file__).resolve().parent.parent
+# Imports are made by the hundred and left as they end: the installation's "one import at once" quota would stop
+# them; tests of that quota set it themselves (tests/test_quotas.py).
+os.environ.setdefault("ARGUS_QUOTA_IMPORTS_AT_ONCE", "unlimited")
 
 
 def _test_url() -> str:

@@ -1,8 +1,9 @@
 """How full ARGUS's storage is, how fast it grows and how much room is left: the Statistics page's storage section.
 
 Three areas: the attachment files (ATTACHMENTS_DIR), the portability archives (ARGUS_PORTABILITY_ROOT) and the
-database. Each is measured against the room planned for it (ARGUS_STORAGE_*_SIZE, the Helm chart's volume
-sizes) and, for the two directories, against what the disk under them still has free: a local-path volume does
+database. Each is measured against the room planned for it — what an administrator set (Administration → Storage,
+the app setting `storage.planned`), else the deployment's (ARGUS_STORAGE_*_SIZE, from the Helm chart), else the
+built-in default (portability 10 GiB) — and, for the two directories, against what the disk under them still has free: a local-path volume does
 not enforce its size, so either can run out first. The database lives on another node; only its planned size is
 known here.
 
@@ -27,6 +28,9 @@ AREAS = {
     "portability": ("ARGUS_PORTABILITY_ROOT", "/data/portability", "ARGUS_STORAGE_PORTABILITY_SIZE"),
 }
 DATABASE_SIZE = "ARGUS_STORAGE_DATABASE_SIZE"
+PLANNED_SETTING = "storage.planned"                     # {area: bytes}, set by an administrator
+DEFAULT_PLANNED = {"portability": 10 * 2 ** 30}         # a full import of a large archive takes about 2 GB
+SIZE_ENV = {**{a: env for a, (_d, _p, env) in AREAS.items()}, "database": DATABASE_SIZE}
 WALK_SECONDS = 120            # a directory too big to walk in this long is reported as measured so far
 _UNITS = {"": 1, "k": 10 ** 3, "m": 10 ** 6, "g": 10 ** 9, "t": 10 ** 12,
           "ki": 2 ** 10, "mi": 2 ** 20, "gi": 2 ** 30, "ti": 2 ** 40}
@@ -38,6 +42,57 @@ def parse_size(value: Optional[str]) -> Optional[int]:
     if not m:
         return None
     return int(float(m.group(1)) * _UNITS[(m.group(2) or "").lower()])
+
+
+def planned_settings(db: Optional[Session]) -> dict:
+    """What an administrator set as each area's planned room (bytes), if anything."""
+    if db is None:
+        return {}
+    from app.models.app_setting import AppSetting
+    row = db.get(AppSetting, PLANNED_SETTING)
+    value = row.value if row is not None and isinstance(row.value, dict) else {}
+    return {k: int(v) for k, v in value.items() if k in SIZE_ENV and isinstance(v, (int, float)) and v > 0}
+
+
+def planned_room(db: Optional[Session], area: str) -> Optional[int]:
+    """An area's planned room: the administrator's setting, else the deployment's, else the default."""
+    return planned_settings(db).get(area) or parse_size(os.environ.get(SIZE_ENV.get(area, ""))) \
+        or DEFAULT_PLANNED.get(area)
+
+
+def planned_view(db: Session) -> dict:
+    """Each area's planned room and where it comes from, for the settings form."""
+    set_ = planned_settings(db)
+    out = {}
+    for area, env in SIZE_ENV.items():
+        deployment = parse_size(os.environ.get(env))
+        out[area] = {"planned_bytes": planned_room(db, area), "setting_bytes": set_.get(area),
+                     "deployment_bytes": deployment, "default_bytes": DEFAULT_PLANNED.get(area),
+                     "source": "setting" if area in set_ else "deployment" if deployment else
+                               "default" if area in DEFAULT_PLANNED else None}
+    return out
+
+
+def set_planned(db: Session, values: dict) -> dict:
+    """Set (bytes) or clear (None) an area's planned room. The caller commits."""
+    from app.models.app_setting import AppSetting
+    current = planned_settings(db)
+    for area, v in values.items():
+        if area not in SIZE_ENV:
+            raise ValueError(f"no storage area {area}")
+        if v is None:
+            current.pop(area, None)
+        elif not isinstance(v, int) or v < 2 ** 20 or v > 2 ** 50:
+            raise ValueError(f"{area}: the planned room is a number of bytes, from 1 MiB")
+        else:
+            current[area] = v
+    row = db.get(AppSetting, PLANNED_SETTING)
+    if row is None:
+        db.add(AppSetting(key=PLANNED_SETTING, value=current))
+    else:
+        row.value = current
+    db.flush()
+    return planned_view(db)
 
 
 def dir_usage(path: str, budget: float = WALK_SECONDS) -> tuple[int, int, bool]:
@@ -75,7 +130,7 @@ def measure(db: Session) -> list[dict]:
     out = []
     for area, (env, default, size_env) in AREAS.items():
         path = os.environ.get(env, default)
-        planned = parse_size(os.environ.get(size_env))
+        planned = planned_room(db, area)
         if os.path.isdir(path):
             used, files, complete = dir_usage(path)
             try:
@@ -89,7 +144,7 @@ def measure(db: Session) -> list[dict]:
                     "planned_bytes": planned, "disk_free_bytes": disk_free, "disk_total_bytes": disk_total})
     used = int(db.scalar(text("SELECT pg_database_size(current_database())")) or 0)
     out.append({"area": "database", "used_bytes": used, "files": None, "complete": True,
-                "planned_bytes": parse_size(os.environ.get(DATABASE_SIZE)), "disk_free_bytes": None,
+                "planned_bytes": planned_room(db, "database"), "disk_free_bytes": None,
                 "disk_total_bytes": None})
     for a in out:
         a["available_bytes"] = available(a["used_bytes"], a["planned_bytes"], a["disk_free_bytes"])
@@ -186,3 +241,55 @@ def report(db: Session, start: date, refresh: bool = False) -> dict:
     return {"measured_at": measured_at, "areas": sorted(now, key=lambda a: order.get(a["area"], 9)),
             "trend": [{"day": d, **v} for d, v in sorted(trend.items())], "attachment_growth": growth,
             "attachments_by_workspace": by_workspace, "largest_tables": tables}
+
+
+def workspace_report(db: Session, workspace_id: str, days: int = 30) -> dict:
+    """One workspace's share of the storage: its attachment files (how many, how big, the largest, what was added
+    each day) against the whole attachments area, and the workspace bundles exported of it."""
+    from app.models.attachment import Attachment
+    start = datetime.now(timezone.utc).date() - timedelta(days=days - 1)
+    files, size = db.execute(select(func.count(), func.coalesce(func.sum(Attachment.file_size), 0)).where(
+        Attachment.workspace_id == workspace_id)).one()
+    total = int(db.scalar(select(func.coalesce(func.sum(Attachment.file_size), 0))) or 0)
+    day = cast(func.timezone("UTC", Attachment.created_at), Date)
+    added = {d.isoformat(): (int(b or 0), int(n)) for d, b, n in db.execute(
+        select(day, func.sum(Attachment.file_size), func.count()).where(
+            Attachment.workspace_id == workspace_id,
+            Attachment.created_at >= datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc)).group_by(day))}
+    per_day = [{"day": (start + timedelta(days=i)).isoformat(),
+                "added_bytes": added.get((start + timedelta(days=i)).isoformat(), (0, 0))[0],
+                "added_files": added.get((start + timedelta(days=i)).isoformat(), (0, 0))[1]} for i in range(days)]
+    largest = [{"uid": a.uid, "filename": a.filename, "bytes": int(a.file_size or 0), "mime_type": a.mime_type,
+                "asset_uid": a.asset_uid, "issue_uid": a.issue_uid,
+                "created_at": a.created_at.isoformat() if a.created_at else None}
+               for a in db.scalars(select(Attachment).where(Attachment.workspace_id == workspace_id)
+                                   .order_by(Attachment.file_size.desc().nulls_last()).limit(10))]
+    by_type = [{"mime_type": m or "unknown", "files": int(n), "bytes": int(b or 0)} for m, n, b in db.execute(
+        select(Attachment.mime_type, func.count(), func.sum(Attachment.file_size)).where(
+            Attachment.workspace_id == workspace_id).group_by(Attachment.mime_type)
+        .order_by(func.sum(Attachment.file_size).desc().nulls_last()).limit(8))]
+    return {"workspace_id": workspace_id, "attachments": {"files": int(files), "bytes": int(size),
+                                                          "share_of_area": (int(size) / total) if total else None,
+                                                          "area_bytes": total, "per_day": per_day,
+                                                          "largest": largest, "by_type": by_type},
+            "bundles": workspace_bundles(workspace_id)}
+
+
+def workspace_bundles(workspace_id: str) -> list[dict]:
+    """The workspace bundles exported of this workspace and kept here to download."""
+    import json
+    from app.routers.bundles import store
+    out = []
+    root = store() / "exports"
+    for d in sorted(root.glob("*"), key=lambda p: p.stat().st_mtime, reverse=True) if root.exists() else []:
+        m = d / "bundle" / "manifest.json"
+        try:
+            manifest = json.loads(m.read_text()) if m.is_file() else None
+        except ValueError:
+            manifest = None
+        if not manifest or (manifest.get("workspace") or {}).get("id") != workspace_id:
+            continue
+        used, n, _ = dir_usage(str(d))
+        out.append({"id": d.name, "created_at": manifest.get("created_at"), "created_by": manifest.get("created_by"),
+                    "bytes": used, "files": n})
+    return out
