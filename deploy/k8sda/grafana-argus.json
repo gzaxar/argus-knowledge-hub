@@ -12,7 +12,7 @@
   "to": "now"
  },
  "editable": true,
- "description": "Load, latency, database and storage of ARGUS on k8sda: what to look at before scaling (docs/k8sda.md, \"When to scale\").",
+ "description": "Load, latency, database, storage and application statistics (usage, content, tickets and service portal, AI) of ARGUS on k8sda: what to look at before scaling (docs/k8sda.md, \"When to scale\").",
  "templating": {
   "list": [
    {
@@ -1051,6 +1051,703 @@
      "refId": "A",
      "expr": "max by (area) (argus_storage_available_bytes{namespace=\"$namespace\"})",
      "legendFormat": "{{area}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     }
+    }
+   ]
+  },
+  {
+   "type": "row",
+   "title": "Usage (application statistics)",
+   "id": 23,
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 61
+   },
+   "panels": []
+  },
+  {
+   "type": "timeseries",
+   "title": "Active people",
+   "id": 24,
+   "description": "People who used ARGUS in the last day, 7 and 30 days. Every API replica reports the same values: max, not sum.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 0,
+    "y": 62
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "mean",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "max by (window) (argus_active_people{namespace=\"$namespace\",client=\"all\"})",
+     "legendFormat": "{{window}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     }
+    }
+   ]
+  },
+  {
+   "type": "timeseries",
+   "title": "Active people by client (7d)",
+   "id": 25,
+   "description": "Web, field app, API. Every API replica reports the same values: max, not sum.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 8,
+    "y": 62
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "mean",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "max by (client) (argus_active_people{namespace=\"$namespace\",window=\"7d\",client!=\"all\"})",
+     "legendFormat": "{{client}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     }
+    }
+   ]
+  },
+  {
+   "type": "timeseries",
+   "title": "Ask ARGUS questions (1d)",
+   "id": 26,
+   "description": "Questions in the last day, by workspace. Every API replica reports the same values: max, not sum.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 16,
+    "y": 62
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "mean",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "max by (workspace) (argus_ask_questions{namespace=\"$namespace\",window=\"1d\"})",
+     "legendFormat": "{{workspace}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     }
+    }
+   ]
+  },
+  {
+   "type": "row",
+   "title": "Content",
+   "id": 27,
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 70
+   },
+   "panels": []
+  },
+  {
+   "type": "timeseries",
+   "title": "Records held",
+   "id": 28,
+   "description": "Objects, tickets and documents held. Every API replica reports the same values: max, not sum.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 0,
+    "y": 71
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "mean",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (kind) (max by (workspace, kind) (argus_records{namespace=\"$namespace\"}))",
+     "legendFormat": "{{kind}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     }
+    }
+   ]
+  },
+  {
+   "type": "timeseries",
+   "title": "Created (1d)",
+   "id": 29,
+   "description": "Records created in the last day. Every API replica reports the same values: max, not sum.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 8,
+    "y": 71
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "mean",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "topk(10, max by (workspace, kind) (argus_records_created{namespace=\"$namespace\",window=\"1d\"}))",
+     "legendFormat": "{{workspace}} {{kind}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     }
+    }
+   ]
+  },
+  {
+   "type": "timeseries",
+   "title": "Changed (1d)",
+   "id": 30,
+   "description": "Older records changed in the last day. Every API replica reports the same values: max, not sum.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 16,
+    "y": 71
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "mean",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "topk(10, max by (workspace, kind) (argus_records_changed{namespace=\"$namespace\",window=\"1d\"}))",
+     "legendFormat": "{{workspace}} {{kind}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     }
+    }
+   ]
+  },
+  {
+   "type": "row",
+   "title": "Tickets and service portal",
+   "id": 31,
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 79
+   },
+   "panels": []
+  },
+  {
+   "type": "timeseries",
+   "title": "Open tickets by workspace",
+   "id": 32,
+   "description": "Open tickets. Every API replica reports the same values: max, not sum.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 0,
+    "y": 80
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "mean",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (workspace) (max by (workspace, state) (argus_tickets_open{namespace=\"$namespace\"}))",
+     "legendFormat": "{{workspace}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     }
+    }
+   ]
+  },
+  {
+   "type": "timeseries",
+   "title": "Open service requests",
+   "id": 33,
+   "description": "Open requests from the help centre, by site and service. Every API replica reports the same values: max, not sum.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 8,
+    "y": 80
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "mean",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "max by (site, service) (argus_service_requests_open{namespace=\"$namespace\"})",
+     "legendFormat": "{{site}} · {{service}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     }
+    }
+   ]
+  },
+  {
+   "type": "timeseries",
+   "title": "Oldest open request",
+   "id": 34,
+   "description": "How long the oldest open request of each service has waited. Every API replica reports the same values: max, not sum.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 16,
+    "y": 80
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "mean",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "max by (site, service) (argus_service_request_oldest_open_seconds{namespace=\"$namespace\"})",
+     "legendFormat": "{{site}} · {{service}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     }
+    }
+   ]
+  },
+  {
+   "type": "row",
+   "title": "AI",
+   "id": 35,
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 88
+   },
+   "panels": []
+  },
+  {
+   "type": "timeseries",
+   "title": "LLM tokens (1d)",
+   "id": 36,
+   "description": "Prompt and completion tokens in the last day (calendar days, UTC). Every API replica reports the same values: max, not sum.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 0,
+    "y": 89
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "mean",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (workspace) (max by (workspace, model, direction) (argus_llm_tokens{namespace=\"$namespace\",window=\"1d\"}))",
+     "legendFormat": "{{workspace}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     }
+    }
+   ]
+  },
+  {
+   "type": "timeseries",
+   "title": "LLM calls and failures (1d)",
+   "id": 37,
+   "description": "Language-model calls in the last day. Every API replica reports the same values: max, not sum.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 8,
+    "y": 89
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "mean",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum(max by (workspace, model) (argus_llm_calls{namespace=\"$namespace\",window=\"1d\"}))",
+     "legendFormat": "calls",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     }
+    },
+    {
+     "refId": "B",
+     "expr": "sum(max by (workspace, model) (argus_llm_failures{namespace=\"$namespace\",window=\"1d\"}))",
+     "legendFormat": "failures",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "${datasource}"
+     }
+    }
+   ]
+  },
+  {
+   "type": "timeseries",
+   "title": "Ask ARGUS feedback (7d)",
+   "id": 38,
+   "description": "Thumbs up and down in the last 7 days. Every API replica reports the same values: max, not sum.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${datasource}"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 16,
+    "y": 89
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "mean",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "max by (rating) (argus_ask_feedback{namespace=\"$namespace\",window=\"7d\"})",
+     "legendFormat": "{{rating}}",
      "datasource": {
       "type": "prometheus",
       "uid": "${datasource}"

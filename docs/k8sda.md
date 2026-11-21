@@ -149,6 +149,14 @@ The cluster's kube-prometheus-stack (namespace `monitoring`, release `prometheus
   `argus_http_requests_total` and `argus_http_request_duration_seconds` by route template, method and status,
   `argus_http_requests_in_flight`, the database pool (`argus_db_pool_*`) and the hourly storage measurement
   (`argus_storage_*_bytes` by area: local-path volumes report nothing to the kubelet);
+  and the application's own statistics (`backend/app/services/app_metrics.py`), read from the database at most
+  once a minute (`ARGUS_APP_METRICS_SECONDS`; `ARGUS_APP_METRICS=off` turns them off): `argus_active_people`
+  (by window and client), `argus_records`, `argus_records_created`, `argus_records_changed` (by workspace and
+  kind), `argus_tickets_open` (by workspace and state), `argus_service_requests_open`,
+  `argus_service_request_oldest_open_seconds` and `argus_service_requests_created` (the help centre, by site and
+  service), `argus_llm_calls`, `argus_llm_failures`, `argus_llm_tokens` (by workspace and model),
+  `argus_ask_questions`, `argus_ask_answers`, `argus_ask_feedback`, and `argus_app_metrics_up`. Windows are 1d, 7d
+  and 30d. Labels never name a person. Every replica reports the same values: a panel takes `max`, not `sum`;
 - **PostgreSQL** (postgres_exporter beside it, port 9187): connections, transactions, cache hits, size;
 - CPU and memory of every pod (cAdvisor and kube-state-metrics, already there).
 
