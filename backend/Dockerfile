@@ -66,6 +66,12 @@ COPY packages packages
 COPY catalogue catalogue
 COPY demo_workspaces demo_workspaces
 
+# The user the hardened chart runs the API as (security.apiUser, values-k8sda.yaml). OpenSSH refuses a uid with
+# no passwd entry ("No user exists for uid 10001"): ssh-keygen, which verifies an import's signed tag, and ssh
+# for Git. The image still starts as root where the chart is not hardened (INFN Cloud).
+RUN groupadd --system --gid 10001 argus \
+    && useradd --system --uid 10001 --gid 10001 --home-dir /tmp --no-create-home --shell /usr/sbin/nologin argus
+
 ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
 
