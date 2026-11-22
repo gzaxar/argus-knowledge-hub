@@ -10,6 +10,7 @@ permissions, the same validation and key allocation, and the ledger, in their na
 A record proposed in the same conversation is referred to as `new:N` before it exists, so "a station composed
 of this camera" can be proposed in one go with the station itself.
 """
+import html
 import json
 import re
 import uuid
@@ -135,7 +136,9 @@ def tool_specs() -> list[dict]:
                            "responsible team (a group) and its request types with the ticket type and the fields "
                            "a requester fills in. Only when a site administrator asks for it. It is checked now: "
                            "an unknown site, workspace, group, ticket type or field is refused with the valid "
-                           "choices. Changes nothing until the person confirms; then the service is created as a "
+                           "choices — so call it straight away with the names as the person gave them, without "
+                           "searching records or tickets to check them first, and correct from what it answers. "
+                           "Changes nothing until the person confirms; then the service is created as a "
                            "draft, which is published from Administration → Help centre once the destination "
                            "workspace has authorised it.",
             "parameters": {"type": "object", "properties": {
@@ -347,7 +350,8 @@ class Proposer:
         kind, payload, summary = handler(arguments or {})
         number = (self.db.scalar(select(AskAction.number).where(AskAction.conversation_id == self.conversation_id)
                                  .order_by(AskAction.number.desc()).limit(1)) or 0) + 1
-        reason = str(arguments.get("reason") or "").strip()[:500]
+        # Prose for the person: some models send it HTML-escaped ("&amp;"), which would be shown as typed.
+        reason = html.unescape(str(arguments.get("reason") or "")).strip()[:500]
         action = AskAction(id=str(uuid.uuid4()), conversation_id=self.conversation_id, turn_seq=self.turn_seq,
                            number=number, kind=kind, payload={**payload, **({"reason": reason} if reason else {})},
                            summary=summary, status="proposed")
@@ -516,9 +520,18 @@ class Proposer:
         name = str(a.get("name") or "").strip()
         if not name:
             raise Refused("a service needs a name")
-        if self.db.scalar(select(ServiceOffering).where(ServiceOffering.site_id == site_id,
-                                                        ServiceOffering.slug == portal.slugify(name))) is not None:
-            raise Refused(f"{site_name} already has a service called {name!r}: choose another name")
+        def same(n: str) -> str:
+            # "Mechanical engineering and alignment service" is the service called "Mechanical engineering &
+            # alignment": the words that count, without "and" or a trailing "service".
+            words = [w for w in portal.slugify(n).split("-") if w and w != "and"]
+            return "-".join(words[:-1] if len(words) > 1 and words[-1] in ("service", "services") else words)
+        existing = next((svc.name for svc in self.db.scalars(select(ServiceOffering).where(
+            ServiceOffering.site_id == site_id)) if same(svc.name) == same(name)), None)
+        if existing is not None:
+            # Not a name to vary: the person may mean the existing one. Asking is theirs to answer.
+            raise Refused(f"{site_name} already has a service called {existing!r}. Do not propose it under another "
+                          "name: tell the person it exists (to change it, Administration → Help centre) and ask "
+                          "whether they want a different service")
         types = self.db.scalars(select(Schema).where(Schema.applies_to == "tickets", Schema.is_concrete.is_(True),
                                                      (Schema.workspace_id == dest_id) | Schema.is_global.is_(True))
                                 .order_by(Schema.name)).all()
