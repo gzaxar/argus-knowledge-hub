@@ -98,6 +98,8 @@ export interface DocumentContext {
   instances: HubAsset[];
   types: { uid: string; name: string; assets: number }[];
   open_tickets: HubTicket[];
+  /** Equipment the text names and the document is not linked to yet: offered to link, never linked by itself. */
+  named?: (HubAsset & { matched_on: "key" | "tag" | "name" })[];
 }
 
 export interface HubSearchResult {

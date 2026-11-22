@@ -343,7 +343,23 @@ def document_context(db: Session, workspace_id: str, doc: Document, access: Acce
         "instances": [asset_summary(a) for a in instances[:50]] if access.assets else [],
         "types": types,
         "open_tickets": open_tickets,
+        "named": _named_in(db, workspace_id, doc, {a.uid for a in direct}) if access.assets else [],
     }
+
+
+def _named_in(db: Session, workspace_id: str, doc: Document, linked: set[str]) -> list[dict]:
+    """The equipment the document's text names (by key, tag or name, never by a model: text_links) and is not
+    linked to yet — what an imported page says it is about, offered for a person to link."""
+    from app.services.text_links import objects_mentioned
+    rev = db.scalar(select(DocumentRevision).where(DocumentRevision.document_uid == doc.uid)
+                    .order_by(DocumentRevision.revision_number.desc()).limit(1))
+    out = []
+    for f in objects_mentioned(db, workspace_id, doc.title, rev.body_markdown if rev else ""):
+        a = db.get(Asset, f["uid"])
+        if a is None or a.uid in linked or not asset_visible_in(a, workspace_id):
+            continue
+        out.append({**asset_summary(a), "matched_on": f["matched_on"]})
+    return out[:10]
 
 
 def _schema_subtree(db: Session, root_uid: str) -> list[str]:

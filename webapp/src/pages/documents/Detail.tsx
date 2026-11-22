@@ -2,7 +2,7 @@ import { ask, askText, notify } from "../../lib/dialogs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { reshapeApi } from "../../api/client";
+import { reshapeApi, rolesApi } from "../../api/client";
 import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
 import {
   ApiError,
@@ -53,6 +53,8 @@ export function DocumentDetail() {
   const [searchParams] = useSearchParams();
   const revisionFromUrl = searchParams.get("revision");
   const workspaceId = useCurrentWorkspaceId();
+  const rights = useQuery({ queryKey: ["my-permissions", workspaceId],
+    queryFn: () => rolesApi.myPermissions(workspaceId!), enabled: !!workspaceId });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [viewedRevisionUid, setViewedRevisionUid] = useState<string | null>(revisionFromUrl);
@@ -433,7 +435,8 @@ export function DocumentDetail() {
 
       <SupersededBanner doc={doc} />
       <DocumentControlCard doc={doc} />
-      <DocumentContextPanel documentUid={doc.uid} />
+      <DocumentContextPanel documentUid={doc.uid}
+        canLink={!!rights.data && (rights.data.is_admin || rights.data.documents.includes("modify"))} />
 
       {/* Revision selector */}
       <div className="mt-6 flex flex-wrap gap-2">

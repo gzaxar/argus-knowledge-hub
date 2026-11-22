@@ -5,7 +5,7 @@
  * and what is currently broken there. All from /v1/hub (one call each). */
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { hubApi } from "../../api/client";
+import { documentsApi, hubApi } from "../../api/client";
 import type { AssetContext, HubDocument } from "../../api/hubTypes";
 import { AccessPointPanel, InvolvedTickets, SegmentPortPanel, TicketAttribution } from "./ConnectivityPanels";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -318,14 +318,45 @@ export function TicketContextPanel({ ticketUid }: { ticketUid: string }) {
   );
 }
 
-export function DocumentContextPanel({ documentUid }: { documentUid: string }) {
+export function DocumentContextPanel({ documentUid, canLink = false }: { documentUid: string; canLink?: boolean }) {
+  const queryClient = useQueryClient();
   const ctx = useQuery({ queryKey: ["hub-document", documentUid], queryFn: () => hubApi.documentContext(documentUid) });
+  const link = useMutation({
+    mutationFn: (assetUid: string) =>
+      documentsApi.addRelation(documentUid, { to_type: "asset", to_uid: assetUid, relation_type: "describes" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hub-document", documentUid] });
+      queryClient.invalidateQueries({ queryKey: ["document-relations", documentUid] });
+    },
+  });
   if (!ctx.data) return null;
   const c = ctx.data;
   const nothing = c.assets.length === 0 && c.types.length === 0 && c.instances.length === 0;
+  const named = canLink ? c.named ?? [] : [];
   return (
     <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card title="Applies to">
+        {named.length > 0 && (
+          <div className="mb-2 rounded border border-indigo-100 bg-indigo-50/60 p-2" data-testid="named-in-text">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">Named in the text</p>
+            <p className="text-[11px] text-slate-500">Found in the inventory by key, tag or name. Nothing is linked until you
+              say so.</p>
+            <ul className="mt-1 space-y-1 text-sm">
+              {named.map((a) => (
+                <li key={a.uid} className="flex items-center justify-between gap-2">
+                  <span>
+                    <Link to={`/assets/${a.uid}`} className="font-medium text-slate-900 hover:underline">{a.name}</Link>
+                    <span className="ml-2 text-xs text-slate-500">{a.type} · by {a.matched_on}</span>
+                  </span>
+                  <button type="button" onClick={() => link.mutate(a.uid)} disabled={link.isPending}
+                          className="rounded border border-indigo-300 bg-white px-2 py-0.5 text-xs text-indigo-700 hover:bg-indigo-50">
+                    Link
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {nothing ? (
           <Empty>
             Not linked to any asset or type yet. Link it to an object type or a product model and it appears on every

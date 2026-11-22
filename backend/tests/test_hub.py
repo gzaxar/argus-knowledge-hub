@@ -270,3 +270,32 @@ def test_a_first_document_sent_for_review_is_waiting_for_approval():
         assert [(d["uid"], d["state"]) for d in docs["awaiting_review"]] == [(f"{ws}-doc", "in_review")]
     finally:
         db.close()
+
+
+def test_a_document_offers_the_equipment_its_text_names_and_is_not_linked_to():
+    """An imported page names a pump and a hall: both are offered to link, the one already linked is not, and
+    nothing is linked by itself."""
+    ws = f"named-{secrets.token_hex(4)}"
+    db = SessionLocal()
+    try:
+        db.add(Workspace(id=ws, name="Named"))
+        db.flush()
+        db.add(Schema(uid=f"{ws}:pump", workspace_id=ws, name="Pump", applies_to="objects"))
+        db.flush()
+        for uid, key, name in (("p1", "IP-0003", "Pompa ionica sezione 1A"), ("hall", "B12-HALL", "Hall"),
+                               ("p2", "IP-0004", "Pompa ionica sezione 1B")):
+            db.add(Asset(uid=f"{ws}-{uid}", workspace_id=ws, schema_uid=f"{ws}:pump", key=key, name=name,
+                         type="Pump", attributes={}))
+        db.add(Document(uid=f"{ws}-doc", workspace_id=ws, code=f"{ws}-D", title="Prova di tenuta"))
+        db.flush()
+        db.add(DocumentRevision(uid=f"{ws}-doc-r1", document_uid=f"{ws}-doc", revision_number=1, state="published",
+                                body_markdown="Se la Pompa ionica sezione 1A in B12-HALL non tiene, vedi la 1B."))
+        db.add(DocumentRelation(workspace_id=ws, from_document_uid=f"{ws}-doc", to_type="asset", to_uid=f"{ws}-hall",
+                                relation_type="describes"))
+        db.commit()
+        c = hub.document_context(db, ws, db.get(Document, f"{ws}-doc"), hub.Access(True, True, True))
+        assert [(a["uid"], a["matched_on"]) for a in c["named"]] == [(f"{ws}-p1", "name")]
+        assert [a["uid"] for a in c["assets"]] == [f"{ws}-hall"]
+        assert hub.document_context(db, ws, db.get(Document, f"{ws}-doc"), hub.Access(False, True, True))["named"] == []
+    finally:
+        db.close()
