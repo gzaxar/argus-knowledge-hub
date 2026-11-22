@@ -912,6 +912,9 @@ def run_confluence_import(
         job.progress = "Import complete"
         job.completed_at = datetime.now(timezone.utc)
         db.commit()
+        # The pages are published: Ask ARGUS reads them once the index has caught up, as after any publication.
+        from app.services import knowledge_schedule
+        knowledge_schedule.after_document_change(db, job.workspace_id)
     except Exception as e:
         db.rollback()
         job = db.get(ImportJob, job_uid)

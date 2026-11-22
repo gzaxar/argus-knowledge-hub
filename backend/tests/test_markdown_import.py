@@ -361,3 +361,14 @@ def test_a_link_to_another_uploaded_page_opens_its_document(token):
     assert "[missing](gone.md)" in body("Index")
     assert f"[index](/documents/{docs['Index'].uid})" in body("Bake-out")
     db.close()
+
+
+def test_imported_pages_are_handed_to_the_index_like_a_publication(token, monkeypatch):
+    """They arrive published: Ask ARGUS reads what is indexed, so the index is asked to catch up, as after any
+    publication — not left until its next scheduled run."""
+    from app.services import knowledge_schedule
+    workspace_id, raw = token
+    asked = []
+    monkeypatch.setattr(knowledge_schedule, "after_document_change", lambda db, ws: asked.append(ws))
+    upload(raw, [("leak.md", b"# Leak test\n\nHelium.\n")])
+    assert asked == [workspace_id]
