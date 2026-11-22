@@ -120,6 +120,15 @@ Administration (`/v1/admin/sites/{site}/service-desk`): `GET`, `GET /options`, `
 `PUT /services/{uid}`, `POST /services/{uid}/authorize|revoke|publish|unpublish`,
 `POST /services/{uid}/request-types`, `PUT /request-types/{uid}`; `GET /v1/admin/sites/service-desk/authorizations`.
 
+## Ask ARGUS
+
+Ask ARGUS answers "how do I…" about the help centre from the user guide (`search_help`, `read_help`, topic
+`help-centre`) and, when a site administrator asks, proposes a service with `propose_help_centre_service`: site,
+destination, team, ticket types and requester fields are resolved and checked when it is proposed, and a wrong
+name is refused with the valid choices. Applying it runs the administration API in the name of the person who
+confirms, so only a site or installation administrator can; it creates the service as a draft. Publishing,
+and authorising the destination, stay manual. MCP clients get the same proposal, reviewed on the Proposals page.
+
 ## Portability
 
 The signed portable archive carries the portal: settings, services and request types with the site, support

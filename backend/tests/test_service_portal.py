@@ -463,3 +463,40 @@ def test_robot_tokens_and_workspace_bound_personal_tokens_have_no_portal(lab):
     with pytest.raises(HTTPException) as e:
         asyncio.run(r.submit_request(site, None, payload="{}", files=[], identity=read_only, db=db))
     assert e.value.detail["code"] == "token_scope"
+
+
+def test_ask_argus_proposes_a_help_centre_service_and_only_a_site_administrator_applies_it(lab):
+    from app.models.ask_conversation import AskConversation
+    from app.models.service_portal import ServiceOffering, ServiceRequestType
+    from app.services import ask_actions
+    db, ids, t = lab["db"], lab["ids"], lab["t"]
+    convo = AskConversation(id=f"c-{t}", workspace_id=ids["sparc"], owner=lab["people"]["site_admin"].id, title="x")
+    db.add(convo)
+    db.commit()
+    propose = ask_actions.Proposer(db, ids["sparc"], convo.id, 1)
+    args = {"site": "LNF", "name": "Network & connectivity", "category": "IT", "destination": "LNF IT",
+            "team": lab["team"].name, "request_types": [{"name": "Wi-Fi problem", "ticket_type": "Network incident",
+                                                         "fields": [{"key": "building", "required": True}]}]}
+    with pytest.raises(ask_actions.Refused) as e:
+        propose("propose_help_centre_service", {**args, "team": "Nobody"})
+    assert lab["team"].name in str(e.value), "a wrong name is refused with the valid choices"
+    with pytest.raises(ask_actions.Refused) as e:
+        propose("propose_help_centre_service", {**args, "request_types": [
+            {"name": "x", "ticket_type": "Network incident", "fields": [{"key": "nope"}]}]})
+    assert "building" in str(e.value)
+    out = propose("propose_help_centre_service", args)
+    assert out["proposed"] and "draft" in out["summary"]
+    assert db.scalar(select(ServiceOffering).where(ServiceOffering.site_id == ids["site"])) is None, "nothing yet"
+    action_id = out["_action"]["id"]
+
+    refused = ask_actions.apply(db, as_(lab, "requester"), ids["sparc"], "requester", convo.id, [action_id])
+    assert refused[0]["status"] == "failed" and "Site administrators" in refused[0]["error"]
+    from app.models.ask_conversation import AskAction
+    db.get(AskAction, action_id).status = "proposed"
+    db.commit()
+    done = ask_actions.apply(db, as_(lab, "site_admin"), ids["sparc"], "site_admin", convo.id, [action_id])
+    assert done[0]["status"] == "applied", done[0]["error"]
+    svc = db.scalar(select(ServiceOffering).where(ServiceOffering.site_id == ids["site"]))
+    assert svc.name == "Network & connectivity" and not svc.active and svc.provider_workspace_id == ids["it"]
+    rt = db.scalar(select(ServiceRequestType).where(ServiceRequestType.service_uid == svc.uid))
+    assert rt.schema_uid == lab["schema"].uid and rt.fields[0]["key"] == "building" and rt.fields[0]["required"]
