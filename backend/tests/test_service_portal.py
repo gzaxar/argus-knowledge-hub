@@ -541,8 +541,11 @@ def test_ask_argus_proposes_a_help_centre_service_and_only_a_site_administrator_
         propose("propose_help_centre_service", {**args, "request_types": [
             {"name": "x", "ticket_type": "Network incident", "fields": [{"key": "nope"}]}]})
     assert "building" in str(e.value)
-    out = propose("propose_help_centre_service", args)
+    out = propose("propose_help_centre_service", {**args, "reason": "Network &amp; Wi-Fi in one place"})
     assert out["proposed"] and "draft" in out["summary"]
+    from app.models.ask_conversation import AskAction
+    assert db.get(AskAction, out["_action"]["id"]).payload["reason"] == "Network & Wi-Fi in one place", \
+        "a model's HTML-escaped prose is shown as text"
     assert db.scalar(select(ServiceOffering).where(ServiceOffering.site_id == ids["site"])) is None, "nothing yet"
     action_id = out["_action"]["id"]
 
@@ -557,3 +560,6 @@ def test_ask_argus_proposes_a_help_centre_service_and_only_a_site_administrator_
     assert svc.name == "Network & connectivity" and not svc.active and svc.provider_workspace_id == ids["it"]
     rt = db.scalar(select(ServiceRequestType).where(ServiceRequestType.service_uid == svc.uid))
     assert rt.schema_uid == lab["schema"].uid and rt.fields[0]["key"] == "building" and rt.fields[0]["required"]
+    with pytest.raises(ask_actions.Refused) as e:
+        propose("propose_help_centre_service", {**args, "name": "Network and connectivity service"})
+    assert "already has a service called 'Network & connectivity'" in str(e.value), "the same service, not a new one"
