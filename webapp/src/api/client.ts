@@ -850,6 +850,8 @@ export const issueLinksApi = {
 
 export const membersApi = {
   directory: () => request<MemberDirectoryEntry[]>("/v1/members"),
+  /** Who may change tickets here: the people an assignee picker offers. */
+  assignable: () => request<MemberDirectoryEntry[]>("/v1/members?can_work=tickets"),
 };
 
 export const documentNavigationApi = {

@@ -36,6 +36,7 @@ export function IssueForm() {
   const assets = useQuery({ queryKey: ["assets"], queryFn: () => assetsApi.list() });
   const schemas = useQuery({ queryKey: ["schemas"], queryFn: schemasApi.list });
   const members = useQuery({ queryKey: ["members"], queryFn: membersApi.directory });
+  const assignable = useQuery({ queryKey: ["members", "assignable"], queryFn: membersApi.assignable });
   const globalValues = useQuery({ queryKey: ["global-values"], queryFn: globalValuesApi.list });
   const priorityOptions =
     globalValues.data?.find((gv) => gv.applies_to === "tickets" && gv.key === "priority")?.options ?? [];
@@ -269,7 +270,7 @@ export function IssueForm() {
             <label className="block text-sm font-medium text-slate-700">Assignee</label>
             <div className="mt-1 flex">
               <UserPicker
-                members={members.data ?? []}
+                members={assignable.data ?? []}
                 value={assignee || null}
                 onChange={(userId) => setAssignee(userId ?? "")}
               />

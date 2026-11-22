@@ -259,3 +259,14 @@ def test_the_example_directory_counts_only_its_fictional_people_and_groups(world
     db.delete(db.get(Group, f"local-{t}"))
     db.commit()
     db.close()
+
+
+def test_an_assignee_picker_offers_only_who_may_work_tickets(world, mailbox):
+    ws, t = world["ws"], world["t"]
+    for role, who in (("viewer", "view"), ("agent", "agent")):
+        client.post(f"/v1/workspaces/{ws}/invitations", headers=world["h"],
+                    json={"emails": f"{who}-{t}@infn.it", "role_id": role, "send_email": False})
+    everyone = {m["email"] for m in client.get("/v1/members", headers=world["h"]).json()}
+    workers = {m["email"] for m in client.get("/v1/members?can_work=tickets", headers=world["h"]).json()}
+    assert {f"view-{t}@infn.it", f"agent-{t}@infn.it"} <= everyone
+    assert f"agent-{t}@infn.it" in workers and f"view-{t}@infn.it" not in workers
