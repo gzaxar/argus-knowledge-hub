@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { catalogueCollectionsApi, workspacesApi, type CatalogueBrowse } from "../api/client";
+import { ApiError, catalogueCollectionsApi, workspacesApi, type CatalogueBrowse } from "../api/client";
 import { ProductCataloguePage } from "../pages/catalogue/ProductCatalogue";
 import { renderWith } from "../test/render";
 
@@ -48,5 +48,16 @@ describe("the model navigator", () => {
     await waitFor(() => expect(screen.getByLabelText("Domain")).toHaveValue(""));
     expect(screen.getByLabelText("Device class")).toHaveValue("");
     expect(screen.getByLabelText("Vendor")).toHaveValue("");
+  });
+});
+
+describe("an installation with no catalogue yet", () => {
+  it("says what that means and where it is set, instead of only the error", async () => {
+    vi.spyOn(workspacesApi, "me").mockResolvedValue({ is_admin: true } as never);
+    vi.spyOn(catalogueCollectionsApi, "models").mockRejectedValue(
+      new ApiError(404, { detail: { error: "this installation has no catalogue workspace" } }));
+    renderWith(<ProductCataloguePage />);
+    const note = await screen.findByTestId("no-catalogue");
+    expect(within(note).getByRole("link", { name: /Administration → Catalogue/ })).toHaveAttribute("href", "/admin/catalogue");
   });
 });

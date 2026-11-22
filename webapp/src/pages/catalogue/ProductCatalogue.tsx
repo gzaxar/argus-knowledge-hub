@@ -177,7 +177,15 @@ export function ProductCataloguePage() {
                names={found.data?.domain_names} />
       </div>
 
-      {found.isError && <p className="whitespace-pre-line text-sm text-red-600">{problem(found.error)}</p>}
+      {found.isError && (/no catalogue workspace/.test(problem(found.error)) ? (
+        // A new installation has none yet: say what that means and where it is set, not only that it is missing.
+        <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" data-testid="no-catalogue">
+          No shared product catalogue yet. Vendors and product models live in one catalogue workspace that every
+          workspace reads; an administrator of the installation designates it in{" "}
+          <Link to="/admin/catalogue" className="font-medium underline">Administration → Catalogue</Link>. Until then,
+          models are recorded per workspace as text (manufacturer and model as written).
+        </div>
+      ) : <p className="whitespace-pre-line text-sm text-red-600">{problem(found.error)}</p>)}
       {found.isLoading && <p className="text-sm text-slate-500">Loading…</p>}
       {found.data && (
         <div className="grid gap-4 md:grid-cols-[14rem_minmax(0,1fr)]">
