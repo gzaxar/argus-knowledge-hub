@@ -230,8 +230,9 @@ class PortalAssistIn(BaseModel):
 
 @router.post("/sites/{site_id}/assist")
 def assist(site_id: str, body: PortalAssistIn, identity=Depends(get_identity), db: Session = Depends(get_db)):
-    """Help while choosing: knowledge articles the requester may read in their own workspace, and — only when
-    asked, and only where that workspace's AI is on — a suggested request type and a summary to edit. Nothing is
+    """Help while choosing: knowledge articles the requester may read, in their own workspace and the site's service
+    workspaces, and — only when asked, and only where their workspace's AI is on — first-help steps drawn from those
+    articles with the articles cited, a suggested request type and a summary to edit. Nothing is
     sent: the requester reviews and submits."""
     from app.services import portal_assist
     user = portal.requester_of(identity)

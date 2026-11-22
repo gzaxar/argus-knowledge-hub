@@ -88,7 +88,12 @@ somewhere else without asking.
 
 ## Optional help while choosing
 
-With **Offer help while choosing** ticked, typing in the search box also suggests published articles from the
-requester's own workspace that they may read. Where that workspace's AI is on, **Ask the assistant which service
-fits** suggests a request type and drafts a summary; the requester checks and sends it. Without AI nothing is sent
-to a model, and the form always works.
+With **Offer help while choosing** ticked, typing in the search box also suggests published articles the requester
+may read — in their own workspace and in the workspaces of the site's services (the IT knowledge base, for example).
+Where the requester's workspace has AI on, **Ask the assistant for help** gives first help: a few safe steps taken
+from those articles, with links to them. **That solved it** ends there, with no request sent; **Still need help?**
+opens the suggested request type with a drafted summary and the steps already tried, to check and send. Without AI
+nothing is sent to a model, and the form always works.
+
+To make first help useful, publish short "first checks" articles in the service's workspace — what anyone may check,
+what not to touch, what to note for the team — and let the site's people read that workspace.
