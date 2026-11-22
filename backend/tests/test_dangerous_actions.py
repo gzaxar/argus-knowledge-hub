@@ -109,3 +109,16 @@ def test_no_token_does_them_and_no_mcp_tool_offers_them(w):
 
     names = {t["name"] for t in catalogue()}
     assert not any(n.startswith(("delete", "remove", "purge", "cleanup")) or "global" in n for n in names), names
+
+
+def test_a_workspace_made_again_with_the_same_id_numbers_its_records_from_one(w):
+    """Its key counters go with the deleted workspace: they have no foreign key to cascade from."""
+    from sqlalchemy import text
+    db = w["db"]
+    db.execute(text("INSERT INTO asset_key_counters (workspace_id, scope, next_value) VALUES (:w, 'X-IP-#', 7)"),
+               {"w": w["ws"]})
+    db.commit()
+    as_person(w["admin"])
+    assert client.delete(f"/v1/workspaces/{w['ws']}", headers=typed()).status_code in (200, 204)
+    left = db.execute(text("SELECT count(*) FROM asset_key_counters WHERE workspace_id = :w"), {"w": w["ws"]}).scalar()
+    assert left == 0

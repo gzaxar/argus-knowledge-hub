@@ -203,3 +203,70 @@ def test_looking_at_an_object_does_not_mark_it_changed(world):
     first = client.get(f"/v1/assets/{uid}", headers=world["headers"]).json()["updated_at"]
     second = client.get(f"/v1/assets/{uid}", headers=world["headers"]).json()["updated_at"]
     assert first == second
+
+
+def test_start_here_follows_a_new_workspace_until_it_is_set_up():
+    """The cockpit's *Start here*: places, equipment, people, a first document, a first ticket — each done once
+    the workspace has one, the creator not counting as someone invited."""
+    from app.models.membership import Membership
+    from app.models.role import RoleBinding
+    ws = f"start-{secrets.token_hex(4)}"
+    db = SessionLocal()
+    try:
+        db.add(Workspace(id=ws, name="Start"))
+        db.flush()
+        for name, parent in (("item", None), ("location", "item"), ("building", "location"),
+                             ("engineered-item", "item"), ("asset", "engineered-item"), ("vacuum-pump", "asset")):
+            db.add(Schema(uid=f"{ws}:argus-object:{name}", workspace_id=ws, name=name.title(), applies_to="objects",
+                          parent_schema_uid=f"{ws}:argus-object:{parent}" if parent else None))
+            db.flush()
+        from app.models.user import User
+        creator = User(id=f"{ws}-creator", email=f"{ws}@example.org", active=True)
+        db.add(creator)
+        db.flush()
+        db.add(Membership(workspace_id=ws, user_id=creator.id))
+        db.commit()
+        everything = hub.Access(True, True, True)
+        start = hub.start_here(db, ws, everything)
+        assert [s["key"] for s in start["steps"]] == ["places", "equipment", "people", "document", "ticket"]
+        assert not start["done"] and not any(s["done"] for s in start["steps"])
+        assert start["steps"][0]["type_uid"] == f"{ws}:argus-object:building"
+
+        db.add(Asset(uid=f"{ws}-hall", workspace_id=ws, schema_uid=f"{ws}:argus-object:building", key=f"{ws}-B1",
+                     name="Hall", type="Building", attributes={}))
+        db.add(RoleBinding(workspace_id=ws, subject_type="user", subject_id="colleague", role_id="viewer",
+                           created_at=NOW))
+        db.commit()
+        start = {s["key"]: s for s in hub.start_here(db, ws, everything)["steps"]}
+        assert start["places"]["done"] and not start["equipment"]["done"], "a building is a place, not equipment"
+        assert start["people"]["count"] == 1
+
+        db.add(Asset(uid=f"{ws}-pump", workspace_id=ws, schema_uid=f"{ws}:argus-object:vacuum-pump",
+                     key=f"{ws}-P1", name="Pump", type="Vacuum Pump", attributes={}))
+        db.add(Document(uid=f"{ws}-doc", code=f"{ws}-D1", title="Procedure", workspace_id=ws))
+        db.add(Issue(uid=f"{ws}-tck", workspace_id=ws, title="Leak", state="new"))
+        db.commit()
+        assert hub.start_here(db, ws, everything)["done"]
+        assert [s["key"] for s in hub.start_here(db, ws, hub.Access(True, False, False))["steps"]] == \
+            ["places", "equipment", "people"], "only the steps of what the caller may read"
+    finally:
+        db.close()
+
+
+def test_a_first_document_sent_for_review_is_waiting_for_approval():
+    """A document never published has no current revision; its revision in review still waits for approval, in the
+    tile and in the list under it alike."""
+    ws = f"first-{secrets.token_hex(4)}"
+    db = SessionLocal()
+    try:
+        db.add(Workspace(id=ws, name="First"))
+        db.flush()
+        db.add(Document(uid=f"{ws}-doc", workspace_id=ws, code=f"{ws}-P1", title="Pump replacement"))
+        db.flush()
+        db.add(DocumentRevision(uid=f"{ws}-doc-r1", document_uid=f"{ws}-doc", revision_number=1, state="in_review"))
+        db.commit()
+        docs = hub.overview(db, ws, hub.Access(False, False, True), None, setup=False)["documents"]
+        assert docs["in_review"] == 1
+        assert [(d["uid"], d["state"]) for d in docs["awaiting_review"]] == [(f"{ws}-doc", "in_review")]
+    finally:
+        db.close()

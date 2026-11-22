@@ -3,7 +3,7 @@ from typing import Optional
 import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -461,6 +461,9 @@ def delete_workspace(
     # The one sanctioned purge of append-only audit rows: the workspace's own.
     from app.ledger.audit import allow_purge
     allow_purge(db)
+    # Its key counters have no foreign key to cascade from: without this, a workspace made again with the same id
+    # would number its records on from the deleted one's (LINAC-IP-0003 for its first pump).
+    db.execute(text("DELETE FROM asset_key_counters WHERE workspace_id = :w"), {"w": workspace_id})
     db.delete(workspace)
     try:
         db.commit()

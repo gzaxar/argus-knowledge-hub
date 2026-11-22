@@ -2699,6 +2699,9 @@ export type SheetColumnPlan = {
   column: string;
   target: string;
   new?: SheetNewProperty;
+  /** For a column going to a choice list: the file's value → the choice it means, or SHEET_DROP to leave it out. */
+  values?: Record<string, string>;
+  value_sources?: Record<string, "rule" | "ai" | "person">;
   source?: "rule" | "ai" | "person";
   confidence?: number;
   reason?: string;

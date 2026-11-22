@@ -715,6 +715,8 @@ def publish_revision(
             previous.state = "superseded"
             previous.superseded_by_uid = revision.uid
 
+    from app.services.reshape import without_draft_notice
+    revision.body_markdown = without_draft_notice(revision.body_markdown)
     revision.state = "published"
     revision.published_at = datetime.now(timezone.utc)
     doc.current_revision_uid = revision.uid

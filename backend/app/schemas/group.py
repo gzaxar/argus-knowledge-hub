@@ -77,6 +77,8 @@ class DirectoryStatusOut(BaseModel):
     groups: int
     active_groups: int
     users: int
+    example_groups: int = 0
+    example_people: int = 0
     last_synced_at: Optional[datetime] = None
 
 

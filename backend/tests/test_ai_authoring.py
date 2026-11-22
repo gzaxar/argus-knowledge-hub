@@ -100,6 +100,27 @@ def test_keys_are_listed_before_names(workspace):
     db.close()
 
 
+def test_a_key_of_any_shape_a_tag_in_a_name_and_never_a_deleted_record(workspace):
+    """Notes name a hall by its key ("B12-HALL", not letters-hyphen-digits) and a pump by the tag in its name
+    ("IP-01"); the building "B12" is not named by "B12-HALL", a tag two records carry names neither, and a deleted
+    record is never offered."""
+    from datetime import datetime, timezone
+    workspace_id, _key = workspace
+    db = SessionLocal()
+    for uid, key, name in (("b", "B12", "Test stand building"), ("hall", "B12-HALL", "Accelerator hall"),
+                           ("ip1", "WS-IP-0001", "Gun ion pump IP-01"), ("vg1", "WS-VG-0001", "Gun gauge VG-01"),
+                           ("vg1b", "WS-VG-0002", "Spare gauge VG-01"), ("old", "WS-IP-0099", "Old pump IP-02")):
+        db.add(Asset(uid=f"{uid}-{workspace_id}", workspace_id=workspace_id, schema_uid=f"{workspace_id}:cam",
+                     key=key, name=name, type="Cameras",
+                     deleted_at=datetime.now(timezone.utc) if uid == "old" else None))
+    db.commit()
+    found = objects_mentioned(db, workspace_id, "Close the valve, switch off ip-01 in B12-HALL, check VG-01 and IP-02.")
+    assert [(f["key"], f["matched_on"]) for f in found] == [("B12-HALL", "key"), ("WS-IP-0001", "tag")]
+    assert found[1]["matched"] == "IP-01", "what the text says, to show as the evidence"
+    assert [f["key"] for f in objects_mentioned(db, workspace_id, "Building B12.")] == ["B12"]
+    db.close()
+
+
 # --- reviewing ----------------------------------------------------------
 
 def test_a_review_is_remarks_and_nothing_else(monkeypatch):

@@ -23,7 +23,7 @@ function page() {
   vi.spyOn(rolesApi, "list").mockResolvedValue([{ id: "viewer", name: "Viewer" }, { id: "reporter", name: "Reporter" },
                                                 { id: "owner", name: "Owner" }] as never);
   vi.spyOn(directoryApi, "groups").mockResolvedValue([ops, { ...ops, uid: "lnl", name: "LNL crew", home_site_id: "lnl" }]);
-  vi.spyOn(directoryApi, "status").mockResolvedValue({ provider: "none", is_test_data: false, groups: 1, active_groups: 1,
+  vi.spyOn(directoryApi, "status").mockResolvedValue({ provider: "none", is_test_data: false, groups: 1, active_groups: 1, example_groups: 0, example_people: 0,
                                                        users: 1, last_synced_at: null } as never);
   vi.spyOn(membersApi, "directory").mockResolvedValue([]);
   vi.spyOn(workspacesApi, "listMine").mockResolvedValue([

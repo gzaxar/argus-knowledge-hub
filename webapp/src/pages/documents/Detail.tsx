@@ -469,7 +469,7 @@ export function DocumentDetail() {
         )}
       </div>
 
-      {viewed && <MadeFromRawText documentUid={doc.uid} revisionUid={viewed.uid} state={viewed.state} />}
+      {viewed && <MadeFromRawText documentUid={doc.uid} revisionUid={viewed.uid} state={viewed.state} body={viewed.body_markdown ?? ""} />}
       {viewed && (
         <div className="mt-4 rounded-lg border border-slate-200 bg-white p-5">
           <div className="flex items-center justify-between">
@@ -911,7 +911,11 @@ const OPERATIONAL = ["Procedure", "Safety Document", "Runbook", "Work Instructio
 
 /** How this revision was made from raw text, when it was: the template and its exact version, where the original
  * is, the dates; and, until it is published, that it is not yet a validated instruction. */
-function MadeFromRawText({ documentUid, revisionUid, state }: { documentUid: string; revisionUid: string; state: string }) {
+/** What a rework left for a person to settle: the template's markers, still in the text. */
+const OPEN_MARKERS = /\[da (confermare|verificare)\]/g;
+
+export function MadeFromRawText({ documentUid, revisionUid, state, body = "" }:
+  { documentUid: string; revisionUid: string; state: string; body?: string }) {
   const gens = useQuery({
     queryKey: ["document-generations", documentUid],
     queryFn: () => reshapeApi.generations(documentUid),
@@ -919,6 +923,7 @@ function MadeFromRawText({ documentUid, revisionUid, state }: { documentUid: str
   const g = gens.data?.find((x) => x.revision_uid === revisionUid);
   if (!g) return null;
   const unpublished = !["published", "superseded", "retired"].includes(state);
+  const open = (body.match(OPEN_MARKERS) ?? []).length;
   return (
     <div className="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs text-indigo-900">
       Reworked from raw text ({g.source.kind}) with template <b>{g.template.id}</b> v{g.template.version}
@@ -927,6 +932,12 @@ function MadeFromRawText({ documentUid, revisionUid, state }: { documentUid: str
       {" "}The original text is among this revision's files.
       {unpublished && OPERATIONAL.some((t) => g.template.id.startsWith(t.toLowerCase().replace(/ /g, "-"))) && (
         <span className="mt-1 block font-medium text-amber-800">Not usable as an operational instruction until validated and published.</span>
+      )}
+      {unpublished && open > 0 && (
+        <span className="mt-1 block font-medium text-amber-800" data-testid="open-markers">
+          {open} {open === 1 ? "place still says" : "places still say"} [da confermare] or [da verificare]: fill them in
+          or remove them before the revision is approved.
+        </span>
       )}
     </div>
   );

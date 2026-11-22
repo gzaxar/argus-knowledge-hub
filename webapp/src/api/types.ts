@@ -1127,6 +1127,8 @@ export interface DirectoryStatus {
   groups: number;
   active_groups: number;
   users: number;
+  example_groups: number;
+  example_people: number;
   last_synced_at: string | null;
 }
 
