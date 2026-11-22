@@ -6,6 +6,7 @@ import '../../data/caching_client.dart';
 import '../../core/problem.dart';
 import '../../domain/capture.dart';
 import '../../widgets/common.dart';
+import 'server_dialog.dart';
 
 /// What the person can set about the app itself, as opposed to the records: how it looks, and what it
 /// keeps on the device.
@@ -41,6 +42,8 @@ class SettingsScreen extends ConsumerWidget {
           value: ref.watch(showKeysProvider),
           onChanged: (v) => ref.read(showKeysProvider.notifier).set(v),
         ),
+        const SectionHeader('Server'),
+        const _Server(),
         const _Notifications(),
         const SectionHeader('On this device'),
         ListTile(
@@ -168,4 +171,32 @@ class _NotificationsState extends ConsumerState<_Notifications> {
 String _summary(WorkspaceSubscription s) {
   final what = [if (s.tickets) 'tickets', if (s.documents) 'documents', if (s.assets) 'equipment'];
   return what.isEmpty ? 'Nothing new' : 'New ${what.join(', ')}';
+}
+
+
+/// The ARGUS server in use, whether it answers, and changing it.
+class _Server extends ConsumerWidget {
+  const _Server();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final base = ref.watch(activeConfigProvider).apiBase;
+    final reachable = ref.watch(reachabilityProvider).reachable;
+    final verified = ref.watch(sessionProvider.select((s) => s.value?.verified ?? true));
+    return ListTile(
+      key: const Key('settings-server'),
+      leading: Icon(reachable ? Icons.dns_outlined : Icons.cloud_off),
+      title: Text(base),
+      subtitle: Text([
+        reachable ? 'Answering' : 'Not answering: the app shows the copies it kept',
+        if (!verified) 'sign-in not yet confirmed',
+      ].join(' · ')),
+      trailing: const Icon(Icons.edit_outlined),
+      onTap: () async {
+        if (await showServerDialog(context, ref) && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Now using ${ref.read(activeConfigProvider).apiBase}.')));
+        }
+      },
+    );
+  }
 }

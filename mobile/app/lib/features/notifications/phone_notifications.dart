@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:workmanager/workmanager.dart';
 
 import '../../core/config.dart';
+import '../../core/problem.dart';
 import '../../core/session.dart';
 import '../../data/api_service.dart';
 import '../../data/capture_repositories.dart';
@@ -129,7 +130,12 @@ Future<int> checkForNews(AppConfig config, {bool showing = true}) async {
   final auth = AppAuthAuthenticator(config);
   Future<void> fresh() async {
     if (session!.expired && session!.refreshToken != null) {
-      final renewed = await auth.refresh(session!);
+      Session? renewed;
+      try {
+        renewed = await auth.refresh(session!);
+      } on Problem {
+        return;                              // the sign-in service is out of reach: try at the next check
+      }
       if (renewed != null) {
         session = renewed;
         await store.save(renewed);
@@ -137,7 +143,9 @@ Future<int> checkForNews(AppConfig config, {bool showing = true}) async {
     }
   }
 
-  final api = ApiService(config, () => session, ensureFresh: fresh, httpClient: http.Client());
+  if (!session!.verified) return 0;           // a sign-in no server has confirmed yet: nothing to ask
+  final api = ApiService(config.withApiBase(session!.apiBase ?? config.apiBase), () => session,
+      ensureFresh: fresh, httpClient: http.Client());
   final after = int.tryParse(await storage.read(key: _lastShown) ?? '') ?? 0;
   final news = await NotificationRepository(api).everywhere(after: after);
   if (news.isEmpty) return 0;

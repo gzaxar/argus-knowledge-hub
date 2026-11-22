@@ -12,7 +12,7 @@ class DiagnosticsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final config = ref.watch(configProvider);
+    final config = ref.watch(activeConfigProvider);
     final session = ref.watch(sessionProvider).value;
     final api = ref.watch(apiServiceProvider);
     final meta = ref.watch(serverMetaProvider);

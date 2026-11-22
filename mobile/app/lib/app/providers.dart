@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
+import '../core/backends.dart';
 import '../core/blob_store.dart';
 import '../core/file_cache_store.dart';
 import '../core/local_store.dart';
@@ -159,6 +160,62 @@ class ReachabilityController extends Notifier<Reachability> {
 final reachabilityProvider = NotifierProvider<ReachabilityController, Reachability>(ReachabilityController.new);
 
 final sessionStoreProvider = Provider<SessionStore>((_) => SessionStore());
+
+/// The servers this phone knows (core/backends.dart): the one chosen in Settings, those that answered lately.
+class BackendController extends AsyncNotifier<BackendChoice> {
+  BackendStore get _store => BackendStore(ref.read(localStoreProvider));
+
+  @override
+  Future<BackendChoice> build() => _store.load();
+
+  Future<void> choose(String? base) async {
+    await _store.choose(base);
+    state = AsyncData(await _store.load());
+  }
+
+  Future<void> remember(String base) async {
+    await _store.remember(base);
+    state = AsyncData(await _store.load());
+  }
+
+  Future<void> rememberWorkspace(String id, String name) async {
+    await _store.rememberWorkspace(id, name);
+    state = AsyncData(await _store.load());
+  }
+}
+
+final backendProvider = AsyncNotifierProvider<BackendController, BackendChoice>(BackendController.new);
+
+/// The build's configuration, pointed at the server in use: the one the session works with, else the one chosen
+/// in Settings, else the build's default.
+final activeConfigProvider = Provider<AppConfig>((ref) {
+  final config = ref.watch(configProvider);
+  final sessionBase = ref.watch(sessionProvider.select((s) => s.value?.apiBase));
+  final chosen = ref.watch(backendProvider.select((b) => b.value?.chosen));
+  return config.withApiBase(sessionBase ?? chosen ?? normalizeBackend(config.apiBase));
+});
+
+/// Whether [base] answers as an ARGUS server (GET /health), for Settings and the sign-in screen.
+Future<bool> backendAnswers(http.Client? client, String base) async {
+  final c = client ?? http.Client();
+  try {
+    final r = await c.get(Uri.parse('$base/health')).timeout(const Duration(seconds: 8));
+    return r.statusCode < 500;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// No server answered a sign-in: what was tried, and whether the app can open anyway on what it has.
+class BackendsUnreachable extends Problem {
+  BackendsUnreachable(this.tried, {required this.canContinue})
+      : super(ProblemCode.offline,
+            'No ARGUS server answered (${tried.join(', ')}). Try again, choose another server, '
+            '${canContinue ? 'or continue offline with what this phone has kept.' : 'or sign in when the network is back.'}');
+
+  final List<String> tried;
+  final bool canContinue;
+}
 final authenticatorProvider = Provider<Authenticator>((ref) => AppAuthAuthenticator(ref.watch(configProvider)));
 
 /// Set when the server says this version is too old (426 `client_too_old`). Nothing else works
@@ -222,21 +279,114 @@ class SessionController extends AsyncNotifier<Session?> {
     await _finishSignIn(s);
   }
 
-  /// Check the credentials against ARGUS and register this device before anything is kept.
+  /// A sign-in no server could confirm, kept for [continueOffline].
+  Session? _unconfirmed;
+
+  /// Check the credentials against ARGUS and register this device before anything is kept. The servers are
+  /// tried in turn — the one chosen in Settings, the last that answered, the build's default — and the first
+  /// that answers is the session's. One that refuses the credentials ends it there; only silence moves on.
   Future<void> _finishSignIn(Session candidate) async {
     final config = ref.read(configProvider);
-    final service = ApiService(config, () => candidate, httpClient: ref.read(httpClientProvider));
+    final choice = await ref.read(backendProvider.future);
+    final tried = <String>[];
+    for (final base in choice.candidates(config.apiBase)) {
+      if (config.backendProblem(base) != null) continue;
+      tried.add(base);
+      try {
+        final confirmed = await _confirm(candidate.copyWith(apiBase: base));
+        ref.read(signOutReasonProvider.notifier).set(null);
+        // The same person on this phone again: back in the workspace they left.
+        final previous = current;
+        final same = previous != null && previous.userLabel == confirmed.userLabel;
+        await _set(same && previous.workspaceId != null
+            ? confirmed.copyWith(workspaceId: previous.workspaceId, workspaceName: previous.workspaceName)
+            : confirmed);
+        _unconfirmed = null;
+        return;
+      } on Problem catch (p) {
+        if (p.code != ProblemCode.offline) rethrow;
+      }
+    }
+    _unconfirmed = candidate.copyWith(apiBase: tried.isEmpty ? normalizeBackend(config.apiBase) : tried.first,
+        verified: false);
+    throw BackendsUnreachable(tried, canContinue: choice.lastWorkspaceId != null);
+  }
+
+  /// whoami and the device's registration on the session's server.
+  Future<Session> _confirm(Session s) async {
+    final config = ref.read(configProvider).withApiBase(s.apiBase ?? ref.read(configProvider).apiBase);
+    final service = ApiService(config, () => s.copyWith(), httpClient: ref.read(httpClientProvider));
     final label = await WorkspaceRepository(service).whoAmI();
     final installation = await _store.installationId();
     final device = await DeviceRepository(service).register(installation, config.appVersion);
+    await ref.read(backendProvider.notifier).remember(s.apiBase!);
+    return s.copyWith(deviceId: device, userLabel: label, verified: true);
+  }
+
+  /// Open the app although no server answered the sign-in: in the workspace last worked in, on the copies this
+  /// phone kept. The sign-in is confirmed with the server as soon as it answers ([confirmPending]).
+  Future<void> continueOffline() async {
+    final s = _unconfirmed;
+    final choice = await ref.read(backendProvider.future);
+    if (s == null || choice.lastWorkspaceId == null) return;
+    _unconfirmed = null;
     ref.read(signOutReasonProvider.notifier).set(null);
-    await _set(candidate.copyWith(deviceId: device, userLabel: label));
+    await _set(s.copyWith(workspaceId: choice.lastWorkspaceId, workspaceName: choice.lastWorkspaceName));
+  }
+
+  bool _confirming = false;
+
+  /// The server answers again: confirm a sign-in made while it did not. A refusal ends the session as any would.
+  Future<void> confirmPending() async {
+    final s = current;
+    if (s == null || s.verified || _confirming) return;
+    _confirming = true;
+    try {
+      final confirmed = await _confirm(s);
+      if (current?.accessToken == s.accessToken) await _set(confirmed);
+    } on Problem catch (p) {
+      if (p.code != ProblemCode.offline) onProblem(p);
+    } finally {
+      _confirming = false;
+    }
+  }
+
+  /// Work with another server from now on (Settings). Signed in, it must accept this person first; its copies
+  /// are kept apart from the old server's.
+  Future<void> switchBackend(String? base) async {
+    final config = ref.read(configProvider);
+    final target = base == null ? null : normalizeBackend(base);
+    final problem = target == null ? null : config.backendProblem(target);
+    if (problem != null) throw Problem(ProblemCode.invalid, problem);
+    final s = current;
+    if (s != null) {
+      final confirmed = await _confirm(s.copyWith(apiBase: target ?? normalizeBackend(config.apiBase)));
+      await _set(confirmed);
+    }
+    await ref.read(backendProvider.notifier).choose(target);
+  }
+
+  /// Sign in again in place, after ARGUS stopped accepting a token the sign-in service could not renew: same
+  /// person, same workspace, nothing wiped.
+  Future<void> renewBySigningIn() async {
+    final s = current;
+    if (s == null) return;
+    final fresh = s.authType == 'oidc' ? await ref.read(authenticatorProvider).signInWithOidc(s.provider ?? 'main') : s;
+    final confirmed = await _confirm(fresh.copyWith(apiBase: s.apiBase ?? normalizeBackend(ref.read(configProvider).apiBase)));
+    if (s.userLabel != null && confirmed.userLabel != s.userLabel) {
+      await signOut(reason: 'Signed in as someone else: the previous session and what it kept were removed.');
+      return;
+    }
+    _renewalUnreachable = false;
+    ref.read(renewalNeededProvider.notifier).set(false);
+    await _set(confirmed.copyWith(workspaceId: s.workspaceId, workspaceName: s.workspaceName));
   }
 
   Future<void> chooseWorkspace(WorkspaceChoice w) async {
     final s = current;
     if (s == null) return;
     await _set(s.copyWith(workspaceId: w.id, workspaceName: w.name));
+    await ref.read(backendProvider.notifier).rememberWorkspace(w.id, w.name);
   }
 
   Future<void> signOut({String? reason}) async {
@@ -262,8 +412,21 @@ class SessionController extends AsyncNotifier<Session?> {
     final s = current;
     if (s == null || !s.expired || s.authType != 'oidc') return;
     _refreshing ??= ref.read(authenticatorProvider).refresh(s);
-    final fresh = await _refreshing;
-    _refreshing = null;
+    Session? fresh;
+    try {
+      fresh = await _refreshing;
+    } on Problem catch (p) {
+      // The sign-in service cannot be reached: not a refusal. The session stays, the app works on what it
+      // kept, and the renewal is tried again with the next request.
+      if (p.code == ProblemCode.offline) {
+        _renewalUnreachable = true;
+        return;
+      }
+      rethrow;
+    } finally {
+      _refreshing = null;
+    }
+    _renewalUnreachable = false;
     if (fresh == null) {
       await signOut(reason: 'Your session expired. Sign in again.');
     } else {
@@ -271,12 +434,21 @@ class SessionController extends AsyncNotifier<Session?> {
     }
   }
 
+  /// The last renewal failed for want of the sign-in service, not by its refusal.
+  bool _renewalUnreachable = false;
+
   /// Problems that end the session, whatever screen met them.
   void onProblem(Problem p) {
     switch (p.code) {
       case ProblemCode.revoked:
         signOut(reason: 'This device was signed out of ARGUS by an administrator. Its local data was removed.');
       case ProblemCode.unauthenticated:
+        // ARGUS answers but the token expired because the sign-in service could not renew it: ask for a sign-in,
+        // keeping what the phone holds, rather than wiping it.
+        if (_renewalUnreachable && (current?.expired ?? false)) {
+          ref.read(renewalNeededProvider.notifier).set(true);
+          return;
+        }
         signOut(reason: 'Your session is no longer valid. Sign in again.');
       case ProblemCode.clientTooOld:
         ref.read(updateRequiredProvider.notifier).require(p.minimum ?? 'a newer version');
@@ -288,9 +460,19 @@ class SessionController extends AsyncNotifier<Session?> {
 
 final sessionProvider = AsyncNotifierProvider<SessionController, Session?>(SessionController.new);
 
+/// The session's token expired while the sign-in service was out of reach, and ARGUS no longer accepts it:
+/// the app keeps working on what it has, and asks the person to sign in again (shell banner).
+class RenewalNeeded extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void set(bool v) => state = v;
+}
+
+final renewalNeededProvider = NotifierProvider<RenewalNeeded, bool>(RenewalNeeded.new);
+
 final apiServiceProvider = Provider<ApiService>((ref) {
   final controller = ref.read(sessionProvider.notifier);
-  final config = ref.watch(configProvider);
+  final config = ref.watch(activeConfigProvider);
   final reach = ref.read(reachabilityProvider.notifier);
   final caching = CachingClient(
     ref.watch(httpClientProvider) ?? http.Client(),
@@ -299,9 +481,13 @@ final apiServiceProvider = Provider<ApiService>((ref) {
     fresh: freshCopies,
     scope: () {
       final s = ref.read(sessionProvider).value;
-      return '${s?.workspaceId}|${s?.userLabel ?? s?.deviceId}';
+      // Each server's copies apart: the same workspace id on another server is another workspace.
+      return '${config.apiBase}|${s?.workspaceId}|${s?.userLabel ?? s?.deviceId}';
     },
-    onReachable: (ok) => Future.microtask(() => reach.reached(ok)),
+    onReachable: (ok) => Future.microtask(() {
+      reach.reached(ok);
+      if (ok) controller.confirmPending();
+    }),
     onServerTime: (t) => Future.microtask(() => reach.serverTime(t)),
   );
   return ApiService(

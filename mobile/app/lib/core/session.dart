@@ -16,6 +16,8 @@ class Session {
     this.deviceId,
     this.userLabel,
     this.provider,
+    this.apiBase,
+    this.verified = true,
   });
 
   final String accessToken;
@@ -28,6 +30,14 @@ class Session {
   final String? userLabel;
   final String? provider; // the OidcProvider that issued it (main | alt); null: main
 
+  /// The ARGUS server this session works with; null: the build's default (a session saved before servers
+  /// could be chosen).
+  final String? apiBase;
+
+  /// False for a sign-in no server could confirm yet (every one was out of reach): the app opens on what it has
+  /// kept, and confirms it with the server — whoami, device registration — as soon as the server answers.
+  final bool verified;
+
   bool get expired => expiresAt != null && DateTime.now().isAfter(expiresAt!.subtract(const Duration(seconds: 30)));
 
   Session copyWith({
@@ -38,6 +48,8 @@ class Session {
     String? workspaceName,
     String? deviceId,
     String? userLabel,
+    String? apiBase,
+    bool? verified,
   }) =>
       Session(
         accessToken: accessToken ?? this.accessToken,
@@ -49,6 +61,8 @@ class Session {
         deviceId: deviceId ?? this.deviceId,
         userLabel: userLabel ?? this.userLabel,
         provider: provider,
+        apiBase: apiBase ?? this.apiBase,
+        verified: verified ?? this.verified,
       );
 
   Map<String, dynamic> toJson() => {
@@ -61,6 +75,8 @@ class Session {
         'workspaceName': workspaceName,
         'deviceId': deviceId,
         'userLabel': userLabel,
+        'apiBase': apiBase,
+        'verified': verified,
       };
 
   static Session fromJson(Map<String, dynamic> j) => Session(
@@ -73,6 +89,8 @@ class Session {
         deviceId: j['deviceId'] as String?,
         userLabel: j['userLabel'] as String?,
         provider: j['provider'] as String?,
+        apiBase: j['apiBase'] as String?,
+        verified: j['verified'] as bool? ?? true,
       );
 }
 
@@ -106,10 +124,16 @@ class SessionStore {
     return id;
   }
 
-  /// Sign-out, revocation or expiry: everything the app keeps goes, except the installation id.
+  /// Sign-out, revocation or expiry: everything the app keeps goes, except the installation id and the choice
+  /// of server (`argus.backend.*`: addresses, nothing about the person).
   Future<void> wipe() async {
-    final installation = await _storage.read(key: _installationKey);
+    final kept = {
+      for (final e in (await _storage.readAll()).entries)
+        if (e.key == _installationKey || e.key.startsWith('argus.backend.')) e.key: e.value,
+    };
     await _storage.deleteAll();
-    if (installation != null) await _storage.write(key: _installationKey, value: installation);
+    for (final e in kept.entries) {
+      await _storage.write(key: e.key, value: e.value);
+    }
   }
 }
