@@ -11,7 +11,9 @@ from app.models.workspace import Workspace
 from app.services import app_metrics, metrics
 
 
-def test_the_numbers_are_aggregates_by_workspace_and_window():
+def test_the_numbers_are_aggregates_by_workspace_and_window(monkeypatch):
+    # Read now: another test's scrape may have left a copy the collector would otherwise serve for a minute.
+    monkeypatch.setenv("ARGUS_APP_METRICS_SECONDS", "0")
     t = secrets.token_hex(4)
     db = SessionLocal()
     now = datetime.now(timezone.utc)

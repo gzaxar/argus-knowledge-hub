@@ -412,7 +412,13 @@ def test_assistance_makes_no_model_call_when_ai_is_off(lab, monkeypatch):
     r.put_service_desk_settings(site, r.PortalSettingsIn(enabled=True, assistance=True,
                                                    helpdesk_request_type_uid=p["desk_type"]),
                                 identity=as_(lab, "site_admin"), db=db)
+    from app.models.llm_config import LLMConfig
     from app.services import llm
+    # The requester's workspace switched AI off, whatever the installation's default (other tests may set one,
+    # checked and enabled): an explicit disable stays a disable.
+    db.add(LLMConfig(workspace_id=lab["ids"]["sparc"], base_url="http://model.invalid", model="m", enabled=False,
+                     last_check_ok=True))
+    db.commit()
     monkeypatch.setattr(llm, "complete_structured", lambda *a, **k: pytest.fail("no model call with AI off"))
     out = r.assist(site, r.PortalAssistIn(text="wifi network down in building B", origin_workspace_id=lab["ids"]["sparc"],
                                     use_ai=True), identity=as_(lab, "requester"), db=db)
