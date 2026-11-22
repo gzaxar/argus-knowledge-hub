@@ -98,11 +98,19 @@ the workflow's first state, the key, the history and the equipment link are the 
 ## Optional assistance
 
 When a site turns assistance on, the search box also suggests **articles**: published, non-confidential documents
-of the requester's own workspace that they may read there. On request, and only where that workspace's own AI
-configuration is enabled and checked, the assistant suggests one of the request types the person could choose and
-drafts a summary; the person reviews, edits and sends it. The model sees only the person's text and the request
-types' names and descriptions. With AI off no model call is made, and the manual form is always there.
-Cross-workspace knowledge search is not part of the portal.
+that the requester may read, in their own workspace and in the workspaces of the site's published services (an IT
+knowledge base the person can read, for example). A workspace they cannot read is not searched.
+
+On request — **Ask the assistant for help** — and only where the requester's workspace has its own AI configuration
+enabled and checked, the assistant gives **first help**: up to five steps the person may safely do themselves,
+drawn only from the passages of those articles (the paragraphs that match the search, at most three articles), with
+the articles it used. Steps without a cited article are dropped, and none are given for danger or for work on
+equipment. It also suggests the request type and drafts a summary: if the steps did not solve it, **Still need
+help?** opens that form with the summary and the steps already tried, for the person to review and send.
+
+The model sees the person's text, the request types' names and descriptions, and those article passages — which
+the person could open themselves; no ticket or other record. With AI off no model call is made, and the manual form
+is always there.
 
 ## API
 
@@ -140,5 +148,6 @@ application rather than by foreign keys, so an archive of one facility loads wit
 
 Service-level targets and business calendars, a governed handoff between provider workspaces, external ticket
 systems, routing rules beyond the request type (origin facility, equipment ownership), approved help publication
-across workspaces, and AI troubleshooting conversations. Existing workflow timers (`sla_hours`) still escalate as
+across workspaces (knowledge comes only from workspaces the requester may read), and multi-turn AI
+troubleshooting conversations. Existing workflow timers (`sla_hours`) still escalate as
 before.

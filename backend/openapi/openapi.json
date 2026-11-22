@@ -73387,7 +73387,7 @@
     },
     "/v1/support/sites/{site_id}/assist": {
       "post": {
-        "description": "Help while choosing: knowledge articles the requester may read in their own workspace, and — only when\nasked, and only where that workspace's AI is on — a suggested request type and a summary to edit. Nothing is\nsent: the requester reviews and submits.",
+        "description": "Help while choosing: knowledge articles the requester may read, in their own workspace and the site's service\nworkspaces, and — only when asked, and only where their workspace's AI is on — first-help steps drawn from those\narticles with the articles cited, a suggested request type and a summary to edit. Nothing is\nsent: the requester reviews and submits.",
         "operationId": "assist_v1_support_sites__site_id__assist_post",
         "parameters": [
           {

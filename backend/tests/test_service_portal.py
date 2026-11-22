@@ -449,6 +449,52 @@ def test_knowledge_suggestions_come_from_the_requesters_own_readable_published_d
     assert [a["uid"] for a in out["articles"]] == [f"pub-{t}"]
 
 
+def test_first_help_comes_from_articles_the_requester_may_read_in_the_services_workspaces(lab, monkeypatch):
+    from app.models.document import Document, DocumentRevision
+    from app.models.llm_config import LLMConfig
+    from app.services import llm
+    db, site, t = lab["db"], lab["ids"]["site"], lab["t"]
+    p = build_portal(lab)
+    r.put_service_desk_settings(site, r.PortalSettingsIn(enabled=True, assistance=True,
+                                                   helpdesk_request_type_uid=p["desk_type"]),
+                                identity=as_(lab, "site_admin"), db=db)
+    now = datetime.now(timezone.utc)
+    doc = Document(uid=f"kb-{t}", code=f"D-kb-{t}", title="Network port not working", workspace_id=lab["ids"]["it"],
+                   confidentiality="interno")
+    db.add(doc)
+    db.flush()
+    rev = DocumentRevision(uid=f"kb-r-{t}", document_uid=doc.uid, revision_number=1, state="published",
+                           published_at=now, body_markdown="# Intro\n\nWho to call.\n\nIf the network port light is "
+                                                           "off, try the other wall socket.")
+    db.add(rev)
+    db.flush()
+    doc.current_revision_uid = rev.uid
+    db.add(LLMConfig(workspace_id=lab["ids"]["sparc"], base_url="http://model.invalid", model="m", enabled=True,
+                     last_check_ok=True))
+    db.commit()
+    seen = []
+
+    def model(endpoint, system, prompt, **kw):
+        seen.append(prompt)
+        return ('{"first_help": ["Try the other wall socket."], "sources": ["A"], "choice": 1, "why": "Network.", '
+                '"title": "Network port down", "summary": "The port light is off."}')
+    monkeypatch.setattr(llm, "complete_structured", model)
+    ask = r.PortalAssistIn(text="the network port light is off", origin_workspace_id=lab["ids"]["sparc"], use_ai=True)
+
+    # The IT workspace's articles are not the requester's to read: not searched, not shown to the model.
+    out = r.assist(site, ask, identity=as_(lab, "requester"), db=db)
+    assert out["articles"] == [] and out["ai"]["first_help"] == [] and "other wall socket" not in seen[-1]
+
+    _bind(db, lab["ids"]["it"], lab["people"]["requester"].id, "viewer")
+    db.commit()
+    out = r.assist(site, ask, identity=as_(lab, "requester"), db=db)
+    assert [a["uid"] for a in out["articles"]] == [doc.uid] and "_passages" not in out["articles"][0]
+    assert "other wall socket" in seen[-1] and "Who to call" not in seen[-1]
+    assert out["ai"]["first_help"] == ["Try the other wall socket."]
+    assert out["ai"]["sources"] == [{"uid": doc.uid, "code": doc.code, "title": doc.title,
+                                     "workspace_id": lab["ids"]["it"]}]
+
+
 def test_robot_tokens_and_workspace_bound_personal_tokens_have_no_portal(lab):
     from app.auth import PatIdentity, TokenScope
     db, site = lab["db"], lab["ids"]["site"]

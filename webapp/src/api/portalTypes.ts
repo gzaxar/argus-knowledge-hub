@@ -121,7 +121,12 @@ export interface PortalAssistResult {
   articles: { uid: string; code: string; title: string; excerpt: string; workspace_id: string }[];
   ai_available: boolean;
   ai_unavailable_reason: string | null;
-  ai: null | { error?: string; why?: string; title?: string; summary?: string; request_type_uid?: string | null };
+  ai: null | {
+    error?: string; why?: string; title?: string; summary?: string; request_type_uid?: string | null;
+    /** Steps the requester may try first, drawn from `sources` (articles they may read). Empty when none cover it. */
+    first_help?: string[];
+    sources?: { uid: string; code: string; title: string; workspace_id: string }[];
+  };
 }
 
 // --------------------------------------------------------------------------- administration

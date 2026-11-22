@@ -38,10 +38,15 @@ export function PortalHome() {
   );
 }
 
-function matches(q: string, ...texts: (string | null | undefined)[]) {
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+const STOP = new Set(["the", "and", "for", "with", "not", "has", "have", "does", "doesn", "from", "this", "that", "into",
+  "there", "when", "what", "can", "cannot", "any", "our", "your", "since", "della", "delle", "non", "che", "per", "con"]);
+
+/** How well a search matches: the number of its words (3 letters or more, common words left out) found in the
+ *  texts. A sentence such as "no network in lab 214" finds the network request types. */
+function score(q: string, ...texts: (string | null | undefined)[]) {
+  const words = q.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3 && !STOP.has(w));
   const hay = texts.filter(Boolean).join(" ").toLowerCase();
-  return words.every((w) => hay.includes(w));
+  return words.filter((w) => hay.includes(w)).length;
 }
 
 /** /support/:siteId — "How can we help?": the site's services by category, each with its request types. */
@@ -54,10 +59,15 @@ export function SitePortal() {
 
   const hits = useMemo(() => {
     if (!data || !q.trim()) return [];
-    const out: { svc: PortalService; rt: PortalRequestTypeCard }[] = [];
-    for (const c of data.categories) for (const svc of c.services) for (const rt of svc.request_types)
-      if (matches(q, rt.name, rt.description, svc.name, svc.description, c.name)) out.push({ svc, rt });
-    return out;
+    const out: { svc: PortalService; rt: PortalRequestTypeCard; n: number }[] = [];
+    for (const c of data.categories) for (const svc of c.services) for (const rt of svc.request_types) {
+      // The request type's own words count double: "network not working" before "VPN" for "no network".
+      const n = 2 * score(q, rt.name, rt.description) + score(q, svc.name, svc.description, c.name);
+      if (n > 0) out.push({ svc, rt, n });
+    }
+    // Only the close matches: a word shared by chance ("lab") does not bring in every service.
+    const best = Math.max(0, ...out.map((h) => h.n));
+    return out.filter((h) => 2 * h.n >= best).sort((a, b) => b.n - a.n).slice(0, 6);
   }, [data, q]);
 
   if (cat.isLoading) return <PortalFrame siteId={siteId}><p className="text-sm text-slate-500">Loading…</p></PortalFrame>;
@@ -173,11 +183,13 @@ function RequestTypeLink({ siteId, rt, service }: { siteId: string; rt: PortalRe
   );
 }
 
-/** Optional help from the search box: articles the person can read in their own workspace, and an AI suggestion
- *  only when they ask for it. */
+/** Optional help from the search box: articles the person can read (in their own workspace and the services'
+ *  workspaces), and — only when they ask — first steps the assistant draws from those articles, with the service
+ *  that fits and a drafted summary if they still need help. */
 function AssistHint({ siteId, data, text }: { siteId: string; data: PortalCatalogue; text: string }) {
   const origin = data.origins[0]?.id;
   const [asked, setAsked] = useState(false);
+  const [solved, setSolved] = useState(false);
   const articles = useQuery({
     queryKey: ["portal", "assist", siteId, origin, text, asked],
     queryFn: () => portalApi.assist(siteId, text, origin!, asked),
@@ -185,40 +197,80 @@ function AssistHint({ siteId, data, text }: { siteId: string; data: PortalCatalo
     staleTime: 60_000,
   });
   const res = articles.data;
-  const suggestion = res?.ai?.request_type_uid;
+  const ai = res?.ai;
+  const suggestion = ai?.request_type_uid;
+  const suggested = data.categories.flatMap((c) => c.services.flatMap((svc) => svc.request_types))
+    .find((rt) => rt.uid === suggestion);
+  const steps = ai?.first_help ?? [];
+  if (asked && articles.isFetching) {
+    return <p className="mt-6 text-sm text-slate-500" role="status">The assistant is looking at the help articles…</p>;
+  }
   if (!res) return null;
+  const draft = ai && {
+    title: ai.title,
+    description: [ai.summary, steps.length ? `Already tried (suggested by the help centre):\n${steps.map((s) => `- ${s}`).join("\n")}` : ""]
+      .filter(Boolean).join("\n\n"),
+  };
+  const docLink = (a: { uid: string; workspace_id: string }) => `/documents/${a.uid}?ws=${encodeURIComponent(a.workspace_id)}`;
   return (
     <div className="mt-6 space-y-3">
+      {res.ai_available && !asked && (
+        <button onClick={() => setAsked(true)} className="text-sm font-medium text-indigo-700 hover:underline">
+          Ask the assistant for help →
+        </button>
+      )}
+      {ai?.error && <PortalMessage tone="error">{ai.error}</PortalMessage>}
+      {ai && !ai.error && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4" aria-live="polite">
+          {steps.length > 0 ? (
+            <>
+              <h3 className="text-sm font-semibold text-emerald-900">Try this first</h3>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-800">
+                {steps.map((s, i) => <li key={i}>{s}</li>)}
+              </ol>
+              {!!ai.sources?.length && (
+                <p className="mt-2 text-xs text-slate-600">From: {ai.sources.map((a, i) => (
+                  <span key={a.uid}>{i > 0 && " · "}<Link to={docLink(a)} className="text-indigo-700 hover:underline">{a.title}</Link></span>
+                ))}</p>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-slate-700">The help articles do not cover this: send a request to the team.</p>
+          )}
+          {ai.why && <p className="mt-2 text-sm text-slate-700">{ai.why}</p>}
+          {solved ? (
+            <p className="mt-3 text-sm font-medium text-emerald-900" role="status">Glad it is solved — no request was sent.</p>
+          ) : (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {steps.length > 0 && (
+                <button onClick={() => setSolved(true)}
+                        className="rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-100">
+                  That solved it
+                </button>
+              )}
+              {suggestion && (
+                <Link to={`/support/${siteId}/new/${suggestion}`} state={{ draft }}
+                      className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">
+                  {steps.length > 0 ? "Still need help? " : ""}Send “{suggested?.name ?? "the request"}” with the drafted summary →
+                </Link>
+              )}
+            </div>
+          )}
+          <span className="mt-2 block text-xs text-slate-500">Suggestions from the help articles: you decide, and you review anything before it is sent.</span>
+        </div>
+      )}
       {res.articles.length > 0 && (
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <h3 className="text-sm font-semibold text-slate-700">Articles that may help</h3>
           <ul className="mt-2 space-y-2">
             {res.articles.map((a) => (
               <li key={a.uid} className="text-sm">
-                <Link to={`/documents/${a.uid}?ws=${encodeURIComponent(a.workspace_id)}`} className="font-medium text-indigo-700 hover:underline">{a.title}</Link>
+                <Link to={docLink(a)} className="font-medium text-indigo-700 hover:underline">{a.title}</Link>
                 {a.excerpt && <p className="text-xs text-slate-500">{a.excerpt}</p>}
               </li>
             ))}
           </ul>
         </div>
-      )}
-      {res.ai_available && !asked && (
-        <button onClick={() => setAsked(true)} className="text-sm text-indigo-700 hover:underline">
-          Ask the assistant which service fits →
-        </button>
-      )}
-      {res.ai && (
-        <PortalMessage>
-          {res.ai.error ?? <>
-            {res.ai.why} {suggestion && (
-              <Link className="font-medium text-indigo-700 hover:underline"
-                    to={`/support/${siteId}/new/${suggestion}`}
-                    state={{ draft: { title: res.ai.title, description: res.ai.summary } }}>
-                Use this service with the drafted summary →
-              </Link>)}
-            <span className="mt-1 block text-xs text-slate-500">A suggestion: you review and send the request yourself.</span>
-          </>}
-        </PortalMessage>
       )}
     </div>
   );
