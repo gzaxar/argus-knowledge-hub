@@ -90,6 +90,9 @@ def test_group_administrator_manages_members_without_workspace_authority():
         assert appointed.user_id == group_admin.id
         identity = OidcIdentity(user=group_admin)
         assert groups.my_groups(identity=identity, db=db)[0].uid == group.uid
+        from app.auth import TokenScope
+        assert groups.my_groups(identity=OidcIdentity(user=group_admin, token=TokenScope(kind="personal")),
+                                db=db) == [], "with a token: nothing to manage, and no refusal shown on every page"
         assert groups.list_group_members(group.uid, workspace_id=None, identity=identity, db=db) == []
         added = groups.add_group_members(group.uid, GroupMembersIn(
             emails=f"new-{suffix}@example.org", send_email=False), workspace_id=a, identity=identity, db=db)

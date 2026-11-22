@@ -34,8 +34,12 @@ def _may_read_group(db: Session, identity: Identity, group: Group, workspace_id:
 
 @router.get("/groups/mine", response_model=list[GroupOut])
 def my_groups(identity: Identity = Depends(get_identity), db: Session = Depends(get_db)):
-    if not isinstance(identity, OidcIdentity) or identity.token is not None:
+    if not isinstance(identity, OidcIdentity):
         raise HTTPException(status_code=403, detail="Sign in to manage groups")
+    if identity.token is not None:
+        # Signed in with a personal token: groups are managed only when signed in, so none to list here. An
+        # empty list, not a refusal: every page's shell asks, and a refusal would show as an error on each one.
+        return []
     groups = db.scalars(select(Group).join(GroupAdministrator, GroupAdministrator.group_uid == Group.uid).where(
         GroupAdministrator.user_id == identity.user.id, Group.source == "local").order_by(Group.name)).all()
     return [_out(db, g) for g in groups]
