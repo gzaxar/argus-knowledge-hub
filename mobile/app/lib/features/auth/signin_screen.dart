@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/providers.dart';
 import '../../core/problem.dart';
+import '../settings/server_dialog.dart';
 
 /// The blue of the ARGUS artwork: launch screens and the app's colour scheme start from it.
 const argusBlue = Color(0xFF00428F);
@@ -44,6 +45,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   bool _busy = false;
   String? _error;
 
+  /// No server answered the sign-in, and the phone knows where the person last worked: they may go in anyway.
+  bool _canContinueOffline = false;
+
   @override
   void dispose() {
     _token.dispose();
@@ -54,9 +58,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     setState(() {
       _busy = true;
       _error = null;
+      _canContinueOffline = false;
     });
     try {
       await action();
+    } on BackendsUnreachable catch (p) {
+      setState(() {
+        _error = p.message;
+        _canContinueOffline = p.canContinue;
+      });
     } on Problem catch (p) {
       setState(() => _error = p.code == ProblemCode.unauthenticated && p.status == 401
           ? 'ARGUS did not accept these credentials.'
@@ -71,6 +81,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     final config = ref.watch(configProvider);
+    final server = ref.watch(activeConfigProvider).apiBase;
     final auth = ref.watch(authenticatorProvider);
     final reason = ref.watch(signOutReasonProvider);
     final controller = ref.read(sessionProvider.notifier);
@@ -92,10 +103,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               const SizedBox(height: 4),
               Text('Look up equipment, positions, tickets and procedures next to the machine.',
                   textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
-              if (config.environment != 'production') ...[
-                const SizedBox(height: 12),
-                Center(child: Chip(label: Text('${config.environment} · ${config.apiBase}'))),
-              ],
+              const SizedBox(height: 12),
+              Center(
+                child: ActionChip(
+                  key: const Key('signin-server'),
+                  avatar: const Icon(Icons.dns_outlined, size: 18),
+                  label: Text(config.environment == 'production' ? server : '${config.environment} · $server'),
+                  tooltip: 'Change the ARGUS server',
+                  onPressed: _busy ? null : () => showServerDialog(context, ref),
+                ),
+              ),
               if (reason != null) ...[
                 const SizedBox(height: 16),
                 Card(
@@ -144,7 +161,22 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               if (_busy) const Padding(padding: EdgeInsets.only(top: 16), child: LinearProgressIndicator()),
               if (_error != null) ...[
                 const SizedBox(height: 16),
-                Text(_error!, style: TextStyle(color: theme.colorScheme.error), textAlign: TextAlign.center),
+                Text(_error!, key: const Key('signin-error'), style: TextStyle(color: theme.colorScheme.error),
+                    textAlign: TextAlign.center),
+              ],
+              if (_canContinueOffline) ...[
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  key: const Key('signin-continue-offline'),
+                  onPressed: _busy ? null : () => _run(() => controller.continueOffline()),
+                  icon: const Icon(Icons.cloud_off),
+                  label: const Text('Continue offline'),
+                ),
+                TextButton(
+                  key: const Key('signin-change-server'),
+                  onPressed: _busy ? null : () => showServerDialog(context, ref),
+                  child: const Text('Choose another server'),
+                ),
               ],
               const SizedBox(height: 24),
               Center(

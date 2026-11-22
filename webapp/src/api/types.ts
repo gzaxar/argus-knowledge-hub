@@ -1696,11 +1696,11 @@ export interface AskAction {
   /** The question it answered (its message seq); the answer that proposed it is the next message. */
   turn_seq: number;
   /** pull_request: files ARGUS opens a (draft) pull request with once confirmed; reviewers merge it, never ARGUS. */
-  kind: "create" | "update" | "relate" | "unrelate" | "pull_request" | "ticket" | "document";
+  kind: "create" | "update" | "relate" | "unrelate" | "pull_request" | "ticket" | "document" | "help_centre_service";
   summary: string;
   status: "proposed" | "applied" | "failed" | "discarded";
   result: {
-    uid?: string; key?: string; name?: string; relation_id?: number;
+    uid?: string; key?: string; name?: string; relation_id?: number; path?: string; site_id?: string;
     url?: string; number?: number; branch?: string; repository?: string;
   } | null;
   error: string | null;

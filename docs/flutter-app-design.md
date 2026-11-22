@@ -408,6 +408,18 @@ Otherwise the server opens a review item with the evidence the person captured.
   - both are stored only in the platform keystore;
   - the database key is also in the keystore, bound to the device, and optionally to biometrics
     under MDM policy.
+- **Servers:** the build's default (`ARGUS_API_BASE`) can be replaced by another server in Settings or on the
+  sign-in screen; a production build accepts only HTTPS servers in `ARGUS_API_DOMAIN` (by default the
+  default server's domain), since the sign-in token is sent there.
+  - The session records its server (`apiBase`); saved copies are keyed by server, workspace and person.
+  - A sign-in tries the chosen server, the last that answered, then the default; only silence moves on — a
+    refusal ends the attempt.
+  - If none answers and the phone remembers the last workspace (`argus.backend.*`, addresses only, kept
+    across sign-outs), the person may continue offline: the session is unconfirmed until whoami and the
+    device registration succeed on the first answer.
+  - A token renewal that gets no answer from the identity provider keeps the session; only a refusal
+    (`invalid_grant`…) signs out. A 401 while the renewal is unreachable asks for a sign-in in place,
+    keeping the person's data, rather than wiping.
 - **Revocation:** each device registers (`/v1/devices`) with its public installation id.
   - Revoking a device, or a person's sessions, invalidates the refresh token.
   - The device learns of it on the next call (401 `revoked`) and wipes.

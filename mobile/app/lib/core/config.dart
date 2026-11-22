@@ -1,6 +1,7 @@
 /// Where this build talks to, set at build time (flutter-app-design §6):
 /// `--dart-define=ARGUS_ENV=staging --dart-define=ARGUS_API_BASE=https://…` and so on,
-/// or by the MDM's managed configuration in a later phase. Never typed by the user.
+/// or by the MDM's managed configuration in a later phase. The person may point the app at another ARGUS server of
+/// the build's domain in Settings (core/backends.dart) when the default one moves or does not answer.
 /// One way to sign in: an OpenID Connect provider and this app's client there. [id] is kept with the session, so
 /// it is renewed by the provider that issued it.
 class OidcProvider {
@@ -38,7 +39,39 @@ class AppConfig {
     this.altIssuer = '',
     this.altClientId = 'argus-mobile',
     this.altLabel = 'Google or ARGUS account',
+    this.apiDomain = '',
   });
+
+  /// The same build, talking to another ARGUS server (a backend chosen in Settings, or the one a session was
+  /// confirmed by).
+  AppConfig withApiBase(String base) => base == apiBase
+      ? this
+      : AppConfig(
+          environment: environment, apiBase: base, linkHost: linkHost, oidcIssuer: oidcIssuer,
+          oidcClientId: oidcClientId, oidcRedirect: oidcRedirect, appVersion: appVersion,
+          offlineRetentionDays: offlineRetentionDays, distribution: distribution, oidcLabel: oidcLabel,
+          oidcIdToken: oidcIdToken, altIssuer: altIssuer, altClientId: altClientId, altLabel: altLabel,
+          apiDomain: apiDomain);
+
+  /// The domain other ARGUS servers of this build must be in (ARGUS_API_DOMAIN, e.g. `infn.it`); empty: the
+  /// default server's own domain, its last two labels. Only checked in production builds.
+  final String apiDomain;
+
+  /// Why [url] cannot be this build's server, or null if it can. Production builds send the person's sign-in
+  /// token to it, so only HTTPS servers in the build's domain are accepted; development builds take any.
+  String? backendProblem(String url) {
+    final u = Uri.tryParse(url);
+    if (u == null || !u.hasScheme || u.host.isEmpty || !(u.scheme == 'https' || u.scheme == 'http')) {
+      return 'Not a server address: give one like https://argus.example.org';
+    }
+    if (environment != 'production') return null;
+    if (u.scheme != 'https') return 'Only HTTPS servers can be used.';
+    final home = Uri.tryParse(apiBase)?.host ?? '';
+    final labels = home.split('.');
+    final domain = apiDomain.isNotEmpty ? apiDomain : (labels.length >= 2 ? labels.sublist(labels.length - 2).join('.') : home);
+    if (u.host == home || u.host == domain || u.host.endsWith('.$domain')) return null;
+    return 'This app only connects to ARGUS servers in $domain.';
+  }
 
   /// The main sign-in's button, and whether it sends its ID token (OIDC_LABEL, OIDC_TOKEN=id).
   final String oidcLabel;
@@ -105,5 +138,6 @@ class AppConfig {
         altIssuer: String.fromEnvironment('OIDC_ALT_ISSUER'),
         altClientId: String.fromEnvironment('OIDC_ALT_CLIENT_ID', defaultValue: 'argus-mobile'),
         altLabel: String.fromEnvironment('OIDC_ALT_LABEL', defaultValue: 'Google or ARGUS account'),
+        apiDomain: String.fromEnvironment('ARGUS_API_DOMAIN'),
       );
 }

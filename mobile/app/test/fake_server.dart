@@ -67,6 +67,9 @@ class FakeArgus {
   /// No network: every request fails as if the device were out of reach.
   bool offline = false;
 
+  /// Servers that do not answer, by host: the rest of the fake still does (another ARGUS server, moved).
+  final Set<String> unreachableHosts = {};
+
   /// Serve these once, then lose the answer (the request reached the server; the reply did not).
   final Set<String> loseAnswer = {};
 
@@ -91,6 +94,7 @@ class FakeArgus {
 
   late final http.Client client = MockClient((req) async {
     if (offline) throw http.ClientException('Network is unreachable', req.url);
+    if (unreachableHosts.contains(req.url.host)) throw http.ClientException('Connection refused', req.url);
     requests.add(req);
     if (loseAnswer.remove('${req.method} ${req.url.path}')) {
       throw http.ClientException('Connection reset after the request was sent', req.url);

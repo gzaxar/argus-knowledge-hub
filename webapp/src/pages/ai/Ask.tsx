@@ -265,7 +265,10 @@ function ProposedChanges({ actions, conversationId }: { actions: AskAction[]; co
               <span className="min-w-0 flex-1">
                 <span className="text-slate-800">{a.summary}</span>
                 {a.reason && <span className="block text-slate-500">{a.reason}</span>}
-                {a.status === "applied" && a.result?.uid && (
+                {a.status === "applied" && a.kind === "help_centre_service" && a.result?.path && (
+                  <Link className="ml-1 text-indigo-600 underline" to={String(a.result.path)}>Open the Help centre to publish it</Link>
+                )}
+                {a.status === "applied" && a.kind !== "help_centre_service" && a.result?.uid && (
                   <Link className="ml-1 text-indigo-600 underline"
                         to={`/${a.kind === "ticket" ? "tickets" : a.kind === "document" ? "documents" : "assets"}/${encodeURIComponent(a.result.uid)}`}>
                     {a.result.key ?? "open"}
@@ -275,6 +278,12 @@ function ProposedChanges({ actions, conversationId }: { actions: AskAction[]; co
                   <a className="ml-1 text-indigo-600 underline" href={a.result.url} target="_blank" rel="noreferrer">
                     {a.result.key ?? "pull request"}
                   </a>
+                )}
+                {a.status === "proposed" && a.kind === "help_centre_service" && (
+                  <span className="block text-slate-500">
+                    Applying creates the service as a draft, if you administer the site; it takes requests once it is
+                    published in Administration → Help centre and its destination workspace has authorised it.
+                  </span>
                 )}
                 {a.status === "proposed" && a.kind === "pull_request" && (
                   <span className="block text-slate-500">

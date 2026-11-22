@@ -12,9 +12,17 @@ abstract class Authenticator {
   bool get supportsOidc;
   /// Sign in with one of the build's providers ([AppConfig.providers]; by default the main one).
   Future<Session> signInWithOidc([String provider = 'main']);
+  /// A renewed session; null when the provider refused it (sign in again). Throws a [Problem] `offline` when
+  /// the provider cannot be reached: the session stays as it is.
   Future<Session?> refresh(Session s);
   Future<void> endSession(Session s);
 }
+
+/// OAuth's answers that mean "this refresh token is no good" (RFC 6749 §5.2), as opposed to not getting an answer.
+bool refusedRefresh(String? error) => const {
+      'invalid_grant', 'invalid_client', 'unauthorized_client', 'invalid_request', 'invalid_scope',
+      'unsupported_grant_type', 'access_denied',
+    }.contains(error);
 
 class AppAuthAuthenticator implements Authenticator {
   AppAuthAuthenticator(this.config, [FlutterAppAuth? appAuth])
@@ -88,8 +96,13 @@ class AppAuthAuthenticator implements Authenticator {
         refreshToken: r.refreshToken,
         expiresAt: r.accessTokenExpirationDateTime,
       );
+    } on FlutterAppAuthPlatformException catch (e) {
+      // The provider said no (the refresh token expired or was revoked): sign in again. Anything else — no
+      // network, the provider down — is not a refusal: the session is kept and tried again later.
+      if (refusedRefresh(e.platformErrorDetails.error)) return null;
+      throw Problem(ProblemCode.offline, 'The sign-in service cannot be reached.');
     } catch (_) {
-      return null;
+      throw Problem(ProblemCode.offline, 'The sign-in service cannot be reached.');
     }
   }
 

@@ -30,6 +30,15 @@ For administrators: the identity provider needs the `argus-mobile` client, with 
 API (an audience mapper adding the web client's id). A new installation's Keycloak has it; an older one adds it
 once (`docs/operations.md`, *The mobile app's sign-in client*).
 
+### When ARGUS moves or does not answer
+
+The app talks to the ARGUS server it was built for, or to the one chosen with the **server chip** on the sign-in
+screen or in **Settings → Server** (only HTTPS servers of your organisation's domain are accepted). At sign-in it
+tries the chosen server, then the last one that answered, then its default, and keeps the first that answers.
+If none answers, **Continue offline** opens the app in the workspace you last used, on what the phone kept; the
+sign-in is confirmed as soon as ARGUS answers again. When only the sign-in service is out of reach, you stay
+signed in; if ARGUS then asks for a new sign-in, a banner offers **Sign in** without removing what the phone kept.
+
 ## Find your way around
 
 Six tabs along the bottom, each keeping its place while you use another:

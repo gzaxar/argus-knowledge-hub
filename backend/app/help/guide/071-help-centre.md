@@ -67,6 +67,14 @@ centre**:
 
 **Open the help centre as requesters see it** shows the result; while it is closed only its administrators see it.
 
+### With Ask ARGUS
+
+Describe the service to **Ask ARGUS** — "set up a Network service at LNF: tickets into LNF IT, queue of the
+network team, a Wi-Fi request type with the Network incident type asking the building" — and it proposes it. A
+wrong site, workspace, group, ticket type or field is corrected from the choices it is given. **Apply** creates
+the service as a draft, if you administer the site; then authorise and **Publish** it here as above. Ask also
+walks you through any of these steps, from this guide.
+
 ## Authorise a destination
 
 A site administrator cannot send tickets into a workspace on their own: someone who manages that workspace's

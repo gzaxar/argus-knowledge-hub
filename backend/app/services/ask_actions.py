@@ -28,13 +28,15 @@ from app.models.schema import Schema
 PERMISSION = {"create": "create", "update": "modify", "relate": "create", "unrelate": "delete", "ticket": "create",
               "document": "create",
               # Leaves ARGUS: a person who may approve in this workspace, signed in, never an API token.
-              "pull_request": "approve"}
+              "pull_request": "approve",
+              # A site's help centre: checked as its administration is (services/service_portal.manager_of).
+              "help_centre_service": "manage"}
 RESOURCE = {"ticket": "tickets", "document": "documents"}
 SKIPPED_ATTRIBUTES = ("argus_source", "argus_facility")
 
 SYSTEM = (
     "\n\nYou may also propose changes, but only when the person asks for one: propose_create_record, "
-    "propose_update_record, propose_relation, propose_ticket to open a ticket, and propose_document for a draft document. A proposal changes nothing: it is shown to the person, who "
+    "propose_update_record, propose_relation, propose_ticket to open a ticket, propose_document for a draft document, and propose_help_centre_service to set up a service of a site's help centre (read the guide's Help centre topic first). A proposal changes nothing: it is shown to the person, who "
     "applies or discards it. Never say a change was made; say it is proposed and waits for their confirmation. "
     "Look the records up first and use their keys — also as the value of an attribute that refers to a record "
     "(where a unit is: its Located in, the argus_location attribute, takes a Location's key). "
@@ -126,6 +128,38 @@ def tool_specs() -> list[dict]:
                               "description": "Keys of the records the document is about."},
                 "reason": {"type": "string"},
             }, "required": ["title", "body"]}}},
+        {"type": "function", "function": {
+            "name": "propose_help_centre_service",
+            "description": "Propose a service for a site's help centre (docs: the guide's Help centre topic): its "
+                           "description, the workspace its tickets go to (the site or one of its facilities), the "
+                           "responsible team (a group) and its request types with the ticket type and the fields "
+                           "a requester fills in. Only when a site administrator asks for it. It is checked now: "
+                           "an unknown site, workspace, group, ticket type or field is refused with the valid "
+                           "choices. Changes nothing until the person confirms; then the service is created as a "
+                           "draft, which is published from Administration → Help centre once the destination "
+                           "workspace has authorised it.",
+            "parameters": {"type": "object", "properties": {
+                "site": {"type": "string", "description": "The site, by its id or name."},
+                "name": {"type": "string"},
+                "category": {"type": "string", "description": "IT, Facilities, Accelerator… groups the cards."},
+                "description": {"type": "string", "description": "What it handles, in a line or two."},
+                "hours": {"type": "string"},
+                "contact": {"type": "string"},
+                "destination": {"type": "string", "description": "The workspace its tickets go to, by id or name."},
+                "team": {"type": "string", "description": "The responsible group, by name."},
+                "request_types": {"type": "array", "items": {"type": "object", "properties": {
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                    "guidance": {"type": "string", "description": "What to check or include, shown above the form."},
+                    "ticket_type": {"type": "string", "description": "A ticket type usable in the destination, by "
+                                    "name; leave it out for a plain ticket."},
+                    "fields": {"type": "array", "items": {"type": "object", "properties": {
+                        "key": {"type": "string", "description": "A field of the ticket type."},
+                        "label": {"type": "string"}, "help": {"type": "string"},
+                        "required": {"type": "boolean"}}, "required": ["key"]}},
+                    "allow_attachments": {"type": "boolean"}}, "required": ["name"]}},
+                "reason": {"type": "string"},
+            }, "required": ["site", "name", "destination", "team", "request_types"]}}},
     ] + _pull_request_specs()
 
 
@@ -157,7 +191,7 @@ def _pull_request_specs() -> list[dict]:
 
 
 TOOL_NAMES = {"propose_create_record", "propose_update_record", "propose_relation", "propose_ioc_pull_request",
-              "propose_ticket", "propose_document"}
+              "propose_ticket", "propose_document", "propose_help_centre_service"}
 
 
 class Refused(ValueError):
@@ -308,7 +342,8 @@ class Proposer:
     def __call__(self, name: str, arguments: dict) -> dict:
         handler = {"propose_create_record": self._create, "propose_update_record": self._update,
                    "propose_relation": self._relation, "propose_ioc_pull_request": self._pull_request,
-                   "propose_ticket": self._ticket, "propose_document": self._document}[name]
+                   "propose_ticket": self._ticket, "propose_document": self._document,
+                   "propose_help_centre_service": self._help_centre_service}[name]
         kind, payload, summary = handler(arguments or {})
         number = (self.db.scalar(select(AskAction.number).where(AskAction.conversation_id == self.conversation_id)
                                  .order_by(AskAction.number.desc()).limit(1)) or 0) + 1
@@ -453,6 +488,76 @@ class Proposer:
         return "pull_request", payload, \
             f"Open a pull request on {checked['repository']}: “{title}” ({n} file{'s' if n != 1 else ''})"
 
+    def _help_centre_service(self, a: dict) -> tuple[str, dict, str]:
+        """A service of a site's help centre, every name resolved and checked now; created as a draft on apply."""
+        from app.models.group import Group
+        from app.models.service_portal import ServiceOffering
+        from app.models.workspace import Workspace
+        from app.services import service_portal as portal
+        from app.services import sites as site_service
+
+        def pick(rows, wanted, what):
+            wanted = str(wanted or "").strip().lower()
+            for row_id, label in rows:
+                if wanted in (str(row_id).lower(), str(label).lower()):
+                    return row_id, label
+            choices = ", ".join(f"{label} ({row_id})" if label != row_id else str(row_id) for row_id, label in rows)
+            raise Refused(f"no {what} {wanted!r}; choose one of: {choices or 'none'}")
+
+        sites = [(w.id, w.name) for w in self.db.scalars(select(Workspace).where(Workspace.role == site_service.ROLE)
+                                                          .order_by(Workspace.name))]
+        site_id, site_name = pick(sites, a.get("site"), "site")
+        places = [(w, self.db.get(Workspace, w)) for w in portal.site_workspaces(self.db, site_id)]
+        dest_id, dest_name = pick([(w, ws.name) for w, ws in places if ws is not None], a.get("destination"),
+                                  f"workspace at {site_name}")
+        groups = [(g.uid, g.name) for g in self.db.scalars(select(Group).where(Group.active.is_(True))
+                                                           .order_by(Group.name))]
+        team_uid, team_name = pick(groups, a.get("team"), "active group")
+        name = str(a.get("name") or "").strip()
+        if not name:
+            raise Refused("a service needs a name")
+        if self.db.scalar(select(ServiceOffering).where(ServiceOffering.site_id == site_id,
+                                                        ServiceOffering.slug == portal.slugify(name))) is not None:
+            raise Refused(f"{site_name} already has a service called {name!r}: choose another name")
+        types = self.db.scalars(select(Schema).where(Schema.applies_to == "tickets", Schema.is_concrete.is_(True),
+                                                     (Schema.workspace_id == dest_id) | Schema.is_global.is_(True))
+                                .order_by(Schema.name)).all()
+        request_types = []
+        for rt in a.get("request_types") or []:
+            rt_name = str((rt or {}).get("name") or "").strip()
+            if not rt_name:
+                raise Refused("every request type needs a name")
+            schema = None
+            if rt.get("ticket_type"):
+                uid, _ = pick([(t.uid, t.name) for t in types], rt["ticket_type"], f"ticket type usable in {dest_name}")
+                schema = self.db.get(Schema, uid)
+            fields = [{"key": str(f.get("key") or "").strip(), "label": f.get("label"), "help": f.get("help"),
+                       "required": bool(f.get("required"))} for f in rt.get("fields") or []]
+            if fields and schema is None:
+                raise Refused(f"{rt_name}: requester fields come from a ticket type: name one")
+            if schema is not None:
+                problems = portal.field_problems(self.db, schema, fields)
+                if problems:
+                    from app.services.attribute_validation import effective_attributes
+                    keys = [x.get("key") or x.get("name") for x in effective_attributes(self.db, schema)
+                            if not str(x.get("key") or x.get("name") or "").startswith("argus_")]
+                    raise Refused(f"{rt_name}: {problems[0]} Its fields are: {', '.join(keys)}")
+            request_types.append({"name": rt_name[:200], "description": rt.get("description"),
+                                  "guidance": rt.get("guidance"), "schema_uid": schema.uid if schema else None,
+                                  "ticket_type": schema.name if schema else None, "fields": fields,
+                                  "allow_attachments": rt.get("allow_attachments", True) is not False})
+        if not request_types:
+            raise Refused("a service needs at least one request type")
+        payload = {"site_id": site_id, "site_name": site_name, "name": name[:200],
+                   "category": (str(a.get("category") or "").strip() or None),
+                   "description": a.get("description"), "hours": a.get("hours"), "contact": a.get("contact"),
+                   "provider_workspace_id": dest_id, "provider_name": dest_name, "team_group_uid": team_uid,
+                   "team_name": team_name, "request_types": request_types}
+        listed = ", ".join(rt["name"] + (f" ({rt['ticket_type']})" if rt["ticket_type"] else "") for rt in request_types)
+        return "help_centre_service", payload, (f"Set up the help-centre service “{name}” at {site_name}: tickets "
+                                                 f"into {dest_name}, queue of {team_name}; request types {listed} "
+                                                 f"(a draft, to publish once {dest_name} authorises it)")
+
     def _relation(self, a: dict) -> tuple[str, dict, str]:
         from app.ledger import registry
         relation = str(a.get("relation_type") or "").strip().lower()
@@ -541,8 +646,11 @@ def _permitted(db: Session, identity, workspace_id: str, kind: str) -> bool:
     from app.auth import OidcIdentity
     from app.services.permissions import resolve_permission
     if not isinstance(identity, OidcIdentity):
-        # A token's scope was checked when it reached the workspace; but only a person opens a pull request.
-        return kind != "pull_request"
+        # A token's scope was checked when it reached the workspace; but only a person opens a pull request or
+        # sets up a help-centre service.
+        return kind not in ("pull_request", "help_centre_service")
+    if kind == "help_centre_service":
+        return True                         # checked against the site itself when it is applied (_execute)
     return resolve_permission(db, identity.user, workspace_id, PERMISSION[kind], RESOURCE.get(kind, "objects"))
 
 
@@ -559,6 +667,20 @@ def _execute(db: Session, identity, workspace_id: str, action: AskAction) -> dic
             return pull_requests.open_pull_request(p, actor, prior_models(db, action.conversation_id, action.number))
         except pull_requests.Refused as e:
             raise HTTPException(status_code=422, detail=str(e))
+    if action.kind == "help_centre_service":
+        from app.routers import service_portal as desk
+        site = p["site_id"]
+        svc = desk.create_service(site, desk.PortalServiceIn(
+            name=p["name"], category=p.get("category"), description=p.get("description"), hours=p.get("hours"),
+            contact=p.get("contact"), provider_workspace_id=p["provider_workspace_id"],
+            team_group_uid=p["team_group_uid"]), identity=identity, db=db)
+        for rt in p["request_types"]:
+            desk.create_request_type(site, svc["uid"], desk.PortalRequestTypeIn(
+                name=rt["name"], description=rt.get("description"), guidance=rt.get("guidance"),
+                schema_uid=rt.get("schema_uid"), fields=[desk.PortalFieldIn(**f) for f in rt.get("fields") or []],
+                allow_attachments=rt.get("allow_attachments", True)), identity=identity, db=db)
+        return {"uid": svc["uid"], "name": svc["name"], "kind": "help_centre_service", "site_id": site,
+                "path": f"/sites/{site}/service-desk"}
     if action.kind == "ticket":
         from datetime import datetime as _dt
         from app.routers import issues

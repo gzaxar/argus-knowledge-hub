@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../core/problem.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
@@ -84,7 +86,46 @@ class OfflineBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final reachable = ref.watch(reachabilityProvider).reachable;
     final waiting = (ref.watch(queueProvider).value ?? const <PendingCommand>[]).where((c) => c.open).length;
+    final unconfirmed = ref.watch(sessionProvider.select((s) => s.value != null && !s.value!.verified));
+    final renew = ref.watch(renewalNeededProvider);
     return Column(children: [
+      if (renew)
+        Material(
+          color: Theme.of(context).colorScheme.errorContainer,
+          child: SafeArea(
+            bottom: false,
+            child: ListTile(
+              key: const Key('renewal-banner'),
+              dense: true,
+              leading: const Icon(Icons.key_off_outlined),
+              title: const Text('ARGUS needs you to sign in again. What this phone keeps stays.'),
+              trailing: TextButton(
+                key: const Key('renewal-signin'),
+                onPressed: () async {
+                  try {
+                    await ref.read(sessionProvider.notifier).renewBySigningIn();
+                  } on Problem catch (p) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(p.message)));
+                    }
+                  }
+                },
+                child: const Text('Sign in'),
+              ),
+            ),
+          ),
+        ),
+      if (unconfirmed && reachable)
+        Material(
+          color: Theme.of(context).colorScheme.secondaryContainer,
+          child: const SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: Text('Confirming your sign-in with ARGUS…', key: Key('unconfirmed-banner')),
+            ),
+          ),
+        ),
       if (!reachable)
         Material(
           color: Theme.of(context).colorScheme.tertiaryContainer,

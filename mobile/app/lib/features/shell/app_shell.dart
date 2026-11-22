@@ -68,7 +68,7 @@ class AppDrawer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider).value;
-    final config = ref.watch(configProvider);
+    final config = ref.watch(activeConfigProvider);
     final features = ref.watch(workspaceFeaturesProvider).value;
     final hasMap = features == null || features.contains('map');
     final theme = Theme.of(context);
@@ -206,7 +206,7 @@ class _NewsWhileOpenState extends ConsumerState<_NewsWhileOpen> with WidgetsBind
 
   Future<void> _check() async {
     if (!mounted) return;
-    await ref.read(phoneNotifierProvider).checkNow(ref.read(configProvider));
+    await ref.read(phoneNotifierProvider).checkNow(ref.read(activeConfigProvider));
     if (!mounted) return;
     ref.invalidate(notificationsProvider);
     ref.invalidate(myWorkProvider);
