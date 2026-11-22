@@ -409,7 +409,7 @@ def _place_named(db: Session, workspace_id: str, text: str, schema: Optional[Sch
         return None
     types = list(db.scalars(select(Schema).where(
         Schema.applies_to == "objects", or_(Schema.workspace_id == workspace_id, Schema.is_global.is_(True)))))
-    _, places = _branch(types, ":argus-object:location")
+    _, places = _branch(types, ":argus-object:location", workspace_id)
     # Places are few: each is looked for in the text, its key as a whole word ("B12-HALL", "B12") and its name
     # (from six letters on, like text_links), whatever their shape.
     import re
@@ -657,7 +657,7 @@ def assist_ticket(db: Session, workspace_id: str, actor: str, endpoint: Endpoint
         from app.services.knowledge_hub import _branch
         _, places = _branch(list(db.scalars(select(Schema).where(
             Schema.applies_to == "objects", or_(Schema.workspace_id == workspace_id, Schema.is_global.is_(True))))),
-            ":argus-object:location")
+            ":argus-object:location", workspace_id)
         named = objects_mentioned(db, workspace_id, clean)
         kinds = dict(db.execute(select(Asset.uid, Asset.schema_uid).where(Asset.uid.in_([f["uid"] for f in named]))).all())
         named.sort(key=lambda f: kinds.get(f["uid"]) in places)

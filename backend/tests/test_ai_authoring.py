@@ -107,17 +107,19 @@ def test_a_key_of_any_shape_a_tag_in_a_name_and_never_a_deleted_record(workspace
     from datetime import datetime, timezone
     workspace_id, _key = workspace
     db = SessionLocal()
-    for uid, key, name in (("b", "B12", "Test stand building"), ("hall", "B12-HALL", "Accelerator hall"),
-                           ("ip1", "WS-IP-0001", "Gun ion pump IP-01"), ("vg1", "WS-VG-0001", "Gun gauge VG-01"),
-                           ("vg1b", "WS-VG-0002", "Spare gauge VG-01"), ("old", "WS-IP-0099", "Old pump IP-02")):
+    n = secrets.token_hex(3).upper()                     # keys are unique across every workspace
+    b = f"B{n}"
+    for uid, key, name in (("b", b, "Test stand building"), ("hall", f"{b}-HALL", "Accelerator hall"),
+                           ("ip1", f"W{n}-IP-0001", "Gun ion pump IP-01"), ("vg1", f"W{n}-VG-0001", "Gun gauge VG-01"),
+                           ("vg1b", f"W{n}-VG-0002", "Spare gauge VG-01"), ("old", f"W{n}-IP-0099", "Old pump IP-02")):
         db.add(Asset(uid=f"{uid}-{workspace_id}", workspace_id=workspace_id, schema_uid=f"{workspace_id}:cam",
                      key=key, name=name, type="Cameras",
                      deleted_at=datetime.now(timezone.utc) if uid == "old" else None))
     db.commit()
-    found = objects_mentioned(db, workspace_id, "Close the valve, switch off ip-01 in B12-HALL, check VG-01 and IP-02.")
-    assert [(f["key"], f["matched_on"]) for f in found] == [("B12-HALL", "key"), ("WS-IP-0001", "tag")]
+    found = objects_mentioned(db, workspace_id, f"Close the valve, switch off ip-01 in {b}-HALL, check VG-01 and IP-02.")
+    assert [(f["key"], f["matched_on"]) for f in found] == [(f"{b}-HALL", "key"), (f"W{n}-IP-0001", "tag")]
     assert found[1]["matched"] == "IP-01", "what the text says, to show as the evidence"
-    assert [f["key"] for f in objects_mentioned(db, workspace_id, "Building B12.")] == ["B12"]
+    assert [f["key"] for f in objects_mentioned(db, workspace_id, f"Building {b}.")] == [b]
     db.close()
 
 
