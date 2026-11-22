@@ -517,10 +517,13 @@ def overview(db: Session, workspace_id: str, access: Access, user_id: Optional[s
     return out
 
 
-def _branch(types: list[Schema], suffix: str) -> tuple[Optional[Schema], set[str]]:
+def _branch(types: list[Schema], suffix: str, workspace_id: Optional[str] = None) -> tuple[Optional[Schema], set[str]]:
     """The type whose uid ends in `suffix` (the packages' `argus-object:location`, `argus-object:asset`) and the
-    uids of it and every type below it."""
-    root = next((t for t in types if t.uid.endswith(suffix)), None)
+    uids of it and every type below it. The workspace's own type first: a global one from another workspace's
+    catalogue is the root only when the workspace has none of its own."""
+    matching = [t for t in types if t.uid.endswith(suffix)]
+    root = next((t for t in matching if workspace_id and t.workspace_id == workspace_id), None) \
+        or next(iter(matching), None)
     if root is None:
         return None, set()
     children: dict[str, list[str]] = {}
@@ -553,11 +556,12 @@ def start_here(db: Session, workspace_id: str, access: Access) -> dict:
             Asset.workspace_id == workspace_id, Asset.deleted_at.is_(None), Asset.schema_uid.in_(uids),
             live_assets_clause(), visible_assets_clause(workspace_id))) or 0
 
-    place_root, places = _branch(types, ":argus-object:location")
+    place_root, places = _branch(types, ":argus-object:location", workspace_id)
     if place_root is not None:
-        building = next((t for t in types if t.uid.endswith(":argus-object:building")), None)
+        buildings = [t for t in types if t.uid.endswith(":argus-object:building") and t.uid in places]
+        building = next((t for t in buildings if t.workspace_id == workspace_id), None) or next(iter(buildings), None)
         steps.append({"key": "places", "count": assets_of(places), "type_uid": building.uid if building else None})
-    equipment_root, equipment = _branch(types, ":argus-object:asset")
+    equipment_root, equipment = _branch(types, ":argus-object:asset", workspace_id)
     if equipment_root is not None:
         steps.append({"key": "equipment", "count": assets_of(equipment)})
     elif access.assets:

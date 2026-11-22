@@ -282,14 +282,15 @@ def test_a_document_offers_the_equipment_its_text_names_and_is_not_linked_to():
         db.flush()
         db.add(Schema(uid=f"{ws}:pump", workspace_id=ws, name="Pump", applies_to="objects"))
         db.flush()
-        for uid, key, name in (("p1", "IP-0003", "Pompa ionica sezione 1A"), ("hall", "B12-HALL", "Hall"),
-                               ("p2", "IP-0004", "Pompa ionica sezione 1B")):
+        n = secrets.token_hex(3).upper()                 # keys are unique across every workspace
+        for uid, key, name in (("p1", f"IP-{n}3", "Pompa ionica sezione 1A"), ("hall", f"B{n}-HALL", "Hall"),
+                               ("p2", f"IP-{n}4", "Pompa ionica sezione 1B")):
             db.add(Asset(uid=f"{ws}-{uid}", workspace_id=ws, schema_uid=f"{ws}:pump", key=key, name=name,
                          type="Pump", attributes={}))
         db.add(Document(uid=f"{ws}-doc", workspace_id=ws, code=f"{ws}-D", title="Prova di tenuta"))
         db.flush()
         db.add(DocumentRevision(uid=f"{ws}-doc-r1", document_uid=f"{ws}-doc", revision_number=1, state="published",
-                                body_markdown="Se la Pompa ionica sezione 1A in B12-HALL non tiene, vedi la 1B."))
+                                body_markdown=f"Se la Pompa ionica sezione 1A in B{n}-HALL non tiene, vedi la 1B."))
         db.add(DocumentRelation(workspace_id=ws, from_document_uid=f"{ws}-doc", to_type="asset", to_uid=f"{ws}-hall",
                                 relation_type="describes"))
         db.commit()

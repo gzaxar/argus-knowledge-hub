@@ -3925,6 +3925,16 @@
             "title": "Active Groups",
             "type": "integer"
           },
+          "example_groups": {
+            "default": 0,
+            "title": "Example Groups",
+            "type": "integer"
+          },
+          "example_people": {
+            "default": 0,
+            "title": "Example People",
+            "type": "integer"
+          },
           "groups": {
             "title": "Groups",
             "type": "integer"
@@ -60899,6 +60909,22 @@
         "description": "Lightweight member lookup for \"user\"-type attribute pickers (assignee,\netc.) — available to anyone with read access, unlike the full permissions\nlisting below which is owner/admin-only.\n\nEveryone who can reach the workspace belongs here, however they got in:\nby legacy membership, by a role binding of their own, or as a member of\na group that holds one. Otherwise a ticket couldn't be assigned to most\nof the division the moment access moved to group bindings.",
         "operationId": "list_member_directory_v1_members_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "can_work",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Can Work"
+            }
+          },
           {
             "in": "header",
             "name": "authorization",
