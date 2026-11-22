@@ -147,9 +147,13 @@ def manager_of(db: Session, identity, site_id: str) -> tuple[Workspace, User]:
     site = db.get(Workspace, site_id)
     if site is None or site.role != site_service.ROLE:
         raise problem(404, "not_found", "Site not found")
-    if not isinstance(identity, OidcIdentity) or (
-            identity.token is not None and (not identity.token.may("admin")
-                                            or identity.token.workspace_id not in (None, site_id))):
+    if not isinstance(identity, OidcIdentity):
+        raise problem(403, "forbidden", "Site administrators only")
+    if identity.token is not None and identity.token.workspace_id not in (None, site_id):
+        # Said as it is: the person may well administer the site, but not with a token kept to one workspace.
+        raise problem(403, "forbidden", "This token is kept to one workspace: administering a site needs your "
+                                        "sign-in (INFN or Google) or a personal token not bound to a workspace.")
+    if identity.token is not None and not identity.token.may("admin"):
         raise problem(403, "forbidden", "Site administrators only")
     if not may_manage_user(db, identity.user, site_id):
         raise problem(403, "forbidden", "Site administrators only")

@@ -85,7 +85,7 @@ export function ServiceDeskPage() {
                    onChange={(e) => setSettings({ ...settings, emergency: e.target.value })} /></label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings.assistance}
                  onChange={(e) => setSettings({ ...settings, assistance: e.target.checked })} />
-            Offer help while choosing (articles from the requester's workspace; AI only where that workspace's AI is on)</label>
+            Offer help while choosing (articles the requester may read, here and in the services' workspaces; AI first help only where their workspace's AI is on)</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings.enabled}
                  onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })} />
             Open the help centre to requesters</label>

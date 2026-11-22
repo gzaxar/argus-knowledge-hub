@@ -511,6 +511,17 @@ def test_robot_tokens_and_workspace_bound_personal_tokens_have_no_portal(lab):
     assert e.value.detail["code"] == "token_scope"
 
 
+def test_a_token_kept_to_one_workspace_cannot_administer_the_site_and_says_so(lab):
+    from app.auth import TokenScope
+    db, site = lab["db"], lab["ids"]["site"]
+    admin = db.get(User, lab["people"]["site_admin"].id)
+    bound = OidcIdentity(user=admin, token=TokenScope(kind="personal", workspace_id=lab["ids"]["sparc"]))
+    with pytest.raises(HTTPException) as e:
+        r.create_service(site, r.PortalServiceIn(name="X", provider_workspace_id=lab["ids"]["it"],
+                                                 team_group_uid=lab["team"].uid), identity=bound, db=db)
+    assert e.value.status_code == 403 and "kept to one workspace" in str(e.value.detail)
+
+
 def test_ask_argus_proposes_a_help_centre_service_and_only_a_site_administrator_applies_it(lab):
     from app.models.ask_conversation import AskConversation
     from app.models.service_portal import ServiceOffering, ServiceRequestType
