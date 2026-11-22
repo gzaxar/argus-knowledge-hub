@@ -3,6 +3,13 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError, workspacesApi } from "../../api/client";
 import { PackagePicker } from "../../components/PackagePicker";
+import { openInWorkspace } from "../../api/session";
+import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
+
+/** The id rule's case, as words: "lower" → lowercase, "keep" → the case as typed. */
+function caseRule(c: string): string {
+  return c === "keep" ? "case as typed" : `${c}case`;
+}
 
 /** Creating a workspace.
  *
@@ -17,6 +24,7 @@ import { PackagePicker } from "../../components/PackagePicker";
  */
 export function NewWorkspace() {
   const navigate = useNavigate();
+  const current = useCurrentWorkspaceId();
   const [name, setName] = useState("");
   const [customId, setCustomId] = useState<string | null>(null);
   const [packages, setPackages] = useState<string[]>([]);
@@ -38,7 +46,14 @@ export function NewWorkspace() {
     // left open since the rule changed cannot produce a stale identifier.
     mutationFn: () => workspacesApi.create(trimmed, customId?.trim() || undefined, packages,
                                            packages.length ? catalogue || undefined : undefined),
-    onSuccess: (ws) => navigate(`/workspaces/${ws.id}/members`),
+    // Into the new workspace, on its cockpit: *Start here* says what to do first (places, equipment, people…).
+    // A token profile cannot switch: it goes to the new workspace's access page instead.
+    onSuccess: (ws) => {
+      if (!openInWorkspace(ws.id, "/", current)) {
+        navigate(`/workspaces/${ws.id}/access`);
+        window.scrollTo(0, 0);
+      }
+    },
   });
 
   return (
@@ -117,8 +132,8 @@ export function NewWorkspace() {
                 {" "}
                 <Link className="underline" to="/admin/settings">
                   {rule.data.prefix
-                    ? `Rule: “${rule.data.prefix}” prefix, ${rule.data.case}ercase, “${rule.data.separator}” between words.`
-                    : `Rule: ${rule.data.case}ercase, “${rule.data.separator}” between words.`}
+                    ? `Rule: “${rule.data.prefix}” prefix, ${caseRule(rule.data.case)}, “${rule.data.separator}” between words.`
+                    : `Rule: ${caseRule(rule.data.case)}, “${rule.data.separator}” between words.`}
                 </Link>
               </>
             )}

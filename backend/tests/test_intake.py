@@ -250,6 +250,21 @@ def test_a_report_becomes_a_ticket_draft_with_causes_only_as_hypotheses(world, m
     assert all(l.get("uid") != w["secret"] for c in out["guide"]["checks"] for l in c.get("links") or [])
 
 
+def test_the_equipment_a_report_names_is_the_ticket_s_record_not_the_hall_it_is_in(world, model):
+    w = world
+    answer, _ = model
+    db = SessionLocal()
+    hall = Asset(uid=str(uuid.uuid4()), workspace_id=w["ws"], schema_uid=w["types"]["Area"], key=f"{w['ws']}-HALL",
+                 name="Hall", type="Area", attributes={})
+    db.add(hall)
+    db.commit()
+    db.close()
+    answer({"title": "Pump tripped", "type": "Operational incident"})
+    report = f"In {w['ws']}-HALL the Ion pump gun area tripped."
+    f = client.post("/v1/intake/assist/ticket", headers=w["headers"], json={"text": report}).json()["fields"]
+    assert f["asset_uid"]["value"] == w["pump"], "the hall is named by key, the pump by name: the pump is the subject"
+
+
 def test_a_report_that_says_this_morning_is_dated_from_today(world, model):
     from datetime import datetime
     from zoneinfo import ZoneInfo
@@ -261,6 +276,21 @@ def test_a_report_that_says_this_morning_is_dated_from_today(world, model):
     today = datetime.now(ZoneInfo("Europe/Rome")).date().isoformat()
     assert "Now: " in seen["user"] and today in seen["user"], seen["user"]
     assert "counted from Now" in seen["system"]
+
+
+def test_yesterday_is_counted_by_the_server_not_by_the_model(world, model):
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    w = world
+    answer, _ = model
+    answer({"title": "Pressure rise", "occurred_at": "2001-01-01", "occurred_precision": "day",
+            "evidence": {"occurred_at": "Dopo la sostituzione di ieri"}, "confidence": {"occurred_at": 0.85}})
+    f = client.post("/v1/intake/assist/ticket", headers=w["headers"],
+                    json={"text": "Dopo la sostituzione di ieri la pressione non scende"}).json()["fields"]
+    yesterday = (datetime.now(ZoneInfo("Europe/Rome")).date() - timedelta(days=1)).isoformat()
+    when = f["attributes.occurred_from"]
+    assert when["value"]["nominal"].startswith(yesterday) and when["value"]["precision"] == "day"
+    assert when["method"] == "resolved"
 
 
 # --- the outcome: what the person kept ------------------------------------------------------------------------------
@@ -782,3 +812,57 @@ def test_a_reasoning_model_is_read_as_it_streams_its_reasoning_left_aside_and_st
     with pytest.raises(llm.LLMOvertime, match="still reasoning") as e:
         llm.complete_structured(ep, "s", "u")
     assert e.value.model in ("auto", "minimax-m27")
+
+
+def test_a_place_the_description_names_is_proposed_as_where_the_unit_is(model):
+    """*Located in* is never the model's: a hall or a building already recorded, named in the text by its key or its
+    name, is matched — the more precise one when both are named."""
+    answer, seen = model
+    tag = pysecrets.token_hex(3)
+    ws = f"place-{tag}"
+    db = SessionLocal()
+    db.add(Workspace(id=ws, name=ws))
+    db.flush()
+
+    def kind(name, parent=None, attributes=None):
+        db.add(Schema(uid=f"{ws}:argus-object:{name}", workspace_id=ws, name=name.replace("-", " ").title(),
+                      applies_to="objects", attributes=attributes or [],
+                      parent_schema_uid=f"{ws}:argus-object:{parent}" if parent else None))
+        db.flush()
+    kind("item")
+    kind("location", "item")
+    kind("building", "location")
+    kind("area", "location")
+    kind("asset", "item", [{"id": "loc", "key": "argus_location", "name": "Located in", "type": "reference"},
+                           {"id": "serial", "key": "serial", "name": "Serial", "type": "string"}])
+    kind("ion-pump", "asset")
+    building = Asset(uid=str(uuid.uuid4()), workspace_id=ws, schema_uid=f"{ws}:argus-object:building",
+                     key=f"B{tag.upper()}", name=f"Building {tag}", type="Building", attributes={})
+    hall = Asset(uid=str(uuid.uuid4()), workspace_id=ws, schema_uid=f"{ws}:argus-object:area",
+                 key=f"B{tag.upper()}-HALL", name=f"Test hall {tag}", type="Area", attributes={})
+    db.add_all([building, hall])
+    db.add(LLMConfig(workspace_id=ws, base_url="https://gateway.example/v1", model="m-1", enabled=True,
+                     last_check_ok=True))
+    headers = token(db, ws)
+    db.commit()
+    hall_uid = hall.uid
+    db.close()
+    answer({"type": "Ion Pump", "name": "Ion pump", "attributes": {"serial": "991"},
+            "evidence": {"type": "ion pump"}, "confidence": {"type": 0.9}})
+    r = client.post("/v1/intake/assist/asset", headers=headers,
+                    json={"text": f"An ion pump, serial 991, in hall B{tag.upper()}-HALL of building B{tag.upper()}."})
+    assert r.status_code == 200, r.text
+    where = r.json()["fields"]["attributes.argus_location"]
+    assert where["value"] == hall_uid and where["method"] == "resolved" and where["evidence"] == f"B{tag.upper()}-HALL"
+    assert "argus_location" not in seen["user"], "the model never sees the reference field"
+
+    r = client.post("/v1/intake/assist/asset", headers=headers, json={"text": "An ion pump, serial 991."})
+    assert "attributes.argus_location" not in r.json()["fields"]
+
+    # A key the model composed from the words ("the gun of the linac in hall …") is nobody's key.
+    answer({"type": "Ion Pump", "name": "Ion pump", "key": f"B{tag.upper()}-HALL:LINAC:GUN",
+            "evidence": {"type": "ion pump"}, "confidence": {"type": 0.9, "key": 0.9}})
+    r = client.post("/v1/intake/assist/asset", headers=headers,
+                    json={"text": f"An ion pump on the gun of the linac in hall B{tag.upper()}-HALL."})
+    out = r.json()
+    assert "key" not in out["fields"] and any(d["field"] == "key" for d in out["dropped"])

@@ -343,3 +343,32 @@ def test_a_drawing_that_cannot_be_converted_still_arrives(token, monkeypatch):
     )
     assert attachment.filename == "chamber.dwg"
     db.close()
+
+
+def test_a_link_to_another_uploaded_page_opens_its_document(token):
+    """'See the [bake-out](bakeout.md)' pointed at a file that only existed in the folder: it now goes to the
+    document that page became, and a link to a page not uploaded stays as written."""
+    workspace_id, raw = token
+    archive = _zip({
+        "wiki/index.md": b"# Index\n\nSee the [bake-out](bakeout.md#log) and [missing](gone.md).\n",
+        "wiki/bakeout.md": b"# Bake-out\n\nBack to the [index](./index.md).\n",
+    })
+    assert upload(raw, [("wiki.zip", archive)]).json()["relations"] == 2
+    db = SessionLocal()
+    docs = {d.title: d for d in db.scalars(select(Document).where(Document.workspace_id == workspace_id))}
+    body = lambda t: db.get(DocumentRevision, docs[t].current_revision_uid).body_markdown
+    assert f"[bake-out](/documents/{docs['Bake-out'].uid})" in body("Index")
+    assert "[missing](gone.md)" in body("Index")
+    assert f"[index](/documents/{docs['Index'].uid})" in body("Bake-out")
+    db.close()
+
+
+def test_imported_pages_are_handed_to_the_index_like_a_publication(token, monkeypatch):
+    """They arrive published: Ask ARGUS reads what is indexed, so the index is asked to catch up, as after any
+    publication — not left until its next scheduled run."""
+    from app.services import knowledge_schedule
+    workspace_id, raw = token
+    asked = []
+    monkeypatch.setattr(knowledge_schedule, "after_document_change", lambda db, ws: asked.append(ws))
+    upload(raw, [("leak.md", b"# Leak test\n\nHelium.\n")])
+    assert asked == [workspace_id]

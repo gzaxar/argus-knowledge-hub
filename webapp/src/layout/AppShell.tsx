@@ -243,7 +243,8 @@ export function AppShell() {
     enabled: me.data?.auth_type === "oidc" });
   const location = useLocation();
   const currentWorkspaceId = useCurrentWorkspaceId();
-  const membersLink = currentWorkspaceId ? `/workspaces/${currentWorkspaceId}/members` : null;
+  // Administration opens on who has access: per-person area permissions are its advanced corner, not its door.
+  const membersLink = currentWorkspaceId ? `/workspaces/${currentWorkspaceId}/access` : null;
   const adminLink = membersLink ?? (me.data?.is_admin ? "/admin/workspaces" :
     (managedGroups.data?.length ? "/admin/my-groups" : null));
 
@@ -280,9 +281,8 @@ export function AppShell() {
 
   const settingsItems = currentWorkspaceId
     ? [
-        { to: `/workspaces/${currentWorkspaceId}/access`, label: "Access", hint: "Who may see and change what" },
-        { to: `/workspaces/${currentWorkspaceId}/groups`, label: "Groups", hint: "People given roles together" },
-        { to: `/workspaces/${currentWorkspaceId}/members`, label: "Members" },
+        // What the workspace's records are made of. Who may do what, imports and integrations are under
+        // Administration, once: the two menus used to repeat five pages, one of them under two names.
         { to: `/workspaces/${currentWorkspaceId}/packages`, label: "Packages", hint: "Types, kinds and workflows" },
         { to: "/catalogue/types", label: "Type catalogue", hint: "Object, ticket and document types" },
         { to: "/catalogue/models", label: "Product catalogue", hint: "Shared vendors and product models" },
@@ -290,7 +290,7 @@ export function AppShell() {
         { to: "/tickets/workflows", label: "Ticket workflows" },
         ...(has(features, "equipment") ? [{ to: "/catalogue/equipment-classes", label: "Equipment classes" }] : []),
         { to: `/workspaces/${currentWorkspaceId}/keys`, label: "Keys", hint: "How records are numbered" },
-        ...(adminLink ? [{ to: adminLink, label: "Administration", hint: "Imports, integrations, AI, tokens" }] : []),
+        ...(adminLink ? [{ to: adminLink, label: "Administration", hint: "Access and groups, imports, integrations, AI" }] : []),
       ]
     : adminLink
       ? [{ to: adminLink, label: "Administration" }]

@@ -54,6 +54,28 @@ workspaces.
 - With none, the screen says so. An administrator with no workspace yet gets a **Create workspace** form there
   instead: type a name (for example *SPARC*) and press **Create workspace**.
 
+## Start here: filling a new workspace
+
+A new workspace holds types and no records. Its cockpit shows **Start here**, the order that works best — each
+step gives the next something to link to:
+
+1. **Add the places**: buildings, halls, rooms and racks (**Add a building**). Equipment is then placed in them and
+   shows on the map.
+2. **Add your equipment**: one unit by hand — describe it in your own words, or from a nameplate photo or a
+   datasheet (*Guided and AI-assisted entry*) — or a whole inventory with **Import a spreadsheet** (*Importing a
+   spreadsheet*).
+3. **Invite your colleagues**: by e-mail, each with a role (*Workspaces, people and roles*).
+4. **Write a first document**: a procedure or a note, from your own text or file (*Documents and the knowledge
+   base*).
+5. **Open a first ticket**: an incident, a request or a maintenance task, linked to its equipment (*Service desk*).
+
+Each step is ticked once the workspace has one. The panel goes away when every step is done, or with **Hide**
+(remembered in that browser). A workspace of records only (contracts, patents) has no places step, and its second
+step is its first record. Other sources — Jira, Confluence, a wiki, Git, an EPIK8s configuration — come in through
+**Imports** (*Importing data*).
+
+After **Create workspace**, an administrator lands on the new workspace's cockpit, with *Start here*.
+
 ## If you cannot find your workspace
 
 Open **My account** and check your email and workspace roles. An INFN address and a Gmail address are

@@ -214,6 +214,7 @@ def import_markdown(
     documents = attachments = 0
     skipped: list[str] = []
     created: dict[str, str] = {}  # upload path -> document uid, for cross-links
+    revisions: dict[str, DocumentRevision] = {}  # upload path -> its revision, whose links to other pages change
 
     for path in sorted(markdown_paths):
         raw = contents[path]
@@ -317,7 +318,14 @@ def import_markdown(
         revision.body_markdown, _ = resolve_links(body, base_dir, stored)
         document.current_revision_uid = revision.uid
         created[path] = document.uid
+        revisions[path] = revision
         documents += 1
+
+    # A link in the text to another uploaded page goes to that page's document here: left as written it points at
+    # a file that only existed in the folder, and opens nothing.
+    pages = {p: f"/documents/{uid}" for p, uid in created.items()}
+    for path, revision in revisions.items():
+        revision.body_markdown, _ = resolve_links(revision.body_markdown or "", os.path.dirname(path), pages)
 
     # A link from one uploaded file to another becomes a relation, so a set
     # of pages arrives as the set it was, not as unconnected documents.
@@ -327,7 +335,7 @@ def import_markdown(
         _, links = split_front_matter(body)
         for match in LINK.finditer(links):
             target = match.group(3)
-            if not _is_local(target) or not target.lower().endswith(MARKDOWN_SUFFIXES):
+            if not _is_local(target) or not target.split("#")[0].lower().endswith(MARKDOWN_SUFFIXES):
                 continue
             base_dir = os.path.dirname(path)
             resolved = _normalise(os.path.join(base_dir, target.split("#")[0]))

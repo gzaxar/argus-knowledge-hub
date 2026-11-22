@@ -37,13 +37,26 @@ def addresses(text: str) -> tuple[list[str], list[str]]:
     return list(dict.fromkeys(found)), bad
 
 
-def person(db: Session, email: str) -> tuple[User, bool]:
-    """The person with this address, or a new one waiting for their first sign-in. (user, made now)"""
+def names(text: str) -> dict[str, str]:
+    """The names written with the addresses (`Luca Bianchi <luca@…>`), by address."""
+    out: dict[str, str] = {}
+    for part in re.split(r"[,;\n]+", text or ""):
+        m = re.match(r"^\s*\"?([^\"<>]*?)\"?\s*<([^>]+)>", part)
+        if m and m.group(1).strip():
+            out.setdefault(m.group(2).strip().lower(), m.group(1).strip())
+    return out
+
+
+def person(db: Session, email: str, name: Optional[str] = None) -> tuple[User, bool]:
+    """The person with this address, or a new one waiting for their first sign-in, named as the invitation wrote
+    them until their sign-in says otherwise. (user, made now)"""
     user = db.scalar(select(User).where(func.lower(User.email) == email)
                      .order_by(User.oidc_sub.isnot(None), User.created_at).limit(1))
     if user is not None:
+        if name and not user.name and user.oidc_sub is None:
+            user.name = name
         return user, False
-    user = User(id=str(uuid.uuid4()), email=email, source="oidc", active=True)
+    user = User(id=str(uuid.uuid4()), email=email, name=name or None, source="oidc", active=True)
     db.add(user)
     db.flush()
     return user, True
@@ -85,6 +98,7 @@ def invite(db: Session, workspace_id: str, text: str, role_id: Optional[str], *,
     if role is None and (role_id or group is None):
         raise InviteError("No such role.")
     found, bad = addresses(text)
+    named = names(text)
     if not found:
         raise InviteError("No e-mail address in what was given." + (f" Not addresses: {', '.join(bad[:5])}." if bad else ""))
     if len(found) > MAX_AT_ONCE:
@@ -105,7 +119,7 @@ def invite(db: Session, workspace_id: str, text: str, role_id: Optional[str], *,
     group_granted = grant("group", group.uid) if group is not None else False
     results = []
     for email in found:
-        user, made = person(db, email)
+        user, made = person(db, email, named.get(email))
         if group is not None:
             joined = add_member(db, group, user)
             granted = joined
@@ -146,13 +160,14 @@ def invite_group_only(db: Session, group, text: str, *, inviter: Optional[str],
     """
     from app.services import notify
     found, bad = addresses(text)
+    named = names(text)
     if not found:
         raise InviteError("No e-mail address in what was given.")
     if len(found) > MAX_AT_ONCE:
         raise InviteError(f"At most {MAX_AT_ONCE} addresses at a time.")
     results = []
     for email in found:
-        user, made = person(db, email)
+        user, made = person(db, email, named.get(email))
         joined = add_member(db, group, user)
         row = {"email": email, "user_id": user.id, "added": made, "granted": joined, "joined": joined,
                "signed_in": user.oidc_sub is not None or user.last_login_at is not None,

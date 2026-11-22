@@ -39,7 +39,13 @@ English and Italian (Nome, Matricola, Produttore, Ubicazione, Stato…); the AI 
 says who made it (*rule*, *AI*, *you*) and how sure it is. Change any of them.
 
 Values are read as the property expects: numbers in either decimal style (12,5 or 12.5), dates as 2021-02-03
-or 03/02/2021, yes/no as yes, no, sì, x, true…, choices by their name. A **location** or another linked record
+or 03/02/2021, yes/no as yes, no, sì, x, true…, choices by their name.
+
+A column that goes to a **choice list** shows **Its values**: each value of the file and the choice it means. The
+rules match the same word (case and accents aside) and the words registers use (*In servizio* is In service, *In
+manutenzione* Under maintenance, *Guasto* Faulty, *Scorta* Held as spare…); with the AI on, it proposes the rest.
+Each says who proposed it (*rule*, *AI*). Change any of them, or choose **Not imported** to leave that field empty on
+its rows. A value nobody matched is reported on its rows by the check, never guessed. A **location** or another linked record
 is found by its key or its name; a **person** by e-mail, username or name; a **group** by name.
 
 ## 4. Check every row, then import
@@ -59,5 +65,9 @@ it came from (file, sheet and row) in *Source revision*. The import runs in the 
 Map a column to **the record's key**: a row whose key names a record of the type already here **updates** it
 (when *Update records whose key is already here* is ticked and you may modify records); a row without a key,
 or with a new one, creates a record. Importing the same sheet again changes nothing.
+
+A sheet with no key column is matched by a **unique identifier** instead: a row whose inventory number (or another
+property that must be unique) a record of the type here already holds is that record — updated, or unchanged — so
+importing it again after fixing a few rows adds only those rows, and makes no second record of the others.
 
 Fields of a restricted class you may not see cannot be written by an import, and are never overwritten by one.

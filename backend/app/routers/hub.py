@@ -62,8 +62,14 @@ def search(
 
 
 @router.get("/overview")
-def overview(s: _Scope = Depends(scope), db: Session = Depends(get_db)):
-    return hub.overview(db, s.workspace_id, s.access, s.user_id)
+def overview(s: _Scope = Depends(scope), identity=Depends(get_identity), db: Session = Depends(get_db)):
+    from app.routers.workspaces import _require_owner_or_admin
+    try:   # Start here is the set-up of the workspace: for those who may set it up, not for everyone in it
+        _require_owner_or_admin(s.workspace_id, identity, db)
+        setup = True
+    except HTTPException:
+        setup = False
+    return hub.overview(db, s.workspace_id, s.access, s.user_id, setup=setup)
 
 
 @router.get("/assets/{uid}/context")

@@ -159,6 +159,28 @@ export function SpreadsheetImportPage() {
     });
   };
 
+  /** One value of a choice-list column matched by the person: the column keeps who proposed where it goes. */
+  const setValue = (column: string, value: string, choice: string | null) => {
+    if (!plan) return;
+    setPreview(null);
+    setPlan({
+      ...plan,
+      columns: plan.columns.map((c) => {
+        if (c.column !== column) return c;
+        const values = { ...(c.values ?? {}) };
+        const sources = { ...(c.value_sources ?? {}) };
+        if (choice === null) {
+          delete values[value];
+          delete sources[value];
+        } else {
+          values[value] = choice;
+          sources[value] = "person";
+        }
+        return { ...c, values, value_sources: sources };
+      }),
+    });
+  };
+
   const chooseTarget = (target: SheetTarget) => {
     if (!plan) return;
     setPreview(null);
@@ -388,6 +410,15 @@ export function SpreadsheetImportPage() {
                           </optgroup>
                         </select>
                         {clash && <p className="mt-1 text-xs text-red-600">Also chosen for {taken.get(c.target)}.</p>}
+                        {(() => {
+                          const prop = props.find((a) => a.key === c.target);
+                          const fileValues = p?.options ?? [];
+                          if (!prop || prop.type !== "enumeration" || fileValues.length === 0) return null;
+                          return (
+                            <ValueMatches column={c} choices={prop.options} fileValues={fileValues}
+                                          onChange={(v, choice) => setValue(c.column, v, choice)} />
+                          );
+                        })()}
                         {c.target === SHEET_NEW && c.new && (
                           <div className="mt-1 flex flex-wrap gap-2">
                             <input
@@ -595,6 +626,51 @@ export function SpreadsheetImportPage() {
           </div>
         </Card>
       )}
+    </div>
+  );
+}
+
+
+/** Each value of a choice-list column and the choice it means: proposed by the rules (the same word, or a word
+ *  registers use: "In servizio" is In service) or by the AI, changed here. A value left unmatched is reported on its
+ *  rows by the check; "Not imported" leaves the field empty on them. */
+export function ValueMatches({ column, choices, fileValues, onChange }: {
+  column: SheetColumnPlan; choices: string[]; fileValues: string[];
+  onChange: (value: string, choice: string | null) => void;
+}) {
+  const values = column.values ?? {};
+  const open = fileValues.filter((v) => !values[v]).length;
+  return (
+    <div className="mt-2 w-96 max-w-full rounded border border-slate-200 bg-slate-50 p-2" aria-label={`Values of ${column.column}`}>
+      <p className="mb-1 text-xs font-medium text-slate-600">
+        Its values{open > 0 && <span className="ml-1 text-red-600">· {open} to match</span>}
+      </p>
+      <ul className="space-y-1">
+        {fileValues.map((v) => {
+          const source = column.value_sources?.[v];
+          return (
+            <li key={v} className="flex items-center gap-2 text-xs">
+              <span className="w-36 truncate text-slate-700" title={v}>{v}</span>
+              <span aria-hidden className="text-slate-400">→</span>
+              <select
+                aria-label={`${v} in ${column.column}`}
+                value={values[v] ?? ""}
+                onChange={(e) => onChange(v, e.target.value || null)}
+                className={`flex-1 rounded border px-1 py-0.5 ${values[v] ? "border-slate-300" : "border-red-300"}`}
+              >
+                <option value="">— choose —</option>
+                {choices.map((o) => <option key={o} value={o}>{o}</option>)}
+                <option value={SHEET_DROP}>Not imported (left empty)</option>
+              </select>
+              {source && source !== "person" && (
+                <span className={`rounded px-1 text-[10px] ${source === "ai" ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700"}`}>
+                  {source === "ai" ? "AI" : "rule"}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

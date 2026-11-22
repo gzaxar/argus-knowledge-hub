@@ -594,6 +594,18 @@ def notices(t: dt.Template, extraction: dict) -> dict:
             if t.document_type in c["reference_types"] else None}
 
 
+def without_draft_notice(body: Optional[str]) -> Optional[str]:
+    """The body as published: the draft notice a rework puts on top ("NOT usable … until it has been validated and
+    published") is true until publishing and false after it, so publishing takes it off. Nothing else changes."""
+    notice = dt.common().get("operational_notice")
+    if not body or not notice:
+        return body
+    line = f"> {notice}"
+    if not body.startswith(line):
+        return body
+    return body[len(line):].lstrip("\n")
+
+
 # ---------------------------------------------------------------- the pictures of the source (a log's plots)
 
 FIGURE_LINE = re.compile(r"^!\[([^\]]*)\]\(/v1/intake/source-images/([0-9a-f]{32})\)\s*$")

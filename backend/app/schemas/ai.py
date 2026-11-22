@@ -185,7 +185,7 @@ class MentionedObject(BaseModel):
     uid: str
     key: Optional[str]
     name: Optional[str]
-    # "key" or "name" — a key is something somebody wrote down, a name
+    # "key", "tag" (a plant tag in its name) or "name" — a key is something somebody wrote down, a name
     # could be a coincidence of words, and the caller should be able to
     # tell them apart.
     matched_on: str

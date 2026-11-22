@@ -20,7 +20,9 @@ export function EquipmentClassesPage() {
     for (const k of ["equipment-classes", "class-report", "class-reviews"]) queryClient.invalidateQueries({ queryKey: [k] });
   };
   const classes = useQuery({ queryKey: ["equipment-classes"], queryFn: catalogueApi.classes });
-  const report = useQuery({ queryKey: ["class-report"], queryFn: catalogueApi.report, retry: false });
+  // Refused outside the catalogue workspace: that refusal is how this page knows where it is.
+  const report = useQuery({ queryKey: ["class-report"], queryFn: catalogueApi.report, retry: false,
+                            meta: { expect403: true } });
   const reviews = useQuery({ queryKey: ["class-reviews"], queryFn: catalogueApi.reviews });
   const isCatalogue = !(report.error instanceof ApiError && report.error.status === 403);
   const [newClass, setNewClass] = useState("");

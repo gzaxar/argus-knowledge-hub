@@ -302,7 +302,11 @@ async def import_markdown_documents(
             status_code=422,
             detail="No Markdown file in the upload — add the .md files, or a zip containing them.",
         )
-    return import_markdown(db, workspace_id, payload, document_type_uid)
+    out = import_markdown(db, workspace_id, payload, document_type_uid)
+    if out.get("documents"):
+        # Published straight away, like a publication: the index catches up so Ask ARGUS can read them.
+        knowledge_schedule.after_document_change(db, workspace_id)
+    return out
 
 
 class DocumentWorkspaceOut(BaseModel):
@@ -715,6 +719,8 @@ def publish_revision(
             previous.state = "superseded"
             previous.superseded_by_uid = revision.uid
 
+    from app.services.reshape import without_draft_notice
+    revision.body_markdown = without_draft_notice(revision.body_markdown)
     revision.state = "published"
     revision.published_at = datetime.now(timezone.utc)
     doc.current_revision_uid = revision.uid

@@ -343,7 +343,23 @@ def document_context(db: Session, workspace_id: str, doc: Document, access: Acce
         "instances": [asset_summary(a) for a in instances[:50]] if access.assets else [],
         "types": types,
         "open_tickets": open_tickets,
+        "named": _named_in(db, workspace_id, doc, {a.uid for a in direct}) if access.assets else [],
     }
+
+
+def _named_in(db: Session, workspace_id: str, doc: Document, linked: set[str]) -> list[dict]:
+    """The equipment the document's text names (by key, tag or name, never by a model: text_links) and is not
+    linked to yet — what an imported page says it is about, offered for a person to link."""
+    from app.services.text_links import objects_mentioned
+    rev = db.scalar(select(DocumentRevision).where(DocumentRevision.document_uid == doc.uid)
+                    .order_by(DocumentRevision.revision_number.desc()).limit(1))
+    out = []
+    for f in objects_mentioned(db, workspace_id, doc.title, rev.body_markdown if rev else ""):
+        a = db.get(Asset, f["uid"])
+        if a is None or a.uid in linked or not asset_visible_in(a, workspace_id):
+            continue
+        out.append({**asset_summary(a), "matched_on": f["matched_on"]})
+    return out[:10]
 
 
 def _schema_subtree(db: Session, root_uid: str) -> list[str]:
@@ -426,8 +442,9 @@ def unified_search(db: Session, workspace_id: str, access: Access, q: str, limit
 
 # --------------------------------------------------------------------- overview
 
-def overview(db: Session, workspace_id: str, access: Access, user_id: Optional[str]) -> dict:
-    """The operations cockpit: what needs attention, across the three sections."""
+def overview(db: Session, workspace_id: str, access: Access, user_id: Optional[str], setup: bool = True) -> dict:
+    """The operations cockpit: what needs attention, across the three sections. `setup`: the caller may give
+    access here, so the cockpit also shows how far the workspace is in being set up (*Start here*)."""
     out: dict = {"access": {"assets": access.assets, "tickets": access.tickets,
                             "documents": access.documents}}
     if access.assets:
@@ -467,10 +484,15 @@ def overview(db: Session, workspace_id: str, access: Access, user_id: Optional[s
     if access.documents:
         docs = list(db.scalars(select(Document).where(Document.workspace_id == workspace_id)))
         in_review, overdue = [], []
+        # A revision waiting for approval, whether the document has a published one yet or not (a first document has
+        # none: its current revision is only set on publishing).
+        reviewing = set(db.scalars(select(DocumentRevision.document_uid).join(
+            Document, Document.uid == DocumentRevision.document_uid).where(
+            Document.workspace_id == workspace_id, DocumentRevision.state == "in_review")))
         for d in docs:
             summary = document_summary(db, d)
-            if summary["state"] == "in_review":
-                in_review.append(summary)
+            if d.uid in reviewing:
+                in_review.append({**summary, "state": "in_review"})
             if summary["review_overdue"]:
                 overdue.append(summary)
         pending_revisions = db.scalar(select(func.count()).select_from(DocumentRevision).join(
@@ -490,4 +512,75 @@ def overview(db: Session, workspace_id: str, access: Access, user_id: Optional[s
             "not_linked_to_assets": unlinked,
             "recent": [document_summary(db, d) for d in recent],
         }
+    if setup:
+        out["start"] = start_here(db, workspace_id, access)
     return out
+
+
+def _branch(types: list[Schema], suffix: str) -> tuple[Optional[Schema], set[str]]:
+    """The type whose uid ends in `suffix` (the packages' `argus-object:location`, `argus-object:asset`) and the
+    uids of it and every type below it."""
+    root = next((t for t in types if t.uid.endswith(suffix)), None)
+    if root is None:
+        return None, set()
+    children: dict[str, list[str]] = {}
+    for t in types:
+        if t.parent_schema_uid:
+            children.setdefault(t.parent_schema_uid, []).append(t.uid)
+    below, stack = {root.uid}, [root.uid]
+    while stack:
+        for child in children.get(stack.pop(), []):
+            if child not in below:
+                below.add(child)
+                stack.append(child)
+    return root, below
+
+
+def start_here(db: Session, workspace_id: str, access: Access) -> dict:
+    """How far a workspace is in being set up, for the cockpit's *Start here*: the places, the equipment, the
+    people, a first document and a first ticket. Each step says whether it is done; a step the workspace has no
+    types for (no places in a records-only workspace) is left out. Counts are what the caller may read."""
+    from app.models.membership import Membership
+    from app.models.role import RoleBinding
+    types = list(db.scalars(select(Schema).where(
+        Schema.applies_to == "objects", or_(Schema.workspace_id == workspace_id, Schema.is_global.is_(True)))))
+    steps: list[dict] = []
+
+    def assets_of(uids: set[str]) -> int:
+        if not uids or not access.assets:
+            return 0
+        return db.scalar(select(func.count()).select_from(Asset).where(
+            Asset.workspace_id == workspace_id, Asset.deleted_at.is_(None), Asset.schema_uid.in_(uids),
+            live_assets_clause(), visible_assets_clause(workspace_id))) or 0
+
+    place_root, places = _branch(types, ":argus-object:location")
+    if place_root is not None:
+        building = next((t for t in types if t.uid.endswith(":argus-object:building")), None)
+        steps.append({"key": "places", "count": assets_of(places), "type_uid": building.uid if building else None})
+    equipment_root, equipment = _branch(types, ":argus-object:asset")
+    if equipment_root is not None:
+        steps.append({"key": "equipment", "count": assets_of(equipment)})
+    elif access.assets:
+        # A workspace of records only (contracts, patents…): its first record is the step.
+        steps.append({"key": "records", "count": db.scalar(select(func.count()).select_from(Asset).where(
+            Asset.workspace_id == workspace_id, Asset.deleted_at.is_(None), live_assets_clause(),
+            visible_assets_clause(workspace_id))) or 0})
+    # Whoever made the workspace has it already: the step is done once someone else (a person or a group) does.
+    people = set(db.scalars(select(Membership.user_id).where(Membership.workspace_id == workspace_id)))
+    groups = 0
+    for kind, subject in db.execute(select(RoleBinding.subject_type, RoleBinding.subject_id).where(
+            RoleBinding.workspace_id == workspace_id)):
+        if kind == "user":
+            people.add(subject)
+        else:
+            groups += 1
+    steps.append({"key": "people", "count": max(0, len(people) - 1) + groups})
+    if access.documents:
+        steps.append({"key": "document", "count": db.scalar(select(func.count()).select_from(Document).where(
+            Document.workspace_id == workspace_id)) or 0})
+    if access.tickets:
+        steps.append({"key": "ticket", "count": db.scalar(select(func.count()).select_from(Issue).where(
+            Issue.workspace_id == workspace_id, Issue.deleted_at.is_(None))) or 0})
+    for step in steps:
+        step["done"] = step["count"] > 0
+    return {"steps": steps, "done": all(step["done"] for step in steps)}

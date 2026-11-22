@@ -170,7 +170,7 @@ def generate_integrity_report(db: Session, workspace_id: str) -> dict:
     dangling objects (relations this workspace created whose target still
     exists but is no longer visible — e.g. a global flag was turned off),
     and orphaned objects (assets with no inbound or outbound relation at
-    all, from any workspace)."""
+    all, from any workspace, placed in nothing and holding nothing, and with no document or ticket about them)."""
     assets = db.scalars(select(Asset).where(Asset.workspace_id == workspace_id)).all()
     asset_uids = {a.uid for a in assets}
 
@@ -234,6 +234,19 @@ def generate_integrity_report(db: Session, workspace_id: str) -> dict:
     for r in touching_relations:
         connected_uids.add(r.from_asset_uid)
         connected_uids.add(r.to_asset_uid)
+    # Not only relations connect a record: a hall that rooms are placed inside, a room placed in it, the equipment a
+    # document is about or a ticket is raised on. Offered for deletion as "orphaned", a building with its halls in it
+    # was one click from going.
+    from app.models.document import DocumentRelation
+    from app.models.indoor import IndoorPlacement
+    from app.models.issue import Issue
+    for asset_uid, place_uid in db.execute(select(IndoorPlacement.asset_uid, IndoorPlacement.place_uid).where(
+            IndoorPlacement.state == "confirmed", or_(IndoorPlacement.asset_uid.in_(asset_uids),
+                                                      IndoorPlacement.place_uid.in_(asset_uids)))):
+        connected_uids.update(u for u in (asset_uid, place_uid) if u)
+    connected_uids.update(db.scalars(select(DocumentRelation.to_uid).where(
+        DocumentRelation.to_type == "asset", DocumentRelation.to_uid.in_(asset_uids))))
+    connected_uids.update(db.scalars(select(Issue.asset_uid).where(Issue.asset_uid.in_(asset_uids))))
     orphaned_objects = [
         {"asset_uid": a.uid, "name": a.name, "key": a.key}
         for a in assets if a.uid not in connected_uids

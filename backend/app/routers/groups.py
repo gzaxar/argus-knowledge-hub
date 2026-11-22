@@ -348,6 +348,10 @@ def directory_status(
         # in use so nobody mistakes it for INFN's real organisation.
         is_test_data=provider == "embedded",
         groups=db.scalar(select(func.count()).select_from(Group)) or 0,
+        # The fictional ones only: the groups made here and the people invited or signed in are real.
+        example_groups=db.scalar(select(func.count()).select_from(Group).where(
+            Group.source == "embedded", Group.active.is_(True))) or 0,
+        example_people=db.scalar(select(func.count()).select_from(User).where(User.source == "embedded")) or 0,
         active_groups=db.scalar(
             select(func.count()).select_from(Group).where(Group.active.is_(True))
         ) or 0,

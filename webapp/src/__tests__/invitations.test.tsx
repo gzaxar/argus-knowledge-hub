@@ -23,7 +23,7 @@ function access() {
   vi.spyOn(rolesApi, "listBindings").mockResolvedValue([]);
   vi.spyOn(rolesApi, "list").mockResolvedValue([{ id: "viewer", name: "Viewer" }, { id: "reporter", name: "Reporter" }] as never);
   vi.spyOn(directoryApi, "groups").mockResolvedValue([group("Shift crew")]);
-  vi.spyOn(directoryApi, "status").mockResolvedValue({ provider: "none", is_test_data: false, groups: 1, active_groups: 1,
+  vi.spyOn(directoryApi, "status").mockResolvedValue({ provider: "none", is_test_data: false, groups: 1, active_groups: 1, example_groups: 0, example_people: 0,
                                                        users: 1, last_synced_at: null } as never);
   vi.spyOn(membersApi, "directory").mockResolvedValue([]);
 }
@@ -48,6 +48,24 @@ describe("inviting by e-mail", () => {
       emails: "a@infn.it, b@infn.it", role_id: "reporter", send_email: true, new_group: "Night shift" })));
     expect(await screen.findByText(/now has Reporter here/)).toBeInTheDocument();
     expect(screen.getByText(/joined Night shift/)).toBeInTheDocument();
+  });
+});
+
+describe("the access page after an invitation", () => {
+  it("lists the group the invitation made, and says nothing about an example directory that holds nobody", async () => {
+    access();
+    vi.spyOn(directoryApi, "status").mockResolvedValue({ provider: "embedded", is_test_data: true, groups: 1,
+      active_groups: 1, example_groups: 0, example_people: 0, users: 4, last_synced_at: null } as never);
+    const groups = vi.spyOn(directoryApi, "groups").mockResolvedValue([]);
+    vi.spyOn(rolesApi, "invite").mockResolvedValue({
+      workspace_id: "btf", role_id: "viewer", role_name: "Viewer", group_uid: "g", group_name: "Vacuum team",
+      group_granted: true, not_addresses: [], people: [] });
+    renderWith(<WorkspaceAccess />, { path: "/workspaces/btf/access" });
+    fireEvent.change(await screen.findByLabelText("E-mail addresses"), { target: { value: "a@infn.it" } });
+    await waitFor(() => expect(groups).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Invite" }));
+    await waitFor(() => expect(groups).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText(/Example directory/)).not.toBeInTheDocument();
   });
 });
 

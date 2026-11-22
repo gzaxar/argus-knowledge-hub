@@ -27,18 +27,18 @@ export function AdminShell() {
       { label: "People & access", items: [
         { to: w("access"), label: "Access" },
         { to: w("groups"), label: "Groups" },
-        { to: w("members"), label: "Area permissions" },
         { to: w("access-reviews"), label: "Access reviews" },
         { to: "/admin/service-authorizations", label: "Help centre destinations" },
+        // Rights given one person at a time, before roles and groups: kept for what still uses them.
+        { to: w("members"), label: "Area permissions (advanced)" },
       ] },
+      // Packages and keys are in the cockpit's Workspace settings, with the types they shape; the migration from
+      // Jira is reached from Imports, beside the Jira imports it builds on.
       { label: "Content", items: [
         { to: w("imports"), label: "Imports" },
-        { to: w("packages"), label: "Packages" },
-        { to: w("keys"), label: "Keys" },
         { to: w("icons"), label: "Icon library" },
         { to: w("glpi"), label: "GLPI" },
         { to: w("transfer"), label: "Transfer" },
-        { to: "/admin/migration", label: "Migration from Jira" },
         { to: w("integrity"), label: "Data integrity" },
         { to: w("storage"), label: "Storage" },
         { to: w("quotas"), label: "Quotas" },

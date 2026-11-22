@@ -200,6 +200,7 @@ export function IssueDetail() {
     queryFn: () => assetsApi.list(),
   });
   const members = useQuery({ queryKey: ["members"], queryFn: membersApi.directory });
+  const assignable = useQuery({ queryKey: ["members", "assignable"], queryFn: membersApi.assignable });
   const me = useQuery({ queryKey: ["me"], queryFn: workspacesApi.me, staleTime: 300_000 });
   const globalValues = useQuery({ queryKey: ["global-values"], queryFn: globalValuesApi.list });
   const ticketGlobals = globalValues.data?.filter((gv) => gv.applies_to === "tickets") ?? [];
@@ -822,10 +823,14 @@ export function IssueDetail() {
                   {i.assignee && !assignedMember && (
                     <option value={i.assignee}>{i.assignee}</option>
                   )}
-                  {members.data?.map((m) => (
+                  {/* Someone assigned before losing the right stays shown, so saving keeps them. */}
+                  {assignedMember && !assignable.data?.some((m) => m.user_id === assignedMember.user_id) && (
+                    <option value={assignedMember.user_id}>{assignedMember.name || assignedMember.email}</option>
+                  )}
+                  {assignable.data?.map((m) => (
                     <option key={m.user_id} value={m.user_id}>
                       {m.name
-                        ? (members.data ?? []).filter((x) => x.name === m.name).length > 1 ? `${m.name} (${m.email})` : m.name
+                        ? (assignable.data ?? []).filter((x) => x.name === m.name).length > 1 ? `${m.name} (${m.email})` : m.name
                         : m.email}
                     </option>
                   ))}

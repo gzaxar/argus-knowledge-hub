@@ -5,6 +5,7 @@ import type { Activity } from "../api/types";
 import { activitiesApi, hubApi } from "../api/client";
 import type { HubOverview } from "../api/hubTypes";
 import { DemoTour } from "../components/demo/DemoTour";
+import { StartHere } from "../components/hub/StartHere";
 import { Card, DocumentRow, Empty, KindBadge, StatTile, TicketRow, relativeTime } from "../components/hub/ui";
 
 /**
@@ -40,6 +41,7 @@ export function Dashboard() {
         </div>
       </div>
 
+      {o.start && <StartHere steps={o.start.steps} />}
       <Kpis o={o} />
       <Summary o={o} />
 
@@ -106,7 +108,7 @@ function Summary({ o }: { o: HubOverview }) {
   if (o.tickets) parts.push({ text: `${o.tickets.total} tickets in all`, to: "/tickets?state=all" });
   if (o.tickets?.without_asset) parts.push({ text: `${o.tickets.without_asset} open not linked to equipment`, to: "/tickets" });
   if (o.assets) parts.push({ text: `${o.assets.own.toLocaleString()} assets`, to: "/assets/search" });
-  if (o.documents?.not_linked_to_assets) parts.push({ text: `${o.documents.not_linked_to_assets} documents not linked to equipment`, to: "/documents" });
+  if (o.documents?.not_linked_to_assets) parts.push({ text: `${o.documents.not_linked_to_assets} document${o.documents.not_linked_to_assets === 1 ? "" : "s"} not linked to equipment`, to: "/documents" });
   if (parts.length === 0) return null;
   return (
     <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">

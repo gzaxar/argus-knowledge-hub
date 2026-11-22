@@ -344,6 +344,12 @@ def assist_asset(db: Session, workspace_id: str, actor: str, endpoint: Endpoint,
         v = data.get(f)
         if isinstance(v, str) and v.strip():
             fields[f] = _field(v.strip(), None, data, f, clean, from_image, "ai_extracted")
+    # A key is an identifier someone wrote — on the label, in the text: read, never composed. From text, the value
+    # itself must be there (a model joins "gun", "linac" and "B12-HALL" into a key nobody wrote).
+    if "key" in fields and not from_image and str(fields["key"]["value"]).lower() not in (clean or "").lower():
+        fields.pop("key")
+        dropped.append({"field": "key", "reason": "a key is read from the label or the text, and this one is in "
+                                                  "neither: the workspace's next key is used instead"})
     # A key the model read that belongs to an existing record is a match, not a new key.
     if "key" in fields:
         existing = db.scalar(select(Asset).where(Asset.key == fields["key"]["value"]))
@@ -368,8 +374,11 @@ def assist_asset(db: Session, workspace_id: str, actor: str, endpoint: Endpoint,
         fields[f"attributes.{k}"] = _field(value, _label(attr, value), data, f"attributes.{k}", clean,
                                            from_image, "ai_classified" if attr.get("type") == "enumeration"
                                            else "ai_extracted")
-    companions = _network(db, workspace_id, data, clean, from_image, dropped,
-                          db.get(Schema, (fields.get("schema_uid") or {}).get("value") or "") or chosen)
+    target = db.get(Schema, (fields.get("schema_uid") or {}).get("value") or "") or chosen
+    place = _place_named(db, workspace_id, clean, target, draft, grants)
+    if place is not None:
+        fields["attributes.argus_location"] = place
+    companions = _network(db, workspace_id, data, clean, from_image, dropped, target)
     base = (fields.get("attributes.tcp_port_base") or {}).get("value") or (draft.get("attributes") or {}).get("tcp_port_base")
     companions += _ports(db, workspace_id, data, clean, from_image, dropped, companions, base)
     validations += [{"step": "vocabulary", "result": "pass", "dropped": len(dropped)},
@@ -384,6 +393,45 @@ def assist_asset(db: Session, workspace_id: str, actor: str, endpoint: Endpoint,
             "companions": companions,
             "redacted": sum(redactions.values()),
             "guide": guide.guide_asset(db, workspace_id, apply(draft, fields), grants)}
+
+
+def _place_named(db: Session, workspace_id: str, text: str, schema: Optional[Schema], draft: dict,
+                 grants=None) -> Optional[dict]:
+    """Where the unit is, when the text names a place already recorded here — a hall, a room, a rack — by its key or
+    its name: *Located in* found by matching, never by the model (the model never sees reference fields). Only for a
+    type that has a location, and only when the form has none yet."""
+    from app.services.attribute_validation import effective_attributes
+    from app.services.knowledge_hub import _branch
+    from app.services.visibility import asset_visible_in, can_see
+    if not text or schema is None or (draft.get("attributes") or {}).get("argus_location"):
+        return None
+    if not any((a.get("key") or a.get("name")) == "argus_location" for a in effective_attributes(db, schema)):
+        return None
+    types = list(db.scalars(select(Schema).where(
+        Schema.applies_to == "objects", or_(Schema.workspace_id == workspace_id, Schema.is_global.is_(True)))))
+    _, places = _branch(types, ":argus-object:location")
+    # Places are few: each is looked for in the text, its key as a whole word ("B12-HALL", "B12") and its name
+    # (from six letters on, like text_links), whatever their shape.
+    import re
+    upper = text.upper()
+    candidates = []
+    for a in db.scalars(select(Asset).where(Asset.workspace_id == workspace_id, Asset.deleted_at.is_(None),
+                                            Asset.schema_uid.in_(places))):
+        # A restricted place is never named to someone without its grant (I-ACL-1), as in text_links.
+        if not asset_visible_in(a, workspace_id, grants) or not can_see(a):
+            continue
+        key = (a.key or "").upper()
+        name = (a.name or "").strip().upper()
+        if key and re.search(rf"(?<![\w-]){re.escape(key)}(?![\w-])", upper):
+            candidates.append((True, len(key), a))
+        elif len(name) >= 6 and name in upper:
+            candidates.append((False, len(name), a))
+    if not candidates:
+        return None
+    # The most precise place named: a key before a name, and "B12-HALL" (the hall) before "B12" (its building).
+    by_key, _, a = max(candidates, key=lambda c: (c[0], c[1]))
+    return {"value": a.uid, "label": f"{a.key} · {a.name}", "confidence": 1.0 if by_key else 0.7,
+            "evidence": a.key if by_key else a.name, "grounded": True, "method": "resolved"}
 
 
 def _network(db: Session, workspace_id: str, data: dict, text: str, from_image: bool, dropped: list,
@@ -504,6 +552,29 @@ def _now_local() -> str:
     return f"{now.strftime('%A')} {now.isoformat(timespec='minutes')} ({zone})"
 
 
+def _relative_day(field: dict) -> Optional[dict]:
+    """'Ieri', 'stamattina', 'l'altro ieri' counted by the server from today where the reports are written, not by
+    the model: the day it quoted, resolved as a spoken time is (capture.resolve_when). None when the quote names no
+    such day, or names a time the model already has."""
+    import os
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from app.ledger import temporal
+    from app.services.capture import resolve_when
+    quote = field.get("evidence") if field.get("grounded") else None
+    if not quote or not re.search(r"(?i)\b(ieri|oggi|stamattina|stamani|stanotte|stasera|altroieri|yesterday|today|"
+                                  r"this morning|last night|tonight)\b", quote):
+        return None
+    now = datetime.now(ZoneInfo(os.environ.get("NOTIFY_TIMEZONE", "Europe/Rome")))
+    said = resolve_when(quote, now)
+    if not said["date"]:
+        return None
+    if said["time"]:
+        local = datetime.fromisoformat(f"{said['date']}T{said['time']}").replace(tzinfo=now.tzinfo)
+        return temporal.instant(local.isoformat(), "instant")
+    return temporal.instant(said["date"], "day")
+
+
 def assist_ticket(db: Session, workspace_id: str, actor: str, endpoint: Endpoint, *, text: str,
                   draft: Optional[dict] = None, grants=None, profile_id: Optional[str] = None,
                   file_refs: Optional[list] = None, trace: Optional[list] = None) -> dict:
@@ -558,6 +629,9 @@ def assist_ticket(db: Session, workspace_id: str, actor: str, endpoint: Endpoint
             value = temporal.instant(when.strip(), precision)
             fields["attributes.occurred_from"] = _field(value, None, data, "occurred_at", clean, False,
                                                         "ai_extracted")
+            relative = _relative_day(fields["attributes.occurred_from"])
+            if relative is not None:
+                fields["attributes.occurred_from"].update(value=relative, method="resolved")
         except (temporal.TemporalError, ValueError):
             dropped.append({"field": "attributes.occurred_from", "reason": "not a date"})
     attrs = data.get("attributes") if isinstance(data.get("attributes"), dict) else {}
@@ -579,12 +653,20 @@ def assist_ticket(db: Session, workspace_id: str, actor: str, endpoint: Endpoint
     from app.services.text_links import objects_mentioned
     from app.services.visibility import asset_visible_in
     if not draft.get("asset_uid"):
-        for f in objects_mentioned(db, workspace_id, clean)[:1]:
+        # The equipment named before the hall it stands in: "IP-01 in B12-HALL" is about the pump.
+        from app.services.knowledge_hub import _branch
+        _, places = _branch(list(db.scalars(select(Schema).where(
+            Schema.applies_to == "objects", or_(Schema.workspace_id == workspace_id, Schema.is_global.is_(True))))),
+            ":argus-object:location")
+        named = objects_mentioned(db, workspace_id, clean)
+        kinds = dict(db.execute(select(Asset.uid, Asset.schema_uid).where(Asset.uid.in_([f["uid"] for f in named]))).all())
+        named.sort(key=lambda f: kinds.get(f["uid"]) in places)
+        for f in named[:1]:
             a = db.get(Asset, f["uid"])
             if a is not None and asset_visible_in(a, workspace_id, grants):
                 fields["asset_uid"] = {"value": a.uid, "label": f"{a.key} · {a.name}",
                                        "confidence": 1.0 if f["matched_on"] == "key" else 0.7,
-                                       "evidence": a.key if f["matched_on"] == "key" else a.name,
+                                       "evidence": f.get("matched") or (a.key if f["matched_on"] == "key" else a.name),
                                        "grounded": True, "method": "resolved"}
     if not (draft.get("description") or "").strip():
         # The report is the person's own words: it is the description, with secrets removed.

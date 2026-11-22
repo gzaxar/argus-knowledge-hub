@@ -98,6 +98,8 @@ export interface DocumentContext {
   instances: HubAsset[];
   types: { uid: string; name: string; assets: number }[];
   open_tickets: HubTicket[];
+  /** Equipment the text names and the document is not linked to yet: offered to link, never linked by itself. */
+  named?: (HubAsset & { matched_on: "key" | "tag" | "name" })[];
 }
 
 export interface HubSearchResult {
@@ -107,8 +109,19 @@ export interface HubSearchResult {
   documents: HubDocument[];
 }
 
+/** One step of the cockpit's *Start here*: done once the workspace has one. */
+export interface HubStartStep {
+  key: "places" | "equipment" | "records" | "people" | "document" | "ticket";
+  count: number;
+  done: boolean;
+  /** places: the Building type, to open the form on it */
+  type_uid?: string | null;
+}
+
 export interface HubOverview {
   access: { assets: boolean; tickets: boolean; documents: boolean };
+  /** How far the workspace is in being set up (absent from an older server). */
+  start?: { steps: HubStartStep[]; done: boolean };
   assets?: { own: number; recent: HubAsset[] };
   tickets?: {
     open: number;

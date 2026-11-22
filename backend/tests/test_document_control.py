@@ -187,3 +187,21 @@ def test_a_shared_document_is_read_with_its_files_in_every_workspace_and_changed
     db.close()
     assert uid not in seen_elsewhere(), "riservato is never shared"
     assert client.get(f"/v1/attachments/{att_uid}", headers=elsewhere).status_code == 404
+
+
+def test_publishing_takes_off_the_draft_notice_of_a_rework_and_nothing_else(ws):
+    """'NOT usable … until validated and published' is true of a reworked draft and false of the published
+    revision: publishing removes that line, and only that line."""
+    from app.services import doc_templates
+    _ws, headers = ws
+    notice = doc_templates.common()["operational_notice"]
+    body = f"> {notice}\n\n# Pump replacement\n\n> {notice}\n"
+    uid = str(uuid.uuid4())
+    assert client.post("/v1/documents", headers=headers, json={"uid": uid, "title": "Pump", "body_markdown": body}
+                       ).status_code == 201
+    rev = client.get(f"/v1/documents/{uid}/revisions", headers=headers).json()[0]["uid"]
+    for step in ("submit", "approve"):
+        assert client.post(f"/v1/documents/{uid}/revisions/{rev}/{step}", headers=headers, json={}).status_code == 200
+    assert client.get(f"/v1/documents/{uid}/revisions", headers=headers).json()[0]["body_markdown"] == body
+    out = client.post(f"/v1/documents/{uid}/revisions/{rev}/publish", headers=headers, json={}).json()
+    assert out["body_markdown"] == f"# Pump replacement\n\n> {notice}\n", "only the notice on top is the draft's"

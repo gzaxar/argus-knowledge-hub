@@ -116,12 +116,12 @@ export function WorkspaceAccess() {
         .
       </p>
 
-      {directory.data?.is_test_data && (
+      {directory.data?.is_test_data && (directory.data.example_groups > 0 || directory.data.example_people > 0) && (
         <div className="mt-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <strong>Example directory.</strong> No LDAP is configured, so ARGUS carries a built-in directory of
-          fictional people and groups ({directory.data.active_groups} groups, {directory.data.users} people) for
-          trying things out: granting them access is safe but meaningless, as they can't sign in. Groups made
-          here and the people who sign in are real, and so is their access.
+          fictional people and groups ({directory.data.example_groups} groups, {directory.data.example_people} people)
+          for trying things out: granting them access is safe but meaningless, as they can't sign in. Groups made
+          here and the people invited or signed in are real, and so is their access.
         </div>
       )}
 
@@ -269,7 +269,7 @@ export function WorkspaceAccess() {
         )}
         {subjectType === "group" && subjectOptions.length === 0 && (
           <p className="px-4 pb-3 text-sm text-slate-500">
-            No groups yet — run a directory sync below.
+            No groups yet — invite people into a new group below, or run a directory sync.
           </p>
         )}
       </div>
@@ -278,6 +278,8 @@ export function WorkspaceAccess() {
         queryClient.invalidateQueries({ queryKey: ["bindings", workspaceId] });
         queryClient.invalidateQueries({ queryKey: ["who-has-access", workspaceId] });
         queryClient.invalidateQueries({ queryKey: ["member-directory", workspaceId] });
+        queryClient.invalidateQueries({ queryKey: ["groups"] });   // an invitation can make a new group
+        queryClient.invalidateQueries({ queryKey: ["directory-status"] });
       }} />
 
       {isSite && (

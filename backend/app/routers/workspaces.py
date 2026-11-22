@@ -3,7 +3,7 @@ from typing import Optional
 import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -461,6 +461,9 @@ def delete_workspace(
     # The one sanctioned purge of append-only audit rows: the workspace's own.
     from app.ledger.audit import allow_purge
     allow_purge(db)
+    # Its key counters have no foreign key to cascade from: without this, a workspace made again with the same id
+    # would number its records on from the deleted one's (LINAC-IP-0003 for its first pump).
+    db.execute(text("DELETE FROM asset_key_counters WHERE workspace_id = :w"), {"w": workspace_id})
     db.delete(workspace)
     try:
         db.commit()
@@ -530,7 +533,8 @@ def set_default_access(
 
 @router.get("/members", response_model=list[MemberDirectoryOut])
 def list_member_directory(
-    workspace_id: str = Depends(require_permission("read")), db: Session = Depends(get_db)
+    workspace_id: str = Depends(require_permission("read")), db: Session = Depends(get_db),
+    can_work: Optional[str] = None,
 ):
     """Lightweight member lookup for "user"-type attribute pickers (assignee,
     etc.) — available to anyone with read access, unlike the full permissions
@@ -563,6 +567,9 @@ def list_member_directory(
     # Someone who has left the directory stays selectable nowhere new, but
     # their existing assignments still resolve through their user row.
     users = db.scalars(select(User).where(User.id.in_(user_ids), User.active.is_(True)))
+    # `can_work=tickets`: only who may change one, for an assignee picker — a viewer cannot take a ticket.
+    if can_work in ("tickets", "objects", "documents"):
+        users = [u for u in users if has_permission(db, u, workspace_id, "modify", can_work)]
     return [MemberDirectoryOut(user_id=u.id, email=u.email, name=u.name) for u in users]
 
 

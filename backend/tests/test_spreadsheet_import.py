@@ -153,7 +153,7 @@ def test_the_ai_places_what_the_rules_cannot_and_nothing_it_invents(world, monke
     seen = {}
 
     def complete(_ep, system, user, **_):
-        seen["user"] = user
+        seen.setdefault("user", user)                # the columns' call; the values' one may follow
         return json.dumps(answer)
     monkeypatch.setattr("app.services.llm.complete", complete)
     resp = _post(world, "analyse", CSV.encode(), use_ai=True)
@@ -166,6 +166,36 @@ def test_the_ai_places_what_the_rules_cannot_and_nothing_it_invents(world, monke
     assert where["Note vuote"]["target"] == svc.DROP                     # an invented property is not taken
     assert where["Matricola"]["target"] == "serial" and where["Matricola"]["source"] == "rule"
     assert "<spreadsheet>" in seen["user"] and "Chiller 1" in seen["user"]
+
+
+def test_the_ai_is_shown_every_type_records_can_have_and_a_branch_it_names_holds_the_new_type(world, monkeypatch):
+    """A leaf deep in the tree (Fire Extinguisher, under Asset) is offered to the AI, not only the first branches;
+    a branch it names anyway (Asset, which records cannot have) becomes the new type's parent."""
+    monkeypatch.setattr(svc, "_ai_endpoint", lambda db, ws: (_endpoint(), None, None))
+    seen, answer = {"calls": []}, {"type": {"existing": "Fire Extinguisher", "confidence": 0.9,
+                                            "reason": "extinguishers"}, "columns": []}
+
+    def complete(_ep, system, user, **_):
+        seen["calls"].append(user)
+        if "Properties of the chosen type" in user:
+            # Asked again with the chosen type's own properties: the column finds its property.
+            return json.dumps({"type": {"existing": "Fire Extinguisher"},
+                               "columns": [{"column": "Potenza (kW)", "target": "capacity_kg", "confidence": 0.9}]})
+        return json.dumps(answer)
+    monkeypatch.setattr("app.services.llm.complete", complete)
+    out = _post(world, "analyse", CSV.encode(), use_ai=True).json()
+    first = seen["calls"][0]
+    assert "Types records can have" in first and "Fire Extinguisher" in first.split("Branches")[0]
+    assert out["plan"]["target"] == {**out["plan"]["target"], "mode": "existing", "source": "ai",
+                                     "schema_uid": f"{world['ws']}:extinguisher"}
+    where = {c["column"]: c for c in out["plan"]["columns"]}
+    assert len(seen["calls"]) == 2 and "capacity_kg" in seen["calls"][1]
+    assert where["Potenza (kW)"]["target"] == "capacity_kg", "a type the AI picked has its properties used"
+
+    answer["type"] = {"existing": "Asset", "new_name": None, "confidence": 0.9, "reason": "equipment"}
+    target = _post(world, "analyse", CSV.encode(), use_ai=True).json()["plan"]["target"]
+    assert target["mode"] == "new" and target["source"] == "ai"
+    assert target["parent_uid"] == asset_types.type_uid(world["ws"], "Asset") and target["name"] == "Impianti frigo"
 
 
 def _endpoint():
@@ -195,6 +225,41 @@ def test_every_row_is_checked_before_anything_is_written(world):
     db = SessionLocal()
     assert db.query(Schema).filter_by(workspace_id=world["ws"], name=plan["target"]["name"]).count() == 0
     db.close()
+
+
+def test_values_of_a_choice_column_are_matched_by_rule_then_by_the_ai_and_the_person_decides(world, monkeypatch):
+    """An Italian register: "In servizio" is In service by rule, "Fermo" the AI matches, "Boh" nobody does — its
+    row is reported until the person matches it or leaves it out."""
+    italian = (CSV.replace("In service;A", "In servizio;A", 1).replace("In service;B", "Boh;B", 1)
+               .replace("Standby", "Fermo"))
+    monkeypatch.setattr(svc, "_ai_endpoint", lambda db, ws: (_endpoint(), None, None))
+    asked = []
+
+    def complete(_ep, system, user, **_):
+        if "match the values" in system:
+            asked.append(user)
+            return json.dumps({"Stato": {"Fermo": "Standby", "Boh": None, "Rotto": "Faulty"}})
+        return json.dumps({"type": {}, "columns": []})
+    monkeypatch.setattr("app.services.llm.complete", complete)
+    out = _post(world, "analyse", italian.encode(), use_ai=True).json()
+    stato = next(c for c in out["plan"]["columns"] if c["column"] == "Stato")
+    assert stato["values"] == {"In servizio": "In service", "In service": "In service", "Fermo": "Standby"}
+    assert stato["value_sources"]["In servizio"] == "rule" and stato["value_sources"]["Fermo"] == "ai"
+    assert "Boh" in asked[0] and "In servizio" not in asked[0], "only what the rules could not match is asked"
+
+    plan = out["plan"]
+    plan["target"] = {"mode": "new", "name": f"Chiller {world['t']}", "parent_uid": plan["target"].get("parent_uid")
+                      or asset_types.type_uid(world["ws"], "Asset")}
+    checked = _post(world, "preview", italian.encode(), plan=plan).json()
+    problems = {r["row"]: r["problems"] for r in checked["rows"] if r["problems"]}
+    assert list(problems) == [3] and "Boh" in problems[3][0], "an unmatched value is reported, never guessed"
+    assert next(r for r in checked["rows"] if r["row"] == 2)["attributes"]["argus_lifecycle"] == "In service"
+
+    stato = next(c for c in plan["columns"] if c["column"] == "Stato")
+    stato["values"]["Boh"] = svc.DROP
+    checked = _post(world, "preview", italian.encode(), plan=plan).json()
+    row3 = next(r for r in checked["rows"] if r["row"] == 3)
+    assert checked["counts"]["error"] == 0 and "argus_lifecycle" not in row3["attributes"]
 
 
 def test_the_import_creates_the_type_and_the_records_through_the_ledger_and_reimporting_updates(world):
@@ -236,6 +301,23 @@ def test_the_import_creates_the_type_and_the_records_through_the_ledger_and_reim
     assert (job.counts["updated"], job.counts["unchanged"], job.counts["created"]) == (1, 3, 0)
     assert db.query(Asset).filter_by(schema_uid=type_uid, name="Chiller 3").one().attributes["serial"] == "SN-003b"
     db.close()
+
+
+def test_a_sheet_without_keys_imported_again_finds_its_records_by_a_unique_identifier(world):
+    """No key column: a row whose inventory number a record of the type here already has is that record —
+    unchanged, or updated — never a failure and never a second record."""
+    sheet = ("Nome;Inventario;Stato\n"
+             f"Chiller 1;INV-{world['t']}-1;In service\nChiller 2;INV-{world['t']}-2;In service\n")
+    plan = _plan(world, sheet.encode())["plan"]
+    plan["target"] = {"mode": "new", "name": f"Chiller {world['t']}",
+                      "parent_uid": asset_types.type_uid(world["ws"], "Asset")}
+    assert {c["column"]: c["target"] for c in plan["columns"]}["Inventario"] == "inventory_number"
+    resp = _post(world, "run", sheet.encode(), plan=plan)
+    type_uid = resp.json()["type_uid"]
+    again = sheet.replace("Chiller 2;INV", "Chiller 2b;INV") + f"Chiller 3;INV-{world['t']}-3;Standby\n"
+    plan2 = _plan(world, again.encode(), target={"mode": "existing", "schema_uid": type_uid})["plan"]
+    preview = _post(world, "preview", again.encode(), plan=plan2).json()
+    assert preview["counts"] == {"create": 1, "update": 1, "unchanged": 1, "error": 0}
 
 
 def test_a_plan_that_does_not_hold_is_refused(world):

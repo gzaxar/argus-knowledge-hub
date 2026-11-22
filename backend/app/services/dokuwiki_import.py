@@ -197,6 +197,9 @@ def run_dokuwiki_import(job_uid: str, workspace_id: str, page_url: str, include_
         job.progress = "Import complete"
         job.completed_at = datetime.now(timezone.utc)
         db.commit()
+        # The pages are published: Ask ARGUS reads them once the index has caught up, as after any publication.
+        from app.services import knowledge_schedule
+        knowledge_schedule.after_document_change(db, job.workspace_id)
     except Exception as e:  # noqa: BLE001 — whatever went wrong is the job's outcome, said in its words
         db.rollback()
         job = db.get(ImportJob, job_uid)

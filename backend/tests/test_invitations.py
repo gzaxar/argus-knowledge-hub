@@ -202,3 +202,71 @@ def test_a_directory_group_is_not_changed_here(world):
     db.close()
     resp = client.post(f"/v1/groups/ldap-{t}/members", headers=world["h"], json={"emails": f"x-{t}@infn.it"})
     assert resp.status_code == 409 and "directory" in resp.json()["detail"]
+
+
+# --- what the invited see, and what is said about them -----------------------------------------------------
+
+def test_the_name_written_in_the_invitation_is_shown_until_the_sign_in_says_otherwise(world, mailbox):
+    ws, t = world["ws"], world["t"]
+    out = client.post(f"/v1/workspaces/{ws}/invitations", headers=world["h"], json={
+        "emails": f'Luca Bianchi <luca-{t}@infn.it>, "Giorgia Ferri" <giorgia-{t}@infn.it>; bare-{t}@infn.it',
+        "role_id": "viewer", "send_email": False}).json()
+    by = {p["email"]: p["user_id"] for p in out["people"]}
+    db = SessionLocal()
+    names = {e: db.get(User, u).name for e, u in by.items()}
+    assert names == {f"luca-{t}@infn.it": "Luca Bianchi", f"giorgia-{t}@infn.it": "Giorgia Ferri",
+                     f"bare-{t}@infn.it": None}
+    user = _resolve_oidc_user(db, {"sub": f"sub-l-{t}", "email": f"luca-{t}@infn.it", "name": "Luca B."})
+    db.commit()
+    assert user.name == "Luca B."
+    db.close()
+
+
+def test_start_here_is_for_who_may_set_the_workspace_up(world):
+    ws, t = world["ws"], world["t"]
+    assert "start" in client.get("/v1/hub/overview", headers=world["h"]).json()
+    db = SessionLocal()
+    viewer = User(id=str(uuid.uuid4()), email=f"viewer-{t}@argus.test")
+    db.add(viewer)
+    db.flush()
+    from datetime import datetime, timezone
+    db.add(RoleBinding(workspace_id=ws, subject_type="user", subject_id=viewer.id, role_id="contributor",
+                       created_at=datetime.now(timezone.utc)))
+    db.commit()
+    db.refresh(viewer)
+    db.expunge(viewer)
+    db.close()
+    app.dependency_overrides[get_identity] = lambda: OidcIdentity(user=viewer)
+    resp = client.get("/v1/hub/overview", headers=world["h"])
+    assert resp.status_code == 200 and "start" not in resp.json()
+
+
+def test_the_example_directory_counts_only_its_fictional_people_and_groups(world, monkeypatch):
+    from app.models.group import Group
+    t = world["t"]
+    monkeypatch.setenv("DIRECTORY_PROVIDER", "embedded")
+    before = client.get("/v1/directory/status", headers=world["h"]).json()
+    db = SessionLocal()
+    db.add(Group(uid=f"local-{t}", name=f"Local {t}", source="local", active=True))
+    db.add(User(id=str(uuid.uuid4()), email=f"real-{t}@argus.test"))
+    db.commit()
+    db.close()
+    after = client.get("/v1/directory/status", headers=world["h"]).json()
+    assert after["is_test_data"]
+    assert (after["example_groups"], after["example_people"]) == (before["example_groups"], before["example_people"])
+    assert after["users"] == before["users"] + 1 and after["groups"] == before["groups"] + 1
+    db = SessionLocal()
+    db.delete(db.get(Group, f"local-{t}"))
+    db.commit()
+    db.close()
+
+
+def test_an_assignee_picker_offers_only_who_may_work_tickets(world, mailbox):
+    ws, t = world["ws"], world["t"]
+    for role, who in (("viewer", "view"), ("agent", "agent")):
+        client.post(f"/v1/workspaces/{ws}/invitations", headers=world["h"],
+                    json={"emails": f"{who}-{t}@infn.it", "role_id": role, "send_email": False})
+    everyone = {m["email"] for m in client.get("/v1/members", headers=world["h"]).json()}
+    workers = {m["email"] for m in client.get("/v1/members?can_work=tickets", headers=world["h"]).json()}
+    assert {f"view-{t}@infn.it", f"agent-{t}@infn.it"} <= everyone
+    assert f"agent-{t}@infn.it" in workers and f"view-{t}@infn.it" not in workers

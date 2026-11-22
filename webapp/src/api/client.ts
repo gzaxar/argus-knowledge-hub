@@ -850,6 +850,8 @@ export const issueLinksApi = {
 
 export const membersApi = {
   directory: () => request<MemberDirectoryEntry[]>("/v1/members"),
+  /** Who may change tickets here: the people an assignee picker offers. */
+  assignable: () => request<MemberDirectoryEntry[]>("/v1/members?can_work=tickets"),
 };
 
 export const documentNavigationApi = {
@@ -2699,6 +2701,9 @@ export type SheetColumnPlan = {
   column: string;
   target: string;
   new?: SheetNewProperty;
+  /** For a column going to a choice list: the file's value → the choice it means, or SHEET_DROP to leave it out. */
+  values?: Record<string, string>;
+  value_sources?: Record<string, "rule" | "ai" | "person">;
   source?: "rule" | "ai" | "person";
   confidence?: number;
   reason?: string;
