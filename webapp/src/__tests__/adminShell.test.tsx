@@ -25,10 +25,15 @@ describe("the administration sidebar", () => {
   it("has one section per scope, and the workspace's pages grouped", async () => {
     shell(person({ is_admin: true, administered_sites: [{ id: "lnf", name: "LNF" }, { id: "lnl", name: "LNL" }] }));
     const workspace = await screen.findByRole("group", { name: "Workspace" });
-    for (const label of ["People & access", "Content", "Integrations", "Area permissions", "Access reviews", "Data integrity"]) {
+    for (const label of ["People & access", "Content", "Integrations", "Area permissions (advanced)", "Access reviews",
+                         "Data integrity"]) {
       expect(within(workspace).getByText(label)).toBeInTheDocument();
     }
     expect(within(workspace).queryByText("Members")).not.toBeInTheDocument();
+    // Once each: packages and keys are in Workspace settings, the Jira migration is reached from Imports.
+    for (const gone of ["Packages", "Keys", "Migration from Jira"]) {
+      expect(within(workspace).queryByRole("link", { name: gone })).not.toBeInTheDocument();
+    }
     const installation = await screen.findByRole("group", { name: "Installation" });
     expect(within(installation).getByRole("link", { name: "Packages (all workspaces)" })).toBeInTheDocument();
     expect(within(installation).getByRole("link", { name: "All tokens" })).toBeInTheDocument();

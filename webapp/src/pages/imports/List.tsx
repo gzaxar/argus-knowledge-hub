@@ -185,6 +185,11 @@ export function ImportList() {
           </Link>
         ))}
       </div>
+      <p className="mt-3 text-xs text-slate-500">
+        Leaving Jira for good, rather than reading it now and then?{" "}
+        <Link to="/admin/migration" className="text-indigo-600 hover:underline">Migration from Jira</Link>
+        {" "}imports a project or an object schema, compares it with Jira while both run, and signs it over to ARGUS.
+      </p>
 
       <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Saved configurations

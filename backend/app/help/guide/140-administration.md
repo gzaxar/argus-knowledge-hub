@@ -10,12 +10,16 @@ the sign-in service only says who they are.
 
 ## The administration pages
 
-**Administration** (**⚙ Workspace** menu, top right) has one section per scope, and every page says which one it
-is in:
+The **⚙ Workspace settings** menu (top right) holds what the workspace's records are made of: **Packages**, the
+**Type catalogue**, the **Product catalogue**, **Global values**, **Ticket workflows**, **Equipment classes** and
+**Keys**. Its last entry, **Administration**, opens on **Access** and has one section per scope; every page says which
+one it is in:
 
 - **Workspace**: changes only the workspace named there. Its pages are grouped under **People & access** (Access,
-  Groups, Area permissions, Access reviews), **Content** (Imports, Packages, Keys, Icon library, GLPI, Transfer,
-  Migration from Jira, Data integrity, Storage, Quotas) and **Integrations** (AI endpoint, Robot tokens).
+  Groups, Access reviews, Help centre destinations, and *Area permissions*, the rights given one person at a time
+  before roles and groups existed, kept as an advanced setting), **Content** (Imports, Icon library, GLPI, Transfer,
+  Data integrity, Storage, Quotas) and **Integrations** (AI endpoint, Robot tokens). **Migration from Jira**, for a
+  team leaving Jira for good, is reached from **Imports**.
 - **Site** *name*: for the site's administrators, whichever workspace is open, and for administrators of the
   installation when the open workspace is at that site. **Administrators**, **Site-wide group access** (with its
   changes to access) and **Facilities** apply to every facility currently at the site.

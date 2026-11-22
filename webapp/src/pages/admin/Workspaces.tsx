@@ -214,10 +214,10 @@ export function AdminWorkspaces() {
                     ) : (
                       <>
                         <Link
-                          to={`/workspaces/${ws.id}/members`}
+                          to={`/workspaces/${ws.id}/access`}
                           className="mr-3 text-slate-500 hover:text-slate-900"
                         >
-                          Members
+                          Access
                         </Link>
                         <Link
                           to={`/workspaces/${ws.id}/integrity`}
