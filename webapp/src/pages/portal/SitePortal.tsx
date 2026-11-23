@@ -18,8 +18,11 @@ export function PortalHome() {
       <h1 className="text-2xl font-semibold text-slate-900">Services &amp; Support</h1>
       <p className="mt-1 text-sm text-slate-500">Choose the laboratory you need help from.</p>
       {list.length === 0 && (
-        <div className="mt-6"><PortalMessage>No site's help centre is open to you yet. It opens once your site
-          publishes its services, and lists the sites whose workspaces you can open.</PortalMessage></div>
+        <div className="mt-6"><PortalMessage>No site's help centre is open to you yet. Here people ask a site's
+          services for help — the network, the workshop, the vacuum group — and follow their requests. It opens once
+          a site's administrators publish its services (Administration → Site → Help centre); until then requests are
+          made as tickets in the workspace. <Link to="/" className="font-medium underline">Back to the Knowledge Hub</Link>
+        </PortalMessage></div>
       )}
       <ul className="mt-6 grid gap-3 sm:grid-cols-2">
         {list.map((s) => (
