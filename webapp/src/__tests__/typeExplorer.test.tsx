@@ -60,6 +60,9 @@ describe("the type explorer", () => {
 
   it("shows every type in one tree, marking a type made in another workspace", () => {
     setup();
+    // Only the types with records at first: the one with none is behind "Show every type".
+    expect(screen.queryByRole("treeitem", { name: /Their type/ })).toBeNull();
+    fireEvent.click(screen.getByTestId("every-type"));
     expect(screen.queryByRole("button", { name: /Shared by other workspaces/ })).toBeNull();
     const theirs = screen.getByRole("treeitem", { name: /Their type/ });
     expect(theirs).toHaveTextContent("shared");
@@ -78,6 +81,7 @@ describe("the type explorer", () => {
     renderWith(<TypeExplorer appliesTo="objects" counts={new Map([["own-pump", 1], ["cat-pump", 2], ["cat-turbo", 4]])}
                              total={7} selected={null} onSelect={onSelect} />,
                { cache: { ...cache, '["schemas"]': schemas } });
+    fireEvent.click(screen.getByTestId("every-type"));
     const pumps = screen.getAllByRole("treeitem", { name: /Vacuum Pump/ });
     expect(pumps).toHaveLength(1);                                           // one node, the workspace's own
     expect(pumps[0]).toHaveAttribute("title", "Vacuum Pump · Core objects 2.0.0 (package core-objects)");

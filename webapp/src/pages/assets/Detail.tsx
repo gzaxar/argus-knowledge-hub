@@ -301,9 +301,17 @@ export function AssetDetail() {
 
       <AssetContextPanel assetUid={a.uid} />
 
-      <div className="mt-6">
-        <SuggestFromFile assetUid={a.uid} />
-      </div>
+      {/* Closed until wanted: open, it pushed the record's own attributes below the fold. */}
+      <details className="group mt-6 rounded-lg border border-slate-200 bg-white" data-testid="complete-from-file">
+        <summary className="cursor-pointer list-none px-4 py-3 text-sm">
+          <span className="font-medium text-slate-900">Complete from a file</span>
+          <span className="ml-2 text-slate-500">a datasheet, a nameplate photo or a note</span>
+          <span className="float-right text-slate-400 group-open:rotate-90">›</span>
+        </summary>
+        <div className="border-t border-slate-100 p-2">
+          <SuggestFromFile assetUid={a.uid} />
+        </div>
+      </details>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SectionCard title="Attributes">
