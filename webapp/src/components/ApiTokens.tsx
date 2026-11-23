@@ -123,7 +123,7 @@ export function TokenForm({
         {workspaces && (
           <div>
             <label className="block text-sm font-medium text-slate-700">Workspace</label>
-            <select value={workspace} onChange={(e) => setWorkspace(e.target.value)}
+            <select aria-label="Workspace" value={workspace} onChange={(e) => setWorkspace(e.target.value)}
                     className="mt-1 rounded border border-slate-300 px-2 py-2 text-sm">
               <option value="">All my workspaces</option>
               {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -132,7 +132,7 @@ export function TokenForm({
         )}
         <div>
           <label className="block text-sm font-medium text-slate-700">Expires after</label>
-          <select value={days} onChange={(e) => setDays(e.target.value)}
+          <select aria-label="Expires after" value={days} onChange={(e) => setDays(e.target.value)}
                   className="mt-1 rounded border border-slate-300 px-2 py-2 text-sm">
             {DAYS.map((d) => <option key={d} value={String(d)}>{d} days</option>)}
             {kind === "robot" && <option value="730">2 years</option>}

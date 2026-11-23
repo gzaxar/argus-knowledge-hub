@@ -588,6 +588,7 @@ export function IssueDetail() {
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <select
+                aria-label="How this ticket is related"
                 value={ticketRelation}
                 onChange={(e) => setTicketRelation(e.target.value)}
                 className="rounded border border-slate-300 px-2 py-1 text-xs"
@@ -810,6 +811,7 @@ export function IssueDetail() {
             <dl>
               <FieldRow label="Assignee">
                 <select
+                  aria-label="Assignee"
                   value={i.assignee ?? ""}
                   onChange={(e) =>
                     updateMutation.mutate({ assignee: e.target.value || null })

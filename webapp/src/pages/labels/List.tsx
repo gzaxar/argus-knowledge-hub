@@ -63,6 +63,7 @@ export function LabelList() {
           className="w-64 rounded border border-slate-300 px-3 py-1.5 text-sm"
         />
         <select
+          aria-label="Label type"
           value={type}
           onChange={(e) => setType(e.target.value)}
           className="rounded border border-slate-300 px-3 py-1.5 text-sm"

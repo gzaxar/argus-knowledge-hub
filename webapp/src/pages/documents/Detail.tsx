@@ -705,6 +705,7 @@ export function DocumentDetail() {
             <div className="mt-2 flex items-center gap-2">
               <select
                 value={linkKind}
+                aria-label="What to link"
                 onChange={(e) => setLinkKind(e.target.value as typeof linkKind)}
                 className="rounded border border-slate-300 px-2 py-1.5 text-sm"
               >

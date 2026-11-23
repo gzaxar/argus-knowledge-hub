@@ -249,7 +249,7 @@ export function MapPage() {
         <details>
           <summary className="cursor-pointer text-xs font-semibold uppercase text-slate-500">Filter by type
             {filters.types?.length ? ` (${filters.types.length})` : ""}</summary>
-          <select multiple value={filters.types ?? []} size={5}
+          <select multiple aria-label="Types to show" value={filters.types ?? []} size={5}
                   onChange={(e) => setFilters({ ...filters, types: Array.from(e.target.selectedOptions).map((o) => o.value) })}
                   className="mt-1 w-full rounded border border-slate-300 text-xs">
             {objectTypes.map((s) => <option key={s.uid} value={s.uid}>{typeLabel(s)}</option>)}
@@ -296,7 +296,7 @@ export function MapPage() {
         <div className="space-y-2 border-t border-slate-100 pt-3">
           <p className="text-xs font-semibold uppercase text-slate-500">Near a point</p>
           <div className="flex items-center gap-2">
-            <select value={radius} onChange={(e) => setRadius(Number(e.target.value))}
+            <select aria-label="Distance" value={radius} onChange={(e) => setRadius(Number(e.target.value))}
                     className="rounded border border-slate-300 px-2 py-1 text-xs">
               {RADII.map((r) => <option key={r} value={r}>within {r < 1000 ? `${r} m` : `${r / 1000} km`}</option>)}
             </select>
@@ -426,7 +426,7 @@ function LocationImportBox({ onDone }: { onDone: () => void }) {
       <p className="text-[11px] text-slate-400">CSV (key or label, latitude, longitude, accuracy_m) or GeoJSON, in WGS 84: points,
         lines (routes) and polygons (outlines, with base_m and top_m for a volume). A record&apos;s route or outline is
         never replaced by a file.</p>
-      <input type="file" accept=".csv,.json,.geojson" className="text-xs"
+      <input type="file" aria-label="Import points (CSV or GeoJSON)" accept=".csv,.json,.geojson" className="text-xs"
              onChange={(e) => { setFile(e.target.files?.[0] ?? null); setPreview(null); }} />
       <div className="flex gap-2">
         <button type="button" disabled={!file || run.isPending} onClick={() => run.mutate(true)}

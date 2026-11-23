@@ -346,7 +346,7 @@ export function GraphExplorer() {
           {mode !== "rootcause" && (
             <>
               {mode === "explore" && (
-                <select value={startKind} onChange={(e) => { setStartKind(e.target.value as StartKind); setStart(null); }}
+                <select aria-label="What to start from" value={startKind} onChange={(e) => { setStartKind(e.target.value as StartKind); setStart(null); }}
                         className="rounded border border-slate-300 px-2 py-1.5 text-sm">
                   {START_KINDS.map((k) => <option key={k.kind} value={k.kind}>{k.label}</option>)}
                 </select>

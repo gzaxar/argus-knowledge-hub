@@ -594,6 +594,7 @@ export function AssetDetail() {
             className="mt-3 flex gap-2"
           >
             <select
+              aria-label="Label kind"
               value={labelType}
               onChange={(e) => setLabelType(e.target.value)}
               className="rounded border border-slate-300 px-2 py-1 text-xs"
@@ -619,6 +620,7 @@ export function AssetDetail() {
               Scan
             </button>
             <select
+              aria-label="Who issued the label"
               value={labelIssuer}
               onChange={(e) => setLabelIssuer(e.target.value)}
               className="rounded border border-slate-300 px-2 py-1 text-xs"

@@ -171,6 +171,7 @@ export function IssueForm() {
         <div>
           <label className="block text-sm font-medium text-slate-700">Type</label>
           <select
+            aria-label="Type"
             value={schemaUid}
             onChange={(e) => {
               setSchemaUid(e.target.value);
@@ -191,6 +192,7 @@ export function IssueForm() {
         <div>
           <label className="block text-sm font-medium text-slate-700">Title</label>
           <input
+            aria-label="Title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
@@ -214,6 +216,7 @@ export function IssueForm() {
         <div>
           <label className="block text-sm font-medium text-slate-700">Description</label>
           <textarea
+            aria-label="Description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
@@ -254,6 +257,7 @@ export function IssueForm() {
           <div>
             <label className="block text-sm font-medium text-slate-700">Priority</label>
             <select
+              aria-label="Priority"
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
               className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
