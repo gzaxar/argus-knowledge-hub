@@ -29,3 +29,17 @@ body,
   isolation: isolate;
   z-index: 0;
 }
+
+/* Touch screens: a finger needs a bigger target than a pointer. Checkboxes of 13 px and text buttons of 16 px
+   ("×", "Remove", "Unlink") were hard to hit on a phone; with a mouse nothing changes. */
+@media (pointer: coarse) {
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-width: 20px;
+    min-height: 20px;
+  }
+  button {
+    min-height: 24px;
+    min-width: 24px;
+  }
+}
