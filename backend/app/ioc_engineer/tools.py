@@ -10,6 +10,9 @@ directory of that name). It runs sandboxed, because the values come from whoever
 Validation is what `ibek runtime generate` will refuse at pod start, found before the pod starts:
 an entity type nobody defines or the image does not compile, a parameter that is missing,
 unknown or of the wrong type, an object reference to nothing.
+
+Python IOCs (epik8s-pyioc) have no template: their entry is checked against the IOC's pyioc.yaml
+with the library `pyioc-run` itself uses, so a check here fails where the pod would.
 """
 from __future__ import annotations
 
@@ -119,7 +122,7 @@ def _score(words: list, fields: list) -> int:
 
 
 def ioc_search(db, workspace_id: str, query: str, kind: Optional[str] = None, limit: int = 15) -> dict:
-    """Modules, entity models, templates and examples that match the words."""
+    """Modules, entity models, templates, examples and Python IOCs that match the words."""
     words = [w.lower() for w in WORD.findall(query or "")]
     if not words:
         return {"error": "Say what to look for: a vendor, a device, a driver, a devtype…"}
@@ -145,6 +148,17 @@ def ioc_search(db, workspace_id: str, query: str, kind: Optional[str] = None, li
             if s:
                 hits.append((s, {"kind": "template", "name": t["name"], "group": t["group"],
                                  "devtypes": t["devtypes"], "path": t["path"]}))
+    if kind in (None, "pyioc"):
+        for x in _pyiocs():
+            spec = x.get("spec") or {}
+            params = " ".join(list(spec.get("parameters") or {}) +
+                              list(((spec.get("devices") or {}).get("parameters")) or {}))
+            s = _score(words, [(6, x["name"]), (3, spec.get("description")), (2, spec.get("devgroup")),
+                               (1, params), (1, (x.get("readme") or "")[:1500])])
+            if s:
+                hits.append((s, {"kind": "pyioc", "name": x["name"], "description": spec.get("description"),
+                                 "devgroup": spec.get("devgroup"), "image": spec.get("image"),
+                                 "repository": (x.get("repository") or {}).get("url")}))
     if kind in (None, "example"):
         for x in load()["examples"]:
             s = _score(words, [(4, x["name"]), (3, x["template"]), (3, x["devtype"]), (1, x["iocprefix"])])
@@ -249,24 +263,41 @@ def ioc_get_example(db, workspace_id: str, name: str) -> dict:
     return out
 
 
+def _pyioc_guide() -> dict:
+    """The epik8s-pyioc documents (how-to, specification, runtime, pitfalls, tools), from the installed library."""
+    try:
+        from epik8s_pyioc.guide import guide
+        return {f"Python IOCs: {title}": text for title, text in guide().items()}
+    except Exception:  # an older library without docs: the architecture section still answers
+        return {}
+
+
 def ioc_guide(db, workspace_id: str, section: Optional[str] = None) -> dict:
-    """How infn-epics-ioc, ibek-support-infn, ibek-templates and the beamlines fit together."""
+    """How infn-epics-ioc, ibek-support-infn, ibek-templates, Python IOCs and the beamlines fit together."""
     cat = load()
     text = cat.get("guide") or ""
     parts = re.split(r"(?m)^## ", text)
     sections = {p.split("\n", 1)[0].strip(): p.split("\n", 1)[1] if "\n" in p else "" for p in parts[1:]}
+    sections.update(_pyioc_guide())
     about = {"repository": cat.get("repository"), "generated_at": cat.get("generated_at"),
              "loaded_from": cat.get("loaded_from"),
              "beamlines": {b["name"]: {"iocs": len(b.get("iocs") or []), "commit": b.get("commit")}
                            for b in cat.get("beamlines") or []},
              "modules": len(cat["modules"]), "entity_models": len(cat["entity_models"]),
              "templates": len(cat["templates"]), "examples": len(cat["examples"]),
+             "pyiocs": [x["name"] for x in cat.get("pyiocs") or []],
              "problems": cat.get("problems", [])[:30]}
     if section:
         s = section.lower()
         hit = next((k for k in sections if s in k.lower()), None)
         if hit:
             return {"section": hit, "text": sections[hit], "catalogue": about}
+        # no title says it: the sections whose text does, most mentions first, to open one by title
+        mentions = sorted(((sections[k].lower().count(s), k) for k in sections if s in sections[k].lower()),
+                          key=lambda m: -m[0])
+        if mentions:
+            return {"section": None, "mentioned_in": [k for _n, k in mentions[:8]],
+                    "next": "Call ioc_guide again with one of these section titles.", "catalogue": about}
     return {"sections": list(sections), "text": text if not section else None, "catalogue": about,
             "workflow": WORKFLOW}
 
@@ -288,6 +319,13 @@ WORKFLOW = [
     "family defaults: ioc_render(values, beamline=…) applies them), commit, sync the ArgoCD application.",
     "5. A beamline in the catalogue: ioc_list_beamline, ioc_get_beamline_ioc for one IOC as deployed, "
     "ioc_check_beamline before bumping the image or a template.",
+    "6. A device better served by Python (a vendor library for Python or .NET, a simple text protocol, logic "
+    "around the hardware): a Python IOC (epik8s-pyioc), not an ibek module. An existing one: ioc_search kind "
+    "pyioc, ioc_get_pyioc (parameters, iocDefaults block, example), then ioc_render the entry. A new one: "
+    "ioc_scaffold_pyioc from a description of the device (transport, PVs with type and access) writes the whole "
+    "project; complete its driver, run its tests on the simulator, tag it to publish the image, then add the "
+    "iocDefaults block and the entry (devtype, never template; a devices list). ioc_guide section 'Python IOCs' "
+    "has the specification and the pitfalls.",
 ]
 
 
@@ -304,11 +342,12 @@ def _values(values: Any) -> tuple[Optional[dict], Optional[str]]:
         return None, "The values must be one IOC entry: a mapping with template, iocprefix, devices, …"
     # A pasted beamline block: epicsConfiguration.iocs.<name>: {...}, or iocs: {<name>: {...}}
     iocs = (data.get("epicsConfiguration") or {}).get("iocs") if isinstance(data.get("epicsConfiguration"), dict) else None
-    iocs = iocs if iocs is not None else (data.get("iocs") if "template" not in data else None)
+    is_entry = "template" in data or "devtype" in data
+    iocs = iocs if iocs is not None else (data.get("iocs") if not is_entry else None)
     # …or the IOC's own block as it sits under iocs: `ocem-modbus4chan0: {template: ocem, …}`
-    if iocs is None and "template" not in data and len(data) == 1:
+    if iocs is None and not is_entry and len(data) == 1:
         only = next(iter(data.values()))
-        if isinstance(only, dict) and "template" in only:
+        if isinstance(only, dict) and ("template" in only or "devtype" in only):
             iocs = data
     if isinstance(iocs, dict) and len(iocs) == 1:
         name, entry = next(iter(iocs.items()))
@@ -451,13 +490,19 @@ def ioc_render(db, workspace_id: str, values: Any, template: Optional[str] = Non
     if not data.get("iocname"):
         data["iocname"] = str(data.get("name") or "ioc-under-test").lower()
         notes.append(f"iocname is injected by epik8s-chart at deploy time; rendered with iocname={data['iocname']!r}.")
+    if not template and not template_source and not data.get("template") and not data.get("host") \
+            and _is_pyioc(data):
+        return pyioc_check(data, notes, apply_defaults=not beamline)
     name = template or data.get("template")
     if template_source:
         sources = [("(template_source)", template_source)]
         resolved = {"kind": "inline"}
     else:
         if not name:
-            return {"ok": False, "errors": ["No template: set `template:` in the values or pass template."]}
+            known = [x["name"] for x in _pyiocs()]
+            return {"ok": False, "errors": ["No template: set `template:` in the values or pass template. A Python "
+                                            "IOC (epik8s-pyioc) has no template: its devtype must name one of the "
+                                            f"catalogue's Python IOCs ({', '.join(known) or 'none indexed'})."]}
         resolved = _resolve(name)
         if resolved["kind"] == "none":
             return {"ok": False, "errors": [f"Template {name!r} is not under the image's templates; the pod would exit "
@@ -705,11 +750,14 @@ def _beamline(name: Optional[str]) -> Optional[dict]:
 
 
 def _mode(values: dict) -> str:
-    """Which branch of ioc-chart's start-up the pod takes: host first, then template, else a git config dir."""
+    """Which branch of ioc-chart's start-up the pod takes: host first, then template, else the config dir and
+    `start:`, which for a Python IOC (epik8s-pyioc) is `pyioc-run`."""
     if values.get("host"):
         return "host"
     if values.get("template"):
         return "template"
+    if _is_pyioc(values):
+        return "pyioc"
     return "git"
 
 
@@ -794,9 +842,9 @@ def ioc_get_beamline_ioc(db, workspace_id: str, beamline: str, name: str, render
     out = {"found": True, "beamline": line["name"], "entry": entry, "defaults_key": d["defaults_key"],
            "defaults": (line.get("ioc_defaults") or {}).get(d["defaults_key"]) if d["defaults_key"] else None,
            "ignored_by_merge": d["ignored_by_merge"], "deployed": d["values"], "mode": _mode(d["values"])}
-    if render and out["mode"] == "template" and not d["values"].get("disable"):
+    if render and out["mode"] in ("template", "pyioc") and not d["values"].get("disable"):
         out["render"] = ioc_render(db, workspace_id, d["values"])
-    elif out["mode"] != "template":
+    elif out["mode"] not in ("template", "pyioc"):
         out["note"] = {"host": "runs natively on a remote host through epik8s-run; not an ibek render",
                        "git": "no template: the pod takes config/iocs/<iocdir|name> from the beamline repository "
                               "(st.cmd.j2, start.sh); not an ibek render"}[out["mode"]]
@@ -804,7 +852,8 @@ def ioc_get_beamline_ioc(db, workspace_id: str, beamline: str, name: str, render
 
 
 def ioc_check_beamline(db, workspace_id: str, beamline: str, template: Optional[str] = None) -> dict:
-    """Render and check every templated, enabled IOC of a beamline: what would fail at its next sync."""
+    """Render and check every templated or Python (pyioc) enabled IOC of a beamline: what would fail at its
+    next sync."""
     line = _beamline(beamline)
     if line is None:
         return {"found": False, **ioc_list_beamline(db, workspace_id)}
@@ -816,7 +865,7 @@ def ioc_check_beamline(db, workspace_id: str, beamline: str, template: Optional[
             continue
         if d["ignored_by_merge"]:
             ignored.append({"ioc": v["iocname"], "keys": d["ignored_by_merge"]})
-        if v.get("disable") or _mode(v) != "template":
+        if v.get("disable") or _mode(v) not in ("template", "pyioc"):
             skipped.append({"ioc": v["iocname"], "why": "disabled" if v.get("disable") else _mode(v)})
             continue
         r = ioc_render(db, workspace_id, v)
@@ -826,8 +875,192 @@ def ioc_check_beamline(db, workspace_id: str, beamline: str, template: Optional[
         errors = list(r.get("errors") or [])
         for o in r.get("outputs") or []:
             errors += ([o["error"]] if o.get("error") else []) + (o.get("errors") or [])
-        failed.append({"ioc": v["iocname"], "template": v.get("template"), "devtype": v.get("devtype"),
+        failed.append({"ioc": v["iocname"], "template": v.get("template") or
+                       (f"(pyioc {v.get('devtype')})" if _mode(v) == "pyioc" else None), "devtype": v.get("devtype"),
                        "errors": errors[:5], "more": max(0, len(errors) - 5)})
     return {"beamline": line["name"], "commit": line.get("commit"), "passed": len(passed), "failed": failed,
             "skipped": skipped, "ignored_by_merge": ignored,
             "next": "ioc_get_beamline_ioc shows one IOC's deployed values and full render."}
+
+
+# --- Python IOCs (epik8s-pyioc) ----------------------------------------------------------
+
+def _pyiocs() -> list:
+    return [x for x in load().get("pyiocs") or [] if x.get("spec")]
+
+
+def _find_pyioc(name: Optional[str]) -> Optional[dict]:
+    n = (name or "").strip().lower()
+    if not n:
+        return None
+    return next((x for x in _pyiocs() if x["name"].lower() == n), None) or \
+        next((x for x in _pyiocs() if n in ((x.get("repository") or {}).get("url") or "").lower()), None)
+
+
+def _is_pyioc(values: dict) -> bool:
+    """An entry the pod starts with pyioc-run, or whose devtype is a Python IOC of the catalogue."""
+    start = str(values.get("start") or "").split()
+    return bool(start and start[0].rsplit("/", 1)[-1] == "pyioc-run") or \
+        (not values.get("template") and _find_pyioc(values.get("devtype")) is not None)
+
+
+_spec_cache: dict = {}
+
+
+def _spec(entry: dict):
+    """The parsed spec of a catalogue entry: (epik8s_pyioc.Spec, None) or (None, the problem)."""
+    key = (id(load()), entry["name"])
+    if key not in _spec_cache:
+        try:
+            from epik8s_pyioc.spec import SpecError, parse_spec
+        except ImportError as e:
+            _spec_cache[key] = (None, f"epik8s-pyioc is not installed in the hub ({e})")
+        else:
+            try:
+                _spec_cache[key] = (parse_spec(entry["spec"]), None)
+            except SpecError as e:
+                _spec_cache[key] = (None, f"{entry['name']}'s pyioc.yaml is invalid: {e}")
+    return _spec_cache[key]
+
+
+def _param_rows(params: dict) -> list:
+    rows = []
+    for p in params.values():
+        row = {"name": p.name, "type": p.type, "description": p.description}
+        if p.required:
+            row["required"] = True
+        elif p.has_default and p.default is not None:
+            row["default"] = p.default
+        for key in ("choices", "aliases"):
+            if getattr(p, key):
+                row[key] = getattr(p, key)
+        for key in ("min", "max", "unit", "pattern"):
+            if getattr(p, key) not in (None, ""):
+                row[key] = getattr(p, key)
+        rows.append(row)
+    return rows
+
+
+def ioc_get_pyioc(db, workspace_id: str, name: str, include_docs: bool = True) -> dict:
+    """A Python IOC: what it is, its image, every parameter an entry may set, the iocDefaults block, an example
+    entry, and the beamline IOCs that run it."""
+    x = _find_pyioc(name)
+    if x is None:
+        return {"found": False, "pyiocs": [p["name"] for p in _pyiocs()],
+                "suggestions": [h["name"] for h in ioc_search(db, workspace_id, name or "", "pyioc")
+                                .get("results", [])]}
+    spec, problem = _spec(x)
+    out = {"found": True, "name": x["name"], "repository": x.get("repository"), "spec_path": x.get("spec_path"),
+           "problems": list(x.get("problems") or []) + ([problem] if problem else [])}
+    raw = x["spec"]
+    out.update({k: raw.get(k) for k in ("description", "devgroup", "image", "version", "docs", "entrypoint",
+                                        "protocols")})
+    if spec is not None:
+        from epik8s_pyioc import tools as pyioc_tools
+        out["parameters"] = _param_rows(spec.parameters)
+        if spec.devices is not None:
+            out["devices"] = {"multiple": spec.devices.multiple, "prefix": spec.devices.prefix,
+                              "single_prefix": spec.devices.single_prefix,
+                              "parameters": _param_rows(spec.devices.parameters)}
+        out["ioc_defaults"] = yaml.safe_dump({"iocDefaults": {spec.name: pyioc_tools.ioc_defaults(spec)}},
+                                             sort_keys=False)
+        if include_docs:
+            out["docs"] = pyioc_tools.markdown(spec)
+    out["example"] = x.get("example")
+    if include_docs:
+        out["readme"] = x.get("readme")
+    used = []
+    for line in _beamlines():
+        for e in line.get("iocs") or []:
+            v = deployed_values(line, e)["values"]
+            if v.get("devtype") == x["name"] and not v.get("template"):
+                used.append({"beamline": line["name"], "ioc": v["iocname"], "iocprefix": v.get("iocprefix"),
+                             "image": v.get("image"), "disabled": bool(v.get("disable"))})
+    out["deployed"] = used
+    out["next"] = ("ioc_render an entry (devtype, iocprefix, devices, parameters) to check it as pyioc-run will; "
+                   "ioc_guide section 'Python IOCs' for the specification and the pitfalls.")
+    return out
+
+
+def pyioc_check(values: dict, notes: Optional[list] = None, apply_defaults: bool = False) -> dict:
+    """A Python IOC entry checked as pyioc-run checks it at pod start, plus the chart settings that would send
+    the pod down the wrong start-up branch. With apply_defaults (an entry checked on its own, without a
+    beamline), the iocDefaults the IOC publishes are merged under it first, as a beamline would have them."""
+    notes = list(notes or [])
+    devtype = values.get("devtype")
+    x = _find_pyioc(devtype)
+    if x is None:
+        return {"ok": False, "kind": "pyioc", "notes": notes,
+                "errors": [f"devtype {devtype!r} is not a Python IOC of the catalogue "
+                           f"({', '.join(p['name'] for p in _pyiocs()) or 'none indexed'}): pyioc-run would find "
+                           "no spec for it and exit 2."]}
+    spec, problem = _spec(x)
+    if spec is None:
+        return {"ok": False, "kind": "pyioc", "errors": [problem], "notes": notes}
+    from epik8s_pyioc.instance import InstanceError, resolve_instance
+    from epik8s_pyioc.tools import ioc_defaults, validate_values
+    if apply_defaults:
+        published = ioc_defaults(spec)
+        values = _merge_overwrite(published, values)
+        notes.append(f"Checked with the iocDefaults {x['name']} publishes ({', '.join(sorted(published))}) under the "
+                     "entry; pass beamline to check it with a beamline's own iocDefaults.")
+    # The checks of `pyioc validate`: the entry against the spec, and template/start/pva/image.
+    _checked, chart_errors, chart_warnings = validate_values(
+        spec, {"epicsConfiguration": {"iocs": {str(values.get("iocname") or "ioc"): values}}})
+    errors = [e.split(": ", 1)[1] if ": " in e else e for e in chart_errors]
+    warnings = [w.split(": ", 1)[1] if ": " in w else w for w in chart_warnings]
+    resolved = None
+    try:
+        resolved = resolve_instance(spec, values).summary()
+    except InstanceError:
+        pass  # every problem is in errors already
+    return {"ok": not errors, "kind": "pyioc", "pyioc": x["name"],
+            "repository": (x.get("repository") or {}).get("url"),
+            "errors": list(dict.fromkeys(errors)), "warnings": list(dict.fromkeys(warnings)), "notes": notes,
+            "resolved": resolved,
+            "next": "Errors are what pyioc-run would refuse at pod start (it exits 2 listing them), or chart "
+                    "settings that start the pod the wrong way. resolved shows each device's PV prefix and "
+                    "parameters."}
+
+
+def ioc_scaffold_pyioc(db, workspace_id: str, description: Any) -> dict:
+    """A complete Python IOC project from a description of the device, as `pyioc init --from` writes it."""
+    try:
+        from epik8s_pyioc import tools as pyioc_tools
+        from epik8s_pyioc.scaffold import EXAMPLE, ScaffoldError, render_project
+        from epik8s_pyioc.spec import parse_spec
+    except ImportError as e:
+        return {"error": f"epik8s-pyioc is not installed in the hub ({e})"}
+    if isinstance(description, str):
+        try:
+            description = yaml.safe_load(description) or {}
+        except yaml.YAMLError as e:
+            return {"error": f"The description is not YAML: {e}", "example": EXAMPLE}
+    try:
+        project = render_project(description)
+    except ScaffoldError as e:
+        return {"error": "The description cannot become a project.", "errors": e.errors, "example": EXAMPLE}
+    d = project["description"]
+    spec = parse_spec(yaml.safe_load(project["files"][f"src/{d['package']}/pyioc.yaml"]))
+    existing = _find_pyioc(d["name"])
+    return {
+        "files": project["files"],
+        "self_check": project["self_check"],
+        "already_exists": {"name": existing["name"], "repository": (existing.get("repository") or {}).get("url")}
+        if existing else None,
+        "ioc_defaults": yaml.safe_dump({"iocDefaults": {d["name"]: pyioc_tools.ioc_defaults(spec)}},
+                                       sort_keys=False),
+        "similar": [x["name"] for x in _pyiocs() if (x.get("spec") or {}).get("devgroup") == d["devgroup"]][:6],
+        "steps": [
+            f"Create the repository github.com/infn-epics/{d['name']} with these files.",
+            "pip install -e '.[test]' && pytest: the IOC runs on its simulator and every PV is read and written "
+            "over Channel Access.",
+            f"Complete src/{d['package']}/driver.py with the device's real commands"
+            + (" (COMMANDS, ACTIONS and the reply parsing of TcpDriver)." if d["transport"] == "tcp"
+               else " (DeviceDriver)."),
+            f"Tag v{d['version']}: its CI publishes {d['image']}:{d['version']}.",
+            "Add the iocDefaults block and an entry (devtype, iocprefix, a devices list) to the beamline "
+            "values.yaml; check it with ioc_render, then sync the ArgoCD application.",
+            "Add the repository to IOC_CATALOG_PYIOCS of infn-epics-ioc, so the catalogue knows the IOC.",
+        ],
+    }
