@@ -62,6 +62,7 @@ export function OccurrenceInput({
           <option value="month">in a month</option>
         </select>
         <input
+          aria-label="When it happened"
           type={type}
           value={toInput(value)}
           required={required}
