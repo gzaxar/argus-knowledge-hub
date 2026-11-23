@@ -22,6 +22,7 @@ import { Navigate, useSearchParams } from "react-router-dom";
 import { DocumentTools, DocumentViewSwitch } from "../../components/DocumentViews";
 import { boardColumn } from "../../lib/documentBoard";
 import { useRights } from "../../lib/permissions";
+import { authorityLabel, confidentialityLabel } from "../../lib/documentLabels";
 
 const AUTHORITY_STYLES: Record<string, string> = {
   ufficiale: "bg-indigo-100 text-indigo-800",
@@ -266,10 +267,10 @@ function DocumentTable() {
                     )}
                     {columns.show("authority") && (
                       <td className="hidden px-3 py-2 lg:table-cell">
-                        <span className={`rounded px-1.5 py-0.5 text-xs ${AUTHORITY_STYLES[d.authority_level] ?? "bg-slate-100 text-slate-700"}`}>{d.authority_level}</span>
+                        <span className={`rounded px-1.5 py-0.5 text-xs ${AUTHORITY_STYLES[d.authority_level] ?? "bg-slate-100 text-slate-700"}`}>{authorityLabel(d.authority_level)}</span>
                       </td>
                     )}
-                    {columns.show("confidentiality") && <td className="hidden px-3 py-2 text-slate-600 xl:table-cell"><Clip>{d.confidentiality}</Clip></td>}
+                    {columns.show("confidentiality") && <td className="hidden px-3 py-2 text-slate-600 xl:table-cell"><Clip>{confidentialityLabel(d.confidentiality)}</Clip></td>}
                     {columns.show("updated") && <td className="hidden whitespace-nowrap px-3 py-2 text-slate-500 md:table-cell"><ListDate value={d.updated_at} /></td>}
                     {columns.show("created") && <td className="hidden whitespace-nowrap px-3 py-2 text-slate-500 xl:table-cell"><ListDate value={d.created_at} /></td>}
                   </tr>

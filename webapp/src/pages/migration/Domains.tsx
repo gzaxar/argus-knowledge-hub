@@ -364,7 +364,7 @@ function DomainPanel({ id }: { id: string }) {
       {d.stage !== "T0" && <ReconcileCard d={d} onDone={refresh} />}
 
       {d.stage === "T3" && (
-        <Card title="Exit criteria (§17.5)">
+        <Card title="Exit criteria">
           <ul className="space-y-1.5 py-1">
             {d.exit_criteria.map((c) => (
               <li key={c.id} className="flex items-start gap-2 text-sm">

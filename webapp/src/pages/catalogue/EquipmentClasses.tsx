@@ -106,7 +106,7 @@ function ExtensionsCard({ canAdmit }: { canAdmit: boolean }) {
   });
   if (!q.data) return null;
   return (
-    <Card title="Extensions (§5.1)">
+    <Card title="Extensions">
       <p className="py-1 text-sm text-slate-600">
         The areas the model grows into. An extension for one enters when it has an owner, a source and a query, and
         the query gives the expected answer on its fixture. Extensions are declared in code and reviewed; admitting one
@@ -155,7 +155,7 @@ function ExtensionsCard({ canAdmit }: { canAdmit: boolean }) {
 function ReportCard({ r }: { r: EquipmentClassReport }) {
   const rows = r.classes.filter((c) => c.objects > 0 || c.triggers.length > 0 || c.requested_attributes.length > 0);
   return (
-    <Card title="Report (§5.5)" action={<span className="text-xs text-slate-400">{new Date(r.at).toLocaleString()}</span>}>
+    <Card title="Report" action={<span className="text-xs text-slate-400">{new Date(r.at).toLocaleString()}</span>}>
       <p className={`mb-2 rounded px-3 py-2 text-sm ${r.unclassified.alert ? "bg-amber-50 text-amber-900" : "bg-slate-50 text-slate-600"}`}>
         {r.unclassified.alert ? "Alert: " : ""}
         {r.unclassified.count} Unclassified of {r.equipment} Equipment ({(r.unclassified.share * 100).toFixed(1)} %). The alert is

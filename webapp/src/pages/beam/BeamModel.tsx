@@ -77,8 +77,9 @@ export function BeamModelPage() {
         )}
         {systems.data?.length === 0 && (
           <p className="mt-4 text-xs text-slate-500">
-            No beam model in this workspace. Import one with <code>POST /v1/beam-model/import</code>, or try the demo
-            workspace (<code>scripts/beam_model_demo.py</code>).
+            No beam model in this workspace yet. The beam model is the accelerator's lattice — its elements in beam
+            order, with the equipment that realises each — and an administrator imports it from the lattice file.
+            See <Link to="/help" className="underline">Help</Link> → <em>The beam model</em>.
           </p>
         )}
         {(systems.data ?? []).map((s) => (

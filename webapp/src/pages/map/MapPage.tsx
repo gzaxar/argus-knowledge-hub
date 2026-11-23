@@ -183,8 +183,9 @@ export function MapPage() {
   });
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-3.5rem)] min-h-0">
-      <aside className="w-80 shrink-0 space-y-4 overflow-y-auto border-r border-slate-200 bg-white p-4 text-sm">
+    // On a phone the map comes first and the panel scrolls under it: side by side, the map was a strip.
+    <div className="-m-6 flex h-[calc(100vh-3.5rem)] min-h-0 flex-col-reverse md:flex-row">
+      <aside className="max-h-[45%] w-full shrink-0 space-y-4 overflow-y-auto border-t border-slate-200 bg-white p-4 text-sm md:max-h-none md:w-80 md:border-r md:border-t-0">
         <div>
           <div className="flex items-center justify-between gap-2">
             <h1 className="text-xl font-semibold text-slate-900">Map</h1>
@@ -342,7 +343,7 @@ export function MapPage() {
           ))}
         </div>
       </aside>
-      <div className="relative min-w-0 flex-1">
+      <div className="relative min-h-0 min-w-0 flex-1">
         <MapContainer center={START} zoom={16} className="h-full w-full" ref={setMap}>
           <TileLayer url={MAP_TILES.url} attribution={MAP_TILES.attribution} maxZoom={20} />
           <Bounds onChange={(b) => setBbox([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()])} />

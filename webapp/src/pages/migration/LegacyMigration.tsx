@@ -60,7 +60,7 @@ export function LegacyMigrationCard() {
   const g = gate.data;
   return (
     <Card
-      title="Legacy records (§12)"
+      title="Legacy records"
       action={
         g && (
           <span className={`rounded px-2 py-0.5 text-xs ${g.ok ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>
@@ -462,7 +462,7 @@ export function SerialLinesCard() {
   }
 
   return (
-    <Card title="Serial lines (§9)">
+    <Card title="Serial lines">
       <p className="py-1 text-sm text-slate-600">
         {lines.length === 0
           ? "No Serial Line is left: every one is a Bus Segment behind a Communication Path."

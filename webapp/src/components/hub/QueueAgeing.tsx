@@ -17,7 +17,7 @@ export function QueueAgeingCard() {
   const buckets = d.queues[0]?.buckets.map((b) => b.label) ?? [];
   return (
     <Card
-      title="Queue ageing (§18.2)"
+      title="Queue ageing"
       action={
         <button onClick={() => escalate.mutate()} className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-50">
           Escalate overdue now

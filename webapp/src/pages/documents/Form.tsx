@@ -258,9 +258,9 @@ export function DocumentForm() {
               onChange={(e) => setAuthorityLevel(e.target.value as AuthorityLevel)}
               className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
             >
-              <option value="ufficiale">Ufficiale</option>
-              <option value="informativo">Informativo</option>
-              <option value="bozza_interna">Bozza interna</option>
+              <option value="ufficiale">Official</option>
+              <option value="informativo">Informative</option>
+              <option value="bozza_interna">Internal draft</option>
             </select>
           </div>
           <div>
@@ -270,9 +270,9 @@ export function DocumentForm() {
               onChange={(e) => setConfidentiality(e.target.value as Confidentiality)}
               className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
             >
-              <option value="pubblico">Pubblico</option>
-              <option value="interno">Interno</option>
-              <option value="riservato">Riservato</option>
+              <option value="pubblico">Public</option>
+              <option value="interno">Internal</option>
+              <option value="riservato">Confidential</option>
             </select>
           </div>
         </div>
@@ -384,7 +384,7 @@ export function DocumentForm() {
           </p>
         )}
 
-        <div className="sticky bottom-0 z-10 -mx-2 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur" data-form-actions="">
+        <div className="-mx-2 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur sm:sticky sm:bottom-0 sm:z-10" data-form-actions="">
         <button
           type="submit"
           disabled={createMutation.isPending}

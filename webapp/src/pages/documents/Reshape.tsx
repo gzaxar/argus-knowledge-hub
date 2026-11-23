@@ -254,7 +254,7 @@ export function DocumentReshape() {
                     className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5">
               <option value="pubblico">Public</option>
               <option value="interno">Internal</option>
-              <option value="riservato">Confidential (riservato)</option>
+              <option value="riservato">Confidential</option>
             </select>
           </label>
           {!intoDocument && (
