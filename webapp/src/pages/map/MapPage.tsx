@@ -393,6 +393,15 @@ export function MapPage() {
             </CircleMarker>
           ))}
         </MapContainer>
+        {/* An empty map said nothing about why or what to do. */}
+        {features.data && features.data.features.length === 0 && (
+          <div className="pointer-events-none absolute inset-x-0 top-3 z-[500] flex justify-center px-3" data-testid="map-empty">
+            <p className="pointer-events-auto max-w-md rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-700 shadow">
+              Nothing with a position in this view. Zoom out, or give a record a place on the map: open it and use
+              <b> Set its position</b> (or draw its route or outline), or import locations from the panel.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

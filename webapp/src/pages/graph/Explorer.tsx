@@ -445,7 +445,9 @@ export function GraphExplorer() {
 
       <div className="flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1">
-          {mode === "explore" && !start && <Hint>Pick an object, ticket or document to see what points at it and what it points at.</Hint>}
+          {mode === "explore" && !start && <Hint>Start from one record: choose Object, Ticket or Document above and type a name
+            or a key (for instance a pump, or a ticket's number). The graph shows what points at it and what it points
+            at; any node opens and expands.</Hint>}
           {mode === "impact" && !start && <Hint>Pick an object: everything that stops when it fails is drawn, with what it loses and the path.</Hint>}
           {mode === "rootcause" && !rootCause.data && <Hint>Add what misbehaves (and, if you know, what still works), then Find causes.</Hint>}
           {mode === "impact" && impact.isFetching && <Hint>Working out what depends on it…</Hint>}
