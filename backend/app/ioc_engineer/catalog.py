@@ -15,6 +15,7 @@ What is read, and from where:
     guide           docs/architecture.md
     sources         (with --sources) each driver's own repository: db templates, protocols, README
     beamlines       (with --beamline) a beamline repository's value files: iocDefaults and the IOC entries
+    pyiocs          (with --pyioc) a Python IOC repository (epik8s-pyioc): its pyioc.yaml, README, example
 
 A module's git source is `organization` + `module`, exactly as the ansible role clones it.
 """
@@ -421,10 +422,99 @@ def _beamline(spec: str, into: Path) -> dict:
     }
 
 
+# --- Python IOCs (epik8s-pyioc) ----------------------------------------------------
+
+def _clone(spec: str, into: Path) -> tuple[Path, str, Optional[str], Optional[str]]:
+    """A path, or a git URL with an optional @ref, checked out shallow under `into` (nothing in it is run)."""
+    url, ref = spec, None
+    if "://" in spec and "@" in spec.rsplit("/", 1)[-1]:
+        url, ref = spec.rsplit("@", 1)
+    if Path(url).is_dir():
+        return Path(url), url, ref, None
+    checkout = into / re.sub(r"\.git$", "", url.rstrip("/").rsplit("/", 1)[-1])
+    if not checkout.exists():
+        cmd = ["git", "clone", "-q", "--depth", "1", "--no-recurse-submodules"] + \
+              (["--branch", ref] if ref else []) + [url, str(checkout)]
+        done = subprocess.run(cmd, capture_output=True, text=True, timeout=600,
+                              env={**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"})
+        if done.returncode != 0:
+            return checkout, url, ref, (done.stderr or "clone failed").strip()[-300:]
+    return checkout, url, ref, None
+
+
+def _pyioc_spec_files(checkout: Path) -> list[Path]:
+    """The pyioc.yaml files a repository registers, as pyioc-run finds them: the packages named by its
+    `epik8s.pyioc` entry points; else every pyioc.yaml outside tests and hidden directories."""
+    found: list[Path] = []
+    pyproject = checkout / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            import tomllib
+            entry_points = (tomllib.loads(pyproject.read_text(encoding="utf-8")).get("project") or {}) \
+                .get("entry-points", {}).get("epik8s.pyioc", {})
+        except Exception:
+            entry_points = {}
+        for value in entry_points.values():
+            package, _, resource = str(value).partition(":")
+            rel = Path(*package.split(".")) / (resource or "pyioc.yaml")
+            for base in (checkout / "src", checkout):
+                if (base / rel).is_file():
+                    found.append(base / rel)
+                    break
+    if not found:
+        found = [p for p in sorted(checkout.rglob("pyioc.yaml"))
+                 if not ({".git", "tests", "test"} & set(p.relative_to(checkout).parts))]
+    return found
+
+
+def _pyioc_repo(spec: str, into: Path) -> list:
+    """The Python IOCs of one repository: spec (raw), README, example entry, version, commit."""
+    checkout, url, ref, error = _clone(spec, into)
+    repository = {"url": url if not Path(url).is_dir() else None, "ref": ref,
+                  "commit": None if error else _git_head(checkout)}
+    if error:
+        return [{"name": checkout.name, "repository": {**repository, "error": error}, "problems": [error]}]
+    readme = next((p for p in sorted(checkout.iterdir()) if p.name.lower().startswith("readme")), None)
+    example = next((checkout / n for n in ("example.yaml", "examples/simulator.yaml") if (checkout / n).exists()),
+                   None)
+    out = []
+    files = _pyioc_spec_files(checkout)
+    if not files:
+        return [{"name": checkout.name, "repository": repository, "problems": ["no pyioc.yaml in the repository"]}]
+    for path in files:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        data = _yaml(path)
+        problems = []
+        if not isinstance(data, dict) or "__error__" in (data or {}):
+            problems.append(f"{path.name}: {data.get('__error__') if isinstance(data, dict) else 'not a mapping'}")
+            data = {}
+        else:
+            try:  # the library the IOC starts with; the hub checks the same way at answer time
+                from epik8s_pyioc.spec import SpecError, parse_spec
+                try:
+                    parse_spec(data)
+                except SpecError as e:
+                    problems.append(f"{path.relative_to(checkout).as_posix()}: {e}")
+            except ImportError:
+                pass
+        out.append({
+            "name": str(data.get("name") or checkout.name),
+            "repository": repository,
+            "spec_path": path.relative_to(checkout).as_posix(),
+            "spec": data,
+            "spec_text": text[:20000],
+            "readme": readme.read_text(encoding="utf-8", errors="replace")[:MAX_TEXT] if readme else None,
+            "example": example.read_text(encoding="utf-8", errors="replace")[:MAX_TEXT] if example else None,
+            "example_path": example.relative_to(checkout).as_posix() if example else None,
+            "problems": problems,
+        })
+    return out
+
+
 # --- the catalogue -----------------------------------------------------------------
 
 def build(repo: Path, sources: Optional[Path] = None, only_collections: tuple = ("infn",),
-          beamlines: tuple = (), workdir: Optional[Path] = None) -> dict:
+          beamlines: tuple = (), workdir: Optional[Path] = None, pyiocs: tuple = ()) -> dict:
     repo = Path(repo).resolve()
     built = _built(repo)
     modules, models, problems = _modules(repo, built)
@@ -447,6 +537,14 @@ def build(repo: Path, sources: Optional[Path] = None, only_collections: tuple = 
             if line.get("error"):
                 problems.append(f"beamline {spec}: {line['error']}")
             lines.append(line)
+    python_iocs = []
+    if pyiocs:
+        into = (workdir or sources or Path(os.environ.get("TMPDIR", "/tmp")) / "argus-ioc-beamlines") / "pyiocs"
+        into.mkdir(parents=True, exist_ok=True)
+        for spec in pyiocs:
+            for entry in _pyioc_repo(spec, into):
+                problems += [f"pyioc {spec}: {p}" for p in entry.get("problems") or []]
+                python_iocs.append(entry)
     guide = repo / "docs" / "architecture.md"
     return {
         "format": FORMAT,
@@ -466,6 +564,7 @@ def build(repo: Path, sources: Optional[Path] = None, only_collections: tuple = 
         "examples": _examples(repo),
         "schemas": schemas,
         "beamlines": lines,
+        "pyiocs": python_iocs,
         "guide": guide.read_text(encoding="utf-8") if guide.exists() else "",
         "problems": problems,
     }
@@ -489,7 +588,8 @@ def _read(path: Path) -> dict:
 
 def _empty_catalog(problem: str) -> dict:
     return {"format": FORMAT, "modules": [], "entity_models": [], "templates": [], "examples": [], "beamlines": [],
-            "template_dirs": [], "global_templates": [], "schemas": {}, "guide": "", "problems": [problem]}
+            "pyiocs": [], "template_dirs": [], "global_templates": [], "schemas": {}, "guide": "",
+            "problems": [problem]}
 
 
 def _fetch(url: str) -> dict:

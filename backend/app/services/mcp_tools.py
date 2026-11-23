@@ -1138,15 +1138,15 @@ TOOLS += [
     {
         "name": "ioc_search",
         "description": "Search the EPICS IOC catalogue (infn-epics-ioc: ibek-support-infn drivers, upstream "
-                       "ibek-support, ibek-templates and their example entries) by vendor, device, driver, "
-                       "devtype or entity type. Start here for any question about building, configuring or "
-                       "deploying a containerised IOC with ibek.",
+                       "ibek-support, ibek-templates and their example entries; and the Python IOCs built with "
+                       "epik8s-pyioc) by vendor, device, driver, devtype or entity type. Start here for any "
+                       "question about building, configuring or deploying a containerised IOC, ibek or Python.",
         "handler": ioc.ioc_search,
         "inputSchema": {
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "e.g. 'pfeiffer gauge', 'ocem', 'modbus', 'technosoft'"},
-                "kind": {"type": "string", "enum": ["module", "entity_model", "template", "example"]},
+                "kind": {"type": "string", "enum": ["module", "entity_model", "template", "example", "pyioc"]},
                 "limit": {"type": "integer"},
             },
             "required": ["query"],
@@ -1200,7 +1200,11 @@ TOOLS += [
                        "a pasted epicsConfiguration.iocs block with one IOC works too) exactly as the IOC pod "
                        "does with jnjrender, then check the resulting ibek IOC YAML as `ibek runtime generate` "
                        "would: unknown or not-compiled entity types, missing, unknown or mistyped parameters, "
-                       "dangling object references. Pass template_source to try a template being written.",
+                       "dangling object references. Pass template_source to try a template being written. A "
+                       "Python IOC entry (devtype of an epik8s-pyioc IOC, start: pyioc-run, no template) is checked "
+                       "instead against the IOC's pyioc.yaml, as pyioc-run checks it at pod start: unknown or "
+                       "mistyped parameters, values out of range, chart settings that start the pod the wrong "
+                       "way; the result shows each device's PV prefix and parameters.",
         "handler": ioc.ioc_render,
         "inputSchema": {
             "type": "object",
@@ -1270,8 +1274,9 @@ TOOLS += [
     {
         "name": "ioc_check_beamline",
         "description": "Render and check every enabled, templated IOC of a beamline against the catalogue's image "
-                       "and templates: which would fail at their next sync, and why. Use it before bumping the "
-                       "image or changing a template the beamline uses.",
+                       "and templates, and every Python (epik8s-pyioc) IOC against its pyioc.yaml: which would "
+                       "fail at their next sync, and why. Use it before bumping the image or changing a template "
+                       "the beamline uses.",
         "handler": ioc.ioc_check_beamline,
         "inputSchema": {"type": "object", "properties": {
             "beamline": {"type": "string"}, "template": {"type": "string", "description": "Only this template"}},
@@ -1334,10 +1339,52 @@ TOOLS += [
         },
     },
     {
+        "name": "ioc_get_pyioc",
+        "description": "One Python IOC (epik8s-pyioc: a caproto IOC in its own image, configured from values.yaml "
+                       "and started with pyioc-run): its repository and image, every parameter an IOC entry may "
+                       "set (type, default, range, unit, aliases; IOC-wide and per device), the PV prefix rules, "
+                       "the iocDefaults block to paste into a beamline, an example entry, its README, and the "
+                       "beamline IOCs that run it.",
+        "handler": ioc.ioc_get_pyioc,
+        "inputSchema": {"type": "object", "properties": {
+            "name": {"type": "string", "description": "The IOC's devtype, e.g. thorlabscct"},
+            "include_docs": {"type": "boolean", "description": "Default true: parameter tables and README"}},
+            "required": ["name"]},
+    },
+    {
+        "name": "ioc_scaffold_pyioc",
+        "description": "Write a complete Python IOC project (epik8s-pyioc) from a description of the device: "
+                       "pyioc.yaml, a caproto IOC (one PV group per device, Connected/LastError, polling and "
+                       "reconnection, enum and array handling Phoebus accepts), a simulator and a TCP or device "
+                       "driver to complete, Channel Access tests, Dockerfile, a CI publishing to ghcr.io on tags, "
+                       "the example entry and the iocDefaults block, with a self-check. The same generator as "
+                       "`pyioc init --from`. Returns text; it writes nothing. Ask for the device's PVs (name, "
+                       "type, access) and how it is reached first; a description that cannot become a project "
+                       "comes back with every problem and an example.",
+        "handler": ioc.ioc_scaffold_pyioc,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "object",
+                    "description": "name (the devtype, lower case), description, devgroup, image, transport "
+                                   "(tcp|none), default_port, multiple (a devices list, default true), parameters "
+                                   "and device_parameters (pyioc.yaml parameter definitions: type, default, min, "
+                                   "max, unit, choices, description), pvs: [{name, type (float|int|bool|enum|"
+                                   "string|waveform), access (ro|rw|cmd), unit, precision, choices, length "
+                                   "(waveform), limits [lo, hi], default, description}].",
+                },
+            },
+            "required": ["description"],
+        },
+    },
+    {
         "name": "ioc_guide",
         "description": "How infn-epics-ioc, ibek-support-infn, ibek-templates, epik8s-chart and the beamline "
-                       "repositories fit together (the architecture document, by section), the workflow for "
-                       "a new IOC or driver, and which commit the catalogue was read from.",
+                       "repositories fit together (the architecture document, by section), the epik8s-pyioc "
+                       "documentation for Python IOCs (sections 'Python IOCs: ...': how-to, pyioc.yaml "
+                       "specification, runtime contract, pitfalls, tools), the workflow for a new IOC or driver, "
+                       "and which commit the catalogue was read from.",
         "handler": ioc.ioc_guide,
         "inputSchema": {"type": "object", "properties": {
             "section": {"type": "string", "description": "A section title or a word in it; omit for all"}}},

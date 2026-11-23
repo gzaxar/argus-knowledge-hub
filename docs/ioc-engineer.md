@@ -13,6 +13,8 @@ submodules:
 | driver repositories (optional) | db templates, protocol files, README | show a driver's macros and records when writing its entity models |
 | `docs/architecture.md` | how the image, ioc-chart, epik8s-chart and the beamlines fit together | `ioc_guide` |
 | beamline repositories (optional) | the deploy value files: `iocDefaults` and the IOC entries | list, render and check a beamline's IOCs as deployed |
+| Python IOC repositories (optional) | `pyioc.yaml` (the parameters an IOC entry may set), README, `example.yaml` | find a Python IOC, explain its parameters, check its entries (*Python IOCs*) |
+| `epik8s-pyioc` (the installed library) | the pyioc.yaml format, the entry checks, the project generator and its documentation | the same checks `pyioc-run` makes at pod start; `ioc_scaffold_pyioc`; `ioc_guide` sections *Python IOCs: …* |
 
 ## The tools
 
@@ -36,7 +38,9 @@ submodules and tagging an image stay with people.
 | `ioc_list_beamline` | The beamlines in the catalogue, or one beamline's IOCs: template, devtype, prefix, how the pod starts them |
 | `ioc_get_beamline_ioc` | One IOC as deployed: its entry, the iocDefaults it inherits, the values the pod receives, its render |
 | `ioc_check_beamline` | Every enabled, templated IOC of a beamline rendered and checked: what its next sync would break |
-| `ioc_guide` | The architecture document by section, the workflow, and which commit the catalogue was read from |
+| `ioc_get_pyioc` | One Python IOC: repository and image, every parameter an entry may set (type, default, range, unit), the PV prefix rules, the `iocDefaults` block, an example entry, the beamline IOCs that run it |
+| `ioc_scaffold_pyioc` | A complete Python IOC project from a description of the device (transport, PVs with type and access): spec, caproto IOC, simulator, driver to complete, CA tests, Dockerfile, CI, with a self-check |
+| `ioc_guide` | The architecture document by section, the epik8s-pyioc documentation (*Python IOCs: …*), the workflow, and which commit the catalogue was read from |
 
 ### What `ioc_render` reproduces
 
@@ -83,9 +87,36 @@ How the pod starts an IOC follows ioc-chart's precedence:
 
 - `host:` runs remotely through epik8s-run;
 - `template:` renders through jnjrender;
-- otherwise the pod uses the git config directory.
+- otherwise the pod uses the git config directory, then the entry's `start:`. With `start: pyioc-run`, or a
+  `devtype` that names a Python IOC of the catalogue, it is a Python IOC (mode `pyioc`).
 
-Only `template:` IOCs are rendered and checked; the others are listed as skipped.
+`template:` and Python IOCs are rendered or checked; the others (`host`, plain git configs) are listed as
+skipped.
+
+### Python IOCs
+
+A Python IOC (epik8s-pyioc) is a caproto IOC in its own image. Its repository ships a `pyioc.yaml` that declares
+the parameters an IOC entry may set, and the pod starts it with `pyioc-run`, which validates the entry against
+it. The library's documentation is in `ioc_guide` (*Python IOCs: How to*, *specification*, *Runtime contract*,
+*Pitfalls*, *Tools*); `infn-epics-ioc/docs/architecture.md` section 11 says where these IOCs fit.
+
+- **Checking an entry.** `ioc_render` takes the Python branch for an entry without `template:` whose `devtype`
+  is a Python IOC of the catalogue (or with `start: pyioc-run`). It runs the checks of `pyioc validate`,
+  with the same library: unknown, mistyped or out-of-range parameters, a misspelt key in a `devices` entry,
+  and the chart settings that start the pod the wrong way: a `template:` (the ibek branch), a `start` that is
+  not `pyioc-run`, no `pva: false` for a CA-only IOC, no image. `resolved` shows each device's PV prefix and
+  parameters. An entry checked on its own gets the `iocDefaults` the IOC publishes under it, and a note says
+  so. With `beamline=…` it gets the beamline's own.
+- **Beamlines.** `ioc_check_beamline` checks a beamline's Python IOCs with its templated ones, and
+  `ioc_get_beamline_ioc` shows one with its check.
+- **A new IOC.** `ioc_scaffold_pyioc` takes a description of the device: `name` (the devtype), `transport`
+  (`tcp` or `none`), `pvs` with `type` (`float`, `int`, `bool`, `enum`, `string`, `waveform`) and `access`
+  (`ro`, `rw`, `cmd`), and optional parameters. It returns the whole project, the same files
+  `pyioc init --from` writes. The generated IOC avoids the traps found in deployed ones: enum puts arriving
+  as strings, arrays shorter than declared that Phoebus cannot decode, char-waveform strings, repeated error
+  logs, blocking calls. Its self-check parses the spec, resolves the example entry and compiles the Python;
+  nothing generated is run in the hub. The person builds and tests it (`pytest` runs the IOC on its simulator
+  over Channel Access) and tags it, and CI publishes the image.
 
 ### Retired modules and stale examples
 
@@ -317,6 +348,11 @@ snapshot includes ELI-NP (`epik8s-eli`, public). SPARC and BTF live on INFN's Gi
 that can reach it:
 `--beamline https://baltig.infn.it/…/epik8-sparc.git --beamline https://baltig.infn.it/…/epik8s-btf.git`.
 
+`--pyioc URL[@REF]` (repeatable, or a local path) reads a Python IOC repository: the `pyioc.yaml` its
+`epik8s.pyioc` entry points register (as `pyioc-run` finds it, else any `pyioc.yaml` outside tests), its
+README and `example.yaml`. It is cloned shallow, without submodules or Git LFS objects, and nothing in it is
+run. infn-epics-ioc's CI passes the repositories of its variable `IOC_CATALOG_PYIOCS` (default `thorlabscct`).
+
 `--sources DIR` also clones each INFN driver at the version its install.yml names (`organization` + `module`)
 and indexes its db templates (macros, record sample), protocol files (commands), startup scripts and README.
 Repositories the build cannot reach are listed under `sources.failed`. The drivers on `baltig.infn.it`
@@ -363,3 +399,8 @@ set. Rebuild it with the command above when you want a newer offline default.
 4. **Before a new image or a template change.** Run `ioc_check_beamline` for each beamline in the catalogue.
 5. **An IOC that does not start.** Render its entry. "Unknown entity type" usually means the module is not in
    the image's `ansible.sh` list. "Template not found" means the image is older than the template.
+6. **A device better served by Python** (a vendor library for Python or .NET, a simple text protocol, logic
+   around the hardware). An existing one: `ioc_search` with kind `pyioc`, `ioc_get_pyioc`, then
+   `ioc_render` the entry. A new one: `ioc_scaffold_pyioc`, then complete the driver, run its tests and tag it.
+   Add the `iocDefaults` block and the entry (`devtype`, never `template`; a `devices` list for the screens),
+   check it with `ioc_render(values, beamline=…)`, and add the repository to `IOC_CATALOG_PYIOCS`.
