@@ -7,6 +7,7 @@ import type { ReshapeResult, ReshapeSource } from "../../api/types";
 import { MarkdownEditor } from "../../components/MarkdownEditor";
 import { WorkspaceScopeBanner } from "../../components/WorkspaceScopeBanner";
 import { daySections, type DaySection } from "../../lib/daySections";
+import { withTitle } from "../../lib/headingTitle";
 
 const KINDS: { id: ReshapeSource["kind"]; label: string }[] = [
   { id: "paste", label: "Notes or a transcript" },
@@ -292,7 +293,7 @@ export function DocumentReshape() {
                        save={(extra) => saveWithOriginal({
                          source: sourceOf(), document_type_uid: typeUid, template: `${result.template.ref}${
                            result.template.scope === "official" ? "" : `@${result.template.version}`}`,
-                         title, markdown: draft, confidentiality, is_global: isGlobal && confidentiality !== "riservato",
+                         title, markdown: withTitle(draft, title), confidentiality, is_global: isGlobal && confidentiality !== "riservato",
                          dates: result.dates, extraction: result.extraction,
                          issues: result.issues, model: result.model, ...extra })}
                        onSaved={(uid, revisionUid) => {
