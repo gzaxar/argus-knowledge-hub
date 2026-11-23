@@ -61,8 +61,9 @@ export function BeamModelPage() {
   };
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-3.5rem)] min-h-0">
-      <aside className="w-64 shrink-0 overflow-y-auto border-r border-slate-200 bg-white p-3 text-sm">
+    // On a phone the panels stack: side by side, the element panel was squeezed off the right edge.
+    <div className="-m-6 flex h-[calc(100vh-3.5rem)] min-h-0 flex-col md:flex-row">
+      <aside className="max-h-[35%] w-full shrink-0 overflow-y-auto border-b border-slate-200 bg-white p-3 text-sm md:max-h-none md:w-64 md:border-b-0 md:border-r">
         <h1 className="text-base font-semibold text-slate-900">Beam model</h1>
         <p className="mt-1 text-xs text-slate-500">Physics positions linked to the equipment, controls and documentation behind them.</p>
         <div className="mt-2 flex flex-wrap gap-1">
@@ -77,8 +78,9 @@ export function BeamModelPage() {
         )}
         {systems.data?.length === 0 && (
           <p className="mt-4 text-xs text-slate-500">
-            No beam model in this workspace. Import one with <code>POST /v1/beam-model/import</code>, or try the demo
-            workspace (<code>scripts/beam_model_demo.py</code>).
+            No beam model in this workspace yet. The beam model is the accelerator's lattice — its elements in beam
+            order, with the equipment that realises each — and an administrator imports it from the lattice file.
+            See <Link to="/help" className="underline">Help</Link> → <em>The beam model</em>.
           </p>
         )}
         {(systems.data ?? []).map((s) => (
@@ -168,7 +170,7 @@ export function BeamModelPage() {
         )}
       </section>
 
-      <aside className="w-96 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-4 text-sm">
+      <aside className="max-h-[45%] w-full shrink-0 overflow-y-auto border-t border-slate-200 bg-white p-4 text-sm md:max-h-none md:w-96 md:border-l md:border-t-0">
         {!selected && <p className="text-slate-500">Select an element to see its physics and what the facility knows behind it.</p>}
         {context.isLoading && <p className="text-slate-400">Loading…</p>}
         {context.data && <ElementPanel c={context.data} onPick={(u) => go(pathUid, u)} />}

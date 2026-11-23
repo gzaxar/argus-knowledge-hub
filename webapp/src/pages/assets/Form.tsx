@@ -322,7 +322,7 @@ export function AssetForm() {
                          onToggle={(i, on) => setPorts((all) => all.map((p, j) => (j === i ? { ...p, on } : p)))} />
         )}
 
-        <div className="sticky bottom-0 z-10 -mx-2 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur" data-form-actions="">
+        <div className="-mx-2 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur sm:sticky sm:bottom-0 sm:z-10" data-form-actions="">
         <button
           type="submit"
           disabled={saveMutation.isPending || !schemaUid || (port.on && !macLooksRight(port.mac))}

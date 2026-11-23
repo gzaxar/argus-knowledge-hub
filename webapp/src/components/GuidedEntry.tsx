@@ -117,6 +117,10 @@ export function GuidedEntry({
   const accept = (isDocument || canSee ? "image/jpeg,image/png,image/webp," : "") + ".pdf,.docx,.xlsx,.xlsm,.eml,.txt,.md,.csv";
 
   const [text, setText] = useState("");
+  // Until the person has written or chosen anything, what is missing is a to-do, not an error: a form that opens
+  // with "Give it a name" in red reads as a mistake they have not made.
+  const pristine = useRef(JSON.stringify(draft));
+  const started = text.trim() !== "" || JSON.stringify(draft) !== pristine.current;
   const navigate = useNavigate();
   const [result, setResult] = useState<AssistResult | null>(null);
   const [used, setUsed] = useState<Set<string>>(new Set());
@@ -523,7 +527,8 @@ export function GuidedEntry({
             )}
             <ul className="mt-2 space-y-1.5">
               {g.checks.map((c) => (
-                <li key={c.id + c.message} className={`rounded border px-2 py-1.5 text-xs ${LEVEL_STYLE[c.level]}`}>
+                <li key={c.id + c.message} data-level={started ? c.level : "todo"}
+                    className={`rounded border px-2 py-1.5 text-xs ${LEVEL_STYLE[!started && c.level === "error" ? "info" : c.level]}`}>
                   <p>{c.message}</p>
                   {c.links && c.links.length > 0 && (
                     <ul className="mt-1 space-y-0.5">

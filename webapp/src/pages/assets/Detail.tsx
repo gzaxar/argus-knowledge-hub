@@ -228,8 +228,9 @@ export function AssetDetail() {
         />
       )}
 
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4">
+      {/* On a phone the actions go under the title instead of squeezing it to a word per line. */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-4">
           <ImageSlot
             attachmentUid={a.avatar_icon_uid}
             fallbackText={a.name}
@@ -239,8 +240,8 @@ export function AssetDetail() {
             onPick={(file) => uploadAvatarMutation.mutate(file)}
             onClear={() => clearAvatarMutation.mutate()}
           />
-          <div>
-            <h1 className="flex items-center gap-2 text-2xl font-semibold text-slate-900">
+          <div className="min-w-0">
+            <h1 className="flex flex-wrap items-center gap-2 break-words text-xl font-semibold text-slate-900 sm:text-2xl">
               {a.name}
               {a.is_global && (
                 <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700">
@@ -255,15 +256,16 @@ export function AssetDetail() {
                 </span>
               )}
             </h1>
-            <p className="text-sm text-slate-500">
-              {showKeys && <>{a.key} · </>}{a.type} · schema:{" "}
-              <Link to={`/schemas/${a.schema_uid}`} className="hover:underline">
-                {schema.data?.name ?? a.schema_uid}
+            <p className="break-all text-sm text-slate-500 sm:break-normal">
+              {showKeys && <>{a.key} · </>}
+              {/* The type, once, opening its definition: "Ion Pump · schema: Ion Pump" said it twice. */}
+              <Link to={`/schemas/${a.schema_uid}`} className="hover:underline" title="Open the type">
+                {schema.data?.name ?? a.type}
               </Link>
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <FollowButton subject="asset" uid={a.uid} />
           <Link
             to={`/assets/${a.uid}/edit`}

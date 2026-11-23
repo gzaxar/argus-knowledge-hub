@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { reshapeApi, rolesApi } from "../../api/client";
+import { authorityLabel, confidentialityLabel } from "../../lib/documentLabels";
 import { useCurrentWorkspaceId } from "../../api/useCurrentWorkspaceId";
 import {
   ApiError,
@@ -344,10 +345,11 @@ export function DocumentDetail() {
 
   return (
     <div className="max-w-4xl">
-      <div className="flex items-start justify-between">
-        <div>
+      {/* On a phone the actions go under the title instead of squeezing it and running off the edge. */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           {showKeys && <p className="font-mono text-xs text-slate-400">{doc.code}</p>}
-          <h1 className="text-2xl font-semibold text-slate-900">{doc.title}</h1>
+          <h1 className="break-words text-xl font-semibold text-slate-900 sm:text-2xl">{doc.title}</h1>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
             {/* An import has to guess the type from a label or a title, so
                 correcting it is routine — it belongs here, not behind an
@@ -366,8 +368,8 @@ export function DocumentDetail() {
                 </option>
               ))}
             </select>
-            <span className="rounded bg-slate-100 px-2 py-0.5">{doc.authority_level}</span>
-            <span className="rounded bg-slate-100 px-2 py-0.5">{doc.confidentiality}</span>
+            <span className="rounded bg-slate-100 px-2 py-0.5" title="Authority level">{authorityLabel(doc.authority_level)}</span>
+            <span className="rounded bg-slate-100 px-2 py-0.5" title="Confidentiality">{confidentialityLabel(doc.confidentiality)}</span>
             {doc.is_global && (
               <span
                 className="rounded bg-sky-100 px-2 py-0.5 text-sky-800"
@@ -380,7 +382,10 @@ export function DocumentDetail() {
                 {doc.workspace_id === workspaceId ? "shared" : `shared from ${doc.workspace_id}`}
               </span>
             )}
-            <span className="rounded bg-slate-100 px-2 py-0.5">source: {doc.source}</span>
+            {/* Where it came from only when that says something: every document typed here was "source: manual". */}
+            {doc.source && doc.source !== "manual" && (
+              <span className="rounded bg-slate-100 px-2 py-0.5">Imported from {doc.source}</span>
+            )}
             {sourceUrl && (
               <a
                 href={sourceUrl}
@@ -401,7 +406,7 @@ export function DocumentDetail() {
             </label>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <FollowButton subject="document" uid={doc.uid} />
           <ExportMenu kind="document" uid={doc.uid} revisionUid={viewed?.uid} />
           {doc.current_revision_uid && (

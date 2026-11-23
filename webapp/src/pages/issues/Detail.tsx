@@ -392,10 +392,11 @@ export function IssueDetail() {
               sourceKey
             )}
           </p>
-          <h1 className="mt-0.5 text-2xl font-semibold text-slate-900">{i.title}</h1>
+          <h1 className="mt-0.5 break-words text-xl font-semibold text-slate-900 sm:text-2xl">{i.title}</h1>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        {/* Wraps on a phone: four actions in a row ran off the edge ("Copy/Move…" cut, Delete unseen). */}
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={i.state}
             onChange={(e) => updateMutation.mutate({ state: e.target.value })}

@@ -16,6 +16,10 @@ export function PortalFrame({ siteId, siteName, crumbs = [], emergency, children
   children: ReactNode;
 }) {
   const home = siteId ? `/support/${siteId}` : "/support";
+  // Reached from the Knowledge Hub's menu, the help centre is a page of its own: those who work in a workspace
+  // get the way back, those who only make requests do not see a door to somewhere they cannot go.
+  const mine = useQuery({ queryKey: ["my-workspaces"], queryFn: workspacesApi.listMine, retry: false });
+  const hub = (mine.data?.length ?? 0) > 0;
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <a href="#portal-main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-sm">
@@ -28,6 +32,7 @@ export function PortalFrame({ siteId, siteName, crumbs = [], emergency, children
             <span className="truncate">{siteName ? `${siteName} · Help centre` : "ARGUS Help centre"}</span>
           </Link>
           <nav aria-label="Service portal" className="ml-auto flex items-center gap-1 text-sm">
+            {hub && <Link to="/" className="rounded px-3 py-1.5 hover:bg-white/10">← Knowledge Hub</Link>}
             {siteId && <Link to={home} className="rounded px-3 py-1.5 hover:bg-white/10">Services</Link>}
             {siteId && (
               <Link to={`/support/${siteId}/requests`}
