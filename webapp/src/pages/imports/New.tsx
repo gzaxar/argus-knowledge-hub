@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { importPaths } from "./paths";
+import { PublishChoice } from "./Markdown";
 import { ApiError, importConfigsApi, workspacesApi } from "../../api/client";
 import { ImportSchedule, ImportSource, MergeStrategy, MERGE_STRATEGIES } from "../../api/types";
 import { WorkspaceScopeBanner } from "../../components/WorkspaceScopeBanner";
@@ -51,6 +52,7 @@ export function ImportConfigForm() {
   const [pageUrl, setPageUrl] = useState("");
   const [includeChildren, setIncludeChildren] = useState(true);
   const [linkAssets, setLinkAssets] = useState(true);
+  const [publish, setPublish] = useState(true);
 
   const [provider, setProvider] = useState<"github" | "gitlab">("github");
   const [repoUrl, setRepoUrl] = useState("");
@@ -98,10 +100,12 @@ export function ImportConfigForm() {
       setPageUrl(param("page_url"));
       setIncludeChildren(existing.data.params.include_children !== false);
       setLinkAssets(existing.data.params.link_assets !== false);
+      setPublish(existing.data.params.publish !== false);
     } else if (existing.data.source === "dokuwiki") {
       setPageUrl(param("page_url"));
       setIncludeChildren(existing.data.params.include_children !== false);
       setLinkAssets(existing.data.params.link_assets !== false);
+      setPublish(existing.data.params.publish !== false);
     } else if (existing.data.source === "jira-issues") {
       setBaseUrl(param("base_url"));
       setJql(param("jql"));
@@ -144,6 +148,7 @@ export function ImportConfigForm() {
                 ? { page_url: pageUrl.trim(), include_children: includeChildren }
                 : { space_key: spaceKey || undefined, cql: cql || undefined }),
               link_assets: linkAssets,
+              publish,
               ...(jiraPat ? { pat: jiraPat } : {}),
             }
           : source === "dokuwiki"
@@ -152,6 +157,7 @@ export function ImportConfigForm() {
               page_url: pageUrl.trim(),
               include_children: includeChildren,
               link_assets: linkAssets,
+              publish,
             }
           : source === "jira-issues"
           ? {
@@ -289,6 +295,7 @@ export function ImportConfigForm() {
                    hint="Its folder (namespace) and the folders below; a page under another becomes that document's child." />
             <Check checked={linkAssets} onChange={setLinkAssets} label="Link the equipment a page names"
                    hint="An asset key found in a page links the document to that asset." />
+            <PublishChoice publish={publish} onChange={setPublish} />
             <p className="text-xs text-slate-500">
               Each wiki page is one document, found again on the next run: unchanged pages are skipped, a changed one
               gets a new revision. Pictures are attached and shown in place; links between imported pages lead to their
@@ -425,6 +432,7 @@ export function ImportConfigForm() {
                     </span>
                   </span>
                 </label>
+                <PublishChoice publish={publish} onChange={setPublish} />
               </>
             ) : source === "jira" ? (
               <div>

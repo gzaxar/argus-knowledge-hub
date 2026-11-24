@@ -44,7 +44,18 @@ export function GlobalValueList() {
             <tbody className="divide-y divide-slate-100">
               {data.map((gv) => (
                 <tr key={gv.uid} className="hover:bg-slate-50">
-                  <td className="px-4 py-2 font-medium text-slate-900">{gv.name}</td>
+                  <td className="px-4 py-2 font-medium text-slate-900">
+                    {gv.name}
+                    {/* Next to Ticket workflows it read as a copy of the default workflow's states: it is where the
+                        board and the list take them from. */}
+                    {gv.applies_to === "tickets" && gv.key === "status" && (
+                      <span className="block text-xs font-normal text-slate-500" data-testid="ticket-status-note">
+                        The states of tickets that follow the default workflow: the board's columns and the list's
+                        filter. A type with its own workflow uses that one (<Link to="/tickets/workflows"
+                        className="text-indigo-600 hover:underline">Ticket workflows</Link>).
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-2 text-slate-500">{gv.key}</td>
                   <td className="px-4 py-2 text-slate-500 capitalize">{gv.applies_to}</td>
                   <td className="px-4 py-2 text-slate-500">{gv.type}</td>

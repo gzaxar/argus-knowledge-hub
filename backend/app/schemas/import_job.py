@@ -61,6 +61,8 @@ class ConfluenceImportRequest(ConfluencePageLink):
     space_key: Optional[str] = None
     cql: Optional[str] = None
     link_assets: bool = True
+    # False: the pages arrive as drafts, each to be reviewed, approved and published like any other document.
+    publish: bool = True
     merge_strategy: MergeStrategy = "override"
 
 
@@ -71,6 +73,8 @@ class DokuwikiImportRequest(BaseModel):
     page_url: str = Field(min_length=8, max_length=2000)
     include_children: bool = True
     link_assets: bool = True
+    # False: the pages arrive as drafts, each to be reviewed, approved and published like any other document.
+    publish: bool = True
     merge_strategy: MergeStrategy = "override"
 
 

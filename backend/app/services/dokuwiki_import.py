@@ -88,8 +88,13 @@ def _relate(db: Session, workspace_id: str, from_uid: str, to_type: str, to_uid:
     return True
 
 
+def _latest_revision(db: Session, document_uid: str) -> Optional[DocumentRevision]:
+    return db.scalar(select(DocumentRevision).where(DocumentRevision.document_uid == document_uid)
+                     .order_by(DocumentRevision.revision_number.desc()).limit(1))
+
+
 def run_dokuwiki_import(job_uid: str, workspace_id: str, page_url: str, include_children: bool = True,
-                        merge_strategy: str = "override", link_assets: bool = True) -> None:
+                        merge_strategy: str = "override", link_assets: bool = True, publish: bool = True) -> None:
     from app.services.confluence_import import choose_document_type
     db = SessionLocal()
     job = db.get(ImportJob, job_uid)
@@ -117,8 +122,10 @@ def run_dokuwiki_import(job_uid: str, workspace_id: str, page_url: str, include_
         changed: list[str] = []
         for page_id in ids:
             doc, code = document_code(host, page_id, workspace_id, db)
-            current = db.get(DocumentRevision, doc.current_revision_uid) if doc and doc.current_revision_uid else None
-            if current is not None and (current.attributes or {}).get("argus_source_version") == \
+            # Against the page's latest revision, published or still a draft: an unchanged page imported as a
+            # draft is not imported again on every run.
+            latest = _latest_revision(db, doc.uid) if doc else None
+            if latest is not None and (latest.attributes or {}).get("argus_source_version") == \
                     fingerprint(bodies[page_id]):
                 documents[page_id] = doc
                 continue
@@ -143,16 +150,18 @@ def run_dokuwiki_import(job_uid: str, workspace_id: str, page_url: str, include_
             doc = documents[page_id]
             path = wk.path_of(page_id)
             page = wi.convert(path, folder)
-            is_new = doc.current_revision_uid is None
-            current = db.get(DocumentRevision, doc.current_revision_uid) if not is_new else None
+            latest = _latest_revision(db, doc.uid)
+            is_new = latest is None
+            current = db.get(DocumentRevision, doc.current_revision_uid) if doc.current_revision_uid else None
             doc.title = page.title if page.title != wi.stem(path) else (names.get(page_id) or page.title)
             kind = choose_document_type([], doc.title)
             if is_new or not doc.document_type_uid:
                 doc.document_type_uid = type_uids.get(kind) or type_uid(workspace_id, kind)
             revision = DocumentRevision(
                 uid=str(uuid.uuid4()), document_uid=doc.uid,
-                revision_number=(current.revision_number + 1) if current else 1, state="published",
-                body_markdown="", published_at=datetime.now(timezone.utc),
+                revision_number=(latest.revision_number + 1) if latest else 1,
+                state="published" if publish else "draft",
+                body_markdown="", published_at=datetime.now(timezone.utc) if publish else None,
                 attributes={**(sources.get(path) or {}), "argus_source": "dokuwiki",
                             "argus_source_version": fingerprint(bodies[page_id]),
                             "argus_source_space": host, "argus_source_updated": datetime.now(timezone.utc).isoformat()})
@@ -162,10 +171,12 @@ def run_dokuwiki_import(job_uid: str, workspace_id: str, page_url: str, include_
             pictures += len(shown)
             _attach(db, workspace_id, revision.uid, path, folder[path])            # the page as the wiki showed it
             revision.body_markdown = wi.finish(page.markdown, shown, by_path)
-            if current is not None:
-                current.state = "superseded"
-                current.superseded_by_uid = revision.uid
-            doc.current_revision_uid = revision.uid
+            # As a draft, the page waits for review: what is published (if anything) stays until it is approved.
+            if publish:
+                if current is not None:
+                    current.state = "superseded"
+                    current.superseded_by_uid = revision.uid
+                doc.current_revision_uid = revision.uid
             if is_new:
                 imported += 1
             else:
@@ -198,8 +209,9 @@ def run_dokuwiki_import(job_uid: str, workspace_id: str, page_url: str, include_
         job.completed_at = datetime.now(timezone.utc)
         db.commit()
         # The pages are published: Ask ARGUS reads them once the index has caught up, as after any publication.
-        from app.services import knowledge_schedule
-        knowledge_schedule.after_document_change(db, job.workspace_id)
+        if publish:
+            from app.services import knowledge_schedule
+            knowledge_schedule.after_document_change(db, job.workspace_id)
     except Exception as e:  # noqa: BLE001 — whatever went wrong is the job's outcome, said in its words
         db.rollback()
         job = db.get(ImportJob, job_uid)

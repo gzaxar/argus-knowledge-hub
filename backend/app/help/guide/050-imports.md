@@ -24,6 +24,12 @@ runs. **New** starts one. Choose the source:
 | **Git** | files from a Git repository |
 | **Markdown** | Markdown files, as documents |
 
+Documents from **Confluence**, **DokuWiki** and **Markdown** arrive **published**, as they are at the source, unless
+the import is set to **As drafts to review**: then each page is a draft with nothing published yet, and goes through
+review, approval and publication like a document written here — the choice for procedures that must be validated
+before anyone works from them. On a re-run, an unchanged page is skipped either way; a changed one adds a new draft
+and leaves what is published until that draft is approved.
+
 A configuration is saved with a name and can be **run again** whenever the source changes — by hand
 (**Run**) or by itself on a schedule (see *Run an import on a schedule*); each run records what it read (for Git
 sources, the commit).

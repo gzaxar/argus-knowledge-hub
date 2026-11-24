@@ -236,3 +236,22 @@ def test_a_saved_dokuwiki_import_needs_no_credential_and_runs(wiki, world):
     assert ran.status_code == 202, ran.text
     job = client.get(f"/v1/imports/{ran.json()['last_import_job_uid']}", headers=world["h"]).json()
     assert job["source"] == "dokuwiki" and job["status"] == "succeeded", job
+
+
+def test_a_wiki_imported_as_drafts_waits_for_review_and_a_rerun_adds_nothing(wiki, world):
+    """Asked for drafts: every page is a draft with nothing published, and running again on an unchanged wiki
+    neither duplicates the drafts nor counts them as new."""
+    job = run(world, publish=False)
+    assert job.status == "succeeded", job.error
+    assert job.counts["documents"] == 3
+    db = SessionLocal()
+    try:
+        made = list(db.scalars(select(Document).where(Document.workspace_id == world["ws"])))
+        assert len(made) == 3 and all(d.current_revision_uid is None for d in made)
+        states = [r.state for r in db.scalars(select(DocumentRevision).where(
+            DocumentRevision.document_uid.in_([d.uid for d in made])))]
+        assert states == ["draft"] * 3
+    finally:
+        db.close()
+    again = run(world, publish=False)
+    assert (again.counts["documents"], again.counts["documents_updated"], again.counts["documents_unchanged"]) == (0, 0, 3)

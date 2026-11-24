@@ -205,3 +205,23 @@ def test_publishing_takes_off_the_draft_notice_of_a_rework_and_nothing_else(ws):
     assert client.get(f"/v1/documents/{uid}/revisions", headers=headers).json()[0]["body_markdown"] == body
     out = client.post(f"/v1/documents/{uid}/revisions/{rev}/publish", headers=headers, json={}).json()
     assert out["body_markdown"] == f"# Pump replacement\n\n> {notice}\n", "only the notice on top is the draft's"
+
+
+def test_a_review_never_asks_more_signatures_than_people_able_to_sign():
+    """One person manages this workspace: a review asking two signatures could never be completed."""
+    ws = f"one-{secrets.token_hex(3)}"
+    db = SessionLocal()
+    db.add(Workspace(id=ws, name="One owner"))
+    owner = User(id=f"owner-{ws}", email=f"owner@{ws}.example", name="Owner", is_admin=True)   # may approve
+    db.add(owner)
+    db.flush()
+    db.add(RoleBinding(workspace_id=ws, subject_type="user", subject_id=owner.id, role_id="owner",
+                       created_at=datetime.now(timezone.utc)))
+    db.commit()
+    assert access_review.eligible_signers(db, ws) == 1
+    review = access_review.create(db, ws, "owner", required_signers=2)
+    assert review.required_signers == 1
+    access_review.sign(db, review, "owner")
+    assert review.completed_at is not None
+    db.rollback()
+    db.close()

@@ -225,9 +225,10 @@ function HeaderMenu({
                   setOpen(false);
                   i.action();
                 }}
-                className="block w-full px-3 py-1.5 text-left text-sm text-slate-800 hover:bg-slate-50"
+                className="block w-full px-3 py-1.5 text-left hover:bg-slate-50"
               >
-                {i.label}
+                <span className="block text-sm text-slate-800">{i.label}</span>
+                {i.hint && <span className="block text-xs text-slate-500">{i.hint}</span>}
               </button>
             ),
           )}
@@ -295,8 +296,12 @@ export function AppShell() {
     : adminLink
       ? [{ to: adminLink, label: "Administration" }]
       : [];
+  // A display preference, with the account's other choices: as a bare checkbox in the header it said nothing.
+  const showKeys = useShowKeys();
   const accountItems = [
     { to: "/account", label: "My account" },
+    { action: () => setShowKeys(!showKeys), label: showKeys ? "Hide keys beside names" : "Show keys beside names",
+      hint: "Record keys and document codes (LINAC-…-IP-0001, PROC-0001) in lists and on pages" },
     { to: "/about", label: "About ARGUS" },
     { action: () => void signOut(), label: "Sign out" },
   ];
@@ -352,7 +357,6 @@ export function AppShell() {
             </kbd>
           </button>
           <div className="ml-auto flex shrink-0 items-center gap-1">
-            <ShowKeysToggle />
             <NotificationBell />
             <Link
               to="/help"
@@ -400,13 +404,3 @@ export function AppShell() {
 
 
 /** Show records with their key (SPARC-IP-01 · Ion pump) or by name and title only; kept in this browser. */
-function ShowKeysToggle() {
-  const show = useShowKeys();
-  return (
-    <label className="hidden cursor-pointer items-center gap-1 text-xs text-slate-500 md:flex"
-           title="Show keys and codes beside names and titles, in lists and on record pages">
-      <input type="checkbox" checked={show} onChange={(e) => setShowKeys(e.target.checked)} />
-      Show keys
-    </label>
-  );
-}

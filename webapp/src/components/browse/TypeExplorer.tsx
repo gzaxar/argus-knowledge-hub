@@ -239,8 +239,21 @@ export function TypeExplorer({ appliesTo, counts, total, selected, onSelect, tit
     return m;
   }, [counts, alias]);
   const allCounts = useMemo(() => subtreeCounts(roots, merged), [roots, merged]);
-  const visible = useMemo(() => filterTree(roots, query.trim()), [roots, query]);
   const searching = query.trim().length > 0;
+  // The types with records here (or the one chosen), unless asked for every type: thirty ticket types listed for
+  // one ticket buried the one that mattered. A workspace with no records yet sees them all, to know what exists.
+  const [everyType, setEveryType] = useState(false);
+  const inUse = useMemo(() => {
+    const keep = (nodes: TreeNode[]): TreeNode[] => nodes.flatMap((n) => {
+      const children = keep(n.children);
+      return (allCounts.get(n.schema.uid) ?? 0) > 0 || n.schema.uid === selected || children.length > 0
+        ? [{ ...n, children }] : [];
+    });
+    return keep(roots);
+  }, [roots, allCounts, selected]);
+  const pruning = !everyType && !searching && total > 0;
+  const countTypes = (nodes: TreeNode[]): number => nodes.reduce((n, x) => n + 1 + countTypes(x.children), 0);
+  const visible = useMemo(() => (pruning ? inUse : filterTree(roots, query.trim())), [pruning, inUse, roots, query]);
   const selectedSchema = (schemas.data ?? []).find((s) => s.uid === selected);
   const selectedName = selectedSchema?.name;
   const pick = (uid: string) => onSelect(uid === selected ? null : uid);
@@ -285,6 +298,12 @@ export function TypeExplorer({ appliesTo, counts, total, selected, onSelect, tit
         )}
         {searching && visible.length === 0 && (
           <p className="px-2 py-1 text-xs text-slate-400">No type matches “{query.trim()}”.</p>
+        )}
+        {!searching && total > 0 && countTypes(roots) > countTypes(inUse) && (
+          <button type="button" onClick={() => setEveryType((v) => !v)} data-testid="every-type"
+                  className="mt-1 px-2 text-xs text-sky-700 hover:underline">
+            {everyType ? "Only the types in use" : `Show every type (${countTypes(roots)})`}
+          </button>
         )}
       </div>
     </section>

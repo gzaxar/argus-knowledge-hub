@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError, workspacesApi } from "../../api/client";
+import { keyExample } from "../../lib/keyExample";
 
 const TOKENS: [string, string][] = [
   ["{WS}", "the workspace id, in capitals"],
@@ -85,6 +86,12 @@ export function WorkspaceKeys() {
             Now: <span className="font-mono">{rule.data.pattern}</span>
             {rule.data.is_default && <span className="text-slate-400"> (the default)</span>}. A first ion pump would
             be <span className="font-mono">{rule.data.example}</span>.
+          </p>
+        )}
+        {rule.data && pattern.trim() && pattern.trim() !== rule.data.pattern && (
+          <p className="text-sm text-indigo-800" data-testid="key-preview">
+            With <span className="font-mono">{pattern.trim()}</span>, once saved, a first ion pump would be{" "}
+            <span className="font-mono">{keyExample(pattern.trim(), workspaceId!)}</span>.
           </p>
         )}
         <div className="flex items-center gap-3">

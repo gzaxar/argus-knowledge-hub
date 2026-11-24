@@ -2547,6 +2547,12 @@
             },
             "title": "Files",
             "type": "array"
+          },
+          "publish": {
+            "default": true,
+            "description": "False: drafts, each to be reviewed and published",
+            "title": "Publish",
+            "type": "boolean"
           }
         },
         "required": [
@@ -3455,6 +3461,11 @@
             ],
             "title": "Pat"
           },
+          "publish": {
+            "default": true,
+            "title": "Publish",
+            "type": "boolean"
+          },
           "source": {
             "const": "confluence",
             "enum": [
@@ -3539,6 +3550,11 @@
           "pat": {
             "title": "Pat",
             "type": "string"
+          },
+          "publish": {
+            "default": true,
+            "title": "Publish",
+            "type": "boolean"
           },
           "source": {
             "const": "confluence",
@@ -4875,6 +4891,11 @@
             ],
             "title": "Pat"
           },
+          "publish": {
+            "default": true,
+            "title": "Publish",
+            "type": "boolean"
+          },
           "source": {
             "const": "dokuwiki",
             "enum": [
@@ -4919,6 +4940,11 @@
             "minLength": 8,
             "title": "Page Url",
             "type": "string"
+          },
+          "publish": {
+            "default": true,
+            "title": "Publish",
+            "type": "boolean"
           },
           "source": {
             "const": "dokuwiki",

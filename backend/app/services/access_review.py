@@ -164,8 +164,23 @@ def diff(previous: Optional[dict], current: dict) -> dict:
             "changed": sorted(k for k in set(before) & set(after) if before[k] != after[k])}
 
 
+def eligible_signers(db: Session, workspace_id: str) -> int:
+    """How many people could sign a review here: those who reach the workspace and may approve (the sign route's
+    right). A review asking more signatures than this could never be completed."""
+    from app.models.user import User
+    from app.routers.workspaces import list_member_directory
+    from app.services.permissions import has_permission
+    people = list_member_directory(workspace_id=workspace_id, db=db, can_work=None)
+    return sum(1 for p in people if (u := db.get(User, p.user_id)) is not None
+               and has_permission(db, u, workspace_id, "approve", "objects"))
+
+
 def create(db: Session, workspace_id: str, actor: str, required_signers: int = 2) -> AccessReview:
     snap = snapshot(db, workspace_id)
+    # Never more signatures than there are people here able to sign (when there are any: signers named through an
+    # API token are not counted here), never fewer than one.
+    eligible = eligible_signers(db, workspace_id)
+    required_signers = max(1, min(required_signers, eligible) if eligible else required_signers)
     previous = db.scalar(select(AccessReview).where(AccessReview.workspace_id == workspace_id)
                          .order_by(AccessReview.created_at.desc()).limit(1))
     body = json.dumps(snap, sort_keys=True, default=str)
