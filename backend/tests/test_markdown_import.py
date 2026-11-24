@@ -372,3 +372,23 @@ def test_imported_pages_are_handed_to_the_index_like_a_publication(token, monkey
     monkeypatch.setattr(knowledge_schedule, "after_document_change", lambda db, ws: asked.append(ws))
     upload(raw, [("leak.md", b"# Leak test\n\nHelium.\n")])
     assert asked == [workspace_id]
+
+
+def test_an_import_can_ask_for_drafts_to_review_instead_of_published_documents(token, monkeypatch):
+    """A team's procedures brought in from a folder can go through review: drafts, nothing current yet, nothing
+    handed to the index — and the links between the pages still go to their documents."""
+    from app.services import knowledge_schedule
+    workspace_id, raw = token
+    asked = []
+    monkeypatch.setattr(knowledge_schedule, "after_document_change", lambda db, ws: asked.append(ws))
+    archive = _zip({"wiki/a.md": b"# Leak test\n\nSee [b](b.md).\n", "wiki/b.md": b"# Bake-out\n\nDone.\n"})
+    out = upload(raw, [("wiki.zip", archive)], publish="false").json()
+    assert out["documents"] == 2 and asked == []
+    db = SessionLocal()
+    docs = {d.title: d for d in db.scalars(select(Document).where(Document.workspace_id == workspace_id))}
+    assert all(d.current_revision_uid is None for d in docs.values())
+    revs = {d.title: db.scalar(select(DocumentRevision).where(DocumentRevision.document_uid == d.uid))
+            for d in docs.values()}
+    assert {r.state for r in revs.values()} == {"draft"} and all(r.published_at is None for r in revs.values())
+    assert f"(/documents/{docs['Bake-out'].uid})" in revs["Leak test"].body_markdown
+    db.close()

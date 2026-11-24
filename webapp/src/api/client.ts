@@ -939,6 +939,7 @@ export const documentsApi = {
   importMarkdown: async (
     files: File[],
     documentTypeUid: string | null,
+    publish = true,
   ): Promise<MarkdownImportResult> => {
     const session = await loadSession();
     if (!session) throw new Error("Not signed in");
@@ -951,6 +952,7 @@ export const documentsApi = {
       form.append("files", file, path || file.name);
     }
     if (documentTypeUid) form.append("document_type_uid", documentTypeUid);
+    if (!publish) form.append("publish", "false");
     const resp = await fetch(`${session.baseUrl}/v1/documents/import`, {
       method: "POST",
       headers: authHeaders(session),

@@ -280,6 +280,7 @@ def retype_documents(
 async def import_markdown_documents(
     files: list[UploadFile] = File(description="Markdown files, resources, or a zip of both"),
     document_type_uid: Optional[str] = Form(None),
+    publish: bool = Form(True, description="False: drafts, each to be reviewed and published"),
     workspace_id: str = Depends(require_permission("create", resource="documents")),
     db: Session = Depends(get_db),
 ):
@@ -302,8 +303,8 @@ async def import_markdown_documents(
             status_code=422,
             detail="No Markdown file in the upload — add the .md files, or a zip containing them.",
         )
-    out = import_markdown(db, workspace_id, payload, document_type_uid)
-    if out.get("documents"):
+    out = import_markdown(db, workspace_id, payload, document_type_uid, publish=publish)
+    if publish and out.get("documents"):
         # Published straight away, like a publication: the index catches up so Ask ARGUS can read them.
         knowledge_schedule.after_document_change(db, workspace_id)
     return out

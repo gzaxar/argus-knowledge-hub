@@ -107,12 +107,13 @@ def create_import(
         background_tasks.add_task(
             run_confluence_import,
             job.uid, workspace_id, body.base_url, body.pat, body.space_key, body.cql,
-            body.merge_strategy, body.link_assets, body.page_url, body.include_children,
+            body.merge_strategy, body.link_assets, body.page_url, body.include_children, publish=body.publish,
         )
     elif isinstance(body, DokuwikiImportRequest):
         background_tasks.add_task(
             run_dokuwiki_import,
             job.uid, workspace_id, body.page_url, body.include_children, body.merge_strategy, body.link_assets,
+            publish=body.publish,
         )
     elif isinstance(body, Epik8sImportRequest):
         background_tasks.add_task(

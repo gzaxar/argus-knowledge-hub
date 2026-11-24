@@ -140,10 +140,10 @@ def start_job(db: Session, config: ImportConfig, identity, add_task: Callable) -
     elif config.source == "confluence":
         add_task(run_confluence_import, job.uid, ws, p.get("base_url"), pat, p.get("space_key"), p.get("cql"), merge,
                  p.get("link_assets", True), p.get("page_url"), p.get("include_children", True),
-                 auth_mode=p.get("auth_mode", "pat"), email=p.get("email", ""))
+                 auth_mode=p.get("auth_mode", "pat"), email=p.get("email", ""), publish=p.get("publish", True))
     elif config.source == "dokuwiki":
         add_task(run_dokuwiki_import, job.uid, ws, p["page_url"], p.get("include_children", True), merge,
-                 p.get("link_assets", True))
+                 p.get("link_assets", True), publish=p.get("publish", True))
     elif config.source == "epik8s":
         add_task(run_epik8s_import, job.uid, ws, p["provider"], p["repo_url"], pat, p.get("branch", "main"),
                  p.get("path", "deploy/values.yaml"), merge, p.get("create_missing_nodes", True),
@@ -224,7 +224,7 @@ def run_one(db: Session, uid: str) -> dict:
     if user is None or not resolve_permission(db, user, config.workspace_id, "create", "objects"):
         return _finish(db, config, "failed", "the person who set the schedule may no longer import here")
     try:
-        job = start_job(db, config, OidcIdentity(user=user), lambda fn, *args: fn(*args))
+        job = start_job(db, config, OidcIdentity(user=user), lambda fn, *args, **kw: fn(*args, **kw))
     except Exception as e:  # noqa: BLE001 — a run that could not start is a failed run, told as such
         db.rollback()
         config = db.get(ImportConfig, uid)

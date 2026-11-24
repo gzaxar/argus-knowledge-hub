@@ -16,12 +16,13 @@ export function MarkdownImport() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const [files, setFiles] = useState<File[]>([]);
   const [documentTypeUid, setDocumentTypeUid] = useState("");
+  const [publish, setPublish] = useState(true);
 
   const schemas = useQuery({ queryKey: ["schemas"], queryFn: schemasApi.list });
   const documentSchemas = (schemas.data ?? []).filter((s) => s.applies_to === "documents");
 
   const importMutation = useMutation({
-    mutationFn: () => documentsApi.importMarkdown(files, documentTypeUid || null),
+    mutationFn: () => documentsApi.importMarkdown(files, documentTypeUid || null, publish),
   });
 
   const markdownCount = files.filter((f) => /\.(md|markdown|mdown|zip)$/i.test(f.name)).length;
@@ -100,6 +101,8 @@ export function MarkdownImport() {
           </p>
         </div>
 
+        <PublishChoice publish={publish} onChange={setPublish} />
+
         <button
           onClick={() => importMutation.mutate()}
           disabled={markdownCount === 0 || importMutation.isPending}
@@ -140,5 +143,27 @@ export function MarkdownImport() {
         )}
       </div>
     </div>
+  );
+}
+
+/** Published as they are at the source, or drafts that go through review — for procedures, say, that become
+ *  controlled documents here. Shared by the Markdown upload and the Confluence and DokuWiki imports. */
+export function PublishChoice({ publish, onChange }: { publish: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <fieldset className="space-y-1 text-sm">
+      <legend className="font-medium text-slate-700">The documents arrive</legend>
+      <label className="flex items-start gap-2">
+        <input type="radio" name="publish" checked={publish} onChange={() => onChange(true)} className="mt-1" />
+        <span>Published, as they are at the source
+          <span className="block text-xs text-slate-500">For pages already in use: readable at once, as informative
+            documents.</span></span>
+      </label>
+      <label className="flex items-start gap-2">
+        <input type="radio" name="publish" checked={!publish} onChange={() => onChange(false)} className="mt-1" />
+        <span>As drafts to review
+          <span className="block text-xs text-slate-500">Each one is reviewed, approved and published like a document
+            written here — for procedures that must be validated first.</span></span>
+      </label>
+    </fieldset>
   );
 }

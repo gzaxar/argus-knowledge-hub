@@ -199,6 +199,7 @@ def import_markdown(
     workspace_id: str,
     files: list[tuple[str, bytes]],
     document_type_uid: Optional[str] = None,
+    publish: bool = True,
 ) -> dict:
     """Create a document per Markdown file, with its resources attached.
 
@@ -266,7 +267,8 @@ def import_markdown(
             uid=str(uuid.uuid4()),
             document_uid=document.uid,
             revision_number=1,
-            state="published",
+            # Published as it was in the folder, or a draft for review when the import asks for one.
+            state="published" if publish else "draft",
             body_markdown="",
             attributes={
                 "argus_keywords": [str(k) for k in keywords],
@@ -275,7 +277,7 @@ def import_markdown(
                 **({"argus_document_number": str(meta["document_number"])}
                    if meta.get("document_number") else {}),
             },
-            published_at=datetime.now(timezone.utc),
+            published_at=datetime.now(timezone.utc) if publish else None,
         )
         db.add(revision)
         db.flush()
@@ -316,7 +318,8 @@ def import_markdown(
                     attachments += 1
 
         revision.body_markdown, _ = resolve_links(body, base_dir, stored)
-        document.current_revision_uid = revision.uid
+        if publish:
+            document.current_revision_uid = revision.uid
         created[path] = document.uid
         revisions[path] = revision
         documents += 1

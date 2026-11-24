@@ -655,6 +655,7 @@ def run_confluence_import(
     include_children: bool = True,
     auth_mode: str = "pat",
     email: str = "",
+    publish: bool = True,
 ) -> None:
     """`page_url` imports one page (and, with `include_children`, every page under
     it) instead of a space or a CQL query; the server comes from the link when
@@ -764,7 +765,8 @@ def run_confluence_import(
                     document, code = _find_or_create_document(
                         db, workspace_id, space, page_id, title
                     )
-                    is_new = document.current_revision_uid is None
+                    is_new = db.scalar(select(DocumentRevision.uid).where(
+                        DocumentRevision.document_uid == document.uid).limit(1)) is None
                     document_by_page[page_id] = document.uid
                     if parent_id:
                         parent_of_page[page_id] = parent_id
@@ -788,10 +790,16 @@ def run_confluence_import(
                         db.get(DocumentRevision, document.current_revision_uid)
                         if document.current_revision_uid else None
                     )
+                    # The latest revision, published or a draft still waiting
+                    # for review: an unchanged page imported as a draft is not
+                    # imported again on every run.
+                    latest = db.scalar(select(DocumentRevision).where(
+                        DocumentRevision.document_uid == document.uid
+                    ).order_by(DocumentRevision.revision_number.desc()).limit(1))
                     # The page's version is what says whether anything changed.
                     # Without this check every re-import would add a revision
                     # identical to the last one.
-                    if current is not None and (current.attributes or {}).get(
+                    if latest is not None and (latest.attributes or {}).get(
                         "argus_source_version"
                     ) == version:
                         skipped += 1
@@ -800,15 +808,14 @@ def run_confluence_import(
                     revision = DocumentRevision(
                         uid=str(uuid.uuid4()),
                         document_uid=document.uid,
-                        revision_number=(current.revision_number + 1) if current else 1,
-                        # Imported pages arrive published: they are already in
-                        # use at the source, and parking them in "draft" would
-                        # hide the entire library behind a review that nobody
-                        # asked for.
-                        state="published",
+                        revision_number=(latest.revision_number + 1) if latest else 1,
+                        # Imported pages arrive published by default: they are
+                        # already in use at the source. The import can ask for
+                        # drafts instead (`publish`), each to go through review.
+                        state="published" if publish else "draft",
                         body_markdown="",
                         attributes=attributes,
-                        published_at=_parse_jira_dt((page.get("version") or {}).get("when")),
+                        published_at=_parse_jira_dt((page.get("version") or {}).get("when")) if publish else None,
                     )
                     db.add(revision)
                     db.flush()
@@ -833,10 +840,11 @@ def run_confluence_import(
                     if not revision.attributes.get("argus_summary"):
                         _note(job, seen, "summary_missing", f"page {page_id}: no introductory prose found for a summary")
 
-                    if current is not None:
-                        current.state = "superseded"
-                        current.superseded_by_uid = revision.uid
-                    document.current_revision_uid = revision.uid
+                    if publish:
+                        if current is not None:
+                            current.state = "superseded"
+                            current.superseded_by_uid = revision.uid
+                        document.current_revision_uid = revision.uid
 
                     if is_new:
                         imported += 1
@@ -913,8 +921,9 @@ def run_confluence_import(
         job.completed_at = datetime.now(timezone.utc)
         db.commit()
         # The pages are published: Ask ARGUS reads them once the index has caught up, as after any publication.
-        from app.services import knowledge_schedule
-        knowledge_schedule.after_document_change(db, job.workspace_id)
+        if publish:
+            from app.services import knowledge_schedule
+            knowledge_schedule.after_document_change(db, job.workspace_id)
     except Exception as e:
         db.rollback()
         job = db.get(ImportJob, job_uid)

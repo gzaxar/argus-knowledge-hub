@@ -40,6 +40,8 @@ class ConfluenceImportConfigParams(ConfluencePageLink):
     space_key: Optional[str] = None
     cql: Optional[str] = None
     link_assets: bool = True
+    # False: the pages arrive as drafts, each to be reviewed, approved and published like any other document.
+    publish: bool = True
     pat: Optional[str] = None  # omit on update to keep the stored secret
 
 
@@ -48,6 +50,8 @@ class DokuwikiImportConfigParams(BaseModel):
     page_url: str
     include_children: bool = True
     link_assets: bool = True
+    # False: the pages arrive as drafts, each to be reviewed, approved and published like any other document.
+    publish: bool = True
     pat: Optional[str] = None  # a public wiki: never needed, accepted for the form's sake
 
 
