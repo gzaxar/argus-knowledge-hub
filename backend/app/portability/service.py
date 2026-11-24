@@ -263,6 +263,16 @@ def create_export(db: Session, actor: str, *, mode: str, workspaces: list[str], 
     return exp
 
 
+def covers_every_workspace(db: Session, exp: PortabilityExport) -> bool:
+    """A full export, or an increment of a chain that began with one: it covers every workspace there is when it
+    runs, not the list its base had (workspaces made or deleted since)."""
+    seen = set()
+    while exp is not None and exp.mode == "incremental" and exp.id not in seen:
+        seen.add(exp.id)
+        exp = db.get(PortabilityExport, exp.base_export_id or "")
+    return exp is not None and exp.mode == "full"
+
+
 def analyse_export(db: Session, exp: PortabilityExport, actor: str, cfg: Optional[Config] = None) -> PortabilityExport:
     cfg = cfg or config()
     from app.models.workspace import Workspace
@@ -270,7 +280,8 @@ def analyse_export(db: Session, exp: PortabilityExport, actor: str, cfg: Optiona
     report("Selecting workspaces", force=True)
     move(db, exp, "analysing", actor, "analyse")
     ws = exp.workspaces
-    if exp.mode == "full" or (exp.mode == "incremental" and db.get(PortabilityExport, exp.base_export_id).mode == "full"):
+    every = covers_every_workspace(db, exp)
+    if every:
         ws = sorted(db.scalars(select(Workspace.id).where(Workspace.import_state.is_(None))))
     sc = Scope(workspaces=list(ws), watermark={})
     report("Checking classification restrictions", force=True)
@@ -286,7 +297,7 @@ def analyse_export(db: Session, exp: PortabilityExport, actor: str, cfg: Optiona
     exp.analysis = {"closure": analysis, "restriction": restriction, "estimate": estimate, "blobs": blobs,
                     "identity_profile": (exp.decisions or {}).get("identity_profile"), "ready": ready,
                     "policy": cfg.policy.describe(),
-                    "warnings": _warnings(exp, restriction, analysis, blobs)}
+                    "warnings": _warnings(exp, restriction, analysis, blobs, every)}
     move(db, exp, "awaiting_approval", actor, "analysed", {"ready": ready})
     report("Analysis complete", force=True)
     return exp
@@ -309,7 +320,8 @@ def _estimate(db: Session, sc: Scope) -> dict:
                 Attachment.workspace_id.in_(sc.workspaces))) or 0)}
 
 
-def _warnings(exp: PortabilityExport, restriction: dict, analysis: dict, blobs: dict) -> list[str]:
+def _warnings(exp: PortabilityExport, restriction: dict, analysis: dict, blobs: dict,
+              every: bool = False) -> list[str]:
     out = []
     if restriction["excluded_classes"]:
         out.append(f"restricted classes left out: {', '.join(restriction['excluded_classes'])} — the archive is "
@@ -337,7 +349,7 @@ def _warnings(exp: PortabilityExport, restriction: dict, analysis: dict, blobs: 
     if blobs.get("uninspected"):
         out.append(f"{len(blobs['uninspected'])} file(s) will travel UNINSPECTED (opaque or unreadable), labelled as "
                    "such; an importer must accept the warning")
-    if analysis.get("workspaces") and sorted(analysis["workspaces"]) != sorted(exp.workspaces) and exp.mode != "full":
+    if analysis.get("workspaces") and sorted(analysis["workspaces"]) != sorted(exp.workspaces) and not every:
         out.append(f"the closure adds workspaces: {', '.join(sorted(set(analysis['workspaces']) - set(exp.workspaces)))}")
     return out
 
