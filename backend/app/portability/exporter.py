@@ -437,15 +437,23 @@ def _generate(engine, export_id, mode, workspaces, out_dir, staging, store, sign
         head = schema_head(w)
     with at_watermark(engine) as (db, watermark):
         from app.models.workspace import Workspace
-        if mode in ("full",) or (mode == "incremental" and base_manifest.get("mode") == "full"):
+        removed_ws: list[str] = []
+        # A chain that began with every workspace goes on with every workspace there is now: one made since the
+        # base comes in whole (all its rows are past the base's watermark), and one deleted since is named in
+        # the manifest instead of failing every run of the chain on an id that no longer exists.
+        if mode in ("full",) or (mode == "incremental" and not base_manifest.get("selective")):
             workspaces = sorted(db.scalars(select(Workspace.id).where(Workspace.import_state.is_(None))))
+            if mode == "incremental":
+                removed_ws = sorted(set(base_manifest["workspaces"]) - set(workspaces))
         elif mode == "incremental":
             workspaces = list(base_manifest["workspaces"])
         if not workspaces:
             raise ExportError("nothing to export: no workspace selected")
         missing_ws = [w_ for w_ in workspaces if db.get(Workspace, w_) is None]
         if missing_ws:
-            raise ExportError(f"unknown workspaces {missing_ws}", code="not_found")
+            raise ExportError(f"unknown workspaces {missing_ws}"
+                              + (" — deleted since the base export: start the chain again from a new export"
+                                 if mode == "incremental" else ""), code="not_found")
         previous = dict(base_manifest["watermark"]["vector"]) if mode == "incremental" else {}
         if previous and set(previous) != set(SEQUENCED_TABLES):
             raise ExportError("the base export's watermark has other sequenced families: a new full "
@@ -531,6 +539,7 @@ def _generate(engine, export_id, mode, workspaces, out_dir, staging, store, sign
                   "instance_id": inst["id"], "instance_name": inst.get("name")},
         "repository": repository or {},
         "workspaces": sc.workspaces,
+        **({"workspaces_removed": removed_ws} if removed_ws else {}),
         "watermark": watermark,
         "base": ({"export_id": base_manifest["export_id"], "watermark": base_manifest["watermark"],
                   "manifest_sha256": base_manifest.get("_sha256")} if mode == "incremental" else None),
