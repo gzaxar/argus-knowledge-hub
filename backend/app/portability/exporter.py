@@ -229,6 +229,24 @@ def _attr(fam: Family, column: str) -> str:
     return column
 
 
+# Files read, then the memory they and their readers took handed back. Reading thousands of attachments in turn
+# (pypdf's objects hold reference cycles, freed late; glibc keeps freed blocks for itself) grew the API past its
+# 1Gi limit at 5,500 of 6,000 attachments, and the kill failed the analysis as "interrupted" (2026-11-24).
+RELEASE_EVERY = 25
+
+
+def release_memory() -> bool:
+    """Collect what is unreachable and ask the C allocator to return free memory to the system. True when the
+    allocator could be asked (glibc); elsewhere the collection alone is done."""
+    import ctypes
+    import gc
+    gc.collect()
+    try:
+        return bool(ctypes.CDLL("libc.so.6").malloc_trim(0) or True)
+    except (OSError, AttributeError):
+        return False
+
+
 class Blobs:
     """Every blob of an export: read, inspected, decided on, staged locally — never stored at the
     destination until the whole export has passed (`publish_to`)."""
@@ -247,6 +265,7 @@ class Blobs:
         self.needs_decision: list = []
         self.secrets: list = []
         self.excluded: list = []
+        self.opened = 0
 
     def decision(self, digest: str, status: str) -> Optional[str]:
         explicit = self.decisions.get(f"blob:{digest}") or (
@@ -277,6 +296,9 @@ class Blobs:
                 return None
             data = path.read_bytes() if path.stat().st_size <= self.limits.max_bytes else None
             name, mime = row.get("filename") or path.name, row.get("mime_type")
+            self.opened += 1
+            if self.opened % RELEASE_EVERY == 0:
+                release_memory()
         else:
             data, name, mime = bytes(value), "", None
         if data is None:

@@ -61,6 +61,11 @@ api:
     # Administrators register repositories, trusted keys and the signing key in the web app
     # (Administration → Portability → Set-up). "off": only what this file and the Secret set.
     ARGUS_PORTABILITY_UI_CONFIG: "on"
+  # As on k8sda: at 1Gi a full export's analysis was OOMKilled reading the attachments (2026-11-24), and the
+  # restart failed the step as "interrupted".
+  resources:
+    requests: {cpu: 200m, memory: 512Mi}
+    limits: {memory: 2Gi}
 web:
   nodeSelector:
     kubernetes.io/hostname: vnode-1
