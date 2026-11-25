@@ -122,7 +122,11 @@ def test_proposed_changes_wait_for_the_person_and_then_are_applied(world, monkey
     # The next turn knows what became of them.
     sent = scripted(monkeypatch, [answer("Done.")])
     client.post("/v1/ai/chat", headers=w["h"], json={"question": "Is it done?", "conversation_id": cid})
-    note = next(m["content"] for m in sent[0]["messages"] if m["role"] == "system" and "proposed earlier" in m["content"])
+    msgs = sent[0]["messages"]
+    # One system message, and first: models served by vLLM refuse "System message must be at the beginning".
+    assert [m["role"] for m in msgs].count("system") == 1 and msgs[0]["role"] == "system"
+    note = msgs[0]["content"]
+    assert "proposed earlier" in note
     assert "A1" in note and "applied" in note and station.key in note
 
 

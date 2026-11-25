@@ -378,8 +378,10 @@ function RateAnswer({ conversationId, answerIndex, initial }: {
   );
 }
 
-function AssistantTurn({ turn, actions, conversationId, answerIndex }: {
+function AssistantTurn({ turn, actions, conversationId, answerIndex, onRetry }: {
   turn: Turn; actions: AskAction[]; conversationId: string | null; answerIndex: number;
+  /** Asks the question that led to this answer again, as a new message (offered when it came back empty). */
+  onRetry?: () => void;
 }) {
   const [showThinking, setShowThinking] = useState(false);
   const links = useMemo(() => recordLinks(turn.steps), [turn.steps]);
@@ -441,6 +443,12 @@ function AssistantTurn({ turn, actions, conversationId, answerIndex }: {
           )}
           {turn.stopped === "cancelled" && <span className="text-amber-700">Stopped.</span>}
           {turn.stopped === "failed" && <span className="text-rose-600">{turn.error}</span>}
+          {onRetry && (
+            <button type="button" onClick={onRetry}
+                    className="rounded border border-slate-300 bg-white px-2 py-0.5 font-medium text-slate-700 hover:bg-slate-50">
+              Try again
+            </button>
+          )}
           <RateAnswer conversationId={conversationId} answerIndex={answerIndex} initial={turn.rating} />
         </div>
       )}
@@ -463,6 +471,7 @@ export function Ask() {
   const [files, setFiles] = useState<ChatAttachment[]>([]);
   const [reading, setReading] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
   const abort = useRef<AbortController | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   // Set while a turn is streaming into a conversation it created, so loading that conversation from the
@@ -685,7 +694,8 @@ export function Ask() {
             {loaded.isLoading && <p className="text-sm text-slate-400">Loading the conversation…</p>}
             {turns.map((t, i) =>
               t.role === "user" ? (
-                <div key={t.id} className="self-end whitespace-pre-wrap rounded-lg bg-slate-900 px-3 py-2 text-sm text-white">
+                <div key={t.id} className="flex flex-col items-end self-end">
+                <div className="whitespace-pre-wrap rounded-lg bg-slate-900 px-3 py-2 text-sm text-white">
                   {t.content}
                   {!!t.attachments?.length && (
                     <ul className="mt-1 flex flex-wrap gap-1">
@@ -697,9 +707,22 @@ export function Ask() {
                     </ul>
                   )}
                 </div>
+                {t.content && usable && !busy && (
+                  <button type="button" title="Put this question in the box below to change it and send it again"
+                          onClick={() => {
+                            setDraft(t.content);
+                            input.current?.focus();
+                          }}
+                          className="mt-0.5 rounded px-1.5 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                    Edit
+                  </button>
+                )}
+                </div>
               ) : (
                 <AssistantTurn key={t.id} turn={t} actions={actionsOf(t)} conversationId={current}
-                               answerIndex={turns.slice(0, i).filter((x) => x.role === "assistant").length} />
+                               answerIndex={turns.slice(0, i).filter((x) => x.role === "assistant").length}
+                               onRetry={!t.live && !t.content && usable && !busy && turns[i - 1]?.role === "user"
+                                        && turns[i - 1].content ? () => void send(turns[i - 1].content) : undefined} />
               ),
             )}
             <div ref={bottom} />
@@ -742,6 +765,7 @@ export function Ask() {
                      if (picked.length) void attach(picked);
                    }} />
             <textarea
+              ref={input}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
