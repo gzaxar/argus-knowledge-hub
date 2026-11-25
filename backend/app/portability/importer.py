@@ -65,7 +65,7 @@ REFERENCE_ONLY = ("identities",)              # never updated, never compared as
 # where letting an archive silently overwrite a local decision would be a real privilege question, or
 # assets/tickets/documents, which go through the fact ledger, not a plain column overwrite). "types"
 # is catalogue too but already has its own admission flow (catalogue_conflicts), not this one.
-CATALOGUE_RESOLVABLE = ("icons", "equipment_classes", "equipment_class_reviews")
+CATALOGUE_RESOLVABLE = ("icons", "equipment_classes", "equipment_class_reviews", "workspace_packages")
 EVENT_TABLES = (ClaimEvent, RevisionEvent, Decision, StatusEvent, IdentityEvent, RecordEvent, ConflictEvent)
 
 
@@ -330,7 +330,9 @@ def _missing_refs(db: Session, fam: Family, values: dict, pending: dict) -> list
 # The decision that accepts this release's rebuilt projections over the archive's (reconcile).
 PROJECTIONS_ACCEPT = "accept_rebuilt"
 
-RECONCILE_IGNORES = {"relations": {"created_at"}, "policies": {"activated_at"}}
+RECONCILE_IGNORES = {"relations": {"created_at"}, "policies": {"activated_at"},
+                     # the same package at the same version, recorded here at another moment or by another person
+                     "workspace_packages": {"installed_at", "installed_by"}}
 
 
 def _normalize_legacy_multi(attrs: object) -> object:
