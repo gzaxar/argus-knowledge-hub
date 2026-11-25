@@ -1904,3 +1904,49 @@ def test_a_person_who_signed_in_before_a_restore_is_taken_over_by_the_archives_a
         assert rossi.oidc_sub == "sub-rossi" and rossi.is_admin
         assert db.scalar(select(Membership).where(Membership.user_id == "u-rossi", Membership.workspace_id == "main"))
         assert db.scalar(select(RoleBinding).where(RoleBinding.subject_id == "u-rossi", RoleBinding.workspace_id == "main"))
+
+
+def test_a_row_nobody_changed_since_its_import_takes_the_next_export_even_when_a_rebuild_reshaped_it(dbs, env):
+    """After an import the ledger rebuilds the fields it projects and normalises an older release's multi-value
+    shape, without a person touching the record: the next export of the same origin was blocked as 'same key,
+    different content, not from this chain' on every such record. A person's change still blocks it."""
+    from sqlalchemy import update
+    from app.ledger import writer
+    src, dst = dbs(), dbs()
+    s = populate(src, env.tmp)
+    first, _ = run_export(src, env, s)
+    run_import(dst, env, first["git"]["tag"])
+    with Session(dst) as db, writer.writing(db):            # a rebuild here: content changes, the stamp does not
+        a = db.get(Asset, s.unit)
+        db.execute(update(Asset).where(Asset.uid == s.unit).values(
+            attributes={**a.attributes, "argus_source": "Rebuilt here"}, updated_at=a.updated_at))
+        db.commit()
+    with Session(src) as db:
+        ledger_service.edit_value(db, s.inv, "rossi@example.org", s.unit, "attr:argus_location", "Rack C9")
+        db.commit()
+    inc, _ = run_export(src, env, s, mode="incremental", base=first["id"])
+    run_import(dst, env, inc["git"]["tag"], root="inc")
+    with Session(dst) as db:
+        assert db.get(Asset, s.unit).attributes["argus_location"] == "Rack C9"
+
+    # A person's change here, stamped after the import, is still never overwritten.
+    with Session(dst) as db, writer.writing(db):
+        a = db.get(Asset, s.unit)
+        db.execute(update(Asset).where(Asset.uid == s.unit).values(
+            attributes={**a.attributes, "argus_location": "Changed here"}, updated_at=datetime.now(timezone.utc)))
+        db.commit()
+    with Session(src) as db:
+        ledger_service.edit_value(db, s.inv, "rossi@example.org", s.unit, "attr:argus_location", "Rack C10")
+        db.commit()
+    inc2, _ = run_export(src, env, s, mode="incremental", base=inc["id"])
+    _, report = run_import(dst, env, inc2["git"]["tag"], root="inc2", expect_ready=False)
+    assert not report["ready"] and any(b["key"] == s.unit for b in report["blocking"])
+
+
+def test_an_older_release_multi_value_shape_on_a_record_is_not_a_divergence(dbs, env):
+    from app.portability import importer
+    from app.portability.families import FAMILIES
+    assets = next(f for f in FAMILIES if f.name == "assets")
+    row = {"uid": "x", "attributes": {"zones": [["FP"]]}}
+    assert importer._reconciles(assets, object(), row, {"uid": "x", "attributes": {"zones": ["FP"]}})
+    assert not importer._reconciles(assets, object(), row, {"uid": "x", "attributes": {"zones": ["FI"]}})
