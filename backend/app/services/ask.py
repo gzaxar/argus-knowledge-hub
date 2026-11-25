@@ -283,8 +283,11 @@ def ask_events(db: Session, workspace_id: str, endpoint: Endpoint, question: str
     """
     from app.services import ask_actions
     system = SYSTEM + (ask_actions.SYSTEM if proposer else "") + (VOICE if voice else "") + _today()
+    # One system message, first: several models' chat templates (served by vLLM and the like) refuse a system
+    # message anywhere else, so what became of earlier proposals travels in it rather than after the history.
+    if context:
+        system += "\n\n" + context
     messages: list[dict[str, Any]] = [{"role": "system", "content": system}, *_history(history),
-                                      *([{"role": "system", "content": context}] if context else []),
                                       {"role": "user", "content": question}]
     tools = _tool_specs() + (ask_actions.tool_specs() if proposer else [])
     steps: list[dict] = []
