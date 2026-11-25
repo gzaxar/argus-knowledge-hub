@@ -1,4 +1,4 @@
-"""Source-derived summaries and a literal page-title heading; no AI rewriting."""
+"""Literal page title and optional whole-page abstract; document wording stays intact."""
 import re
 from html import unescape
 from html.parser import HTMLParser
@@ -78,11 +78,18 @@ def title_heading(title: str, body: str) -> str:
     return f"# {literal}\n\n{beginning}"
 
 
-def prepare_presentation(title: str, body: str, attributes: dict, storage: str) -> tuple[str, dict]:
+def prepare_presentation(title: str, body: str, attributes: dict, storage: str, *,
+                         summary_factory=None) -> tuple[str, dict]:
     attrs = dict(attributes or {})
-    # A manually written summary takes precedence over automatic extraction.
+    # The native importer always supplies an AI factory. Its empty/failure result
+    # stays empty; it never falls back to copied opening prose. The no-factory
+    # path is retained only for older standalone title/file repair callers.
     if not str(attrs.get("argus_summary") or "").strip():
-        summary = source_summary(storage)
+        summary = summary_factory(title, body) if summary_factory is not None else source_summary(storage)
         if summary:
             attrs["argus_summary"] = summary
+            if summary_factory is not None:
+                from app.services.document_abstract import VERSION, summary_signature
+                attrs["argus_summary_method"] = VERSION
+                attrs["argus_summary_generated_sha256"] = summary_signature(summary)
     return title_heading(title, body), attrs

@@ -31,6 +31,8 @@ from app.models.import_job import ImportJob
 from app.services.document_types import ensure_document_kinds, type_uid
 from app.services.confluence_file_macros import FILE_VIEWER_MACROS, render_file_macro
 from app.services.confluence_presentation import prepare_presentation
+from app.services.document_abstract import preserve_reviewed_summary, workspace_abstract
+from app.services.confluence_excerpts import authenticated_resolver, missing_excerpt
 from app.services.confluence_contents import collect_headings, render_contents, toc_placeholder
 from app.services.confluence_visuals import panel_placeholder, render_emoticons, render_panel_wrappers
 from app.services.confluence_tables import protect_complex_tables, restore_complex_tables, table_contents_slots, source_note_panel
@@ -136,7 +138,9 @@ def _convert_macro(match: re.Match, files: Optional[dict] = None, toc_slots: Opt
         return panel_placeholder(name, body, block, visual_slots)
     if name == "toc":
         return toc_placeholder(block, toc_slots) if toc_slots is not None else ""
-    if name in ("children", "pagetree", "excerpt-include"):
+    if name == "excerpt-include":
+        return missing_excerpt(block)
+    if name in ("children", "pagetree"):
         # Navigation furniture that means nothing outside Confluence.
         return ""
     if body:
@@ -175,7 +179,7 @@ def _confluence_macros_to_html(storage: str, files: Optional[dict] = None,
         html = converted
     html = re.sub(
         r'<ac:structured-macro[^>]*ac:name="([^"]+)"[^>]*/>',
-        lambda m: _convert_macro(m, files, toc_slots) if m.group(1).lower() == "toc" else "", html,
+        lambda m: _convert_macro(m, files, toc_slots) if m.group(1).lower() in {"toc", "excerpt-include"} else "", html,
     )
 
     # A link to another page keeps its title; the URL is resolved by
@@ -668,6 +672,7 @@ def run_confluence_import(
 
     seen: set = set()
     user_name_cache: dict = {}
+    excerpt_resolvers: dict = {}
 
     try:
         link = parse_page_link(page_url) if page_url else None
@@ -828,17 +833,29 @@ def run_confluence_import(
                         document.uid, revision.uid, page_id, job, seen,
                     )
                     attachments_copied += copied
+                    if base_url not in excerpt_resolvers:
+                        excerpt_resolvers[base_url] = authenticated_resolver(
+                            session, base_url, confluence_json,
+                            on_warning=lambda reason: _note(job, seen, "excerpt_missing", reason),
+                        )
+                    body = excerpt_resolvers[base_url].resolve(body, space or "", page_id)
                     user_names = resolve_user_names(
                         body, session, base_url, user_name_cache, confluence_json,
                         on_warning=lambda message: _record_diagnostic(
                             job, seen, "user_lookup_failed", f"page {page_id}: {message}"),
                     )
                     markdown = storage_to_markdown(body, files, title=document.title, user_names=user_names)
+                    attributes = preserve_reviewed_summary(
+                        (latest.attributes or {}) if latest is not None else {}, attributes,
+                    )
                     revision.body_markdown, revision.attributes = prepare_presentation(
                         title, markdown, attributes, body,
+                        summary_factory=lambda page_title, page_body: workspace_abstract(
+                            db, workspace_id, page_title, page_body, document.confidentiality,
+                            on_warning=lambda reason: _note(
+                                job, seen, "summary_missing", f"page {page_id}: {reason}"),
+                        ),
                     )
-                    if not revision.attributes.get("argus_summary"):
-                        _note(job, seen, "summary_missing", f"page {page_id}: no introductory prose found for a summary")
 
                     if publish:
                         if current is not None:
