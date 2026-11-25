@@ -1024,26 +1024,39 @@ def pyioc_check(values: dict, notes: Optional[list] = None, apply_defaults: bool
 
 
 def ioc_scaffold_pyioc(db, workspace_id: str, description: Any) -> dict:
-    """A complete Python IOC project from a description of the device, as `pyioc init --from` writes it."""
+    """A device IOC project or a box from a description, as `pyioc init --from` writes it.
+
+    Any PV with ``source: driver`` (the default) or a ``transport`` makes a device IOC in its own
+    image; otherwise the description is a box: links, expressions and rules run by iocmng in the
+    shared epik8s-softioc-mng image as a ``softiocs:`` entry.
+    """
     try:
         from epik8s_pyioc import tools as pyioc_tools
         from epik8s_pyioc.scaffold import EXAMPLE, ScaffoldError, render_project
         from epik8s_pyioc.spec import parse_spec
     except ImportError as e:
         return {"error": f"epik8s-pyioc is not installed in the hub ({e})"}
+    try:
+        from epik8s_pyioc.scaffold import EXAMPLE_BOX
+    except ImportError:     # epik8s-pyioc before 0.3: device IOCs only
+        EXAMPLE_BOX = None
+    examples = {"example": EXAMPLE, **({"example_box": EXAMPLE_BOX} if EXAMPLE_BOX else {})}
     if isinstance(description, str):
         try:
             description = yaml.safe_load(description) or {}
         except yaml.YAMLError as e:
-            return {"error": f"The description is not YAML: {e}", "example": EXAMPLE}
+            return {"error": f"The description is not YAML: {e}", **examples}
     try:
         project = render_project(description)
     except ScaffoldError as e:
-        return {"error": "The description cannot become a project.", "errors": e.errors, "example": EXAMPLE}
+        return {"error": "The description cannot become a project.", "errors": e.errors, **examples}
     d = project["description"]
+    if project.get("kind") == "box":
+        return _scaffold_box(project, d)
     spec = parse_spec(yaml.safe_load(project["files"][f"src/{d['package']}/pyioc.yaml"]))
     existing = _find_pyioc(d["name"])
     return {
+        "kind": "device",
         "files": project["files"],
         "self_check": project["self_check"],
         "already_exists": {"name": existing["name"], "repository": (existing.get("repository") or {}).get("url")}
@@ -1062,5 +1075,37 @@ def ioc_scaffold_pyioc(db, workspace_id: str, description: Any) -> dict:
             "Add the iocDefaults block and an entry (devtype, iocprefix, a devices list) to the beamline "
             "values.yaml; check it with ioc_render, then sync the ArgoCD application.",
             "Add the repository to IOC_CATALOG_PYIOCS of infn-epics-ioc, so the catalogue knows the IOC.",
+        ],
+    }
+
+
+def _scaffold_box(project: dict, d: dict) -> dict:
+    """A box: a config.yaml folder for the beamline repository, deployed as a softiocs: entry."""
+    files = project["files"]
+    start = files.get("start.sh.j2", "")
+    module = re.search(r"--module (\S+)", start)
+    class_name = re.search(r"--class-name (\S+)", start)
+    entry = {
+        "name": d["name"],
+        "iocprefix": f"BEAMLINE:{d['devgroup'].upper()}:{re.sub(r'[^A-Z0-9]', '', d['name'].upper())}",
+        "devgroup": d["devgroup"],
+        "module": module.group(1) if module else "iocmng.declarative",
+        "className": class_name.group(1) if class_name else "DeclarativeTask",
+        "description": d["description"],
+        "gitRepoConfig": {"url": "<the beamline repository>", "path": f"config/softiocs/{d['name']}",
+                          "branch": "main"},
+    }
+    return {
+        "kind": "box",
+        "files": files,
+        "self_check": project["self_check"],
+        "softiocs_entry": yaml.safe_dump({"softiocs": [entry]}, sort_keys=False),
+        "steps": [
+            f"Put these files in the beamline repository under config/softiocs/{d['name']}/.",
+            "pip install 'iocmng' pytest && pytest tests: a stub IOC serves the linked PVs and the box must "
+            "follow them; fill in RULE_CASES in tests/test_box.py to test each rule.",
+            "Add the softiocs entry to the beamline values.yaml (set iocprefix and the repository URL); the "
+            "box runs in the shared epik8s-softioc-mng image, which must carry iocmng 2.8 or later.",
+            "Commit, then sync the ArgoCD application.",
         ],
     }

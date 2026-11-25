@@ -1353,26 +1353,33 @@ TOOLS += [
     },
     {
         "name": "ioc_scaffold_pyioc",
-        "description": "Write a complete Python IOC project (epik8s-pyioc) from a description of the device: "
-                       "pyioc.yaml, a caproto IOC (one PV group per device, Connected/LastError, polling and "
-                       "reconnection, enum and array handling Phoebus accepts), a simulator and a TCP or device "
-                       "driver to complete, Channel Access tests, Dockerfile, a CI publishing to ghcr.io on tags, "
-                       "the example entry and the iocDefaults block, with a self-check. The same generator as "
-                       "`pyioc init --from`. Returns text; it writes nothing. Ask for the device's PVs (name, "
-                       "type, access) and how it is reached first; a description that cannot become a project "
-                       "comes back with every problem and an example.",
+        "description": "Write a Python IOC project or a software box (epik8s-pyioc, running on iocmng/"
+                       "pythonSoftIOC, CA and PVA) from a description where each PV says where its value comes "
+                       "from. With a driver PV (the default source) or a transport: a device IOC in its own image "
+                       "(pyioc.yaml, config.yaml of PVs/expressions/rules, an iocmng task per device with "
+                       "Connected/LastError, a TCP or device driver to complete, Channel Access tests, Dockerfile, "
+                       "CI publishing to ghcr.io on tags, the example entry and the iocDefaults block). Without: a "
+                       "box, logic over existing PVs (config.yaml, start.sh.j2, tests against a stub IOC, the "
+                       "softiocs: entry) run in the shared epik8s-softioc-mng image. The same generator as "
+                       "`pyioc init --from`, with a self-check. Returns text; it writes nothing. Ask for the PVs "
+                       "(name, type, access, source) and, for a device, how it is reached first; a description "
+                       "that cannot become a project comes back with every problem and examples.",
         "handler": ioc.ioc_scaffold_pyioc,
         "inputSchema": {
             "type": "object",
             "properties": {
                 "description": {
                     "type": "object",
-                    "description": "name (the devtype, lower case), description, devgroup, image, transport "
-                                   "(tcp|none), default_port, multiple (a devices list, default true), parameters "
-                                   "and device_parameters (pyioc.yaml parameter definitions: type, default, min, "
-                                   "max, unit, choices, description), pvs: [{name, type (float|int|bool|enum|"
-                                   "string|waveform), access (ro|rw|cmd), unit, precision, choices, length "
-                                   "(waveform), limits [lo, hi], default, description}].",
+                    "description": "name (devtype or box name, lower case), description, devgroup, image, "
+                                   "transport (tcp|none, device only), default_port, multiple (a devices list, "
+                                   "default true), mode (continuous|reactive), interval, parameters (device: "
+                                   "pyioc.yaml parameter definitions; box: name -> value), device_parameters, "
+                                   "pvs: [{name, type (float|int|bool|enum|string|waveform), access (ro|rw|cmd), "
+                                   "source (driver|soft|{link: PV, mode: monitor|poll}|{expr: '...'}), unit, "
+                                   "precision, choices, length (waveform), limits [lo, hi], default, buffer_size, "
+                                   "latch, alarm_on (MAJOR|MINOR), description}], rules: [{id, condition, "
+                                   "tolerance, message, message_pv, outputs {soft PV: value}, actuators "
+                                   "{link PV: value}}], rule_defaults, python (box: add a Python class).",
                 },
             },
             "required": ["description"],
