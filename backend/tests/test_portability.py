@@ -1950,3 +1950,24 @@ def test_an_older_release_multi_value_shape_on_a_record_is_not_a_divergence(dbs,
     row = {"uid": "x", "attributes": {"zones": [["FP"]]}}
     assert importer._reconciles(assets, object(), row, {"uid": "x", "attributes": {"zones": ["FP"]}})
     assert not importer._reconciles(assets, object(), row, {"uid": "x", "attributes": {"zones": ["FI"]}})
+
+
+def test_a_workspaces_packages_travel_so_it_shows_the_same_pages(dbs, env):
+    """k8sda had the beam model's documents and values from the cloud, but not the accelerator package its
+    workspace had there: the Beam model page (and what else a package turns on) stayed hidden."""
+    from app.models.package import WorkspacePackage
+    from app.packages.install import capabilities as workspace_capabilities
+    src, dst = dbs(), dbs()
+    s = populate(src, env.tmp)
+    with Session(src) as db:
+        db.add(WorkspacePackage(workspace_id=s.ws, package_id="accelerator", version="2.3.0", checksum="c" * 64,
+                                options={"scope": "all"}, installed_by="rossi@example.org"))
+        db.commit()
+    view, manifest = run_export(src, env, s)
+    assert manifest["families"]["workspace_packages"]["rows"] >= 1
+    run_import(dst, env, view["git"]["tag"])
+    with Session(dst) as db:
+        row = db.scalar(select(WorkspacePackage).where(WorkspacePackage.workspace_id == s.ws,
+                                                       WorkspacePackage.package_id == "accelerator"))
+        assert row is not None and row.version == "2.3.0"
+        assert workspace_capabilities(db, s.ws)["features"]["beam_model"]
