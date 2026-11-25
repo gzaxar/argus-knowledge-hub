@@ -144,7 +144,7 @@ class _Copier:
 def seed(active: Session, stage: Session, plan, archive_refs: dict) -> dict:
     """Copy into staging the active state an import is reconciled against. `archive_refs` maps a
     table to the primary keys the archive's rows refer to (from `importer.references`)."""
-    from app.models.portability import PortabilityChainLink, PortabilityRowMap, PortabilityTagSeen
+    from app.models.portability import PortabilityChainLink, PortabilityImport, PortabilityRowMap, PortabilityTagSeen
     from app.portability.families import FAMILIES, Scope
     c = _Copier(active, stage)
     present = [w for w in plan.workspaces if active.execute(
@@ -172,6 +172,10 @@ def seed(active: Session, stage: Session, plan, archive_refs: dict) -> dict:
         col = model.origin if hasattr(model, "origin") else None
         if col is not None:
             c.query(model.__tablename__, col == plan.origin)
+    # The earlier imports those row maps name: when each was made tells a row nobody changed since from local work.
+    c.query(PortabilityImport.__tablename__, PortabilityImport.id.in_(
+        select(PortabilityRowMap.import_id).where(PortabilityRowMap.origin == plan.origin,
+                                                  PortabilityRowMap.import_id != plan.import_id).distinct()))
     stage.flush()
     _sync_sequences(stage)
     return {"rows_copied": c.copied, "workspaces": present}
