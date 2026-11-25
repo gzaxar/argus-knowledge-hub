@@ -8,9 +8,9 @@ hosts:
 
 images:
   backend:
-    tag: "1.35.150"
+    tag: "1.35.151"
   web:
-    tag: "1.35.150"
+    tag: "1.35.151"
   postgres: ghcr.io/infn-argus/argus-knowledge-hub-postgres:1.35.24
 
 # Kept when the release is removed; on the node the pod first runs on.
