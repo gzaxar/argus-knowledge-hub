@@ -51,7 +51,8 @@ from app.ledger.writer import writing
 from app.models.attachment import file_sha256
 from app.models.ledger import (ClaimEvent, Conflict, ConflictEvent, Decision, IdentityBinding, IdentityEvent,
                                RecordEvent, RevisionEvent, SourceRevision, StatusEvent, StreamHead)
-from app.models.portability import PortabilityChainLink, PortabilityEvent, PortabilityOriginRecord, PortabilityRowMap
+from app.models.portability import (PortabilityChainLink, PortabilityEvent, PortabilityImport, PortabilityOriginRecord,
+                                    PortabilityRowMap)
 from app.models.workspace import Workspace
 from app.portability import chunks
 from app.portability.families import BY_NAME, FAMILIES, ORIGIN_CHAIN, Family, Scope, from_json, to_json
@@ -64,7 +65,7 @@ REFERENCE_ONLY = ("identities",)              # never updated, never compared as
 # where letting an archive silently overwrite a local decision would be a real privilege question, or
 # assets/tickets/documents, which go through the fact ledger, not a plain column overwrite). "types"
 # is catalogue too but already has its own admission flow (catalogue_conflicts), not this one.
-CATALOGUE_RESOLVABLE = ("icons", "equipment_classes", "equipment_class_reviews")
+CATALOGUE_RESOLVABLE = ("icons", "equipment_classes", "equipment_class_reviews", "workspace_packages")
 EVENT_TABLES = (ClaimEvent, RevisionEvent, Decision, StatusEvent, IdentityEvent, RecordEvent, ConflictEvent)
 
 
@@ -222,6 +223,20 @@ def _digest(row: dict) -> str:
     return hashlib.sha256(json.dumps(row, sort_keys=True, default=str).encode()).hexdigest()
 
 
+def _same_origin(db: Session, fam: Family, local, rm, form: dict) -> bool:
+    """This row came from the archive's origin and nobody here changed it since: a later export of that origin may
+    update it. Its content as the import left it says so; failing that, its own timestamp — what the import left
+    can change afterwards with nobody touching it (the ledger rebuilding the fields it projects, an older release's
+    multi-value shape normalised), and a person's change stamps the row after the import that brought it."""
+    if rm is None:
+        return False
+    if rm.content_sha256 == _digest(form):
+        return True
+    stamp = getattr(local, "updated_at", None) or getattr(local, "created_at", None)
+    imp = db.get(PortabilityImport, rm.import_id)
+    return stamp is not None and imp is not None and imp.created_at is not None and stamp <= imp.created_at
+
+
 def find_local(db: Session, plan: Plan, fam: Family, key: str, row: dict):
     """The local row that holds this archive row, if any."""
     rm = db.scalar(select(PortabilityRowMap).where(PortabilityRowMap.origin == plan.origin,
@@ -315,7 +330,9 @@ def _missing_refs(db: Session, fam: Family, values: dict, pending: dict) -> list
 # The decision that accepts this release's rebuilt projections over the archive's (reconcile).
 PROJECTIONS_ACCEPT = "accept_rebuilt"
 
-RECONCILE_IGNORES = {"relations": {"created_at"}, "policies": {"activated_at"}}
+RECONCILE_IGNORES = {"relations": {"created_at"}, "policies": {"activated_at"},
+                     # the same package at the same version, recorded here at another moment or by another person
+                     "workspace_packages": {"installed_at", "installed_by"}}
 
 
 def _normalize_legacy_multi(attrs: object) -> object:
@@ -429,15 +446,14 @@ def dry_run(db: Session, plan: Plan) -> dict:
                     candidates += _candidates(db, row)
                 continue
             form = as_archived(archive_form(plan, fam, local, key), row)
-            if form == row or _installation_defined(fam, local, row) or \
-                    (fam.name in RECONCILE_IGNORES and _reconciles(fam, local, row, form)):
+            if form == row or _installation_defined(fam, local, row) or _reconciles(fam, local, row, form):
                 counts[fam.name]["identical"] += 1
                 continue
             if fam.name in REFERENCE_ONLY:
                 counts[fam.name]["known_identity"] += 1
                 identity_notes.append({"user": key, "note": "known here with other details; kept as is"})
                 continue
-            if rm is not None and rm.content_sha256 == _digest(form):
+            if _same_origin(db, fam, local, rm, form):
                 counts[fam.name]["update_same_origin"] += 1
                 continue
             counts[fam.name]["divergent"] += 1
@@ -672,12 +688,12 @@ def _load_chunk(db: Session, plan: Plan, fam: Family, chunk: dict, pending: dict
         if local is not None:
             form = as_archived(archive_form(plan, fam, local, key), row)
             if form == row or fam.name in REFERENCE_ONLY or _installation_defined(fam, local, row) or \
-                    (fam.name in RECONCILE_IGNORES and _reconciles(fam, local, row, form)):
+                    _reconciles(fam, local, row, form):
                 if rm is None:
                     _remember(db, plan, fam, key, _local_key(fam, local), False, form)
                 report["identical"] += 1
                 continue
-            if rm is None or rm.content_sha256 != _digest(form):
+            if not _same_origin(db, fam, local, rm, form):
                 resolution = (plan.decisions.get("catalogue_conflicts") or {}).get(f"{fam.name}:{key}") \
                     if fam.name in CATALOGUE_RESOLVABLE else None
                 if resolution == "keep_local":

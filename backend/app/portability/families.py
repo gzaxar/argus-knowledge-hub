@@ -53,6 +53,7 @@ from app.models.membership import Membership
 from app.models.role import Role, RoleBinding, SiteGroupRoleBinding
 from app.models.schema import Schema
 from app.models.service_portal import ServiceOffering, ServiceRequestType, SiteServiceSettings, SupportRequest
+from app.models.package import WorkspacePackage
 from app.models.user import User
 from app.models.workflow import TicketWatcher, Workflow
 from app.models.workspace import Workspace, SiteAdministrator
@@ -281,6 +282,9 @@ FAMILIES: list[Family] = [
     Family("site_administrators", "access", SiteAdministrator, ("site_id", "user_id"),
            lambda db, sc: select(SiteAdministrator).where(SiteAdministrator.site_id.in_(sc.workspaces))
                .order_by(SiteAdministrator.id), exclude=("id",), replace_set=True),
+    # Which template packages each workspace has (and so which pages it shows: equipment, map, beam model…).
+    Family("workspace_packages", "access", WorkspacePackage, ("workspace_id", "package_id"),
+           _ws(WorkspacePackage, (WorkspacePackage.workspace_id, WorkspacePackage.package_id)), exclude=("id",)),
     # Shared value lists (statuses, priorities…) per workspace.
     Family("global_values", "access", GlobalValue, ("uid",), _ws(GlobalValue, (GlobalValue.uid,))),
     Family("memberships", "access", Membership, ("workspace_id", "user_id"), _ws(Membership, (Membership.id,)),

@@ -8,6 +8,7 @@ generator `pyioc init` uses.
 import textwrap
 
 import pytest
+import yaml
 
 from app.ioc_engineer import catalog, tools
 from app.services import mcp_tools
@@ -130,6 +131,25 @@ def test_scaffold_a_python_ioc(pyioc_catalog):
     assert "start: pyioc-run" in out["ioc_defaults"] and out["already_exists"] is None
     bad = tools.ioc_scaffold_pyioc(None, "", "name: Bad Name\npvs: []\n")
     assert bad["errors"] and bad["example"]["name"] == "tpg366"
+
+
+def test_scaffold_a_box(pyioc_catalog):
+    scaffold = pytest.importorskip("epik8s_pyioc.scaffold")
+    if not hasattr(scaffold, "EXAMPLE_BOX"):
+        pytest.skip("epik8s-pyioc before 0.3 generates device IOCs only")
+    out = tools.ioc_scaffold_pyioc(None, "", {
+        "name": "vac-leak", "devgroup": "vac", "parameters": {"ratio": 3},
+        "pvs": [{"name": "P1", "type": "float", "source": {"link": "SPARC:VAC:GAUGE01:Pressure"}},
+                {"name": "P2", "type": "float", "source": {"link": "SPARC:VAC:GAUGE02:Pressure"}},
+                {"name": "Leak", "type": "bool", "source": "soft", "latch": True}],
+        "rules": [{"id": "LEAK", "condition": "P2 > 0 and P1 / P2 > ratio", "outputs": {"Leak": 1}}]})
+    assert out["kind"] == "box" and out["self_check"]["ok"], out
+    assert {"config.yaml", "start.sh.j2", "tests/test_box.py"} <= set(out["files"])
+    entry = yaml.safe_load(out["softiocs_entry"])["softiocs"][0]
+    assert entry["module"] == "iocmng.declarative" and entry["className"] == "DeclarativeTask"
+    assert entry["gitRepoConfig"]["path"] == "config/softiocs/vac-leak"
+    bad = tools.ioc_scaffold_pyioc(None, "", {"name": "vac-leak", "pvs": [{"name": "X", "source": "magic"}]})
+    assert bad["errors"] and bad["example_box"]["name"] == "vac-leak"
 
 
 def test_the_guide_serves_the_python_ioc_documentation(pyioc_catalog):

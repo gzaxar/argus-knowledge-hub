@@ -356,3 +356,30 @@ def test_a_run_that_cannot_see_an_attachment_says_so_and_publishes_once_the_file
     hidden.rename(path)
     again = _run(src, env, sid)
     assert again["outcome"] == "published" and again["export"] == out["export"], again["message"]
+
+
+def test_a_chain_of_every_workspace_follows_the_workspaces_made_and_deleted_since(dbs, env):
+    """An increment on an increment of a full export covered the base's list: a workspace deleted since failed every
+    run ('unknown workspaces'), and one made since was never exported."""
+    from app.models.workspace import Workspace
+    src = dbs()
+    s = populate(src, env.tmp)
+    with Session(src) as db:
+        db.add(Workspace(id="old-layout", name="Old layout"))
+        db.commit()
+    full, _ = run_export(src, env, s, mode="full")
+    _edit(src, s, "Rack D4")
+    inc, _ = run_export(src, env, s, mode="incremental", base=full["id"])
+    with Session(src) as db:
+        db.delete(db.get(Workspace, "old-layout"))
+        db.add(Workspace(id="new-layout", name="New layout"))
+        db.commit()
+    _edit(src, s, "Rack D5")
+    second, manifest = run_export(src, env, s, mode="incremental", base=inc["id"])
+    assert second["state"] == "published"
+    assert "new-layout" in manifest["workspaces"] and "old-layout" not in manifest["workspaces"]
+    assert manifest["workspaces_removed"] == ["old-layout"]
+    with Session(src) as db:
+        assert service.covers_every_workspace(db, db.get(PortabilityExport, second["id"]))
+        analysed = db.get(PortabilityExport, second["id"]).analysis
+    assert not any("closure adds" in w for w in analysed["warnings"])

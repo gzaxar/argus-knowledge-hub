@@ -11,7 +11,7 @@ pyyaml==6.0.2
 jinja2==3.1.6
 # Python IOCs (app/ioc_engineer): pyioc.yaml specs, entry checks and the project generator,
 # the same library the IOCs start with, so answers and pods agree.
-epik8s-pyioc @ https://github.com/infn-epics/epik8s-pyioc/archive/refs/tags/v0.2.1.tar.gz
+epik8s-pyioc @ https://github.com/infn-epics/epik8s-pyioc/archive/refs/tags/v0.3.0.tar.gz
 pyjwt[crypto]==2.9.0
 cryptography==43.0.1
 ldap3==2.9.1
