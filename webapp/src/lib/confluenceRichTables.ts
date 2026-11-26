@@ -3,7 +3,7 @@ export type RichTableStyle = {
   backgroundColor?: string; color?: string; width?: string;
   textAlign?: "left" | "center" | "right" | "justify";
   verticalAlign?: "top" | "middle" | "bottom";
-  fontWeight?: "bold"; fontStyle?: "italic"; textDecoration?: "underline"; tableLayout?: "fixed";
+  fontWeight?: "bold"; fontStyle?: "italic"; textDecoration?: "underline"; tableLayout?: "fixed" | "auto";
 };
 export function richTableClass(className: string | undefined, token: string): boolean {
   return (className ?? "").split(/\s+/).includes(token);
@@ -38,6 +38,12 @@ export function confluenceRichStyle(className?: string): RichTableStyle | undefi
     if (token === "argus-rich-underline") style.textDecoration = "underline";
     if (token === "argus-rich-fixed") style.tableLayout = "fixed";
   }
+  // Explicit presentation mode: width follows the table's content. This is
+  // opt-in so existing port grids and other responsive imports keep their layout.
+  if (richTableClass(className, "argus-confluence-natural-table")) {
+    style.width = "auto";
+    style.tableLayout = "auto";
+  }
   return style;
 }
 
@@ -70,12 +76,16 @@ function relativeWidth(node: RichNode, percent?: number): void {
  * Run after sanitization so this never enables source CSS or unsafe HTML. */
 export function fitConfluenceRichTables() {
   return (tree: RichNode): void => {
-    function visit(node: RichNode, rich = false, basis?: number): void {
+    function visit(node: RichNode, rich = false, basis?: number, natural = false): void {
       if (node.tagName === "table") {
         const classes = nodeClass(node);
         rich = richTableClass(classes, "argus-confluence-rich-node") && richTableClass(classes, "argus-confluence-rich-table");
         basis = undefined;
-        if (rich) {
+        natural = rich && richTableClass(classes, "argus-confluence-natural-table");
+        if (natural) {
+          node.properties = { ...node.properties, className: classes.split(/\s+/).filter((token) => token !== "argus-rich-fixed") };
+          relativeWidth(node);
+        } else if (rich) {
           basis = pixelWidth(node);
           const columns = (node.children ?? []).filter((child) => child.tagName === "colgroup")
             .flatMap((group) => (group.children ?? []).filter((child) => child.tagName === "col"));
@@ -89,9 +99,10 @@ export function fitConfluenceRichTables() {
         }
       } else if (rich && ["col", "colgroup", "td", "th"].includes(node.tagName ?? "")) {
         const width = pixelWidth(node);
-        if (width !== undefined) relativeWidth(node, basis ? Math.min(100, width / basis * 100) : undefined);
+        if (natural) relativeWidth(node);
+        else if (width !== undefined) relativeWidth(node, basis ? Math.min(100, width / basis * 100) : undefined);
       }
-      for (const child of node.children ?? []) visit(child, rich, basis);
+      for (const child of node.children ?? []) visit(child, rich, basis, natural);
     }
     visit(tree);
   };
