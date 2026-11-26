@@ -185,3 +185,28 @@ def test_a_vague_fix_of_a_record_placed_only_outdoors_still_goes_to_review(world
     obs = client.post(f"/v1/assets/{world['far']}/location/observations", headers=world["headers"],
                       json={"latitude": 41.8, "longitude": 12.6, "accuracy_m": 25}).json()
     assert obs["status"] == "pending"
+
+
+def test_a_record_without_a_position_is_shown_where_the_place_it_is_in_stands(world):
+    """plk8sdactrl003 is in Edificio 6b, on a plan not placed on the map: with no position of its own, its Location
+    shows where Edificio 6b is — said to be that, never saved as its own; a position of its own takes over."""
+    h = world["headers"]
+    building, room = _unit(world, "BLD-D", "Building"), _unit(world, "ROOM-D1", "Area")
+    node = _unit(world, "NODE-D1", "Ion Pump")
+    db = SessionLocal()
+    spatial.set_location(db, db.get(Asset, building), spatial.point(41.8230, 12.6740), actor="test")
+    db.commit()
+    db.close()
+    assert client.put(f"/v1/assets/{room}/indoors", headers=h, json={"place_uid": building}).status_code == 200
+    assert client.put(f"/v1/assets/{node}/indoors", headers=h, json={"place_uid": room}).status_code == 200
+    view = client.get(f"/v1/assets/{node}/location", headers=h).json()
+    assert view["location"] is None
+    d = view["derived"]
+    assert d["from"] == "place" and d["via"]["key"] == "BLD-D"
+    assert (d["latitude"], d["longitude"]) == (pytest.approx(41.8230), pytest.approx(12.6740))
+    db = SessionLocal()
+    spatial.set_location(db, db.get(Asset, node), spatial.point(41.8231, 12.6741), actor="test")
+    db.commit()
+    db.close()
+    view = client.get(f"/v1/assets/{node}/location", headers=h).json()
+    assert view["location"]["latitude"] == pytest.approx(41.8231) and view["derived"] is None

@@ -370,6 +370,12 @@ def require_permission(action: Action, resource: Resource = "objects"):
             raise HTTPException(status_code=400, detail="Missing X-Workspace-Id header")
         if not resolve_permission(db, identity.user, x_workspace_id, action, resource):
             raise HTTPException(status_code=403, detail="Not permitted")
+        # An administrator is permitted everywhere, even in a workspace deleted since the page chose it: said
+        # here, rather than failing later on what refers to it (a chat's conversation, mid-answer).
+        from app.models.workspace import Workspace
+        if db.get(Workspace, x_workspace_id) is None:
+            raise HTTPException(status_code=404, detail=f"The workspace {x_workspace_id} no longer exists: "
+                                                        "choose another one")
         return x_workspace_id
 
     return dependency
