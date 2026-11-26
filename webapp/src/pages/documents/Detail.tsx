@@ -344,7 +344,7 @@ export function DocumentDetail() {
   const doc = document.data;
 
   return (
-    <div className="max-w-4xl">
+    <div className="min-w-0 w-full max-w-4xl">
       {/* On a phone the actions go under the title instead of squeezing it and running off the edge. */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -585,7 +585,8 @@ export function DocumentDetail() {
               />
             </div>
           ) : typeof viewed.attributes?.argus_summary === "string" && viewed.attributes.argus_summary.trim() ? (
-            <p className="mt-4 rounded border-l-4 border-indigo-200 bg-indigo-50/50 px-3 py-2 text-sm text-slate-700">
+            <p className="mt-4 rounded border-l-4 border-indigo-200 bg-indigo-50/50 px-3 py-2 text-sm text-slate-700"
+              style={{ overflowWrap: "anywhere", wordBreak: "normal" }}>
               {viewed.attributes.argus_summary}
             </p>
           ) : null}
