@@ -1,7 +1,7 @@
 ---
 title: Documents and the knowledge base
 summary: Browsing, writing and importing procedures, manuals and reports; document hierarchy, previews, revisions, review, publication, confidentiality, sharing and retention.
-keywords: [view selector, view icons, last view, remembered view, browser preference, list tree board, confluence tables, nested tables, merged cells, native confluence import, document types, hierarchy, folder, preview, subsystem, WP, unfiled, full table, list, tree, board, kanban, review board, bacheca, document, documents, logbook, log, running log, shift log, days, rework, raw text, notes, email, e-mail, transcript, minutes, template, templates, variant, rielabora, testo grezzo, procedure, manual, report, knowledge base, revision, draft, submit, review, reject, approval, approve, publish, new revision, edit, retire, confidentiality, riservato, shared, global, retention, markdown, controlled document, attachment, related by meaning, export, pdf, print, download, markdown file, .md, save as pdf]
+keywords: [long string, text overflow, wrap long URLs, inline code, Summary field, Confluence AI summary, included excerpts, view selector, view icons, last view, remembered view, browser preference, list tree board, confluence tables, nested tables, merged cells, native confluence import, document types, hierarchy, folder, preview, subsystem, WP, unfiled, full table, list, tree, board, kanban, review board, bacheca, document, documents, logbook, log, running log, shift log, days, rework, raw text, notes, email, e-mail, transcript, minutes, template, templates, variant, rielabora, testo grezzo, procedure, manual, report, knowledge base, revision, draft, submit, review, reject, approval, approve, publish, new revision, edit, retire, confidentiality, riservato, shared, global, retention, markdown, controlled document, attachment, related by meaning, export, pdf, print, download, markdown file, .md, save as pdf]
 order: 80
 ---
 
@@ -133,6 +133,30 @@ whole words; very wide tables can still scroll. See *Importing data* for source 
 and re-import limits. An unchanged source version can be skipped: re-running an import does not necessarily
 repair an older flattened table. Corrections to an existing published document go through a new editable
 draft and the normal review workflow; do not delete the document to refresh its layout.
+
+## Summary above the document body
+
+**Summary** describes what the document covers; it does not replace its body. On the full document page,
+it can be edited when the revision is **Draft**. Change an existing published document through a new draft,
+then review and publish as required. Do not replace technical instructions with their summary.
+
+The native Confluence importer can generate a short whole-page Summary when it imports a new page or a
+changed source version, using the effective checked AI settings. Manual summaries are retained. An empty
+Summary can mean AI is unavailable, generation failed, or the page has too little readable text; check the
+import warnings. Older source-extracted summaries and already-current pages are not automatically rewritten.
+See *Importing data* for Summary prerequisites and included-excerpt limits.
+
+## Long text stays inside the document
+
+Long identifiers and URLs without spaces can wrap inside normal paragraphs, lists, links and inline code.
+Wrapping is visual: ARGUS does not insert spaces into the saved value or shorten it. Fenced code blocks
+keep their formatting and scroll horizontally. Supported rich Confluence table cells retain whole-word
+wrapping, and wide tables scroll within their own box.
+
+This renderer change can improve an existing document without re-importing it. If text still crosses the
+frame, confirm that the updated frontend is running; a backend-only update does not change browser layout.
+An excerpt missing from the saved body is a conversion problem and cannot be recovered by a display fix.
+Use synthetic examples when reporting layout problems; do not publish access credentials or tokens.
 
 ## Import a web page folder
 
@@ -307,6 +331,9 @@ For example, ask **Ask ARGUS**:
 - "Where is the native Confluence import now that its New document panel is gone?"
 - "Why does an imported nested table contain HTML in its Markdown body?"
 - "Will re-running the import repair a table from an unchanged source page?"
+- "Why is the Summary missing after a Confluence import?"
+- "How do I import an excerpt included from another Confluence page?"
+- "Why does a long identifier run outside the document frame?"
 
 These questions ask for guidance. To change placement, edit a draft, run an import or submit a revision,
 use the corresponding ARGUS controls with the required permissions; asking for an explanation does not

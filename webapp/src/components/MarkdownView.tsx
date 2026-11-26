@@ -58,7 +58,10 @@ export function MarkdownView({
   }
 
   return (
-    <div className={`markdown-body text-sm leading-relaxed text-slate-700 ${className}`}>
+    // Allow long identifiers and URLs to wrap without changing their text.
+    // Rich table cells override this with whole-word wrapping; pre blocks scroll.
+    <div className={`markdown-body min-w-0 max-w-full text-sm leading-relaxed text-slate-700 ${className}`}
+      style={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere", wordBreak: "normal" }}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], fitConfluenceRichTables, headingAnchors]}
@@ -162,7 +165,8 @@ export function MarkdownView({
           // A fenced block without a language arrives as "inline" code: inside a block it must not take the
           // inline span's light background, or every line of a MAD-X deck shows as a pale bar.
           pre: ({ children }) => (
-            <pre className="my-3 overflow-x-auto rounded bg-slate-900 p-3 text-slate-100 [&_code]:rounded-none [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-xs [&_code]:text-slate-100">
+            <pre className="my-3 max-w-full overflow-x-auto rounded bg-slate-900 p-3 text-slate-100 [&_code]:rounded-none [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-xs [&_code]:text-slate-100"
+              style={{ minWidth: 0, maxWidth: "100%", overflowWrap: "normal", wordBreak: "normal", whiteSpace: "pre" }}>
               {children}
             </pre>
           ),
@@ -178,7 +182,7 @@ export function MarkdownView({
             // auto layout can redistribute space while respecting those words.
             const table = <table className={`w-full border-collapse text-sm ${tableClass ?? ""}`} style={nested ? { ...confluenceRichStyle(tableClass), tableLayout: "auto" } : confluenceRichStyle(tableClass)}>{children}</table>;
             if (nested) return table;
-            return <div className="my-3 overflow-x-auto rounded border border-slate-200">{table}</div>;
+            return <div className="my-3 min-w-0 max-w-full overflow-x-auto rounded border border-slate-200">{table}</div>;
           },
           thead: ({ children, className: richClass }) => <thead className={richTableClass(richClass, "argus-confluence-rich-node") ? richClass : "bg-slate-50"} style={confluenceRichStyle(richClass)}>{children}</thead>,
           tbody: ({ children, className: richClass }) => <tbody className={richClass} style={confluenceRichStyle(richClass)}>{children}</tbody>,
