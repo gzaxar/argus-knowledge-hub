@@ -176,13 +176,14 @@ export function MarkdownView({
           table: ({ children, className: tableClass }) => {
             const rich = richTableClass(tableClass, "argus-confluence-rich-table");
             const nested = rich && richTableClass(tableClass, "argus-confluence-nested-table");
+            const natural = rich && richTableClass(tableClass, "argus-confluence-natural-table");
             // Nested port grids need content-based minimum column widths. A fixed
             // layout ignores later-row labels such as "Available" and lets whole
             // words paint outside their cells. Percentage columns remain hints;
             // auto layout can redistribute space while respecting those words.
-            const table = <table className={`w-full border-collapse text-sm ${tableClass ?? ""}`} style={nested ? { ...confluenceRichStyle(tableClass), tableLayout: "auto" } : confluenceRichStyle(tableClass)}>{children}</table>;
+            const table = <table className={`${natural ? "w-auto" : "w-full"} border-collapse text-sm ${tableClass ?? ""}`} style={nested ? { ...confluenceRichStyle(tableClass), tableLayout: "auto" } : confluenceRichStyle(tableClass)}>{children}</table>;
             if (nested) return table;
-            return <div className="my-3 min-w-0 max-w-full overflow-x-auto rounded border border-slate-200">{table}</div>;
+            return <div className={`my-3 min-w-0 max-w-full overflow-x-auto rounded border border-slate-200 ${natural ? "mx-auto w-fit [&_p]:my-0" : ""}`}>{table}</div>;
           },
           thead: ({ children, className: richClass }) => <thead className={richTableClass(richClass, "argus-confluence-rich-node") ? richClass : "bg-slate-50"} style={confluenceRichStyle(richClass)}>{children}</thead>,
           tbody: ({ children, className: richClass }) => <tbody className={richClass} style={confluenceRichStyle(richClass)}>{children}</tbody>,

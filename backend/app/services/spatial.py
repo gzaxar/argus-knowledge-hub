@@ -434,6 +434,47 @@ def extents(db: Session, asset_filter, limit: int = 20000):
     return list(db.execute(q))
 
 
+def derived_position(db: Session, asset: Asset, may=None, depth: int = 8) -> Optional[dict]:
+    """Where a record without a position of its own stands, from where it is said to be: its point on a floor plan
+    placed on the map (the plan's own transform: as exact as the plan's fit), else the position, or the outline, of
+    the nearest place it is in that has one (Edificio 6b, else Edificio 6, else the laboratory). None when nothing
+    on the way is on the map. `may(asset)` says whether the person may see a place on the way; the walk stops there."""
+    from app.models.indoor import FloorPlan
+    from app.services import indoor
+    shown = indoor.spot(db, asset.uid, may)
+    if shown is not None:
+        plan = db.get(FloorPlan, shown["plan"]["uid"])
+        if plan is not None and plan.transform:
+            lon, lat = indoor.to_lonlat(plan.transform, shown["x"], shown["y"])
+            return {"from": "plan", "latitude": round(lat, 7), "longitude": round(lon, 7),
+                    "accuracy_m": plan.residual_m, "plan": {"uid": plan.uid, "name": plan.name},
+                    "via": shown.get("via"), "outline": None}
+    node, seen = asset, {asset.uid}
+    for _ in range(depth):
+        nxt = indoor._container_of(db, node)
+        if not nxt or nxt in seen:
+            return None
+        rec = db.get(Asset, nxt)
+        if rec is None or rec.deleted_at is not None or (may is not None and not may(rec)):
+            return None
+        seen.add(rec.uid)
+        via = {"uid": rec.uid, "key": rec.key, "name": rec.name, "type": rec.type}
+        point = current(db, rec.uid)
+        outline = current(db, rec.uid, "outline")
+        if point is not None:
+            lat, lon = lat_lon(point.geometry)
+            return {"from": "place", "latitude": lat, "longitude": lon, "accuracy_m": point.accuracy_m,
+                    "plan": None, "via": via, "outline": geojson(outline.geometry) if outline is not None else None}
+        if outline is not None:
+            import json
+            inside = db.scalar(select(func.ST_AsGeoJSON(func.ST_PointOnSurface(_geom(geojson(outline.geometry))))))
+            lat, lon = lat_lon(json.loads(inside)) if inside else lat_lon(outline.geometry)
+            return {"from": "place", "latitude": lat, "longitude": lon, "accuracy_m": None, "plan": None,
+                    "via": via, "outline": geojson(outline.geometry)}
+        node = rec
+    return None
+
+
 def feature_out(f: SpatialFeature, db: Optional[Session] = None) -> dict:
     """A feature as the API gives it; a point's latitude and longitude, a shape's measures (given a database)."""
     point_ = f.geometry_type == "Point"
