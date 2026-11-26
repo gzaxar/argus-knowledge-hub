@@ -1,7 +1,7 @@
 ---
 title: Importing data
-summary: Bringing equipment, tickets and documents in from EPIK8s, Jira, Confluence, DokuWiki, Git and Markdown; re-running imports, by hand or on a schedule; mapping imported records.
-keywords: [nested tables, merged cells, rich tables, table colours, table colors, horizontal scroll, word wrapping, native import, confluence cloud, confluence contents, table of contents, section links, document owner, document status, table images, emoji, panel colours, confluence authentication, source metadata, source version, file viewer, missing attachment, imported parent, published import, dokuwiki, wiki, wiki.infn.it, namespace, schedule, scheduled, nightly, every day, every week, run by itself, confluence page link, share link, short link, prerequisite, missing package, install the catalogue, import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
+summary: Importing equipment, tickets and documents; Confluence whole-page summaries and included excerpts, source checks, re-import limits, schedules and mapping.
+keywords: [Confluence summary, automatic summary, whole-page summary, summary_missing, ai_endpoint_unavailable, excerpt-include, included excerpt, excerpt_missing, nested tables, merged cells, rich tables, table colours, table colors, horizontal scroll, word wrapping, native import, confluence cloud, confluence contents, table of contents, section links, document owner, document status, table images, emoji, panel colours, confluence authentication, source metadata, source version, file viewer, missing attachment, imported parent, published import, dokuwiki, wiki, wiki.infn.it, namespace, schedule, scheduled, nightly, every day, every week, run by itself, confluence page link, share link, short link, prerequisite, missing package, install the catalogue, import, imports, epik8s, values.yaml, jira, insight, confluence, git, markdown, re-run, merge strategy, mapping, catalogue mapping, channels, hardware, infer elements]
 order: 50
 ---
 
@@ -208,6 +208,50 @@ file attachments and **Import a web page folder** remain available for their own
   remote emoji, avatars and application-specific macros are not recreated. Unsupported styling and active
   content are removed.
 
+## Generate a Summary during a Confluence import
+
+For a new page or a changed source version, the native importer asks the configured AI for a short Summary
+in the document's language, based on its complete converted text: paragraphs, lists, table text and later
+sections. It aims for two or three short sentences about purpose and scope. The Summary is separate from
+the original body and appears above it; read and check both. This does not rewrite the imported instructions.
+
+Before importing, configure the workspace's **AI endpoint**, or the installation's shared settings in
+**Administration → AI**. Enable AI features, save and press **Check endpoint**. The effective settings must
+pass the check. Use an endpoint approved for the content; confidential documents need the workspace's
+explicit permission and that permission is not inherited. See *AI settings* for model choices and checks.
+
+Long pages are read in sections and their notes combined. Pictures and attached files are not read for
+this Summary. Pages with too little readable text or beyond the supported size limit can have no Summary.
+If the endpoint is unavailable or the reply is invalid, the page can still import: Summary stays empty and
+`summary_missing` appears in the run's warnings. `ai_endpoint_unavailable` means the effective AI settings
+are missing, disabled or have not passed their last check. Do not treat successful import as successful
+summary generation, and do not expect copied opening paragraphs as a fallback.
+
+A manually written Summary is retained on a changed-source import. An unchanged automatically generated
+Summary can be regenerated for that new source version; editing it makes it a manual Summary. Older
+summaries without generation history, including old opening-text excerpts, are retained conservatively.
+Enabling AI does not fill missing summaries in existing revisions. An unchanged source version is still
+skipped; correct an existing document through an editable draft and the normal review workflow.
+
+## Include an excerpt from another Confluence page
+
+A Confluence **Insert Excerpt** (`excerpt-include`) can refer to a named **Excerpt** on another page. The
+importer reads that source with the same Confluence account and inserts only the requested excerpt at its
+original position. An unnamed reference selects an unnamed excerpt. It does not import the entire source
+page as another document. The source title and excerpt name are shown unless the source requests no frame.
+The included text is available to the Summary generator too.
+
+The source account must be able to read the referenced page and space. A missing or inaccessible page,
+missing or ambiguous excerpt name, circular reference or supported-limit failure leaves a visible
+missing-excerpt reference and an `excerpt_missing` warning. Included excerpts with their own images or
+attachments currently also use that explicit fallback; their files are not copied by this feature. Check
+such content at the source instead of assuming it was retained.
+
+Changing only the referenced excerpt does not bypass the receiving page's source-version check. Installing
+this fix does not restore excerpts already discarded from saved revisions. For an existing document, give
+an administrator the source page, excerpt name, document code and affected revision; use an editable draft
+for a reviewed correction rather than deleting and re-importing the document.
+
 ## Check imported Confluence content and files
 
 1. Open a representative imported page in **Documents**, then **Open full document** if you need its complete
@@ -215,8 +259,9 @@ file attachments and **Import a web page folder** remain available for their own
 2. Check its title, actual document type, body, state and revision. The importer records the source page ID,
    link, space, version, author, update time and labels where the source provides them. The browser shows
    source-space information and **From Confluence** when available.
-3. Check the summary against the body. A summary is introductory text, not a replacement for the complete
-   source. A page with no introductory prose can have no summary; read the import's warnings.
+3. Check the Summary against the complete body, including later sections. It should describe the page's
+   purpose and scope. If it is missing, check `summary_missing` and the effective AI settings; an old imported
+   revision is not updated merely by enabling AI.
 4. Follow the contents links where present and compare the Document owner and Document status fields with
    the source. Distinguish the source's status text from the ARGUS revision state.
 5. Open a sample image inside a table, an image outside tables and a linked PDF or other attachment, where
@@ -225,7 +270,8 @@ file attachments and **Import a web page folder** remain available for their own
 6. For a nested or coloured table, compare the inner grid, merged cells, panel text and colours with the
    source. Check that complete words remain readable and that horizontal scrolling, if needed, exposes all
    columns. The Markdown editor can show HTML for these tables; inspect the rendered preview as well.
-7. Check the run report for user-lookup, attachment-list, download, size-limit and conversion warnings. A page
+7. Check included excerpts against their source and read `excerpt_missing` warnings.
+8. Check the run report for summary, user-lookup, attachment-list, download, size-limit and conversion warnings. A page
    can import while a field or file needs attention. Do not infer that every source file was copied from the
    job's completion alone.
 

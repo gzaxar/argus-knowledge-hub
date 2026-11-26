@@ -1,7 +1,7 @@
 ---
 title: AI settings
 summary: Connecting an AI endpoint, choosing models, the model for structured work and each model's settings, the output-token limit, keeping the knowledge index up to date automatically, and evaluating models for guided entry.
-keywords: [ai, ai endpoint, structured model, model settings, temperature, json mode, time limit, minimax, installation, default, inherit, shared, re-ranker, reranker, rerank, llm, model, embedding, vision, speech, transcription, whisper, token limit, output-token limit, reasoning model, qwen, index, knowledge index, automatic, schedule, reindex, evaluation, golden dataset, profile, candidate, activate, troubleshoot]
+keywords: [Confluence summary AI, ai_endpoint_unavailable, model not served, no rerank route, ai, ai endpoint, structured model, model settings, temperature, json mode, time limit, minimax, installation, default, inherit, shared, re-ranker, reranker, rerank, llm, model, embedding, vision, speech, transcription, whisper, token limit, output-token limit, reasoning model, qwen, index, knowledge index, automatic, schedule, reindex, evaluation, golden dataset, profile, candidate, activate, troubleshoot]
 order: 120
 ---
 
@@ -35,6 +35,24 @@ itself.
    reasoning model (Qwen, DeepSeek…) no room to answer.
 5. Tick **Offer AI features in this workspace**, save, then press **Check endpoint**: features turn on only once the
    check passes.
+
+## Check the settings used for Confluence summaries
+
+The native Confluence import needs effective AI settings that are enabled and have passed **Check endpoint**.
+Changing and saving settings requires another check. A shared installation endpoint is used only by a
+workspace without settings of its own; a disabled or unchecked workspace override is not replaced silently
+by the shared default. The workspace's **AI endpoint** page shows which settings apply.
+
+Use exact model IDs offered by the endpoint. **Model** and **Model for structured work** are text-generating
+models; **Embedding model** must be an embedding model. Leave optional fields blank when their services are
+not provided. A model appearing in the list does not prove its task route works: for example, a re-ranker
+also needs a working `/rerank` route. If that route is unavailable, clear **Re-ranker model**, save and check
+again. Embeddings and re-ranking are not needed to write the imported Summary.
+
+The summary generator uses the effective configuration's **Model for structured work**, falling back to its
+**Model** when none is set, and its per-model settings. A successful endpoint check confirms availability;
+a real import still needs a valid generation response. Check `summary_missing` in the run report if the
+Summary stays empty. Configuring AI now does not backfill already-imported pages.
 
 ## Per-model settings
 
