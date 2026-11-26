@@ -2474,6 +2474,17 @@ export interface AssetLocationView {
   location: PlacedFeature | null;
   route: PlacedFeature | null;
   outline: PlacedFeature | null;
+  /** Without a position of its own: where it stands by what it is in — its point on a floor plan placed on the
+   *  map ("plan"), else the position or outline of the nearest place it is in that has one ("place"). */
+  derived?: {
+    from: "plan" | "place";
+    latitude: number;
+    longitude: number;
+    accuracy_m: number | null;
+    plan: { uid: string; name: string } | null;
+    via: { uid: string; key: string; name: string; type: string } | null;
+    outline: GeoGeometry | null;
+  } | null;
   history: PlacedFeature[];
   observations: LocationObservation[];
 }

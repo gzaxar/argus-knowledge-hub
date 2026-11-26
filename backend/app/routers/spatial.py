@@ -88,6 +88,11 @@ def _when(value: Optional[str]):
 
 # --------------------------------------------------------------------------- one record
 
+def _viewer(db: Session, identity, workspace_id: str):
+    from app.routers.indoor import _viewer as viewer
+    return viewer(db, identity, workspace_id)
+
+
 @router.get("/assets/{uid}/location")
 def get_location(uid: str, workspace_id: str = Depends(require_permission("read")), grants=Depends(get_grants),
                  identity=Depends(get_identity), db: Session = Depends(get_db)):
@@ -103,6 +108,9 @@ def get_location(uid: str, workspace_id: str = Depends(require_permission("read"
     return {"uid": uid, "locatable": locatable, "map_layer": layer, "hidden": False,
             "may_set": locatable and asset.workspace_id == workspace_id and _may_modify(db, identity, workspace_id),
             "location": spatial.feature_out(approved) if approved else None,
+            # Without a position of its own: where it stands by what it is in (its point on a plan placed on the
+            # map, else the place's position or outline) — shown on the map as that, never saved as its own.
+            "derived": None if approved else spatial.derived_position(db, asset, _viewer(db, identity, workspace_id)),
             "route": spatial.feature_out(shapes["route"], db) if shapes["route"] else None,
             "outline": spatial.feature_out(shapes["outline"], db) if shapes["outline"] else None,
             "history": [spatial.feature_out(f) for f in spatial.history(db, uid)],

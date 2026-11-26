@@ -91,7 +91,10 @@ export function LocationCard({ uid, editable }: { uid: string; editable: boolean
   const here = l.location;
   const pending = l.observations.filter((o) => o.status === "pending");
   const shapeDraft = draft && draft.kind !== "position" ? draft : null;
+  // No position of its own: shown where what it is in stands (its point on a plan placed on the map, or its place).
+  const derived = !here ? l.derived ?? null : null;
   const fit = [here, l.route, l.outline].flatMap((f) => (f ? pointsOf(f.geometry) : []));
+  if (derived && !fit.length) fit.push(...(derived.outline ? pointsOf(derived.outline) : [[derived.latitude, derived.longitude] as LatLng]));
   const minimum = shapeDraft ? (shapeDraft.kind === "route" ? 2 : 3) : 0;
   const startShape = (kind: "route" | "outline") => {
     const f = kind === "outline" ? l.outline : null;
@@ -127,6 +130,11 @@ export function LocationCard({ uid, editable }: { uid: string; editable: boolean
               {l.outline && <GeoShape geometry={l.outline.geometry} style={STYLE.outline} />}
               {l.route && <GeoShape geometry={l.route.geometry} style={STYLE.route} />}
               {here && <GeoShape geometry={here.geometry} style={STYLE.position} />}
+              {derived?.outline && <GeoShape geometry={derived.outline} style={{ color: "#2563eb", weight: 1, dashArray: "4", fillOpacity: 0.08 }} />}
+              {derived && (
+                <CircleMarker center={[derived.latitude, derived.longitude]} radius={7}
+                              pathOptions={{ color: "#2563eb", weight: 2, dashArray: "3", fillColor: "#93c5fd", fillOpacity: 0.6 }} />
+              )}
               {pending.map((o) => (
                 <CircleMarker key={o.id} center={[o.latitude, o.longitude]} radius={6}
                               pathOptions={{ color: "#f59e0b", dashArray: "3", fillOpacity: 0.2 }} />
@@ -155,6 +163,17 @@ export function LocationCard({ uid, editable }: { uid: string; editable: boolean
                   {here.accuracy_m != null && <span className="text-slate-500"> ±{Math.round(here.accuracy_m)} m</span>}
                   <span className="block text-xs text-slate-500">{SOURCE(here)}</span>
                 </p>
+              ) : derived ? (
+                <p>
+                  <span className="font-mono">{derived.latitude.toFixed(6)}, {derived.longitude.toFixed(6)}</span>
+                  {derived.accuracy_m != null && <span className="text-slate-500"> ±{Math.round(derived.accuracy_m)} m</span>}
+                  <span className="block text-xs text-slate-500">
+                    {derived.from === "plan"
+                      ? <>from its point on the plan {derived.plan?.name}{derived.via && <> (where its <Link className="text-indigo-700 hover:underline" to={`/assets/${derived.via.uid}`}>{derived.via.name}</Link> is)</>}</>
+                      : <>where <Link className="text-indigo-700 hover:underline" to={`/assets/${derived.via!.uid}`}>{derived.via!.name}</Link> is</>}
+                    {" "}— not a position of its own
+                  </span>
+                </p>
               ) : <p className="text-slate-500">None yet.</p>}
             </div>
             {l.route && (
@@ -176,8 +195,9 @@ export function LocationCard({ uid, editable }: { uid: string; editable: boolean
             )}
             {editable && !draft && (
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setDraft({ kind: "position", lat: here?.latitude != null ? String(here.latitude) : "",
-                                                                 lon: here?.longitude != null ? String(here.longitude) : "", acc: "" })}
+                <button type="button" onClick={() => setDraft({ kind: "position",
+                                                                 lat: here?.latitude != null ? String(here.latitude) : derived ? String(derived.latitude) : "",
+                                                                 lon: here?.longitude != null ? String(here.longitude) : derived ? String(derived.longitude) : "", acc: "" })}
                         className="rounded border border-slate-300 px-3 py-1 text-xs hover:bg-slate-50">
                   {here ? "Move it" : "Set its position"}
                 </button>
